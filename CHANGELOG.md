@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.7.0] – 2026-10-19
+
 ### Hinzugefügt
 - ⇧↩ führt den Code-Block aus (zusätzlich zu ⌘↩), neue Code-Blöcke bekommen sofort den Cursor.
 - Tastenkürzel für Werkzeuge: ⌃C Code-Block, ⌃T Numbers-Tabelle, ⌃D Zeichnung, ⌃L Checkliste, ⌃W Webseite, ⌃I Datei/Bild/PDF, ⌃G Image Playground, ⌃U Link, ⌃J KI-Chat, ⌃R Writing Tools, ⌃⇧R alle Code-Blöcke ausführen. In einem laufenden Code-Block stoppt ⌃C die Ausführung.
