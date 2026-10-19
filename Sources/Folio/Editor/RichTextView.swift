@@ -473,6 +473,11 @@ struct RichTextView: NSViewRepresentable {
         tv.isIncrementalSearchingEnabled = true
         tv.usesFontPanel = true
         tv.usesInspectorBar = false
+        if #available(macOS 15.0, *) {
+            // Apple Intelligence Writing Tools: rewrite, proofread, summarize, lists and tables.
+            tv.writingToolsBehavior = .complete
+            tv.allowedWritingToolsResultOptions = [.plainText, .richText, .list, .table]
+        }
         if #available(macOS 14.0, *) { tv.inlinePredictionType = theme.settings.systemPredictions ? .yes : .no }
         tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
         tv.delegate = context.coordinator

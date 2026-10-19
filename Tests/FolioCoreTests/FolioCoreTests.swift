@@ -123,3 +123,27 @@ final class ServerDetectorTests: XCTestCase {
         XCTAssertTrue(result.cancelled)
     }
 }
+
+final class CodeStyleTests: XCTestCase {
+    func testReindentBraces() {
+        let input = "func a() {\nif x {\nprint(1)   \n}\n}"
+        XCTAssertEqual(CodeStyle.reindent(code: input, language: "swift"), "func a() {\n    if x {\n        print(1)\n    }\n}")
+        XCTAssertEqual(CodeStyle.reindent(code: "function f() {\nreturn \"{\";\n}", language: "javascript"), "function f() {\n  return \"{\";\n}")
+    }
+
+    func testPythonTabsBecomeSpaces() {
+        XCTAssertEqual(CodeStyle.reindent(code: "def f():\n\treturn 1  ", language: "python"), "def f():\n    return 1")
+    }
+
+    func testFencesAndReindent() {
+        XCTAssertEqual(CodeStyle.stripFences("```python\nx = 1\n```\n"), "x = 1")
+        XCTAssertEqual(CodeStyle.reindent("a\n  b\n    c", baseIndent: "\t"), "a\n\t  b\n\t    c")
+        XCTAssertEqual(CodeStyle.relativeToFirstLine("    else:\n        return 1"), "else:\n    return 1")
+    }
+
+    func testGofmtIfInstalled() throws {
+        guard CodeFormatter.available(for: Languages.spec(for: "go")) != nil else { throw XCTSkip("kein gofmt") }
+        let out = try CodeFormatter.format("package main\nfunc main(){\nx:=1\n_=x}", language: Languages.spec(for: "go"))
+        XCTAssertTrue(out.contains("\tx := 1"))
+    }
+}

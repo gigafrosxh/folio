@@ -84,6 +84,7 @@ struct FormatToolbar: View {
             .frame(width: 34)
 
             plain("link", "Link hinzufügen (⌘K)", actions.addLink)
+            plain("apple.writing.tools", "Writing Tools: Umschreiben, Korrekturlesen, Zusammenfassen") { f.showWritingTools() }
 
             sep
             Menu {

@@ -6,7 +6,11 @@ final class CodeTextView: NSTextView {
     var onHeightChange: ((CGFloat) -> Void)?
     var onRun: (() -> Void)?
     var onFocus: (() -> Void)?
+    var onFormat: (() -> Void)?
     var indentUnit = "    "
+    var language = "plain"
+    var predictionsEnabled: () -> Bool = { false }
+    var ghostColor: NSColor = .tertiaryLabelColor
 
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
         guard let lm = layoutManager, let tc = textContainer else { return 20 }
@@ -22,7 +26,9 @@ final class CodeTextView: NSTextView {
         var h = lm.usedRect(for: tc).height
         if lm.extraLineFragmentTextContainer != nil { h = max(h, lm.extraLineFragmentRect.maxY) }
         let lineHeight = (font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)).boundingRectForFont.height
-        return ceil(max(h, lineHeight) + textContainerInset.height * 2)
+        // Room for the extra lines of a multi-line suggestion.
+        let ghostLines = CGFloat(max((suggestion?.components(separatedBy: "\n").count ?? 1) - 1, 0))
+        return ceil(max(h, lineHeight) + ghostLines * lm.defaultLineHeight(for: font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)) + textContainerInset.height * 2)
     }
 
     func reportHeight() { onHeightChange?(contentHeight(forWidth: bounds.width)) }
@@ -44,25 +50,134 @@ final class CodeTextView: NSTextView {
         return ok
     }
 
+    override func resignFirstResponder() -> Bool {
+        clearSuggestion()
+        return super.resignFirstResponder()
+    }
+
     /// Focusing via accessibility (VoiceOver, automation) must move the real keyboard focus here too.
     override func setAccessibilityFocused(_ focused: Bool) {
         super.setAccessibilityFocused(focused)
         if focused, window?.firstResponder !== self { window?.makeFirstResponder(self) }
     }
 
-    override func insertNewline(_ sender: Any?) {
-        let ns = string as NSString
+    // MARK: Helpers
+
+    private var ns: NSString { string as NSString }
+    private func char(at i: Int) -> Character? {
+        guard i >= 0, i < ns.length else { return nil }
+        return Character(ns.substring(with: NSRange(location: i, length: 1)))
+    }
+    private var currentLineIndent: String {
         let loc = selectedRange().location
         let para = ns.paragraphRange(for: NSRange(location: loc, length: 0))
-        let before = ns.substring(with: NSRange(location: para.location, length: loc - para.location))
-        var indent = String(before.prefix { $0 == " " || $0 == "\t" })
+        return String(ns.substring(with: para).prefix { $0 == " " || $0 == "\t" })
+    }
+    private var textBeforeCaretOnLine: String {
+        let loc = selectedRange().location
+        let para = ns.paragraphRange(for: NSRange(location: loc, length: 0))
+        return ns.substring(with: NSRange(location: para.location, length: loc - para.location))
+    }
+
+    // MARK: Auto-formatting while typing
+
+    /// Closes brackets and quotes, steps over closers that are already there, wraps a selection in a pair
+    /// and pulls a closing bracket typed on an empty line back to the matching indentation.
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        guard let s = (string as? String) ?? (string as? NSAttributedString)?.string, s.count == 1, let ch = s.first,
+              replacementRange.location == NSNotFound || replacementRange == selectedRange() else {
+            super.insertText(string, replacementRange: replacementRange)
+            return
+        }
+        let sel = selectedRange()
+        let next = char(at: sel.location)
+        let prev = char(at: sel.location - 1)
+
+        if sel.length == 0, next == ch, ")]}\"'`".contains(ch) {
+            setSelectedRange(NSRange(location: sel.location + 1, length: 0))
+            return
+        }
+        if let close = CodeStyle.pairs[ch] {
+            let isQuote = ch == close
+            let quoteAllowed = !isQuote || ((prev.map { !$0.isLetter && !$0.isNumber } ?? true)
+                && (ch != "'" || CodeStyle.autoClosesSingleQuote(language)))
+            if sel.length > 0, quoteAllowed {
+                let inner = ns.substring(with: sel)
+                super.insertText(String(ch) + inner + String(close), replacementRange: sel)
+                setSelectedRange(NSRange(location: sel.location + 1, length: (inner as NSString).length))
+                return
+            }
+            let nextAllowsPair = next.map { $0.isWhitespace || ")]},;:".contains($0) } ?? true
+            if quoteAllowed && nextAllowsPair {
+                super.insertText(String(ch) + String(close), replacementRange: replacementRange)
+                setSelectedRange(NSRange(location: selectedRange().location - 1, length: 0))
+                return
+            }
+        }
+        if "}])".contains(ch), sel.length == 0, textBeforeCaretOnLine.allSatisfy({ $0 == " " || $0 == "\t" }),
+           !textBeforeCaretOnLine.isEmpty {
+            // Dedent one level before the closer.
+            let loc = sel.location
+            let lineStart = loc - (textBeforeCaretOnLine as NSString).length
+            let newIndent = String(textBeforeCaretOnLine.dropLast(min(indentUnit.count, textBeforeCaretOnLine.count)))
+            super.insertText(newIndent + String(ch), replacementRange: NSRange(location: lineStart, length: loc - lineStart))
+            return
+        }
+        super.insertText(string, replacementRange: replacementRange)
+    }
+
+    override func deleteBackward(_ sender: Any?) {
+        let sel = selectedRange()
+        if sel.length == 0, let prev = char(at: sel.location - 1), let next = char(at: sel.location),
+           CodeStyle.pairs[prev] == next {
+            // Remove an empty pair in one go.
+            let range = NSRange(location: sel.location - 1, length: 2)
+            if shouldChangeText(in: range, replacementString: "") {
+                textStorage?.replaceCharacters(in: range, with: "")
+                didChangeText()
+                setSelectedRange(NSRange(location: sel.location - 1, length: 0))
+            }
+            return
+        }
+        // Backspace in leading whitespace removes a whole indentation unit.
+        let before = textBeforeCaretOnLine
+        if sel.length == 0, !before.isEmpty, before.allSatisfy({ $0 == " " }), indentUnit != "\t" {
+            let n = ((before.count - 1) % indentUnit.count) + 1
+            let range = NSRange(location: sel.location - n, length: n)
+            if shouldChangeText(in: range, replacementString: "") {
+                textStorage?.replaceCharacters(in: range, with: "")
+                didChangeText()
+            }
+            return
+        }
+        super.deleteBackward(sender)
+    }
+
+    override func insertNewline(_ sender: Any?) {
+        let loc = selectedRange().location
+        let before = textBeforeCaretOnLine
+        let indent = String(before.prefix { $0 == " " || $0 == "\t" })
         let trimmed = before.trimmingCharacters(in: .whitespaces)
-        if let last = trimmed.last, "{[(:".contains(last) { indent += indentUnit }
+        var inner = indent
+        if let last = trimmed.last, "{[(:".contains(last) { inner += indentUnit }
+        // Python: a block ends after return/pass/break/continue/raise.
+        if language == "python", let word = trimmed.split(separator: " ").first,
+           ["return", "pass", "break", "continue", "raise"].contains(String(word)) {
+            inner = String(inner.dropLast(min(indentUnit.count, inner.count)))
+        }
+        if let prev = char(at: loc - 1), let next = char(at: loc), CodeStyle.pairs[prev] == next, "{[(".contains(prev) {
+            // Between a pair: put the closer on its own line.
+            super.insertNewline(sender)
+            insertText(inner + "\n" + indent, replacementRange: selectedRange())
+            setSelectedRange(NSRange(location: selectedRange().location - 1 - (indent as NSString).length, length: 0))
+            return
+        }
         super.insertNewline(sender)
-        insertText(indent, replacementRange: selectedRange())
+        insertText(inner, replacementRange: selectedRange())
     }
 
     override func insertTab(_ sender: Any?) {
+        if acceptSuggestion() { return }
         let sel = selectedRange()
         if sel.length > 0 { shiftLines(by: 1); return }
         insertText(indentUnit, replacementRange: sel)
@@ -70,11 +185,15 @@ final class CodeTextView: NSTextView {
 
     override func insertBacktab(_ sender: Any?) { shiftLines(by: -1) }
 
+    override func cancelOperation(_ sender: Any?) {
+        if suggestion != nil { clearSuggestion(); return }
+        super.cancelOperation(sender)
+    }
+
     private func shiftLines(by direction: Int) {
-        let ns = string as NSString
         let para = ns.paragraphRange(for: selectedRange())
         var out: [String] = []
-        ns.substring(with: para).components(separatedBy: "\n").enumerated().forEach { i, line in
+        ns.substring(with: para).components(separatedBy: "\n").forEach { line in
             if direction > 0 {
                 out.append(line.isEmpty ? line : indentUnit + line)
             } else {
@@ -97,7 +216,97 @@ final class CodeTextView: NSTextView {
             onRun?()
             return true
         }
+        if event.modifierFlags.contains([.option, .shift]), event.charactersIgnoringModifiers?.lowercased() == "f" { // ⌥⇧F
+            onFormat?()
+            return true
+        }
         return super.performKeyEquivalent(with: event)
+    }
+
+    // MARK: Code prediction (Apple Intelligence)
+
+    private(set) var suggestion: String?
+    private var suggestionLocation = 0
+    private var predictionTask: Task<Void, Never>?
+
+    func clearSuggestion() {
+        predictionTask?.cancel()
+        if suggestion != nil {
+            suggestion = nil
+            needsDisplay = true
+            reportHeight()
+        }
+    }
+
+    /// Asks the on-device model how the code continues once typing pauses at the end of a line.
+    func schedulePrediction() {
+        clearSuggestion()
+        guard predictionsEnabled(), window?.firstResponder === self, !hasMarkedText() else { return }
+        let sel = selectedRange()
+        guard sel.length == 0, sel.location > 0 else { return }
+        let atLineEnd = sel.location == ns.length || char(at: sel.location) == "\n"
+        guard atLineEnd else { return }
+        let before = ns.substring(to: sel.location)
+        guard before.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 else { return }
+        let after = ns.substring(from: sel.location)
+        let lang = language
+        let location = sel.location
+        let linePrefix = textBeforeCaretOnLine
+        predictionTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled,
+                  let text = await TextPredictor.suggestCode(before: before, after: after, language: lang, linePrefix: linePrefix),
+                  !Task.isCancelled, let self, self.selectedRange() == NSRange(location: location, length: 0) else { return }
+            self.suggestion = text
+            self.suggestionLocation = location
+            self.needsDisplay = true
+            self.reportHeight()
+        }
+    }
+
+    var isSuggestionAnchoredAtCursor: Bool { selectedRange() == NSRange(location: suggestionLocation, length: 0) }
+
+    private func acceptSuggestion() -> Bool {
+        guard let s = suggestion, isSuggestionAnchoredAtCursor else { return false }
+        suggestion = nil
+        // Continuation lines follow the indentation of the line being completed, using this language's unit.
+        var text = CodeStyle.reindent(s, baseIndent: currentLineIndent)
+        if indentUnit != "\t" { text = text.replacingOccurrences(of: "\t", with: indentUnit) }
+        insertTextWithoutPairing(text)
+        return true
+    }
+
+    private func insertTextWithoutPairing(_ text: String) {
+        let sel = selectedRange()
+        guard shouldChangeText(in: sel, replacementString: text) else { return }
+        textStorage?.replaceCharacters(in: sel, with: NSAttributedString(string: text, attributes: typingAttributes))
+        didChangeText()
+        setSelectedRange(NSRange(location: sel.location + (text as NSString).length, length: 0))
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let s = suggestion, isSuggestionAnchoredAtCursor, let lm = layoutManager else { return }
+        // Code is monospaced: the caret sits after the line's text, measured with the editor font.
+        let measureFont = self.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        let left = textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0)
+        let lineBefore = textBeforeCaretOnLine.replacingOccurrences(of: "\t", with: "    ")
+        let caretX = left + (lineBefore as NSString).size(withAttributes: [.font: measureFont]).width
+        let font = self.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        let lineHeight = lm.defaultLineHeight(for: font)
+        var top: CGFloat
+        if suggestionLocation > 0, char(at: suggestionLocation - 1) != "\n" {
+            let glyph = lm.glyphIndexForCharacter(at: suggestionLocation - 1)
+            top = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).minY + textContainerOrigin.y
+        } else {
+            top = lm.extraLineFragmentRect.minY + textContainerOrigin.y
+        }
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ghostColor]
+        let base = currentLineIndent
+        for (i, line) in CodeStyle.reindent(s, baseIndent: base).components(separatedBy: "\n").enumerated() {
+            let x = i == 0 ? caretX : left
+            NSAttributedString(string: line, attributes: attrs).draw(at: NSPoint(x: x, y: top + CGFloat(i) * lineHeight))
+        }
     }
 }
 
@@ -180,6 +389,7 @@ struct CodeEditorView: NSViewRepresentable {
     var onChange: () -> Void
     var onRun: () -> Void
     var onFocus: () -> Void
+    var onFormat: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -206,6 +416,7 @@ struct CodeEditorView: NSViewRepresentable {
         tv.usesFindBar = true
         tv.textContainerInset = NSSize(width: 6, height: 10)
         tv.setAccessibilityLabel("Code-Editor")
+        if #available(macOS 15.0, *) { tv.writingToolsBehavior = .none }
         tv.setAccessibilityRole(.textArea)
         tv.delegate = context.coordinator
         let container = CodeEditorContainer(textView: tv)
@@ -224,10 +435,15 @@ struct CodeEditorView: NSViewRepresentable {
         tv.onHeightChange = { h in if abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } } }
         tv.onRun = onRun
         tv.onFocus = onFocus
+        tv.onFormat = onFormat
+        tv.language = block.language
+        tv.indentUnit = CodeStyle.indentUnit(for: block.language)
+        tv.predictionsEnabled = { [theme = ThemeManager.shared] in theme.settings.aiPredictions && theme.settings.codePredictions }
+        tv.ghostColor = codeTheme.foregroundColor.withAlphaComponent(0.38)
         container.showsGutter = showLineNumbers
         container.gutter.font = .monospacedDigitSystemFont(ofSize: max(font.pointSize - 2, 9), weight: .regular)
         container.gutter.color = codeTheme.color(for: .comment).withAlphaComponent(0.7)
-        let key = "\(codeTheme.id)|\(codeTheme.hashValue)|\(font.fontName)|\(font.pointSize)|\(block.language)"
+        let key = "\(codeTheme.id)|\(codeTheme.hashValue)|\(font.fontName)|\(font.pointSize)|\(block.language)|\(block.revision)"
         if force || key != context.coordinator.styleKey {
             context.coordinator.styleKey = key
             tv.font = font
@@ -255,6 +471,11 @@ struct CodeEditorView: NSViewRepresentable {
 
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: CodeEditorView
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let tv = notification.object as? CodeTextView, tv.suggestion != nil else { return }
+            if tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor { tv.clearSuggestion() }
+        }
         var styleKey = ""
         init(_ parent: CodeEditorView) { self.parent = parent }
 
@@ -263,6 +484,7 @@ struct CodeEditorView: NSViewRepresentable {
             highlight(tv)
             (tv.superview as? CodeEditorContainer)?.gutter.needsDisplay = true
             parent.onChange()
+            tv.schedulePrediction()
         }
 
         func highlight(_ tv: NSTextView) {

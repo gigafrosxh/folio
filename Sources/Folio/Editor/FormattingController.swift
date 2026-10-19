@@ -331,6 +331,14 @@ final class FormattingController: ObservableObject {
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
+    /// Opens Apple Intelligence Writing Tools for the selection (or the whole block when nothing is selected).
+    func showWritingTools() {
+        guard let tv = activeTextView else { return }
+        tv.window?.makeFirstResponder(tv)
+        if tv.selectedRange().length == 0 { tv.selectAll(nil) }
+        if #available(macOS 15.2, *) { tv.showWritingTools(nil) }
+    }
+
     /// Inserts a horizontal divider line as a paragraph.
     func insertDivider() {
         guard let tv = activeTextView else { return }

@@ -119,6 +119,8 @@ struct ThemeSettings: Codable, Equatable {
     var aiPredictions = true
     /// The system's own inline word predictions in text fields.
     var systemPredictions = true
+    /// Grey code completions in code blocks (needs `aiPredictions`).
+    var codePredictions = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -151,6 +153,7 @@ struct ThemeSettings: Codable, Equatable {
         libraryPath = v(.libraryPath, d.libraryPath)
         aiPredictions = v(.aiPredictions, d.aiPredictions)
         systemPredictions = v(.systemPredictions, d.systemPredictions)
+        codePredictions = v(.codePredictions, d.codePredictions)
     }
 }
 

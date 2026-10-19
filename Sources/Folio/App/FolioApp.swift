@@ -98,6 +98,7 @@ struct FolioCommands: Commands {
             Button("Ausrücken") { f.indent(-1) }.keyboardShortcut("[")
             Divider()
             Button("Link…") { NotificationCenter.default.post(name: .folioInsert, object: "link") }.keyboardShortcut("k")
+            Button("Writing Tools …") { f.showWritingTools() }.keyboardShortcut("w", modifiers: [.command, .shift])
             Button("Schrift größer") { f.changeFontSize(by: 2) }.keyboardShortcut("+")
             Button("Schrift kleiner") { f.changeFontSize(by: -2) }.keyboardShortcut("-")
         }
@@ -124,6 +125,7 @@ struct FolioCommands: Commands {
 /// its text views and embedded views, to diagnose overlapping blocks.
 enum LayoutDebug {
     @MainActor static func runIfRequested() {
+        if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil { print("LAYOUT start", NSApp.windows.count); fflush(stdout) }
         let env = ProcessInfo.processInfo.environment
         if let mode = env["FOLIO_APPEARANCE"] {
             NSApp.appearance = NSAppearance(named: mode == "dark" ? .darkAqua : .aqua)
@@ -144,7 +146,28 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed == "run-server", let doc = NoteStore.shared.currentDocument {
+                if typed.hasPrefix("code-type:"), let doc = NoteStore.shared.currentDocument {
+                    // Types into a fresh code block key by key, like a user would.
+                    let parts = typed.dropFirst("code-type:".count).split(separator: ":", maxSplits: 1)
+                    let block = BlockModel(kind: .code)
+                    block.language = String(parts[0])
+                    doc.insert(block, after: doc.blocks.first?.id)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        func findCode(_ v: NSView) -> CodeTextView? {
+                            if let c = v as? CodeTextView { return c }
+                            for s in v.subviews { if let f = findCode(s) { return f } }
+                            return nil
+                        }
+                        guard let code = NSApp.windows.first(where: { $0.isVisible })?.contentView.flatMap(findCode) else { return }
+                        code.window?.makeFirstResponder(code)
+                        for ch in String(parts[1]).replacingOccurrences(of: "\\n", with: "\n") {
+                            if ch == "\n" { code.insertNewline(nil) }
+                            else if ch == "\u{8}" { code.deleteBackward(nil) }
+                            else { code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0)) }
+                        }
+                        print("LAYOUT code:", code.string.debugDescription)
+                    }
+                } else if typed == "run-server", let doc = NoteStore.shared.currentDocument {
                     let block = BlockModel(kind: .code)
                     block.language = "python"
                     block.storage.setAttributedString(NSAttributedString(string: "import http.server\nhttp.server.test(http.server.SimpleHTTPRequestHandler, port=8767, bind='127.0.0.1')"))
@@ -190,7 +213,8 @@ enum LayoutDebug {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + (Double(env["FOLIO_DUMP_DELAY"] ?? "") ?? 4)) {
-            guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
+            print("LAYOUT windows", NSApp.windows.map { "\(type(of: $0)) visible=\($0.isVisible) \($0.frame)" }); fflush(stdout)
+            guard let root = (NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.windows.first(where: { $0.contentView != nil && $0.frame.width > 400 }))?.contentView else { return }
             func walk(_ v: NSView) {
                 if v is FolioTextView || v is CodeTextView || String(describing: type(of: v)).contains("WKWebView")
                     || v is CodeEditorContainer {

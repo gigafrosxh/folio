@@ -21,7 +21,8 @@ struct CodeBlockView: View {
             CodeEditorView(block: block, height: $height, codeTheme: codeTheme, font: theme.codeFont(),
                            showLineNumbers: theme.settings.showLineNumbers,
                            onChange: { doc.markDirty() }, onRun: run,
-                           onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) })
+                           onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
+                           onFormat: formatCode)
                 .frame(height: height)
                 .padding(.bottom, 2)
             serverBar
@@ -77,6 +78,7 @@ struct CodeBlockView: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(block.storage.string, forType: .string)
             }
+            headerButton("wand.and.rays", formatHelp, action: formatCode)
             headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
 
             if spec.isRunnable {
@@ -147,11 +149,35 @@ struct CodeBlockView: View {
     private func resolveInterpreter() async {
         let lang = spec
         let override = theme.settings.interpreterOverrides[lang.id]
-        guard lang.isRunnable || !(override ?? "").isEmpty else { interpreter = nil; return }
-        let result = await Task.detached { () -> String? in
-            (try? CodeRun.plan(for: lang, override: override)).map(CodeRun.describe)
+        let runnable = lang.isRunnable || !(override ?? "").isEmpty
+        // Looking up tools may start a login shell once, so it never runs on the main thread.
+        let result = await Task.detached { () -> (String?, String?) in
+            (runnable ? (try? CodeRun.plan(for: lang, override: override)).map(CodeRun.describe) : nil, CodeFormatter.available(for: lang))
         }.value
-        interpreter = result
+        interpreter = result.0
+        formatterName = result.1
+    }
+
+    @State private var formatterName: String?
+
+    private var formatHelp: String {
+        if let tool = formatterName { return "Code formatieren mit \(tool) (⌥⇧F)" }
+        return "Code neu einrücken (⌥⇧F)"
+    }
+
+    /// Formats with an installed formatter, falling back to Folio's own re-indenter.
+    private func formatCode() {
+        let code = block.storage.string
+        let lang = spec
+        Task {
+            let result: String = await Task.detached {
+                (try? CodeFormatter.format(code, language: lang)) ?? CodeStyle.reindent(code: code, language: lang.id)
+            }.value
+            guard result != code, block.storage.string == code else { return }
+            block.storage.replaceCharacters(in: NSRange(location: 0, length: block.storage.length), with: result)
+            block.revision += 1
+            doc.markDirty()
+        }
     }
 
     private func run() {

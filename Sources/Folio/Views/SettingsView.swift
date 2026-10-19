@@ -80,6 +80,8 @@ struct SettingsView: View {
             }
             Section {
                 Toggle("Textvorhersage mit Apple Intelligence", isOn: $theme.settings.aiPredictions)
+                Toggle("Code-Vorhersage in Code-Blöcken", isOn: $theme.settings.codePredictions)
+                    .disabled(!theme.settings.aiPredictions)
                 Toggle("Wortvorschläge des Systems", isOn: $theme.settings.systemPredictions)
                 switch TextPredictor.status {
                 case .available:
