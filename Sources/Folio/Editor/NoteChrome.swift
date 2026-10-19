@@ -21,8 +21,9 @@ struct NoteActionsBar: View {
             button("trash", "In den Papierkorb legen") { store.delete(doc.id) }
         }
         .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(Color.primary)
         .padding(5)
-        .floating(cornerRadius: 14)
+        .solidBar()
     }
 
     private func button(_ icon: String, _ help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
@@ -56,7 +57,9 @@ struct NoteStatusPill: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .floating(cornerRadius: 999)
+        .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
+        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
         .onAppear(perform: refresh)
         .onChange(of: doc.meta.modified) { refresh() }
     }
@@ -70,5 +73,16 @@ struct NoteStatusPill: View {
     private func refresh() {
         let attrs = try? FileManager.default.attributesOfItem(atPath: doc.url.path)
         fileSize = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+}
+
+extension View {
+    /// Opaque rounded bar for the editor header (readable over any content, light or dark).
+    func solidBar() -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return self
+            .background(Color(nsColor: .controlBackgroundColor), in: shape)
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
     }
 }

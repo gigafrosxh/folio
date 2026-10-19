@@ -117,9 +117,11 @@ struct FormatToolbar: View {
         .menuIndicator(.hidden)
         .buttonStyle(.borderless)
         .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(Color.primary)
+        .tint(.primary)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .floating(cornerRadius: 14)
+        .solidBar()
     }
 
     private var sep: some View {

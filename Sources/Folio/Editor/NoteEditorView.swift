@@ -18,9 +18,11 @@ struct NoteEditorView: View {
     @State private var promptText = ""
     @State private var alertMessage: String?
     @State private var dropTargeted = false
+    @State private var scrolled = false
 
     var body: some View {
-        ZStack(alignment: .top) {
+        VStack(spacing: 0) {
+            header
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(doc.meta.modified.formatted(date: .long, time: .shortened)) · \(doc.url.lastPathComponent)")
@@ -57,25 +59,19 @@ struct NoteEditorView: View {
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
                 .padding(.trailing, 36)
-                .padding(.top, 76)
+                .padding(.top, 18)
                 .frame(maxWidth: .infinity)
             }
             .scrollContentBackground(.hidden)
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y > 2 } action: { _, now in
+                withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
+            }
             .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
             .overlay {
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
                 }
             }
-
-            HStack(alignment: .top, spacing: 10) {
-                Spacer(minLength: 0)
-                FormatToolbar(actions: actions)
-                NoteActionsBar(doc: doc)
-                Spacer(minLength: 0)
-            }
-            .padding(.top, 14)
-            .padding(.horizontal, 12)
         }
         .overlay(alignment: .bottomTrailing) {
             NoteStatusPill(doc: doc).padding(16)
@@ -111,6 +107,32 @@ struct NoteEditorView: View {
         .onAppear {
             if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
         }
+    }
+
+    /// Opaque header like in Apple Notes: content scrolls underneath it, and a hairline plus a soft
+    /// shadow appear once something is behind it.
+    private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            bars
+            ScrollView(.horizontal) { bars.padding(.horizontal, 2) }.scrollIndicators(.never)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.primary.opacity(scrolled ? 0.12 : 0)).frame(height: 1)
+        }
+        .shadow(color: .black.opacity(scrolled ? 0.10 : 0), radius: 6, y: 3)
+        .zIndex(1)
+    }
+
+    private var bars: some View {
+        HStack(spacing: 10) {
+            FormatToolbar(actions: actions)
+            NoteActionsBar(doc: doc)
+        }
+        .fixedSize()
     }
 
     private var actions: EditorActions {
