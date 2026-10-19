@@ -21,8 +21,10 @@ case "$CONFIG" in
 esac
 
 cd "$ROOT"
-swift build -c "$CONFIG" --product Folio
-BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
+ARCH_ARGS=()
+if [[ -n "${ARCH:-}" ]]; then ARCH_ARGS=(--arch "$ARCH"); fi
+swift build -c "$CONFIG" --product Folio ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
+BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"} --show-bin-path)"
 if [[ ! -f Resources/AppIcon.icns ]]; then
     swift scripts/make-icon.swift Resources
 fi

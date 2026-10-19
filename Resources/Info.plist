@@ -17,6 +17,13 @@
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Folio benötigt Zugriff auf Notizen, um Notizen zu importieren, und auf Numbers, um Tabellen zu erstellen.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key><true/>
+        <key>NSAllowsArbitraryLoadsInWebContent</key><true/>
+    </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Folio zeigt Webseiten aus deinem lokalen Netzwerk (z. B. localhost oder Entwicklungsserver) in Notizen an.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

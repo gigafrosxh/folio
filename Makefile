@@ -1,4 +1,4 @@
-.PHONY: build test app run install clean
+.PHONY: build test app run install installer clean
 
 build:
 	swift build
@@ -14,6 +14,9 @@ run:
 
 install:
 	./scripts/build-app.sh --install
+
+installer:
+	./scripts/make-installer.sh
 
 clean:
 	swift package clean
