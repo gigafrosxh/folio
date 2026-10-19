@@ -99,6 +99,8 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("a", modifiers: [.command, .shift])
             Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }
                 .keyboardShortcut("d", modifiers: [.command, .option])
+            Button("Skizze/Foto vom iPhone oder iPad…") { NotificationCenter.default.post(name: .folioInsert, object: "device") }
+                .keyboardShortcut("d", modifiers: [.command, .option, .shift])
             Button("Webseite…") { NotificationCenter.default.post(name: .folioInsert, object: "web") }
                 .keyboardShortcut("w", modifiers: [.command, .option])
             Button("Bild mit Image Playground…") { NotificationCenter.default.post(name: .folioInsert, object: "playground") }

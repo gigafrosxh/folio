@@ -319,6 +319,18 @@ final class FormattingController: ObservableObject {
         _ = tv
     }
 
+    /// Shows the Continuity Camera menu (sketch/photo/scan from iPhone or iPad) at the pointer.
+    /// The result arrives in the focused text view's `readSelection(from:)` and becomes an image block.
+    func showDeviceImportMenu(fallbackBlock: UUID?) {
+        var tv = activeTextView
+        if tv == nil, let id = fallbackBlock { tv = textView(for: id) }
+        guard let tv, let window = tv.window else { return }
+        window.makeFirstResponder(tv)
+        let menu = NSMenu()
+        menu.addItem(FolioTextView.deviceImportItem())
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
     /// Inserts a horizontal divider line as a paragraph.
     func insertDivider() {
         guard let tv = activeTextView else { return }

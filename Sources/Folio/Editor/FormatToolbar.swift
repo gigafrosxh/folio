@@ -100,7 +100,16 @@ struct FormatToolbar: View {
 
             plain("tablecells", "Numbers-Tabelle erstellen", actions.insertNumbers)
             plain("paperclip", "PDF, Bild oder Dokument einfügen", actions.insertFile)
-            plain("scribble.variable", "Zeichnung einfügen", actions.insertDrawing)
+            Menu {
+                Button { actions.insertDrawing() } label: { Label("Hier zeichnen", systemImage: "scribble.variable") }
+                Button { actions.importFromDevice() } label: { Label("Skizze/Foto vom iPhone oder iPad…", systemImage: "iphone") }
+            } label: {
+                Image(systemName: "scribble.variable")
+            } primaryAction: {
+                actions.insertDrawing()
+            }
+            .help("Zeichnen – Klick: hier zeichnen, gedrückt halten: vom iPhone oder iPad")
+            .frame(width: 40)
             plain("globe", "Webseite einbetten", actions.insertWeb)
             plain("apple.image.playground", "Bild mit Image Playground erstellen", actions.insertImagePlayground)
         }

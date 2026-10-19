@@ -191,6 +191,42 @@ final class FolioTextView: NSTextView {
         return before.allSatisfy({ $0 == "\t" || $0 == " " }) ? idx : nil
     }
 
+    // MARK: Continuity Camera (sketch, photo or scan from iPhone/iPad)
+
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?,
+                                 returnType: NSPasteboard.PasteboardType?) -> Any? {
+        if sendType == nil, let returnType, NSImage.imageTypes.contains(returnType.rawValue) || returnType == .png || returnType == .tiff {
+            return self
+        }
+        return super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+
+    override func readSelection(from pboard: NSPasteboard) -> Bool {
+        if let data = pboard.data(forType: .png) ?? pboard.data(forType: .tiff)
+            ?? (pboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first?.tiffRepresentation {
+            let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) ?? data
+            onPasteImage?(png)
+            return true
+        }
+        return super.readSelection(from: pboard)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        if !menu.items.contains(where: { $0.identifier == NSMenuItem.importFromDeviceIdentifier }) {
+            menu.insertItem(.separator(), at: 0)
+            menu.insertItem(FolioTextView.deviceImportItem(), at: 0)
+        }
+        return menu
+    }
+
+    /// The system fills this item with "Take Photo", "Scan Documents" and "Add Sketch" for nearby devices.
+    static func deviceImportItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Vom iPhone oder iPad importieren", action: nil, keyEquivalent: "")
+        item.identifier = NSMenuItem.importFromDeviceIdentifier
+        return item
+    }
+
     // MARK: Paste & drop
 
     override func paste(_ sender: Any?) {

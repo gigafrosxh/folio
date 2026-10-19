@@ -341,7 +341,7 @@ struct DrawingBlockView: View {
     @StateObject private var model: DrawingModel
     @EnvironmentObject var theme: ThemeManager
 
-    static let palette: [NSColor] = [.labelColor, .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemTeal, .systemBlue, .systemPurple, .systemPink]
+    static let palette: [NSColor] = [.labelColor, .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple]
 
     init(block: BlockModel, doc: NoteDocument) {
         self.block = block
@@ -403,13 +403,31 @@ struct DrawingBlockView: View {
                 }
                 .buttonStyle(.plain)
             }
-            ColorPicker("", selection: Binding(get: { Color(nsColor: model.color) }, set: { model.color = NSColor($0) }))
-                .labelsHidden()
-                .frame(width: 24)
+            Button { openColorPanel() } label: {
+                Circle()
+                    .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
+                    .frame(width: 15, height: 15)
+                    .overlay(Circle().stroke(Color.primary.opacity(isCustomColor ? 0.9 : 0.15), lineWidth: isCustomColor ? 2 : 1).padding(-2))
+            }
+            .buttonStyle(.plain)
+            .help("Eigene Farbe")
             Divider().frame(height: 18).padding(.horizontal, 3)
-            Slider(value: $model.width, in: 1...16)
-                .frame(width: 70)
-                .help("Strichstärke")
+            Menu {
+                ForEach([1.5, 3, 5, 8, 12] as [CGFloat], id: \.self) { w in
+                    Button { model.width = w } label: {
+                        Text(w == model.width ? "● \(Int(w * 2)) pt" : "   \(Int(w * 2)) pt")
+                    }
+                }
+            } label: {
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: min(4 + model.width, 16), height: min(4 + model.width, 16))
+                    .frame(width: 26, height: 24)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Strichstärke")
             toolButton("arrow.uturn.backward", "Rückgängig", selected: false, action: model.undo).disabled(!model.canUndo)
             toolButton("arrow.uturn.forward", "Wiederholen", selected: false, action: model.redo).disabled(!model.canRedo)
         }
@@ -417,6 +435,21 @@ struct DrawingBlockView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .floating(cornerRadius: 12)
+    }
+
+    private var isCustomColor: Bool { !Self.palette.contains(model.color) }
+
+    private func openColorPanel() {
+        let panel = NSColorPanel.shared
+        panel.showsAlpha = false
+        panel.color = model.color
+        ColorPanelBridge.shared.onChange = { [weak model] c in
+            model?.color = c
+            if model?.tool == .eraser { model?.tool = .pen }
+        }
+        panel.setTarget(ColorPanelBridge.shared)
+        panel.setAction(#selector(ColorPanelBridge.colorChanged(_:)))
+        panel.orderFront(nil)
     }
 
     private func toolButton(_ icon: String, _ help: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -447,4 +480,11 @@ struct DrawingBlockView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([image])
     }
+}
+
+/// Receives NSColorPanel changes for the drawing toolbar's custom color.
+final class ColorPanelBridge: NSObject {
+    static let shared = ColorPanelBridge()
+    var onChange: ((NSColor) -> Void)?
+    @objc func colorChanged(_ sender: NSColorPanel) { onChange?(sender.color) }
 }

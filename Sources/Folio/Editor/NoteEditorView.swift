@@ -121,6 +121,7 @@ struct NoteEditorView: View {
             insertWeb: { promptText = ""; showWebPrompt = true },
             insertImagePlayground: openPlayground,
             insertDrawing: { insertBlock(BlockModel(kind: .drawing)) },
+            importFromDevice: { formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id) },
             addLink: { promptText = ""; showLinkPrompt = true },
             pasteFiles: { urls, anchor in insertFiles(urls, after: anchor) },
             pasteImage: { data, anchor in insertBlock(AttachmentSync.makeImageBlock(data: data, in: doc), after: anchor) },
@@ -136,6 +137,7 @@ struct NoteEditorView: View {
         case "web": promptText = ""; showWebPrompt = true
         case "playground": openPlayground()
         case "drawing": insertBlock(BlockModel(kind: .drawing))
+        case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
         case "link": promptText = ""; showLinkPrompt = true
         default: break
         }
@@ -270,6 +272,7 @@ struct EditorActions {
     var insertWeb: () -> Void
     var insertImagePlayground: () -> Void
     var insertDrawing: () -> Void
+    var importFromDevice: () -> Void
     var addLink: () -> Void
     var pasteFiles: ([URL], UUID) -> Bool
     var pasteImage: (Data, UUID) -> Void
