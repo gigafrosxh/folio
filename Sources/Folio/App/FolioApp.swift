@@ -134,8 +134,21 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                tv.insertNewline(nil)
-                tv.insertText(typed, replacementRange: tv.selectedRange())
+                if typed.hasPrefix("paste-image:") || typed.hasPrefix("paste-file:") {
+                    // Simulates ⌘V on a private pasteboard so the user's clipboard stays untouched.
+                    let pb = NSPasteboard(name: NSPasteboard.Name("folio.debug"))
+                    pb.clearContents()
+                    let path = String(typed.drop(while: { $0 != ":" }).dropFirst())
+                    if typed.hasPrefix("paste-image:"), let img = NSImage(contentsOfFile: path) {
+                        pb.writeObjects([img])
+                    } else {
+                        pb.writeObjects([URL(fileURLWithPath: path) as NSURL])
+                    }
+                    print("LAYOUT paste handled:", tv.handlePasteboard(pb), pb.types ?? [])
+                } else {
+                    tv.insertNewline(nil)
+                    tv.insertText(typed, replacementRange: tv.selectedRange())
+                }
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) {

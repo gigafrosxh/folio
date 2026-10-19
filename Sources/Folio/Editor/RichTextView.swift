@@ -242,6 +242,12 @@ final class FolioTextView: NSTextView {
         return item
     }
 
+    /// Stores pasted pictures as PNG unless they already are a compact format.
+    static func normalizedImage(_ data: Data) -> Data {
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) || data.starts(with: [0xFF, 0xD8, 0xFF]) { return data }
+        return NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) ?? data
+    }
+
     // MARK: Paste & drop
 
     override func paste(_ sender: Any?) {
@@ -249,24 +255,77 @@ final class FolioTextView: NSTextView {
         super.paste(sender)
     }
 
+    // Files and images dropped onto the text become blocks. With `importsGraphics` off, NSTextView would
+    // otherwise refuse these drags (or insert the file path), so it is told to accept them here.
+    override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
+        super.acceptableDragTypes + [.fileURL, .png, .tiff, NSPasteboard.PasteboardType("public.jpeg"), NSPasteboard.PasteboardType("public.heic")]
+    }
+
+    private func carriesMedia(_ pb: NSPasteboard) -> Bool {
+        let hasFiles = pb.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        return hasFiles || Self.imageData(in: pb) != nil
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        carriesMedia(sender.draggingPasteboard) ? .copy : super.draggingEntered(sender)
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        carriesMedia(sender.draggingPasteboard) ? .copy : super.draggingUpdated(sender)
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        if let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           !urls.isEmpty, onPasteFiles?(urls) == true {
-            return true
+        let pb = sender.draggingPasteboard
+        if carriesMedia(pb) {
+            // Put the cursor where the item was dropped so it lands there.
+            let point = convert(sender.draggingLocation, from: nil)
+            let index = characterIndexForInsertion(at: point)
+            if index != NSNotFound { setSelectedRange(NSRange(location: index, length: 0)) }
+            if handlePasteboard(pb) { return true }
         }
         return super.performDragOperation(sender)
     }
 
-    private func handlePasteboard(_ pb: NSPasteboard) -> Bool {
+    /// Image bytes on a pasteboard (screenshots, images copied from browsers, Preview, Photos …).
+    static func imageData(in pb: NSPasteboard) -> Data? {
+        for t in [NSPasteboard.PasteboardType.png, NSPasteboard.PasteboardType("public.jpeg"), NSPasteboard.PasteboardType("public.heic"), .tiff] {
+            if let d = pb.data(forType: t) { return d }
+        }
+        return nil
+    }
+
+    func handlePasteboard(_ pb: NSPasteboard) -> Bool {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
            !urls.isEmpty, onPasteFiles?(urls) == true {
             return true
         }
         let types = pb.types ?? []
-        if !types.contains(.string), !types.contains(.rtf),
-           let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
-            onPasteImage?(data)
-            return true
+        // An image wins unless the pasteboard mainly carries text: browsers add the image URL or HTML as text.
+        if let data = Self.imageData(in: pb) {
+            let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let textIsJustALink = text.isEmpty || (!text.contains(" ") && !text.contains("\n"))
+            if !types.contains(.rtf) && textIsJustALink {
+                onPasteImage?(Self.normalizedImage(data))
+                return true
+            }
+        }
+        // Rich text with embedded pictures (Notes, TextEdit, Pages): paste the text, then the pictures as blocks.
+        if types.contains(.rtfd), let rtfd = pb.data(forType: .rtfd),
+           let rich = NSAttributedString(rtfd: rtfd, documentAttributes: nil) {
+            var images: [Data] = []
+            let clean = NSMutableAttributedString(attributedString: rich)
+            rich.enumerateAttribute(.attachment, in: NSRange(location: 0, length: rich.length), options: .reverse) { value, range, _ in
+                guard let att = value as? NSTextAttachment else { return }
+                if let d = att.fileWrapper?.regularFileContents ?? att.contents ?? att.image?.tiffRepresentation {
+                    images.insert(Self.normalizedImage(d), at: 0)
+                }
+                clean.deleteCharacters(in: range)
+            }
+            if !images.isEmpty {
+                if clean.length > 0 { insertText(clean, replacementRange: selectedRange()) }
+                for d in images { onPasteImage?(d) }
+                return true
+            }
         }
         if let s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !s.contains(" "), !s.contains("\n"), let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {

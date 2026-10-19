@@ -67,6 +67,10 @@ struct NoteEditorView: View {
                 withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
             }
             .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
+            .onPasteCommand(of: [.fileURL, .image, .png, .tiff]) { providers in
+                // ⌘V while no text block has focus (e.g. after clicking an embed): append at the end.
+                _ = handleDrop(providers)
+            }
             .overlay {
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
@@ -260,10 +264,12 @@ struct NoteEditorView: View {
                     guard let url else { return }
                     DispatchQueue.main.async { insertFiles([url], after: doc.blocks.last?.id) }
                 }
-            } else if provider.canLoadObject(ofClass: NSImage.self) {
-                _ = provider.loadDataRepresentation(for: .png) { data, _ in
+            } else if let type = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .image) == true }) {
+                _ = provider.loadDataRepresentation(forTypeIdentifier: type) { data, _ in
                     guard let data else { return }
-                    DispatchQueue.main.async { insertBlock(AttachmentSync.makeImageBlock(data: data, in: doc), after: doc.blocks.last?.id) }
+                    DispatchQueue.main.async {
+                        insertBlock(AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc), after: doc.blocks.last?.id)
+                    }
                 }
             } else if provider.canLoadObject(ofClass: URL.self) {
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
