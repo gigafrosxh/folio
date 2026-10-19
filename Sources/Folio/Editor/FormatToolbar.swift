@@ -100,6 +100,7 @@ struct FormatToolbar: View {
 
             plain("tablecells", "Numbers-Tabelle erstellen", actions.insertNumbers)
             plain("paperclip", "PDF, Bild oder Dokument einfügen", actions.insertFile)
+            plain("scribble.variable", "Zeichnung einfügen", actions.insertDrawing)
             plain("globe", "Webseite einbetten", actions.insertWeb)
             plain("apple.image.playground", "Bild mit Image Playground erstellen", actions.insertImagePlayground)
         }

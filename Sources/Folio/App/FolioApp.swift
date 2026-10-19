@@ -97,6 +97,8 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Button("Datei, PDF oder Bild…") { NotificationCenter.default.post(name: .folioInsert, object: "file") }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
+            Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }
+                .keyboardShortcut("d", modifiers: [.command, .option])
             Button("Webseite…") { NotificationCenter.default.post(name: .folioInsert, object: "web") }
                 .keyboardShortcut("w", modifiers: [.command, .option])
             Button("Bild mit Image Playground…") { NotificationCenter.default.post(name: .folioInsert, object: "playground") }

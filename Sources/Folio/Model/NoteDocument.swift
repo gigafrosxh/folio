@@ -29,7 +29,7 @@ final class BlockModel: ObservableObject, Identifiable {
         language = "python"
         outputIsError = false
         url = ""
-        height = kind == .pdf ? 520 : kind == .web ? 480 : kind == .file ? 420 : 0
+        height = kind == .pdf ? 520 : kind == .web ? 480 : kind == .file ? 420 : kind == .drawing ? 380 : 0
         width = 1
         mode = kind == .web ? "page" : ""
         caption = ""

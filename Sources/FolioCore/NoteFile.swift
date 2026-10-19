@@ -50,6 +50,8 @@ public enum BlockKind: String, Codable, Sendable, CaseIterable {
     case image
     /// Any other document (Numbers, Pages, Word …) rendered with Quick Look.
     case file
+    /// A hand-drawn sketch; the attachment holds a PencilKit `PKDrawing` data representation.
+    case drawing
 }
 
 /// One block of a note's body. Fields not used by a block's kind stay nil.

@@ -120,6 +120,7 @@ struct NoteEditorView: View {
             insertNumbers: createNumbersTable,
             insertWeb: { promptText = ""; showWebPrompt = true },
             insertImagePlayground: openPlayground,
+            insertDrawing: { insertBlock(BlockModel(kind: .drawing)) },
             addLink: { promptText = ""; showLinkPrompt = true },
             pasteFiles: { urls, anchor in insertFiles(urls, after: anchor) },
             pasteImage: { data, anchor in insertBlock(AttachmentSync.makeImageBlock(data: data, in: doc), after: anchor) },
@@ -134,6 +135,7 @@ struct NoteEditorView: View {
         case "numbers": createNumbersTable()
         case "web": promptText = ""; showWebPrompt = true
         case "playground": openPlayground()
+        case "drawing": insertBlock(BlockModel(kind: .drawing))
         case "link": promptText = ""; showLinkPrompt = true
         default: break
         }
@@ -267,6 +269,7 @@ struct EditorActions {
     var insertNumbers: () -> Void
     var insertWeb: () -> Void
     var insertImagePlayground: () -> Void
+    var insertDrawing: () -> Void
     var addLink: () -> Void
     var pasteFiles: ([URL], UUID) -> Bool
     var pasteImage: (Data, UUID) -> Void
@@ -362,6 +365,8 @@ struct BlockRow: View {
             ImageBlockView(block: block, doc: doc)
         case .file:
             FileBlockView(block: block, doc: doc)
+        case .drawing:
+            DrawingBlockView(block: block, doc: doc)
         }
     }
 
