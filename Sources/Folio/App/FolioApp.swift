@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import FolioCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             NoteStore.shared.currentDocument?.saveNow()
             RunManager.shared.stopAll()
+            LSPCompleter.shared.shutdownAll()
         }
     }
 
@@ -166,6 +168,7 @@ enum LayoutDebug {
                             else { code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0)) }
                         }
                         print("LAYOUT code:", code.string.debugDescription)
+                        if ProcessInfo.processInfo.environment["FOLIO_COMPLETE"] != nil { code.triggerCompletion(manual: true) }
                     }
                 } else if typed == "run-server", let doc = NoteStore.shared.currentDocument {
                     let block = BlockModel(kind: .code)
@@ -241,6 +244,14 @@ enum LayoutDebug {
                 root.cacheDisplay(in: root.bounds, to: rep)
                 try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
                 print("LAYOUT snapshot", out)
+                // Child panels (e.g. the completion list) are separate windows: snapshot them too.
+                for (i, w) in NSApp.windows.enumerated() where w.isVisible && w is NSPanel {
+                    guard let v = w.contentView, let r = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { continue }
+                    v.cacheDisplay(in: v.bounds, to: r)
+                    let path = out.replacingOccurrences(of: ".png", with: "-panel\(i).png")
+                    try? r.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    print("LAYOUT panel snapshot", path, w.frame)
+                }
             }
             fflush(stdout)
         }

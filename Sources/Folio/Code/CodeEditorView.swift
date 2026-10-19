@@ -11,6 +11,8 @@ final class CodeTextView: NSTextView {
     var language = "plain"
     var predictionsEnabled: () -> Bool = { false }
     var ghostColor: NSColor = .tertiaryLabelColor
+    var completionEnabled: () -> Bool = { true }
+    var accentColor: NSColor = .controlAccentColor
 
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
         guard let lm = layoutManager, let tc = textContainer else { return 20 }
@@ -52,6 +54,7 @@ final class CodeTextView: NSTextView {
 
     override func resignFirstResponder() -> Bool {
         clearSuggestion()
+        hideCompletion()
         return super.resignFirstResponder()
     }
 
@@ -154,6 +157,7 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertNewline(_ sender: Any?) {
+        if acceptCompletion() { return }
         let loc = selectedRange().location
         let before = textBeforeCaretOnLine
         let indent = String(before.prefix { $0 == " " || $0 == "\t" })
@@ -177,6 +181,7 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertTab(_ sender: Any?) {
+        if acceptCompletion() { return }
         if acceptSuggestion() { return }
         let sel = selectedRange()
         if sel.length > 0 { shiftLines(by: 1); return }
@@ -186,8 +191,26 @@ final class CodeTextView: NSTextView {
     override func insertBacktab(_ sender: Any?) { shiftLines(by: -1) }
 
     override func cancelOperation(_ sender: Any?) {
+        if completion.isVisible { hideCompletion(); return }
         if suggestion != nil { clearSuggestion(); return }
         super.cancelOperation(sender)
+    }
+
+    /// Esc arrives as `complete(_:)` in NSTextView: close our list or suggestion, or open the list.
+    override func complete(_ sender: Any?) {
+        if completion.isVisible { hideCompletion(); return }
+        if suggestion != nil { clearSuggestion(); return }
+        triggerCompletion(manual: true)
+    }
+
+    override func moveUp(_ sender: Any?) {
+        if completion.isVisible { completion.move(-1); return }
+        super.moveUp(sender)
+    }
+
+    override func moveDown(_ sender: Any?) {
+        if completion.isVisible { completion.move(1); return }
+        super.moveDown(sender)
     }
 
     private func shiftLines(by direction: Int) {
@@ -216,6 +239,10 @@ final class CodeTextView: NSTextView {
             onRun?()
             return true
         }
+        if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == " " { // ⌃Space
+            triggerCompletion(manual: true)
+            return true
+        }
         if event.modifierFlags.contains([.option, .shift]), event.charactersIgnoringModifiers?.lowercased() == "f" { // ⌥⇧F
             onFormat?()
             return true
@@ -241,7 +268,7 @@ final class CodeTextView: NSTextView {
     /// Asks the on-device model how the code continues once typing pauses at the end of a line.
     func schedulePrediction() {
         clearSuggestion()
-        guard predictionsEnabled(), window?.firstResponder === self, !hasMarkedText() else { return }
+        guard predictionsEnabled(), window?.firstResponder === self, !hasMarkedText(), !completion.isVisible else { return }
         let sel = selectedRange()
         guard sel.length == 0, sel.location > 0 else { return }
         let atLineEnd = sel.location == ns.length || char(at: sel.location) == "\n"
@@ -282,6 +309,94 @@ final class CodeTextView: NSTextView {
         textStorage?.replaceCharacters(in: sel, with: NSAttributedString(string: text, attributes: typingAttributes))
         didChangeText()
         setSelectedRange(NSRange(location: sel.location + (text as NSString).length, length: 0))
+    }
+
+    // MARK: Autocomplete list (IDE-style)
+
+    let completion = CompletionPopup()
+    private var completionTask: Task<Void, Never>?
+    private var completionAnchor = 0
+
+    /// Called after every edit: opens the list after `.`/`::`/`->` or once an identifier has 2+ characters,
+    /// and refines it while it is open.
+    func textChangedForCompletion() {
+        guard completionEnabled() else { return }
+        let ctx = CompletionContext(code: string, offset: selectedRange().location, language: language)
+        let typedTrigger = ctx.receiver != nil && ctx.prefix.isEmpty
+        if completion.isVisible || typedTrigger || ctx.prefix.count >= 2 {
+            triggerCompletion(manual: false)
+        }
+    }
+
+    func triggerCompletion(manual: Bool) {
+        completionTask?.cancel()
+        let sel = selectedRange()
+        guard sel.length == 0 else { hideCompletion(); return }
+        let ctx = CompletionContext(code: string, offset: sel.location, language: language)
+        // Typing a non-identifier character (space, operator) closes the list.
+        if !manual, ctx.prefix.isEmpty, ctx.receiver == nil { hideCompletion(); return }
+        let location = sel.location
+        completionTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(manual ? 0 : 90))
+            guard !Task.isCancelled else { return }
+            var items = await CompletionEngine.shared.complete(ctx)
+            if items.isEmpty, ctx.receiver != nil, !Task.isCancelled {
+                // Language servers may still be parsing imports right after start; ask once more.
+                try? await Task.sleep(for: .milliseconds(900))
+                guard !Task.isCancelled else { return }
+                items = await CompletionEngine.shared.complete(ctx)
+            }
+            guard !Task.isCancelled, let self, self.selectedRange().location == location else { return }
+            self.showCompletion(items, prefix: ctx.prefix, anchor: location - (ctx.prefix as NSString).length)
+        }
+    }
+
+    private func showCompletion(_ items: [CompletionItem], prefix: String, anchor: Int) {
+        guard let window, !items.isEmpty else { hideCompletion(); return }
+        completionAnchor = anchor
+        clearSuggestion()
+        completion.model.accent = Color(nsColor: accentColor)
+        completion.model.font = font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        completion.model.onAccept = { [weak self] item in self?.accept(item) }
+        // Anchor the list under the start of the word being completed.
+        let measureFont = font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        let lineStart = ns.paragraphRange(for: NSRange(location: anchor, length: 0)).location
+        let lineText = ns.substring(with: NSRange(location: lineStart, length: anchor - lineStart)).replacingOccurrences(of: "\t", with: "    ")
+        let x = textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0)
+            + (lineText as NSString).size(withAttributes: [.font: measureFont]).width
+        var lineBottom = textContainerOrigin.y
+        if let lm = layoutManager, ns.length > 0 {
+            let glyph = lm.glyphIndexForCharacter(at: max(min(anchor, ns.length - 1), 0))
+            lineBottom += lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).maxY
+            if anchor >= ns.length, ns.hasSuffix("\n") { lineBottom = textContainerOrigin.y + lm.extraLineFragmentRect.maxY }
+        }
+        let inWindow = convert(NSPoint(x: x, y: lineBottom), to: nil)
+        completion.show(items: items, prefix: prefix, at: window.convertPoint(toScreen: inWindow), in: window)
+    }
+
+    func hideCompletion() {
+        completionTask?.cancel()
+        completion.hide()
+    }
+
+    private func acceptCompletion() -> Bool {
+        guard completion.isVisible, let item = completion.selectedItem else { return false }
+        accept(item)
+        return true
+    }
+
+    private func accept(_ item: CompletionItem) {
+        hideCompletion()
+        let caret = selectedRange().location
+        let range = NSRange(location: min(completionAnchor, caret), length: max(caret - completionAnchor, 0))
+        var text = item.insertText
+        var caretBack = 0
+        // Methods: add the closing parenthesis and place the cursor inside when arguments are expected.
+        if text.hasSuffix("(") { text += ")"; caretBack = 1 }
+        guard shouldChangeText(in: range, replacementString: text) else { return }
+        textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: typingAttributes))
+        didChangeText()
+        setSelectedRange(NSRange(location: range.location + (text as NSString).length - caretBack, length: 0))
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -440,6 +555,8 @@ struct CodeEditorView: NSViewRepresentable {
         tv.indentUnit = CodeStyle.indentUnit(for: block.language)
         tv.predictionsEnabled = { [theme = ThemeManager.shared] in theme.settings.aiPredictions && theme.settings.codePredictions }
         tv.ghostColor = codeTheme.foregroundColor.withAlphaComponent(0.38)
+        tv.completionEnabled = { ThemeManager.shared.settings.codeCompletion }
+        tv.accentColor = ThemeManager.shared.accentNSColor
         container.showsGutter = showLineNumbers
         container.gutter.font = .monospacedDigitSystemFont(ofSize: max(font.pointSize - 2, 9), weight: .regular)
         container.gutter.color = codeTheme.color(for: .comment).withAlphaComponent(0.7)
@@ -473,7 +590,10 @@ struct CodeEditorView: NSViewRepresentable {
         var parent: CodeEditorView
 
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard let tv = notification.object as? CodeTextView, tv.suggestion != nil else { return }
+            guard let tv = notification.object as? CodeTextView else { return }
+            // Clicking elsewhere closes the list (typing keeps it, the text change refreshes it).
+            if tv.completion.isVisible, NSApp.currentEvent?.type == .leftMouseDown { tv.hideCompletion() }
+            guard tv.suggestion != nil else { return }
             if tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor { tv.clearSuggestion() }
         }
         var styleKey = ""
@@ -484,6 +604,7 @@ struct CodeEditorView: NSViewRepresentable {
             highlight(tv)
             (tv.superview as? CodeEditorContainer)?.gutter.needsDisplay = true
             parent.onChange()
+            tv.textChangedForCompletion()
             tv.schedulePrediction()
         }
 

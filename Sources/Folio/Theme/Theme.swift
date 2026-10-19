@@ -121,6 +121,8 @@ struct ThemeSettings: Codable, Equatable {
     var systemPredictions = true
     /// Grey code completions in code blocks (needs `aiPredictions`).
     var codePredictions = true
+    /// IDE-style completion list in code blocks.
+    var codeCompletion = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -154,6 +156,7 @@ struct ThemeSettings: Codable, Equatable {
         aiPredictions = v(.aiPredictions, d.aiPredictions)
         systemPredictions = v(.systemPredictions, d.systemPredictions)
         codePredictions = v(.codePredictions, d.codePredictions)
+        codeCompletion = v(.codeCompletion, d.codeCompletion)
     }
 }
 

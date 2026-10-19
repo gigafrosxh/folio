@@ -146,6 +146,12 @@ final class FolioTextView: NSTextView {
         super.cancelOperation(sender)
     }
 
+    /// NSTextView sends Esc as `complete(_:)`; with a suggestion showing, Esc only dismisses it.
+    override func complete(_ sender: Any?) {
+        if suggestion != nil { clearSuggestion(); return }
+        super.complete(sender)
+    }
+
     override func moveRight(_ sender: Any?) {
         if suggestion != nil, acceptSuggestion() { return }
         super.moveRight(sender)

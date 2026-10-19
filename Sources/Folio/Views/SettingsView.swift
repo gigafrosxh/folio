@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var lookupRevision = 0
     @State private var commands: [String: String] = [:]
     @State private var resolving = true
+    @State private var completionSources: [(String, String)] = []
 
     private let accents = ["#E5A50A", "#E86A33", "#D64959", "#C64B91", "#8956CF", "#3478D4", "#269B9B", "#459D54"]
     private static let fontFamilies = NSFontManager.shared.availableFontFamilies.sorted()
@@ -118,6 +119,30 @@ struct SettingsView: View {
                 Stepper("Schriftgröße: \(Int(theme.settings.codeFontSize)) pt", value: $theme.settings.codeFontSize, in: 9...28)
                 Toggle("Zeilennummern", isOn: $theme.settings.showLineNumbers)
                 settingSlider("Eckenradius", value: $theme.settings.codeCornerRadius, range: 0...28, unit: "pt")
+            }
+            Section {
+                Toggle("Vorschlagsliste beim Tippen (wie in einer IDE)", isOn: $theme.settings.codeCompletion)
+                Text("Öffnet sich nach „.“, „::“ oder „->“ und ab zwei Buchstaben, oder mit ⌃Leertaste. ↑/↓ wählen, Enter oder Tab übernimmt, Esc schließt.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if completionSources.isEmpty {
+                    ProgressView().controlSize(.small)
+                } else {
+                    ForEach(completionSources, id: \.0) { name, source in
+                        LabeledContent(name) {
+                            Text(source).foregroundStyle(source.hasPrefix("Schlüsselwörter") ? Color.secondary : Color.green)
+                        }
+                    }
+                }
+            } header: {
+                Text("Autovervollständigung")
+            } footer: {
+                Text("Weitere Sprachserver (z. B. pyright, typescript-language-server, gopls, jdtls) werden automatisch genutzt, sobald sie installiert sind.")
+            }
+            .task {
+                let langs = Languages.all.filter { !["plain", "markdown"].contains($0.id) }
+                completionSources = await Task.detached {
+                    langs.map { ($0.name, CompletionEngine.shared.sourceDescription(for: $0.id)) }
+                }.value
             }
             Section("Eigenes Theme") {
                 Button("Aktuelles Theme duplizieren", action: duplicateTheme)
