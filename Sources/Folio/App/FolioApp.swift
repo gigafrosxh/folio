@@ -179,12 +179,18 @@ enum LayoutDebug {
                         }
                         guard let code = NSApp.windows.first(where: { $0.isVisible })?.contentView.flatMap(findCode) else { return }
                         code.window?.makeFirstResponder(code)
-                        for ch in String(parts[1]).replacingOccurrences(of: "\\n", with: "\n") {
-                            if ch == "\n" { code.insertNewline(nil) }
-                            else if ch == "\u{8}" { code.deleteBackward(nil) }
-                            else { code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0)) }
+                        // "~" pauses 2.5 s (e.g. to let the completion list open), then typing continues.
+                        let chunks = String(parts[1]).replacingOccurrences(of: "\\n", with: "\n").components(separatedBy: "~")
+                        for (i, chunk) in chunks.enumerated() {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 2.5) {
+                                for ch in chunk {
+                                    if ch == "\n" { code.insertNewline(nil) }
+                                    else if ch == "\u{8}" { code.deleteBackward(nil) }
+                                    else { code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0)) }
+                                }
+                                if i == chunks.count - 1 { print("LAYOUT code:", code.string.debugDescription); fflush(stdout) }
+                            }
                         }
-                        print("LAYOUT code:", code.string.debugDescription)
                         if ProcessInfo.processInfo.environment["FOLIO_COMPLETE"] != nil { code.triggerCompletion(manual: true) }
                     }
                 } else if typed == "run-server", let doc = NoteStore.shared.currentDocument {

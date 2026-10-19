@@ -323,6 +323,23 @@ final class CodeTextView: NSTextView {
         guard completionEnabled() else { return }
         let ctx = CompletionContext(code: string, offset: selectedRange().location, language: language)
         let typedTrigger = ctx.receiver != nil && ctx.prefix.isEmpty
+        if completion.isVisible {
+            // Narrow the visible list right away, so a fast Enter never takes an entry that no longer matches.
+            let caret = selectedRange().location
+            if caret >= completionAnchor, caret - completionAnchor <= ns.length {
+                let typed = ns.substring(with: NSRange(location: completionAnchor, length: caret - completionAnchor))
+                let narrowed = CompletionFilter.filter(completion.model.items, prefix: typed)
+                if narrowed.isEmpty || typed.contains(where: { !($0.isLetter || $0.isNumber || $0 == "_" || $0 == "$") }) {
+                    hideCompletion()
+                } else {
+                    completion.model.items = narrowed
+                    completion.model.prefix = typed
+                    completion.model.selection = 0
+                }
+            } else {
+                hideCompletion()
+            }
+        }
         if completion.isVisible || typedTrigger || ctx.prefix.count >= 2 {
             triggerCompletion(manual: false)
         }
@@ -381,6 +398,13 @@ final class CodeTextView: NSTextView {
 
     private func acceptCompletion() -> Bool {
         guard completion.isVisible, let item = completion.selectedItem else { return false }
+        // Only accept an entry that still matches what was typed since the list opened.
+        let caret = selectedRange().location
+        let typed = caret >= completionAnchor ? ns.substring(with: NSRange(location: completionAnchor, length: caret - completionAnchor)) : ""
+        guard typed.isEmpty || item.label.lowercased().contains(typed.lowercased()) else {
+            hideCompletion()
+            return false
+        }
         accept(item)
         return true
     }

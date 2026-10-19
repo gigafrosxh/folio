@@ -29,12 +29,13 @@ final class CompletionPopup {
         model.selection = min(model.selection, max(items.count - 1, 0))
         if items.isEmpty { hide(); return }
         let panel = self.panel ?? makePanel()
-        let height = CGFloat(min(items.count, 9)) * Self.rowHeight + 10
+        let height = CGFloat(min(items.count, 8)) * Self.rowHeight + 10
         var frame = NSRect(x: screenPoint.x - 8, y: screenPoint.y - height - 4, width: Self.width, height: height)
         if let screen = parent.screen?.visibleFrame {
             if frame.minY < screen.minY { frame.origin.y = screenPoint.y + 26 }   // no room below: show above
             frame.origin.x = min(frame.origin.x, screen.maxX - frame.width)
         }
+        panel.appearance = parent.effectiveAppearance
         panel.setFrame(frame, display: true)
         if panel.parent == nil { parent.addChildWindow(panel, ordered: .above) }
         panel.orderFront(nil)

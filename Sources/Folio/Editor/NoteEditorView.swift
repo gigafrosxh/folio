@@ -147,22 +147,48 @@ struct NoteEditorView: View {
     private func insertChatAnswer(_ markdown: String) {
         let body = theme.bodyAttributes
         let result = NSMutableAttributedString()
+        let codeFont = NSFont.monospacedSystemFont(ofSize: theme.bodyFont().pointSize * 0.92, weight: .regular)
         for (i, rawLine) in markdown.components(separatedBy: "\n").enumerated() {
             var line = rawLine
-            if let r = line.range(of: #"^\s*[-*] "#, options: .regularExpression) { line.replaceSubrange(r, with: "• ") }
-            if let r = line.range(of: #"^\s*- \[ \] "#, options: .regularExpression) { line.replaceSubrange(r, with: "☐ ") }
+            // Nested list items keep their level as tabs (two spaces of Markdown indentation per level).
+            let leading = line.prefix { $0 == " " || $0 == "\t" }
+            let level = leading.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) } / 2
+            if let r = line.range(of: #"^\s*[-*+] \[ \] "#, options: .regularExpression) {
+                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "☐ ")
+            } else if let r = line.range(of: #"^\s*[-*+] \[[xX]\] "#, options: .regularExpression) {
+                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "☑ ")
+            } else if let r = line.range(of: #"^\s*[-*+] "#, options: .regularExpression) {
+                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "• ")
+            } else if let r = line.range(of: #"^\s*\d+\. "#, options: .regularExpression) {
+                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + line[r].trimmingCharacters(in: .whitespaces) + " ")
+            }
             var attrs = body
             if let r = line.range(of: #"^#{1,6} "#, options: .regularExpression) {
                 line.removeSubrange(r)
                 attrs = TextStyle.subheading.attributes(theme: theme)
             }
             if i > 0 { result.append(NSAttributedString(string: "\n", attributes: body)) }
-            // **bold** spans
-            let parts = line.components(separatedBy: "**")
-            for (j, part) in parts.enumerated() where !part.isEmpty {
+            // **bold** and `code` spans become real formatting instead of literal Markdown.
+            let tokens = try! NSRegularExpression(pattern: #"\*\*(.+?)\*\*|`([^`]+)`"#)
+            let ns = line as NSString
+            var cursor = 0
+            for m in tokens.matches(in: line, range: NSRange(location: 0, length: ns.length)) {
+                if m.range.location > cursor {
+                    result.append(NSAttributedString(string: ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)), attributes: attrs))
+                }
                 var a = attrs
-                if j % 2 == 1, let f = a[.font] as? NSFont { a[.font] = NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) }
-                result.append(NSAttributedString(string: part, attributes: a))
+                if m.range(at: 1).location != NSNotFound {
+                    if let f = a[.font] as? NSFont { a[.font] = NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) }
+                    result.append(NSAttributedString(string: ns.substring(with: m.range(at: 1)), attributes: a))
+                } else {
+                    a[.font] = codeFont
+                    a[.backgroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.12)
+                    result.append(NSAttributedString(string: ns.substring(with: m.range(at: 2)), attributes: a))
+                }
+                cursor = NSMaxRange(m.range)
+            }
+            if cursor < ns.length {
+                result.append(NSAttributedString(string: ns.substring(from: cursor), attributes: attrs))
             }
         }
         if let tv = formatting.activeTextView, tv.window != nil, doc.block(tv.blockID ?? UUID()) != nil {
