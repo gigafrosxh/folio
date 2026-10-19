@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.5.1] – 2026-10-19
+
 ### Behoben
 - Autovervollständigung: Schnelles Weitertippen und Enter übernahm einen veralteten Vorschlag (z. B. `System.out.flush()` statt `println`). Die Liste wird jetzt sofort mit jedem Zeichen gefiltert, und nur noch passende Einträge werden übernommen.
 - In die Notiz eingefügte KI-Antworten zeigen `Code` als Code statt mit Backticks und behalten verschachtelte Listen bei.
