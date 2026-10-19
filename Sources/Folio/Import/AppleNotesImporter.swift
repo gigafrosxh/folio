@@ -30,7 +30,13 @@ enum AppleNotesImporter {
         }
     }
 
-    static func fetch() async throws -> [RawNote] {
+    struct Report: Decodable, Sendable {
+        var notes: [RawNote]
+        /// Notes or folders that could not be read (locked, or not resolvable via scripting).
+        var skipped: [String]
+    }
+
+    static func fetch() async throws -> Report {
         try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -67,7 +73,7 @@ enum AppleNotesImporter {
                 if let date = formatter.date(from: value) { return date }
                 throw ImportError.invalidData
             }
-            do { return try decoder.decode([RawNote].self, from: data) }
+            do { return try decoder.decode(Report.self, from: data) }
             catch { throw ImportError.invalidData }
         }.value
     }
@@ -140,42 +146,56 @@ enum AppleNotesImporter {
                             file: NoteFile(meta: meta, body: NoteBody(blocks: blocks), attachments: attachments))
     }
 
+    /// Walks the flat folder list of each account. Nested folders reached through `folder.folders()` can
+    /// fail to resolve in JXA (error -1728), so the folder path is rebuilt from each folder's container
+    /// chain instead, and any folder or note that still fails is skipped and reported, not fatal.
     private static let script = #"""
-    const notes = Application('Notes');
+    const app = Application('Notes');
     const result = [];
-    const visited = new Set();
-    function walk(folder, account, path) {
-        const folderID = folder.id();
-        if (visited.has(folderID)) return;
-        visited.add(folderID);
-        const name = folder.name();
-        if (name === 'Recently Deleted' || name === 'Zuletzt gelöscht') return;
-        const folderPath = path.concat([name]);
-        const names = folder.notes.name();
-        const created = folder.notes.creationDate();
-        const modified = folder.notes.modificationDate();
-        const ids = folder.notes.id();
-        const locked = folder.notes.passwordProtected();
-        let bodies;
-        try { bodies = folder.notes.body(); }
-        catch (error) {
-            if (String(error).includes('-1743') || /not authorized/i.test(String(error))) throw error;
-            bodies = ids.map((id, i) => locked[i] ? null : folder.notes[i].body());
-        }
-        for (let i = 0; i < ids.length; i++) {
-            if (locked[i] || bodies[i] == null) continue;
-            result.push({account: account, folderPath: folderPath, name: names[i], body: bodies[i],
-                         created: created[i].toISOString(), modified: modified[i].toISOString(), id: ids[i]});
-        }
-        folder.folders().forEach(child => walk(child, account, folderPath));
-    }
-    notes.accounts().forEach(account => {
+    const skipped = [];
+    const deletedNames = ['Recently Deleted', 'Zuletzt gelöscht'];
+    function attempt(f, fallback) { try { return f(); } catch (e) { return fallback; } }
+    function denied(e) { return String(e).includes('-1743') || /not authori[sz]ed/i.test(String(e)); }
+    app.accounts().forEach(account => {
         const accountID = account.id();
         const accountName = account.name();
         account.folders().forEach(folder => {
-            if (folder.container().id() === accountID) walk(folder, accountName, []);
+            let name = '?';
+            try {
+                name = folder.name();
+                if (deletedNames.includes(name)) return;
+                const path = [name];
+                let parent = attempt(() => folder.container(), null);
+                let depth = 0;
+                while (parent && depth < 20 && attempt(() => parent.id(), accountID) !== accountID) {
+                    const parentName = attempt(() => parent.name(), null);
+                    if (parentName === null) break;
+                    if (deletedNames.includes(parentName)) return;
+                    path.unshift(parentName);
+                    parent = attempt(() => parent.container(), null);
+                    depth++;
+                }
+                const ids = folder.notes.id();
+                if (ids.length === 0) return;
+                const names = folder.notes.name();
+                const created = folder.notes.creationDate();
+                const modified = folder.notes.modificationDate();
+                const locked = attempt(() => folder.notes.passwordProtected(), ids.map(() => false));
+                let bodies = attempt(() => folder.notes.body(), null);
+                for (let i = 0; i < ids.length; i++) {
+                    if (locked[i]) { skipped.push(path.join('/') + '/' + names[i] + ' (gesperrt)'); continue; }
+                    let body = bodies ? bodies[i] : null;
+                    if (body == null) body = attempt(() => app.notes.byId(ids[i]).body(), null);
+                    if (body == null) { skipped.push(path.join('/') + '/' + names[i]); continue; }
+                    result.push({account: accountName, folderPath: path, name: names[i], body: body,
+                                 created: created[i].toISOString(), modified: modified[i].toISOString(), id: ids[i]});
+                }
+            } catch (e) {
+                if (denied(e)) throw e;
+                skipped.push(name + ' (Ordner)');
+            }
         });
     });
-    JSON.stringify(result);
+    JSON.stringify({notes: result, skipped: skipped});
     """#
 }

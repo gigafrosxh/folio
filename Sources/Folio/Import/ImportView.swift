@@ -9,6 +9,7 @@ struct ImportView: View {
     @State private var total = 0
     @State private var importedCount: Int?
     @State private var errorText: String?
+    @State private var skipped: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -16,10 +17,13 @@ struct ImportView: View {
                 .font(.title2.bold())
             VStack(alignment: .leading, spacing: 10) {
                 Text("Deine Notizen werden mit ihrer Ordnerstruktur in den Bibliotheksordner „Apple Notizen“ kopiert. Die Originale bleiben unverändert.")
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("macOS fragt nach der Erlaubnis, Notizen zu steuern. Gesperrte Notizen können nicht gelesen werden und werden übersprungen.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .font(.callout)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .floating()
 
@@ -36,6 +40,19 @@ struct ImportView: View {
             if let importedCount {
                 Text("\(importedCount) Notizen importiert")
                     .foregroundStyle(.secondary)
+            }
+            if !skipped.isEmpty {
+                DisclosureGroup("\(skipped.count) übersprungen") {
+                    ScrollView {
+                        Text(skipped.joined(separator: "\n"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 90)
+                }
+                .font(.callout)
             }
             if let errorText {
                 ScrollView {
@@ -71,7 +88,9 @@ struct ImportView: View {
     private func runImport() async {
         defer { isImporting = false; isReading = false }
         do {
-            let notes = try await AppleNotesImporter.fetch()
+            let report = try await AppleNotesImporter.fetch()
+            let notes = report.notes
+            skipped = report.skipped
             isReading = false
             total = notes.count
             completed = 0
