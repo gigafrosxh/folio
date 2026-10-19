@@ -109,7 +109,7 @@ struct FormatToolbar: View {
         .font(.system(size: 13, weight: .medium))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .floatingCapsule()
+        .floating(cornerRadius: 14)
     }
 
     private var sep: some View {

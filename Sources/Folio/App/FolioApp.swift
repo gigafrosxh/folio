@@ -30,7 +30,7 @@ struct FolioApp: App {
                 .tint(theme.accent)
                 .frame(minWidth: 900, minHeight: 560)
         }
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .windowStyle(.hiddenTitleBar)
         .commands { FolioCommands(store: store) }
 
         Settings {
@@ -55,6 +55,12 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Divider()
             Button("Apple Notizen importieren…") { NotificationCenter.default.post(name: .folioShowImport, object: nil) }
+        }
+        CommandGroup(after: .sidebar) {
+            Button("Seitenleiste ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleSidebar, object: nil) }
+                .keyboardShortcut("s", modifiers: [.command, .option])
+            Button("Notizen durchsuchen") { NotificationCenter.default.post(name: .folioFocusSearch, object: nil) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
         }
         CommandGroup(after: .saveItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }

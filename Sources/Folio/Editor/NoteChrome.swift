@@ -1,0 +1,74 @@
+import AppKit
+import SwiftUI
+import FolioCore
+
+/// Floating pill to the right of the formatting bar: pin, share, show in Finder, delete.
+struct NoteActionsBar: View {
+    @ObservedObject var doc: NoteDocument
+    @EnvironmentObject var store: NoteStore
+    @EnvironmentObject var theme: ThemeManager
+
+    var body: some View {
+        HStack(spacing: 2) {
+            button(doc.meta.pinned ? "pin.fill" : "pin", doc.meta.pinned ? "Loslösen" : "Anpinnen",
+                   tint: doc.meta.pinned ? theme.accent : nil) { store.togglePin(doc.id) }
+            ShareLink(item: doc.url) {
+                Image(systemName: "square.and.arrow.up").frame(width: 30, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Teilen")
+            button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
+            button("trash", "In den Papierkorb legen") { store.delete(doc.id) }
+        }
+        .font(.system(size: 13, weight: .medium))
+        .padding(5)
+        .floating(cornerRadius: 14)
+    }
+
+    private func button(_ icon: String, _ help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .foregroundStyle(tint ?? .primary)
+                .frame(width: 30, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+}
+
+/// Small floating pill in the bottom-right corner with tags, words and compressed file size.
+struct NoteStatusPill: View {
+    @ObservedObject var doc: NoteDocument
+    @State private var fileSize: Int64 = 0
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if !doc.meta.tags.isEmpty {
+                Text("\(doc.meta.tags.count) Tag\(doc.meta.tags.count == 1 ? "" : "s")")
+                dot
+            }
+            Text("\(wordCount) Wörter")
+            dot
+            Text("\(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)) komprimiert")
+        }
+        .font(.system(size: 11.5))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .floating(cornerRadius: 999)
+        .onAppear(perform: refresh)
+        .onChange(of: doc.meta.modified) { refresh() }
+    }
+
+    private var dot: some View { Text("·").foregroundStyle(.tertiary) }
+
+    private var wordCount: Int {
+        doc.meta.searchText.split { $0.isWhitespace || $0.isNewline }.count
+    }
+
+    private func refresh() {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: doc.url.path)
+        fileSize = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+}

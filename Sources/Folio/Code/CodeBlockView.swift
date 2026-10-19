@@ -38,7 +38,20 @@ struct CodeBlockView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            Text("main.\(spec.fileExtension)")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
+            if spec.isRunnable {
+                Text(interpreter ?? "kein Interpreter gefunden")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(interpreter == nil ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)).opacity(0.8))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            if let runInfo {
+                Text(runInfo).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+            }
             Menu {
                 ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
                     Button(lang.name) { block.language = lang.id; doc.markDirty() }
@@ -46,49 +59,65 @@ struct CodeBlockView: View {
                 Divider()
                 Button("Nur Text") { block.language = "plain"; doc.markDirty() }
             } label: {
-                Text(spec.name).font(.system(size: 11, weight: .semibold))
+                HStack(spacing: 4) {
+                    Text(spec.name)
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                }
+                .font(.system(size: 11.5, weight: .medium))
+                .padding(.horizontal, 9)
+                .frame(height: 26)
+                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(Color.primary.opacity(0.15)))
+                .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .fixedSize()
 
-            if spec.isRunnable {
-                Text(interpreter ?? "kein Interpreter gefunden")
-                    .font(.system(size: 10))
-                    .foregroundStyle(interpreter == nil ? Color.orange : Color.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if let runInfo {
-                Text(runInfo).font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            Button {
+            headerButton("doc.on.doc", "Code kopieren") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(block.storage.string, forType: .string)
-            } label: { Image(systemName: "doc.on.doc") }
-                .buttonStyle(.borderless)
-                .help("Code kopieren")
+            }
+            headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
 
             if spec.isRunnable {
                 if running != nil {
-                    Button { running?.cancel() } label: {
-                        Label("Stopp", systemImage: "stop.fill").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.red)
+                    runButton("Stopp", icon: "stop.fill", color: .red) { running?.cancel() }
                 } else {
-                    Button(action: run) {
-                        Label("Ausführen", systemImage: "play.fill").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(Color(nsColor: codeTheme.color(for: .function)))
-                    .help("Mit installiertem Interpreter ausführen (⌘↩)")
-                    .disabled(interpreter == nil)
+                    runButton("Ausführen", icon: "play.fill", color: Color(red: 0.12, green: 0.55, blue: 0.27), action: run)
+                        .help("Mit installiertem Interpreter ausführen (⌘↩)")
+                        .disabled(interpreter == nil)
+                        .opacity(interpreter == nil ? 0.5 : 1)
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
         .padding(.vertical, 7)
-        .background(Color(nsColor: codeTheme.foregroundColor).opacity(0.05))
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
+    }
+
+    private func headerButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func runButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 11)
+                .frame(height: 26)
+                .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private func outputView(_ output: String) -> some View {

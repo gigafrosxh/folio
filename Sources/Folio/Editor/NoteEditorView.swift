@@ -23,11 +23,29 @@ struct NoteEditorView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(doc.meta.modified.formatted(date: .long, time: .shortened))
-                        .font(.caption)
+                    Text("\(doc.meta.modified.formatted(date: .long, time: .shortened)) · \(doc.url.lastPathComponent)")
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                         .frame(maxWidth: .infinity)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 2)
+                    if !doc.meta.tags.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(doc.meta.tags, id: \.self) { tag in
+                                Button { store.sidebarSelection = .tag(tag) } label: {
+                                    Text("#\(tag)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(theme.accent)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 3)
+                                        .background(theme.accent.opacity(0.14), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Alle Notizen mit #\(tag)")
+                            }
+                        }
+                        .padding(.leading, BlockRow.gutter)
+                    }
                     ForEach(doc.blocks) { block in
                         BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
                     }
@@ -36,8 +54,9 @@ struct NoteEditorView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { focusEnd() }
                 }
-                .frame(maxWidth: CGFloat(theme.settings.editorWidth))
-                .padding(.horizontal, 36)
+                .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
+                .padding(.leading, 36 - BlockRow.gutter)
+                .padding(.trailing, 36)
                 .padding(.top, 76)
                 .frame(maxWidth: .infinity)
             }
@@ -49,8 +68,17 @@ struct NoteEditorView: View {
                 }
             }
 
-            FormatToolbar(actions: actions)
-                .padding(.top, 14)
+            HStack(alignment: .top, spacing: 10) {
+                Spacer(minLength: 0)
+                FormatToolbar(actions: actions)
+                NoteActionsBar(doc: doc)
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14)
+            .padding(.horizontal, 12)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            NoteStatusPill(doc: doc).padding(16)
         }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
@@ -257,8 +285,11 @@ extension FormattingController {
     }
 }
 
-/// One block in the editor, with floating hover controls for non-text blocks.
+/// One block in the editor. Non-text blocks get floating controls in a gutter on the left; the gutter is
+/// part of the hover area, so the controls stay put while the pointer moves onto them.
 struct BlockRow: View {
+    static let gutter: CGFloat = 40
+
     @ObservedObject var block: BlockModel
     @ObservedObject var doc: NoteDocument
     var isFirst: Bool
@@ -266,52 +297,95 @@ struct BlockRow: View {
     @EnvironmentObject var theme: ThemeManager
     @State private var height: CGFloat = 24
     @State private var hovering = false
+    @State private var hideTask: Task<Void, Never>?
 
     var body: some View {
-        Group {
-            switch block.kind {
-            case .text:
-                RichTextView(block: block, isFirstBlock: isFirst, height: $height, theme: theme,
-                             onChange: { doc.markDirty() },
-                             onFocus: {
-                                 FormattingController.shared.didFocus(FormattingController.shared.textView(for: block.id), blockID: block.id)
-                             },
-                             onDeleteEmpty: { deleteEmptyText() },
-                             onPasteFiles: { actions.pasteFiles($0, block.id) },
-                             onPasteImage: { actions.pasteImage($0, block.id) },
-                             onPasteURL: { actions.pasteURL($0, block.id) })
-                    .frame(height: height)
-            case .code:
-                CodeBlockView(block: block, doc: doc)
-            case .pdf:
-                PDFBlockView(block: block, doc: doc)
-            case .web:
-                WebBlockView(block: block, doc: doc)
-            case .image:
-                ImageBlockView(block: block, doc: doc)
-            case .file:
-                FileBlockView(block: block, doc: doc)
+        HStack(alignment: .top, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                if block.kind != .text && hovering {
+                    blockControls
+                        .padding(.top, 6)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
+            }
+            .frame(width: Self.gutter)
+            content
+        }
+        .contentShape(Rectangle())
+        .onHover(perform: setHover)
+        .contextMenu {
+            if block.kind != .text {
+                Button("Nach oben") { doc.move(block.id, by: -1) }
+                Button("Nach unten") { doc.move(block.id, by: 1) }
+                Divider()
+                Button("Entfernen", role: .destructive) { doc.remove(block.id) }
             }
         }
-        .overlay(alignment: .topLeading) {
-            if block.kind != .text && hovering {
-                blockControls.offset(x: -34, y: 6)
+        .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+
+    /// Hides the controls with a short delay so they don't vanish while the pointer crosses a gap.
+    private func setHover(_ inside: Bool) {
+        hideTask?.cancel()
+        if inside {
+            hovering = true
+        } else {
+            hideTask = Task {
+                try? await Task.sleep(for: .milliseconds(450))
+                if !Task.isCancelled { hovering = false }
             }
         }
-        .onHover { hovering = $0 }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch block.kind {
+        case .text:
+            RichTextView(block: block, isFirstBlock: isFirst, height: $height, theme: theme,
+                         onChange: { doc.markDirty() },
+                         onFocus: {
+                             FormattingController.shared.didFocus(FormattingController.shared.textView(for: block.id), blockID: block.id)
+                         },
+                         onDeleteEmpty: { deleteEmptyText() },
+                         onPasteFiles: { actions.pasteFiles($0, block.id) },
+                         onPasteImage: { actions.pasteImage($0, block.id) },
+                         onPasteURL: { actions.pasteURL($0, block.id) })
+                .frame(height: height)
+        case .code:
+            CodeBlockView(block: block, doc: doc)
+        case .pdf:
+            PDFBlockView(block: block, doc: doc)
+        case .web:
+            WebBlockView(block: block, doc: doc)
+        case .image:
+            ImageBlockView(block: block, doc: doc)
+        case .file:
+            FileBlockView(block: block, doc: doc)
+        }
     }
 
     private var blockControls: some View {
-        VStack(spacing: 6) {
-            Button { doc.move(block.id, by: -1) } label: { Image(systemName: "chevron.up") }.help("Nach oben")
-            Button { doc.move(block.id, by: 1) } label: { Image(systemName: "chevron.down") }.help("Nach unten")
-            Button(role: .destructive) { doc.remove(block.id) } label: { Image(systemName: "trash") }.help("Entfernen")
+        VStack(spacing: 2) {
+            control("chevron.up", "Nach oben") { doc.move(block.id, by: -1) }
+            control("chevron.down", "Nach unten") { doc.move(block.id, by: 1) }
+            Divider().frame(width: 16).padding(.vertical, 2)
+            control("trash", "Entfernen", destructive: true) { doc.remove(block.id) }
         }
-        .buttonStyle(.borderless)
-        .font(.system(size: 11))
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
+        .padding(4)
         .floating(cornerRadius: 10)
+    }
+
+    private func control(_ icon: String, _ help: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .foregroundStyle(destructive ? Color.red : Color.primary)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 
     private func deleteEmptyText() {
