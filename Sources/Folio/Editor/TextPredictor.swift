@@ -43,15 +43,41 @@ enum TextPredictor {
 
     /// Suggests how `context` (the text before the cursor, ending in a space) continues; nil if nothing useful.
     static func suggest(for context: String) async -> String? {
+        let trimmed = String(context.suffix(400))
+        if let hit = cache[trimmed] { return hit }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *), case .available = status {
-            let session = LanguageModelSession(instructions: instructions)
-            let options = GenerationOptions(temperature: 0.2, maximumResponseTokens: 32)
-            guard let response = try? await session.respond(to: String(context.suffix(800)), options: options) else { return nil }
-            return clean(response.content, context: context)
+            let session = SessionPool.take(.text, instructions: instructions)
+            let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 20)
+            guard let response = try? await session.respond(to: trimmed, options: options),
+                  let text = clean(response.content, context: context) else { return nil }
+            remember(trimmed, text)
+            return text
         }
         #endif
         return nil
+    }
+
+    // MARK: Speed
+
+    /// Small cache so retyping or undo shows the same suggestion instantly.
+    private static var cache: [String: String] = [:]
+    private static var cacheOrder: [String] = []
+
+    private static func remember(_ key: String, _ value: String) {
+        if cache[key] == nil { cacheOrder.append(key) }
+        cache[key] = value
+        if cacheOrder.count > 60 { cache[cacheOrder.removeFirst()] = nil }
+    }
+
+    /// Loads the model and the instructions ahead of time, so the first suggestion doesn't wait ~3 s.
+    static func prewarm() {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *), case .available = status {
+            SessionPool.prepare(.text, instructions: instructions)
+            SessionPool.prepare(.code, instructions: codeInstructions(for: "Code"))
+        }
+        #endif
     }
 
     /// Suggests code to insert at the cursor of a code block, knowing the code around it.
@@ -59,19 +85,28 @@ enum TextPredictor {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *), case .available = status {
             let name = Languages.spec(for: language).name
-            let session = LanguageModelSession(instructions: """
-            You are a code completion engine inside an editor. The user writes \(name). \
-            Reply with ONLY the code that should be inserted at <CURSOR>: at most 4 lines, no explanations, \
-            no markdown fences, never repeat code that is already before <CURSOR>. If the current line is unfinished, \
-            finish it first.
-            """)
-            let prompt = String(before.suffix(1500)) + "<CURSOR>" + String(after.prefix(300))
-            let options = GenerationOptions(temperature: 0.1, maximumResponseTokens: 80)
-            guard let response = try? await session.respond(to: prompt, options: options) else { return nil }
-            return cleanCode(response.content, linePrefix: linePrefix, after: after)
+            let prompt = "Language: \(name)\n" + String(before.suffix(900)) + "<CURSOR>" + String(after.prefix(200))
+            if let hit = cache[prompt] { return hit }
+            let session = SessionPool.take(.code, instructions: codeInstructions(for: name))
+            let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 60)
+            guard let response = try? await session.respond(to: prompt, options: options),
+                  let code = cleanCode(response.content, linePrefix: linePrefix, after: after) else { return nil }
+            remember(prompt, code)
+            return code
         }
         #endif
         return nil
+    }
+
+    /// Same instructions for every language (the language is named in the prompt), so one prewarmed
+    /// session fits all code blocks.
+    static func codeInstructions(for _: String) -> String {
+        """
+        You are a code completion engine inside an editor. The first line names the language. \
+        Reply with ONLY the code that should be inserted at <CURSOR>: at most 4 lines, no explanations, \
+        no markdown fences, never repeat code that is already before <CURSOR>. If the current line is unfinished, \
+        finish it first.
+        """
     }
 
     static func cleanCode(_ raw: String, linePrefix: String, after: String) -> String? {
@@ -96,8 +131,8 @@ enum TextPredictor {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         s = s.trimmingCharacters(in: CharacterSet(charactersIn: "\"„“”«»'`"))
         if let newline = s.firstIndex(where: \.isNewline) { s = String(s[..<newline]) }
-        // Drop an echoed tail of the context ("…, dass" → "dass die …").
-        let tailWords = context.split(whereSeparator: \.isWhitespace).suffix(3).map(String.init)
+        // Drop an echoed tail of the context ("…, dass" → "dass die …"), up to the whole last sentence.
+        let tailWords = context.split(whereSeparator: \.isWhitespace).suffix(12).map(String.init)
         for n in stride(from: tailWords.count, through: 1, by: -1) {
             let tail = tailWords.suffix(n).joined(separator: " ")
             if s.lowercased().hasPrefix(tail.lowercased() + " ") { s = String(s.dropFirst(tail.count + 1)); break }
@@ -106,3 +141,27 @@ enum TextPredictor {
         return s.count >= 2 ? s : nil
     }
 }
+
+#if canImport(FoundationModels)
+/// Keeps one prewarmed session per kind ready; taking one immediately prepares the next, so every
+/// request starts on a warm session and never pays the model load time.
+@available(macOS 26.0, *)
+@MainActor
+private enum SessionPool {
+    enum Kind { case text, code }
+    private static var ready: [Kind: LanguageModelSession] = [:]
+
+    static func prepare(_ kind: Kind, instructions: String) {
+        guard ready[kind] == nil else { return }
+        let s = LanguageModelSession(instructions: instructions)
+        s.prewarm()
+        ready[kind] = s
+    }
+
+    static func take(_ kind: Kind, instructions: String) -> LanguageModelSession {
+        let s = ready.removeValue(forKey: kind) ?? LanguageModelSession(instructions: instructions)
+        prepare(kind, instructions: instructions)
+        return s
+    }
+}
+#endif

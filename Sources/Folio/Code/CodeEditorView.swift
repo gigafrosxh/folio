@@ -280,7 +280,7 @@ final class CodeTextView: NSTextView {
         let location = sel.location
         let linePrefix = textBeforeCaretOnLine
         predictionTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled,
                   let text = await TextPredictor.suggestCode(before: before, after: after, language: lang, linePrefix: linePrefix),
                   !Task.isCancelled, let self, self.selectedRange() == NSRange(location: location, length: 0) else { return }

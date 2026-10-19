@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         LayoutDebug.runIfRequested()
+        // Load the on-device model in the background so the first suggestion comes quickly.
+        if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -101,6 +103,8 @@ struct FolioCommands: Commands {
             Divider()
             Button("Link…") { NotificationCenter.default.post(name: .folioInsert, object: "link") }.keyboardShortcut("k")
             Button("Writing Tools …") { f.showWritingTools() }.keyboardShortcut("w", modifiers: [.command, .shift])
+            Button("Chat mit Apple Intelligence") { NotificationCenter.default.post(name: .folioToggleChat, object: nil) }
+                .keyboardShortcut("i", modifiers: [.command, .option])
             Button("Schrift größer") { f.changeFontSize(by: 2) }.keyboardShortcut("+")
             Button("Schrift kleiner") { f.changeFontSize(by: -2) }.keyboardShortcut("-")
         }
@@ -148,7 +152,20 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed.hasPrefix("code-type:"), let doc = NoteStore.shared.currentDocument {
+                if typed.hasPrefix("chat:"), let doc = NoteStore.shared.currentDocument {
+                    NotificationCenter.default.post(name: .folioToggleChat, object: nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        let started = Date()
+                        let chat = AIChatModel.forNote(doc.id)
+                        chat.send(String(typed.dropFirst("chat:".count)))
+                        @MainActor func poll() {
+                            if chat.isResponding { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { MainActor.assumeIsolated { poll() } }; return }
+                            print("LAYOUT chat answer after \(Int(Date().timeIntervalSince(started) * 1000)) ms:", chat.messages.last?.text.prefix(300) ?? "-", chat.errorText ?? "")
+                            fflush(stdout)
+                        }
+                        poll()
+                    }
+                } else if typed.hasPrefix("code-type:"), let doc = NoteStore.shared.currentDocument {
                     // Types into a fresh code block key by key, like a user would.
                     let parts = typed.dropFirst("code-type:".count).split(separator: ":", maxSplits: 1)
                     let block = BlockModel(kind: .code)
@@ -212,6 +229,13 @@ enum LayoutDebug {
                 } else {
                     tv.insertNewline(nil)
                     tv.insertText(typed, replacementRange: tv.selectedRange())
+                    // A second sentence a bit later measures a warm request.
+                    if let again = ProcessInfo.processInfo.environment["FOLIO_TYPE_AGAIN"] {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            tv.insertNewline(nil)
+                            tv.insertText(again, replacementRange: tv.selectedRange())
+                        }
+                    }
                 }
             }
         }

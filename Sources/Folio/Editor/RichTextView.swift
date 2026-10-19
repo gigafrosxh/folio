@@ -95,13 +95,17 @@ final class FolioTextView: NSTextView {
         let context = ns.substring(with: NSRange(location: start, length: sel.location - start))
         guard context.trimmingCharacters(in: .whitespacesAndNewlines).count >= 4 else { return }
         let location = sel.location
+        let started = Date()
         predictionTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, let text = await TextPredictor.suggest(for: context), !Task.isCancelled else { return }
             guard let self, self.selectedRange() == NSRange(location: location, length: 0) else { return }
             self.suggestion = text
             self.suggestionLocation = location
             self.needsDisplay = true
+            if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil {
+                print("LAYOUT suggestion after \(Int(Date().timeIntervalSince(started) * 1000)) ms: \(text)"); fflush(stdout)
+            }
         }
     }
 

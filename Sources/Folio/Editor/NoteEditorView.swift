@@ -19,6 +19,7 @@ struct NoteEditorView: View {
     @State private var alertMessage: String?
     @State private var dropTargeted = false
     @State private var scrolled = false
+    @AppStorage("folio.chatVisible") private var showChat = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,7 +59,7 @@ struct NoteEditorView: View {
                 }
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
-                .padding(.trailing, 36)
+                .padding(.trailing, showChat ? 36 + 372 : 36)
                 .padding(.top, 18)
                 .frame(maxWidth: .infinity)
             }
@@ -75,7 +76,20 @@ struct NoteEditorView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            NoteStatusPill(doc: doc).padding(16)
+            if !showChat { NoteStatusPill(doc: doc).padding(16) }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showChat {
+                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { withAnimation(.snappy) { showChat = false } })
+                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+                    .frame(width: 360)
+                    .padding(.top, 62)
+                    .padding([.trailing, .bottom], 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
+            withAnimation(.snappy) { showChat.toggle() }
         }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
@@ -110,6 +124,57 @@ struct NoteEditorView: View {
         }
         .onAppear {
             if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
+        }
+    }
+
+    /// The Apple Intelligence chat for this note; it reads the note and the current selection on each question.
+    private var chatModel: AIChatModel {
+        let chat = AIChatModel.forNote(doc.id)
+        chat.noteProvider = { [weak doc] in
+            guard let doc else { return ("", "", nil) }
+            let text = doc.blocks.map { b -> String in
+                switch b.kind {
+                case .code: return "```\(b.language)\n\(b.storage.string)\n```"
+                default: return b.plainText
+                }
+            }.filter { !$0.isEmpty }.joined(separator: "\n\n")
+            return (doc.meta.title, text, FormattingController.shared.selectedText)
+        }
+        return chat
+    }
+
+    /// Inserts a chat answer at the cursor (or at the end of the note), turning Markdown lists and bold into note formatting.
+    private func insertChatAnswer(_ markdown: String) {
+        let body = theme.bodyAttributes
+        let result = NSMutableAttributedString()
+        for (i, rawLine) in markdown.components(separatedBy: "\n").enumerated() {
+            var line = rawLine
+            if let r = line.range(of: #"^\s*[-*] "#, options: .regularExpression) { line.replaceSubrange(r, with: "• ") }
+            if let r = line.range(of: #"^\s*- \[ \] "#, options: .regularExpression) { line.replaceSubrange(r, with: "☐ ") }
+            var attrs = body
+            if let r = line.range(of: #"^#{1,6} "#, options: .regularExpression) {
+                line.removeSubrange(r)
+                attrs = TextStyle.subheading.attributes(theme: theme)
+            }
+            if i > 0 { result.append(NSAttributedString(string: "\n", attributes: body)) }
+            // **bold** spans
+            let parts = line.components(separatedBy: "**")
+            for (j, part) in parts.enumerated() where !part.isEmpty {
+                var a = attrs
+                if j % 2 == 1, let f = a[.font] as? NSFont { a[.font] = NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) }
+                result.append(NSAttributedString(string: part, attributes: a))
+            }
+        }
+        if let tv = formatting.activeTextView, tv.window != nil, doc.block(tv.blockID ?? UUID()) != nil {
+            let range = tv.selectedRange()
+            if tv.shouldChangeText(in: range, replacementString: result.string) {
+                tv.textStorage?.replaceCharacters(in: range, with: result)
+                tv.didChangeText()
+            }
+        } else if let last = doc.blocks.last(where: { $0.kind == .text }) {
+            if last.storage.length > 0 { last.storage.append(NSAttributedString(string: "\n", attributes: body)) }
+            last.storage.append(result)
+            doc.markDirty()
         }
     }
 
@@ -335,6 +400,8 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Shows or hides the Apple Intelligence chat panel.
+    static let folioToggleChat = Notification.Name("folio.toggleChat")
     /// Posted with the pasteboard when ⌘V reaches the app without a text field handling it.
     static let folioPasteboard = Notification.Name("folio.pasteboard")
 }

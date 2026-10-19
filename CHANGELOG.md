@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Hinzugefügt
+- KI-Chat mit Apple Intelligence (auf dem Gerät): schwebendes Panel neben der Notiz (✨ in der Aktionsleiste, ⌥⌘I), kennt die Notiz und auf Wunsch die Auswahl, antwortet live, Schnellaktionen (Zusammenfassen, Stichpunkte, Aufgaben, Fragen, Übersetzen), Antworten lassen sich in die Notiz einfügen oder kopieren; eine Unterhaltung pro Notiz.
+
+### Geändert
+- Text- und Code-Vorhersagen erscheinen schneller: Das Sprachmodell wird beim Start vorgeladen, jede Anfrage startet mit einer vorbereiteten Sitzung, kürzere Wartezeit nach dem Tippen, weniger Kontext und ein Cache. Gemessen: erste Vorhersage 1,1 s statt ca. 3,6 s, danach 0,86 s statt ca. 1,25 s.
+
 ## [0.4.0] – 2026-10-19
 
 ### Hinzugefügt
