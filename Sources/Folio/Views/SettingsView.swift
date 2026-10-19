@@ -34,6 +34,7 @@ struct SettingsView: View {
             code.tabItem { Label("Code", systemImage: "chevron.left.forwardslash.chevron.right") }
             execution.tabItem { Label("Ausführung", systemImage: "play.circle") }
             appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }
+            shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }
         }
             Divider()
             Text(Self.versionString)
@@ -48,6 +49,8 @@ struct SettingsView: View {
         .preferredColorScheme(theme.settings.appearance.colorScheme)
         .onAppear { previewDark = (theme.settings.appearance.colorScheme ?? colorScheme) == .dark }
     }
+
+    private var shortcuts: some View { ShortcutSettingsView() }
 
     private var general: some View {
         Form {

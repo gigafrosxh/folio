@@ -3,6 +3,7 @@ import SwiftUI
 import FolioCore
 
 final class CodeTextView: NSTextView {
+    var blockID: UUID?
     var onHeightChange: ((CGFloat) -> Void)?
     var onRun: (() -> Void)?
     var onFocus: (() -> Void)?
@@ -161,6 +162,12 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertNewline(_ sender: Any?) {
+        // ⇧↩ runs the block (like a notebook cell).
+        if NSApp.currentEvent?.type == .keyDown, NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+            hideCompletion()
+            onRun?()
+            return
+        }
         if acceptCompletion() { return }
         let loc = selectedRange().location
         let before = textBeforeCaretOnLine
@@ -581,6 +588,8 @@ struct CodeEditorView: NSViewRepresentable {
         if #available(macOS 15.0, *) { tv.writingToolsBehavior = .none }
         tv.setAccessibilityRole(.textArea)
         tv.delegate = context.coordinator
+        tv.blockID = block.id
+        FormattingController.shared.registerCode(tv, for: block.id)
         let container = CodeEditorContainer(textView: tv)
         apply(to: container, context: context, force: true)
         DispatchQueue.main.async { tv.reportHeight() }

@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Needed when started as a bare binary (`swift run`); harmless inside the .app bundle.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        ShortcutCenter.shared.install()
         LayoutDebug.runIfRequested()
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
@@ -153,7 +154,31 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed == "linked-run", let doc = NoteStore.shared.currentDocument {
+                if typed == "keys", let doc = NoteStore.shared.currentDocument {
+                    // Real key events through the event queue: ⌃C inserts a code block, typing lands in it, ⇧↩ runs it.
+                    func key(_ chars: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags) {
+                        guard let w = tv.window, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                                                          windowNumber: w.windowNumber, context: nil, characters: chars,
+                                                                          charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                    let before = doc.blocks.filter { $0.kind == .code }.count
+                    key("\u{3}", 8, .control)   // ⌃C
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        let fr = tv.window?.firstResponder
+                        print("LAYOUT keys: code blocks \(before) -> \(doc.blocks.filter { $0.kind == .code }.count), focus: \(fr.map { String(describing: type(of: $0)) } ?? "nil")")
+                        for ch in "print(6*7" { key(String(ch), 0xFFFF, []) }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            key("\r", 36, .shift)  // ⇧↩
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                let id = (tv.window?.firstResponder as? CodeTextView)?.blockID
+                                let code = doc.blocks.first(where: { $0.id == id })
+                                print("LAYOUT keys: code=\(code?.storage.string.debugDescription ?? "-") output=\(code?.output?.debugDescription ?? "-")")
+                                fflush(stdout)
+                            }
+                        }
+                    }
+                } else if typed == "linked-run", let doc = NoteStore.shared.currentDocument {
                     let a = BlockModel(kind: .code), b = BlockModel(kind: .code)
                     a.language = "python"; b.language = "python"
                     a.storage.setAttributedString(NSAttributedString(string: "a = 10\nnamen = ['Ada', 'Linus']"))

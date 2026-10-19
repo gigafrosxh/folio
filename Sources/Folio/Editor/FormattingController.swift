@@ -85,6 +85,28 @@ final class FormattingController: ObservableObject {
 
     func textView(for id: UUID) -> FolioTextView? { registry[id]?.view }
 
+    private final class WeakCodeView { weak var view: CodeTextView?; init(_ v: CodeTextView) { view = v } }
+    private var codeRegistry: [UUID: WeakCodeView] = [:]
+
+    func registerCode(_ tv: CodeTextView, for id: UUID) {
+        codeRegistry = codeRegistry.filter { $0.value.view != nil }
+        codeRegistry[id] = WeakCodeView(tv)
+    }
+
+    /// Puts the cursor into a code block (e.g. right after inserting it). The view may appear a moment later.
+    func focusCodeBlock(_ id: UUID, attempts: Int = 10) {
+        activeBlockID = id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let tv = self.codeRegistry[id]?.view, tv.window != nil else {
+                if attempts > 0 { self.focusCodeBlock(id, attempts: attempts - 1) }
+                return
+            }
+            tv.window?.makeFirstResponder(tv)
+            tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+            tv.scrollRangeToVisible(tv.selectedRange())
+        }
+    }
+
     func didFocus(_ tv: FolioTextView?, blockID: UUID) {
         activeTextView = tv
         activeBlockID = blockID

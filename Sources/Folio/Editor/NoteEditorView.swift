@@ -254,6 +254,7 @@ struct NoteEditorView: View {
         case "web": promptText = ""; showWebPrompt = true
         case "playground": openPlayground()
         case "drawing": insertBlock(BlockModel(kind: .drawing))
+        case "runall": RunManager.shared.runAll(doc: doc, theme: theme)
         case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
         case "link": promptText = ""; showLinkPrompt = true
         default: break
@@ -267,7 +268,7 @@ struct NoteEditorView: View {
         let split = (target == formatting.activeBlockID) ? formatting.cursorLocation : nil
         doc.insert(block, after: target, splitAt: split)
         if block.kind == .code {
-            DispatchQueue.main.async { formatting.focusCode(block.id) }
+            formatting.focusCodeBlock(block.id)
         } else if let i = doc.blocks.firstIndex(where: { $0.id == block.id }), i + 1 < doc.blocks.count {
             formatting.focus(blockID: doc.blocks[i + 1].id, atEnd: false)
         }
@@ -432,12 +433,6 @@ extension Notification.Name {
     static let folioPasteboard = Notification.Name("folio.pasteboard")
 }
 
-extension FormattingController {
-    func focusCode(_ id: UUID) {
-        // Code views are not registered as rich text views; focusing happens through the responder chain.
-        activeBlockID = id
-    }
-}
 
 /// One block in the editor. Non-text blocks get floating controls in a gutter on the left; the gutter is
 /// part of the hover area, so the controls stay put while the pointer moves onto them.
