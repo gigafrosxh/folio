@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct SidebarView: View {
     @EnvironmentObject var store: NoteStore
     @EnvironmentObject var theme: ThemeManager
+    @EnvironmentObject var windowState: WindowState
     @State private var newFolderParent: URL?
     @State private var showNewFolder = false
     @State private var renaming: URL?
@@ -16,8 +17,13 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Room for the window's traffic lights, which sit on top of this panel.
-            Color.clear.frame(height: 30)
+            HStack {
+                WindowControls(window: windowState.window)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 14)
 
             searchField
                 .padding(.horizontal, 10)
@@ -118,7 +124,7 @@ struct SidebarView: View {
         .font(.system(size: 13))
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -161,8 +167,8 @@ struct SidebarView: View {
         }
         .padding(.leading, 8 + CGFloat(depth) * 16)
         .padding(.trailing, 8)
-        .frame(height: 30)
-        .background(selected ? Color.primary.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(height: 32)
+        .background(selected ? theme.accent.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { store.sidebarSelection = item }
     }

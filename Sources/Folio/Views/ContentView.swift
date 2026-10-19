@@ -7,13 +7,14 @@ struct ContentView: View {
     @EnvironmentObject var theme: ThemeManager
     @AppStorage("folio.sidebarVisible") private var sidebarVisible = true
     @AppStorage("folio.listWidth") private var listWidth: Double = 300
+    @StateObject private var windowState = WindowState()
 
     var body: some View {
         HStack(spacing: 0) {
             if sidebarVisible {
                 SidebarView()
                     .frame(width: 240)
-                    .padding(.trailing, 10)
+                    .padding(.trailing, 12)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
             NoteListView(sidebarVisible: $sidebarVisible)
@@ -25,8 +26,11 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
         }
-        .padding(10)
-        .background(Color(nsColor: .underPageBackgroundColor))
+        .padding(12)
+        .background(AmbientBackground(accent: theme.accent))
+        .background(WindowAccessor(window: $windowState.window))
+        .environmentObject(windowState)
+        .fontDesign(.rounded)
         .ignoresSafeArea()
         .animation(.snappy(duration: 0.25), value: sidebarVisible)
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
@@ -78,7 +82,7 @@ struct ColumnResizer: View {
 
     var body: some View {
         Color.clear
-            .frame(width: 10)
+            .frame(width: 12)
             .contentShape(Rectangle())
             .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
             .gesture(DragGesture(minimumDistance: 1)
@@ -97,12 +101,12 @@ extension Notification.Name {
 extension View {
     /// A floating, rounded, shadowed panel used for the note list and the editor.
     func panel(theme: ThemeManager, fill: Color? = nil) -> some View {
-        let radius = CGFloat(theme.settings.cornerRadius)
+        let radius = CGFloat(theme.settings.cornerRadius) + 4
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         return self
-            .background(fill ?? Color(nsColor: .windowBackgroundColor), in: shape)
+            .background(fill ?? Color(nsColor: .windowBackgroundColor).opacity(0.92), in: shape)
             .clipShape(shape)
             .overlay(shape.strokeBorder(Color.primary.opacity(0.09), lineWidth: 1))
-            .shadow(color: .black.opacity(theme.settings.shadows ? 0.22 : 0), radius: 16, y: 6)
+            .shadow(color: .black.opacity(theme.settings.shadows ? 0.25 : 0), radius: 22, y: 10)
     }
 }

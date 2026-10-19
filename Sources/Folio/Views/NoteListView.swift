@@ -6,6 +6,7 @@ struct NoteListView: View {
     @Binding var sidebarVisible: Bool
     @EnvironmentObject var store: NoteStore
     @EnvironmentObject var theme: ThemeManager
+    @EnvironmentObject var windowState: WindowState
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -61,12 +62,22 @@ struct NoteListView: View {
     }
 
     private func header(count: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !sidebarVisible { WindowControls(window: windowState.window) }
+            headerRow(count: count)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+    }
+
+    private func headerRow(count: Int) -> some View {
         HStack(alignment: .center, spacing: 8) {
             if !sidebarVisible {
                 iconButton("sidebar.left", help: "Seitenleiste einblenden") { sidebarVisible = true }
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 17, weight: .bold)).lineLimit(1)
+                Text(title).font(.system(size: 20, weight: .bold, design: .rounded)).lineLimit(1)
                 Text(subtitle(count)).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
@@ -77,9 +88,6 @@ struct NoteListView: View {
                 store.createNote(initialTag: currentTag)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 34)
-        .padding(.bottom, 8)
     }
 
     private func iconButton(_ icon: String, help: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
@@ -204,7 +212,8 @@ struct NoteCard: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selected ? theme.accent.opacity(0.5) : .clear, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering = $0 }
     }
