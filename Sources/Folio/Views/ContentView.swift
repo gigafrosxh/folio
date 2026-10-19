@@ -13,20 +13,20 @@ struct ContentView: View {
             if sidebarVisible {
                 SidebarView()
                     .frame(width: 240)
-                    .padding(10)
+                    .padding(.trailing, 10)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
             NoteListView(sidebarVisible: $sidebarVisible)
                 .frame(width: CGFloat(listWidth))
-                .padding(.leading, sidebarVisible ? 0 : 76)
+                .frame(maxHeight: .infinity)
+                .panel(theme: theme)
             ColumnResizer(width: $listWidth, range: 240...460)
             editor
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14, style: .continuous))
-                .shadow(color: .black.opacity(theme.settings.shadows ? 0.08 : 0), radius: 12, x: -2)
-                .padding(.vertical, 0)
+                .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .padding(10)
+        .background(Color(nsColor: .underPageBackgroundColor))
         .ignoresSafeArea()
         .animation(.snappy(duration: 0.25), value: sidebarVisible)
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
@@ -44,7 +44,6 @@ struct ContentView: View {
                 .id(doc.id)
         } else {
             ZStack {
-                Color(nsColor: .textBackgroundColor)
                 VStack(spacing: 14) {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 40, weight: .light))
@@ -79,7 +78,7 @@ struct ColumnResizer: View {
 
     var body: some View {
         Color.clear
-            .frame(width: 6)
+            .frame(width: 10)
             .contentShape(Rectangle())
             .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
             .gesture(DragGesture(minimumDistance: 1)
@@ -93,4 +92,17 @@ struct ColumnResizer: View {
 
 extension Notification.Name {
     static let folioToggleSidebar = Notification.Name("folio.toggleSidebar")
+}
+
+extension View {
+    /// A floating, rounded, shadowed panel used for the note list and the editor.
+    func panel(theme: ThemeManager, fill: Color? = nil) -> some View {
+        let radius = CGFloat(theme.settings.cornerRadius)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return self
+            .background(fill ?? Color(nsColor: .windowBackgroundColor), in: shape)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.09), lineWidth: 1))
+            .shadow(color: .black.opacity(theme.settings.shadows ? 0.22 : 0), radius: 16, y: 6)
+    }
 }

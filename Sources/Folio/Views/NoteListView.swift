@@ -14,7 +14,7 @@ struct NoteListView: View {
             header(count: notes.count)
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
+                    LazyVStack(alignment: .leading, spacing: 5) {
                         ForEach(groups(notes), id: \.title) { group in
                             Text(group.title)
                                 .font(.system(size: 11, weight: .semibold))
@@ -211,7 +211,7 @@ struct NoteCard: View {
 
     private var background: Color {
         if selected { return theme.accent.opacity(0.22) }
-        return hovering ? Color.primary.opacity(0.05) : .clear
+        return Color.primary.opacity(hovering ? 0.08 : 0.035)
     }
 
     private var dateString: String {

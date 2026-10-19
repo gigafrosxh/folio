@@ -81,7 +81,7 @@ struct SidebarView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-        .floating(cornerRadius: 16)
+        .panel(theme: theme, fill: Color(nsColor: .controlBackgroundColor))
         .alert(newFolderParent == nil ? "Neuer Ordner" : "Neuer Unterordner", isPresented: $showNewFolder) {
             TextField("Name", text: $folderName)
             Button("Anlegen") { if !folderName.isEmpty { store.createFolder(named: folderName, in: newFolderParent) } }
