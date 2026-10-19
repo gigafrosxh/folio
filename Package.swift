@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Folio",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS("15.2")],
     products: [
         .executable(name: "Folio", targets: ["Folio"]),
         .library(name: "FolioCore", targets: ["FolioCore"]),

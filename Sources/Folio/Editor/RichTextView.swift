@@ -1,0 +1,347 @@
+import AppKit
+import SwiftUI
+import FolioCore
+
+/// List markers handled by the editor. Lists are plain-text prefixes so they survive RTF round trips
+/// and look the same everywhere.
+enum ListKind: String, CaseIterable {
+    case bullet = "• "
+    case dash = "– "
+    case numbered = "1. "
+    case checklist = "☐ "
+
+    static let checked = "☑ "
+
+    var label: String {
+        switch self {
+        case .bullet: return "Aufzählung"
+        case .dash: return "Strichliste"
+        case .numbered: return "Nummerierte Liste"
+        case .checklist: return "Checkliste"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .bullet: return "list.bullet"
+        case .dash: return "list.dash"
+        case .numbered: return "list.number"
+        case .checklist: return "checklist"
+        }
+    }
+
+    /// Detects a list marker at the start of `line` (after indentation).
+    static func detect(_ line: String) -> (indent: String, marker: String, kind: ListKind)? {
+        let indent = String(line.prefix { $0 == "\t" || $0 == " " })
+        let rest = line.dropFirst(indent.count)
+        for kind in [ListKind.bullet, .dash, .checklist] where rest.hasPrefix(kind.rawValue) {
+            return (indent, kind.rawValue, kind)
+        }
+        if rest.hasPrefix(checked) { return (indent, checked, .checklist) }
+        let digits = rest.prefix { $0.isNumber }
+        if !digits.isEmpty, rest.dropFirst(digits.count).hasPrefix(". ") {
+            return (indent, String(digits) + ". ", .numbered)
+        }
+        return nil
+    }
+
+    static func next(after marker: String, kind: ListKind) -> String {
+        switch kind {
+        case .numbered: return "\((Int(marker.dropLast(2)) ?? 0) + 1). "
+        case .checklist: return ListKind.checklist.rawValue
+        default: return marker
+        }
+    }
+}
+
+final class FolioTextView: NSTextView {
+    var blockID: UUID?
+    var isFirstBlock = false
+    var onHeightChange: ((CGFloat) -> Void)?
+    var onFocus: (() -> Void)?
+    var onDeleteBackwardAtStart: (() -> Void)?
+    var onPasteFiles: (([URL]) -> Bool)?
+    var onPasteImage: ((Data) -> Void)?
+    var onPasteURL: ((URL) -> Bool)?
+    var bodyAttributes: () -> [NSAttributedString.Key: Any] = { [:] }
+    private var lastWidth: CGFloat = 0
+
+    func contentHeight(forWidth width: CGFloat) -> CGFloat {
+        guard let lm = layoutManager, let tc = textContainer else { return 24 }
+        let w = max(width - textContainerInset.width * 2, 10)
+        if tc.containerSize.width != w { tc.containerSize = NSSize(width: w, height: .greatestFiniteMagnitude) }
+        lm.ensureLayout(for: tc)
+        var h = lm.usedRect(for: tc).height
+        if lm.extraLineFragmentTextContainer != nil { h = max(h, lm.extraLineFragmentRect.maxY) }
+        return ceil(max(h, (typingFont?.boundingRectForFont.height ?? 18)) + textContainerInset.height * 2)
+    }
+
+    private var typingFont: NSFont? { typingAttributes[.font] as? NSFont }
+
+    func reportHeight() {
+        let h = contentHeight(forWidth: bounds.width)
+        onHeightChange?(h)
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        if abs(newSize.width - lastWidth) > 0.5 {
+            lastWidth = newSize.width
+            reportHeight()
+        }
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        reportHeight()
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok { onFocus?() }
+        return ok
+    }
+
+    // MARK: Keys
+
+    override func insertNewline(_ sender: Any?) {
+        let ns = string as NSString
+        let sel = selectedRange()
+        let para = ns.paragraphRange(for: NSRange(location: sel.location, length: 0))
+        let line = ns.substring(with: para).trimmingCharacters(in: .newlines)
+
+        if let list = ListKind.detect(line) {
+            let prefixLength = (list.indent + list.marker as NSString).length
+            if (line as NSString).length == prefixLength {
+                // Empty list item ends the list.
+                replace(NSRange(location: para.location, length: prefixLength), with: "")
+                return
+            }
+            super.insertNewline(sender)
+            insertText(list.indent + ListKind.next(after: list.marker, kind: list.kind), replacementRange: selectedRange())
+            return
+        }
+
+        let wasTitle = isFirstBlock && para.location == 0
+        super.insertNewline(sender)
+        if wasTitle { typingAttributes = bodyAttributes() }
+    }
+
+    override func deleteBackward(_ sender: Any?) {
+        let sel = selectedRange()
+        if sel.location == 0 && sel.length == 0 && string.isEmpty {
+            onDeleteBackwardAtStart?()
+            return
+        }
+        super.deleteBackward(sender)
+    }
+
+    override func insertTab(_ sender: Any?) {
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: selectedRange())
+        if ListKind.detect(ns.substring(with: para)) != nil {
+            replace(NSRange(location: para.location, length: 0), with: "\t")
+            return
+        }
+        super.insertTab(sender)
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: selectedRange())
+        if para.length > 0, ns.character(at: para.location) == 9 {
+            replace(NSRange(location: para.location, length: 1), with: "")
+            return
+        }
+        super.insertBacktab(sender)
+    }
+
+    func replace(_ range: NSRange, with text: String) {
+        guard shouldChangeText(in: range, replacementString: text) else { return }
+        let attrs = range.location < textStorage!.length ? textStorage!.attributes(at: range.location, effectiveRange: nil) : typingAttributes
+        textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: attrs))
+        didChangeText()
+    }
+
+    // MARK: Checklist clicks
+
+    override func mouseDown(with event: NSEvent) {
+        if let idx = checkboxIndex(at: convert(event.locationInWindow, from: nil)) {
+            let ns = string as NSString
+            let current = ns.substring(with: NSRange(location: idx, length: 1))
+            replace(NSRange(location: idx, length: 1), with: current == "☐" ? "☑" : "☐")
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    private func checkboxIndex(at point: NSPoint) -> Int? {
+        guard let lm = layoutManager, let tc = textContainer, !string.isEmpty else { return nil }
+        let p = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        let glyph = lm.glyphIndex(for: p, in: tc)
+        let rect = lm.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: tc).insetBy(dx: -3, dy: -2)
+        guard rect.contains(p) else { return nil }
+        let idx = lm.characterIndexForGlyph(at: glyph)
+        let ns = string as NSString
+        guard idx < ns.length else { return nil }
+        let ch = ns.substring(with: NSRange(location: idx, length: 1))
+        guard ch == "☐" || ch == "☑" else { return nil }
+        let para = ns.paragraphRange(for: NSRange(location: idx, length: 0))
+        let before = ns.substring(with: NSRange(location: para.location, length: idx - para.location))
+        return before.allSatisfy({ $0 == "\t" || $0 == " " }) ? idx : nil
+    }
+
+    // MARK: Paste & drop
+
+    override func paste(_ sender: Any?) {
+        if handlePasteboard(NSPasteboard.general) { return }
+        super.paste(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !urls.isEmpty, onPasteFiles?(urls) == true {
+            return true
+        }
+        return super.performDragOperation(sender)
+    }
+
+    private func handlePasteboard(_ pb: NSPasteboard) -> Bool {
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !urls.isEmpty, onPasteFiles?(urls) == true {
+            return true
+        }
+        let types = pb.types ?? []
+        if !types.contains(.string), !types.contains(.rtf),
+           let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
+            onPasteImage?(data)
+            return true
+        }
+        if let s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !s.contains(" "), !s.contains("\n"), let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            let ns = string as NSString
+            let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
+            let line = ns.substring(with: para).trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty, onPasteURL?(url) == true { return true }
+        }
+        return false
+    }
+}
+
+/// SwiftUI wrapper around `FolioTextView` that grows with its content.
+struct RichTextView: NSViewRepresentable {
+    @ObservedObject var block: BlockModel
+    var isFirstBlock: Bool
+    @Binding var height: CGFloat
+    var theme: ThemeManager
+    var onChange: () -> Void
+    var onFocus: () -> Void
+    var onDeleteEmpty: () -> Void
+    var onPasteFiles: ([URL]) -> Bool
+    var onPasteImage: (Data) -> Void
+    var onPasteURL: (URL) -> Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> FolioTextView {
+        let lm = NSLayoutManager()
+        block.storage.addLayoutManager(lm)
+        let tc = NSTextContainer(size: NSSize(width: 100, height: CGFloat.greatestFiniteMagnitude))
+        tc.widthTracksTextView = true
+        tc.lineFragmentPadding = 0
+        lm.addTextContainer(tc)
+
+        let tv = FolioTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 30), textContainer: tc)
+        tv.blockID = block.id
+        tv.isRichText = true
+        tv.allowsUndo = true
+        tv.importsGraphics = false
+        tv.isEditable = true
+        tv.isSelectable = true
+        tv.drawsBackground = false
+        tv.isVerticallyResizable = false
+        tv.isHorizontallyResizable = false
+        tv.textContainerInset = NSSize(width: 0, height: 2)
+        tv.isAutomaticLinkDetectionEnabled = true
+        tv.isAutomaticQuoteSubstitutionEnabled = false
+        tv.isAutomaticDashSubstitutionEnabled = false
+        tv.isContinuousSpellCheckingEnabled = true
+        tv.usesFindBar = true
+        tv.isIncrementalSearchingEnabled = true
+        tv.usesFontPanel = true
+        tv.usesInspectorBar = false
+        tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
+        tv.delegate = context.coordinator
+        configureCallbacks(tv, context: context)
+        tv.typingAttributes = initialTypingAttributes()
+        FormattingController.shared.register(tv, for: block.id)
+        context.coordinator.highlightTags(in: tv)
+        DispatchQueue.main.async { tv.reportHeight() }
+        return tv
+    }
+
+    private func initialTypingAttributes() -> [NSAttributedString.Key: Any] {
+        if block.storage.length > 0 {
+            return block.storage.attributes(at: block.storage.length - 1, effectiveRange: nil)
+        }
+        if isFirstBlock { return TextStyle.title.attributes(theme: theme) }
+        return theme.bodyAttributes
+    }
+
+    private func configureCallbacks(_ tv: FolioTextView, context: Context) {
+        tv.isFirstBlock = isFirstBlock
+        tv.onHeightChange = { h in
+            if abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } }
+        }
+        tv.onFocus = onFocus
+        tv.onDeleteBackwardAtStart = onDeleteEmpty
+        tv.onPasteFiles = onPasteFiles
+        tv.onPasteImage = onPasteImage
+        tv.onPasteURL = onPasteURL
+        tv.bodyAttributes = { [theme] in theme.bodyAttributes }
+    }
+
+    func updateNSView(_ tv: FolioTextView, context: Context) {
+        context.coordinator.parent = self
+        configureCallbacks(tv, context: context)
+        tv.linkTextAttributes?[.foregroundColor] = theme.accentNSColor
+        if tv.string.isEmpty { tv.typingAttributes = initialTypingAttributes() }
+        context.coordinator.highlightTags(in: tv)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: FolioTextView, context: Context) -> CGSize? {
+        guard let w = proposal.width, w > 0, w.isFinite else { return nil }
+        return CGSize(width: w, height: nsView.contentHeight(forWidth: w))
+    }
+
+    static func dismantleNSView(_ tv: FolioTextView, coordinator: Coordinator) {
+        if let lm = tv.layoutManager { tv.textStorage?.removeLayoutManager(lm) }
+    }
+
+    @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: RichTextView
+        init(_ parent: RichTextView) { self.parent = parent }
+
+        func textDidChange(_ notification: Notification) {
+            guard let tv = notification.object as? FolioTextView else { return }
+            highlightTags(in: tv)
+            parent.onChange()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            FormattingController.shared.selectionChanged()
+        }
+
+        /// Colors #tags with the accent color without changing the stored text.
+        func highlightTags(in tv: NSTextView) {
+            guard let lm = tv.layoutManager else { return }
+            let full = NSRange(location: 0, length: (tv.string as NSString).length)
+            lm.removeTemporaryAttribute(.foregroundColor, forCharacterRange: full)
+            lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
+            let accent = parent.theme.accentNSColor
+            for m in TagParser.matches(in: tv.string) {
+                lm.addTemporaryAttributes([.foregroundColor: accent, .backgroundColor: accent.withAlphaComponent(0.12)], forCharacterRange: m.range)
+            }
+        }
+    }
+}
