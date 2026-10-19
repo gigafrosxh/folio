@@ -202,6 +202,7 @@ struct CodeEditorView: NSViewRepresentable {
         tv.isContinuousSpellCheckingEnabled = false
         tv.isGrammarCheckingEnabled = false
         tv.smartInsertDeleteEnabled = false
+        if #available(macOS 14.0, *) { tv.inlinePredictionType = .no }
         tv.usesFindBar = true
         tv.textContainerInset = NSSize(width: 6, height: 10)
         tv.setAccessibilityLabel("Code-Editor")

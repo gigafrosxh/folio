@@ -115,6 +115,10 @@ struct ThemeSettings: Codable, Equatable {
     var runTimeout: Double = 30
     var interpreterOverrides: [String: String] = [:]
     var libraryPath: String = ThemeSettings.defaultLibraryPath
+    /// Grey inline completions from Apple Intelligence (Foundation Models), accepted with Tab.
+    var aiPredictions = true
+    /// The system's own inline word predictions in text fields.
+    var systemPredictions = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -145,6 +149,8 @@ struct ThemeSettings: Codable, Equatable {
         runTimeout = v(.runTimeout, d.runTimeout)
         interpreterOverrides = v(.interpreterOverrides, d.interpreterOverrides)
         libraryPath = v(.libraryPath, d.libraryPath)
+        aiPredictions = v(.aiPredictions, d.aiPredictions)
+        systemPredictions = v(.systemPredictions, d.systemPredictions)
     }
 }
 

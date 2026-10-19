@@ -151,7 +151,7 @@ enum LayoutDebug {
                 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Double(env["FOLIO_DUMP_DELAY"] ?? "") ?? 4)) {
             guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
             func walk(_ v: NSView) {
                 if v is FolioTextView || v is CodeTextView || String(describing: type(of: v)).contains("WKWebView")

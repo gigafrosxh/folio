@@ -64,7 +64,97 @@ final class FolioTextView: NSTextView {
     var onPasteImage: ((Data) -> Void)?
     var onPasteURL: ((URL) -> Bool)?
     var bodyAttributes: () -> [NSAttributedString.Key: Any] = { [:] }
+    var predictionsEnabled: () -> Bool = { false }
     private var lastWidth: CGFloat = 0
+
+    // MARK: Apple Intelligence completion (ghost text)
+
+    /// The grey suggestion shown after the cursor, and where it applies.
+    private(set) var suggestion: String?
+    private var suggestionLocation = 0
+    private var predictionTask: Task<Void, Never>?
+
+    func clearSuggestion() {
+        predictionTask?.cancel()
+        if suggestion != nil {
+            suggestion = nil
+            needsDisplay = true
+        }
+    }
+
+    /// Asks for a completion shortly after the user stops typing at the end of a line, after a space.
+    func schedulePrediction() {
+        clearSuggestion()
+        guard predictionsEnabled(), window?.firstResponder === self, hasMarkedText() == false else { return }
+        let sel = selectedRange()
+        let ns = string as NSString
+        guard sel.length == 0, sel.location > 3, sel.location <= ns.length else { return }
+        let atLineEnd = sel.location == ns.length || ns.character(at: sel.location) == 10
+        guard atLineEnd, ns.character(at: sel.location - 1) == 32 else { return }
+        let start = max(0, sel.location - 800)
+        let context = ns.substring(with: NSRange(location: start, length: sel.location - start))
+        guard context.trimmingCharacters(in: .whitespacesAndNewlines).count >= 4 else { return }
+        let location = sel.location
+        predictionTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled, let text = await TextPredictor.suggest(for: context), !Task.isCancelled else { return }
+            guard let self, self.selectedRange() == NSRange(location: location, length: 0) else { return }
+            self.suggestion = text
+            self.suggestionLocation = location
+            self.needsDisplay = true
+        }
+    }
+
+    var isSuggestionAnchoredAtCursor: Bool { selectedRange() == NSRange(location: suggestionLocation, length: 0) }
+
+    private func acceptSuggestion() -> Bool {
+        guard let s = suggestion, selectedRange() == NSRange(location: suggestionLocation, length: 0) else { return false }
+        suggestion = nil
+        insertText(s, replacementRange: selectedRange())
+        return true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let s = suggestion, let lm = layoutManager, let tc = textContainer,
+              selectedRange() == NSRange(location: suggestionLocation, length: 0) else { return }
+        _ = tc
+        let ns = string as NSString
+        guard suggestionLocation > 0, suggestionLocation <= ns.length else { return }
+        // Caret x from the insertion point, baseline from the line the previous character sits on.
+        let screenRect = firstRect(forCharacterRange: NSRange(location: suggestionLocation, length: 0), actualRange: nil)
+        guard let window, screenRect != .zero else { return }
+        let caretX = convert(window.convertFromScreen(screenRect), from: nil).minX
+        let glyph = lm.glyphIndexForCharacter(at: suggestionLocation - 1)
+        let line = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        let baseline = line.minY + lm.location(forGlyphAt: glyph).y + textContainerOrigin.y
+        var attrs = typingAttributes
+        attrs[.foregroundColor] = NSColor.tertiaryLabelColor
+        attrs[.backgroundColor] = nil
+        attrs[.underlineStyle] = nil
+        attrs[.link] = nil
+        let font = attrs[.font] as? NSFont ?? .systemFont(ofSize: 15)
+        let available = bounds.width - caretX - textContainerInset.width
+        guard available > 20 else { return }
+        let text = NSAttributedString(string: s, attributes: attrs)
+        text.draw(with: NSRect(x: caretX, y: baseline - font.ascender, width: available, height: font.boundingRectForFont.height),
+                  options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        if suggestion != nil { clearSuggestion(); return }
+        super.cancelOperation(sender)
+    }
+
+    override func moveRight(_ sender: Any?) {
+        if suggestion != nil, acceptSuggestion() { return }
+        super.moveRight(sender)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        clearSuggestion()
+        return super.resignFirstResponder()
+    }
 
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
         guard let lm = layoutManager, let tc = textContainer else { return 24 }
@@ -152,6 +242,7 @@ final class FolioTextView: NSTextView {
     }
 
     override func insertTab(_ sender: Any?) {
+        if acceptSuggestion() { return }
         let ns = string as NSString
         let para = ns.paragraphRange(for: selectedRange())
         if ListKind.detect(ns.substring(with: para)) != nil {
@@ -380,6 +471,7 @@ struct RichTextView: NSViewRepresentable {
         tv.isIncrementalSearchingEnabled = true
         tv.usesFontPanel = true
         tv.usesInspectorBar = false
+        if #available(macOS 14.0, *) { tv.inlinePredictionType = theme.settings.systemPredictions ? .yes : .no }
         tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
         tv.delegate = context.coordinator
         configureCallbacks(tv, context: context)
@@ -409,6 +501,12 @@ struct RichTextView: NSViewRepresentable {
         tv.onPasteImage = onPasteImage
         tv.onPasteURL = onPasteURL
         tv.bodyAttributes = { [theme] in theme.bodyAttributes }
+        tv.predictionsEnabled = { [theme] in theme.settings.aiPredictions }
+        if #available(macOS 14.0, *) {
+            // Our own completion replaces the system's single-word prediction to avoid two ghost texts.
+            let wantSystem = theme.settings.systemPredictions && !(theme.settings.aiPredictions && TextPredictor.status == .available)
+            tv.inlinePredictionType = wantSystem ? .yes : .no
+        }
     }
 
     func updateNSView(_ tv: FolioTextView, context: Context) {
@@ -439,10 +537,15 @@ struct RichTextView: NSViewRepresentable {
             guard let tv = notification.object as? FolioTextView else { return }
             highlightTags(in: tv)
             parent.onChange()
+            tv.schedulePrediction()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             FormattingController.shared.selectionChanged()
+            if let tv = notification.object as? FolioTextView, tv.suggestion != nil,
+               tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor {
+                tv.clearSuggestion()
+            }
         }
 
         /// Colors #tags with the accent color without changing the stored text.

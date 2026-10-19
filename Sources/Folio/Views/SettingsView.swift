@@ -78,6 +78,19 @@ struct SettingsView: View {
                 settingSlider("Zeilenabstand", value: $theme.settings.lineSpacing, range: 0...14, unit: "pt")
                 settingSlider("Maximale Breite", value: $theme.settings.editorWidth, range: 520...1200, unit: "pt")
             }
+            Section {
+                Toggle("Textvorhersage mit Apple Intelligence", isOn: $theme.settings.aiPredictions)
+                Toggle("Wortvorschläge des Systems", isOn: $theme.settings.systemPredictions)
+                switch TextPredictor.status {
+                case .available:
+                    Text("Vorschläge erscheinen grau nach einem Leerzeichen. Tab übernimmt sie, Esc verwirft sie. Alles läuft auf dem Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                case .unavailable(let reason):
+                    Label(reason, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Vorhersage")
+            }
         }.formStyle(.grouped)
     }
 
