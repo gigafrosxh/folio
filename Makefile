@@ -1,4 +1,4 @@
-.PHONY: build test app run install installer clean
+.PHONY: build test app run install installer release clean
 
 build:
 	swift build
@@ -17,6 +17,10 @@ install:
 
 installer:
 	./scripts/make-installer.sh
+
+# make release V=patch|minor|major|X.Y.Z
+release:
+	./scripts/release.sh $(V)
 
 clean:
 	swift package clean

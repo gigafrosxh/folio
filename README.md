@@ -82,3 +82,15 @@ Beim Import aus Apple Notizen und beim Erstellen von Numbers-Tabellen fragt macO
 | `build/Folio.app` | Fertiges lokales App-Bundle |
 
 Die Dateitypdeklaration registriert `.folio` als `de.daniel.folio.note` mit der Rolle „Editor“. Die App muss vom Finder übergebene Datei-URLs selbst entgegennehmen und die betreffende Notiz öffnen.
+
+## Versionen und Releases
+
+Folio folgt [Semantic Versioning](https://semver.org/lang/de/). Die Version steht in `Resources/Info.plist` (`CFBundleShortVersionString`), jede veröffentlichte Version hat einen Git-Tag `vX.Y.Z` und einen Abschnitt in [CHANGELOG.md](CHANGELOG.md). Änderungen werden laufend unter **Unreleased** im Changelog notiert.
+
+Ein Release ist ein Befehl (sauberer Stand auf `main`, `gh` angemeldet):
+
+```bash
+make release V=minor
+```
+
+Das zählt die Version hoch, überträgt den Changelog, setzt den Tag, baut DMG und PKG für Apple Silicon und lädt beide als GitHub-Release hoch.
