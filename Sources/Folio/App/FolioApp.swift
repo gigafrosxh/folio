@@ -14,6 +14,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// ⌘V when no text field has focus (e.g. right after picking a note in the list): the end of the
+    /// responder chain lands here, and files or images go into the open note.
+    @objc func paste(_ sender: Any?) {
+        if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil { print("LAYOUT app delegate paste") }
+        NotificationCenter.default.post(name: .folioPasteboard, object: NSPasteboard.general)
+    }
 }
 
 @main
@@ -134,7 +141,22 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed.hasPrefix("paste-image:") || typed.hasPrefix("paste-file:") {
+                if typed.hasPrefix("list-paste") {
+                    tv.window?.makeFirstResponder(nil)
+                    if typed.hasPrefix("list-paste-file:") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.writeObjects([URL(fileURLWithPath: String(typed.dropFirst("list-paste-file:".count))) as NSURL])
+                    } else if typed.hasPrefix("list-paste-image:") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.writeObjects([NSImage(contentsOfFile: String(typed.dropFirst("list-paste-image:".count)))!])
+                    }
+                    print("LAYOUT list paste target:", NSApp.target(forAction: #selector(NSText.paste(_:))).map { String(describing: type(of: $0)) } ?? "nil", "fr:", tv.window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")
+                    print("LAYOUT list paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil))
+                } else if typed == "menu-paste" {
+                    // Real ⌘V path: Edit › Paste through the responder chain with the general pasteboard.
+                    print("LAYOUT menu paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil),
+                          NSPasteboard.general.types ?? [])
+                } else if typed.hasPrefix("paste-image:") || typed.hasPrefix("paste-file:") {
                     // Simulates ⌘V on a private pasteboard so the user's clipboard stays untouched.
                     let pb = NSPasteboard(name: NSPasteboard.Name("folio.debug"))
                     pb.clearContents()
@@ -164,6 +186,17 @@ enum LayoutDebug {
                 v.subviews.forEach(walk)
             }
             walk(root)
+            if env["FOLIO_MENU_DUMP"] != nil, let menu = NSApp.mainMenu {
+                for top in menu.items {
+                    for item in top.submenu?.items ?? [] where !item.keyEquivalent.isEmpty {
+                        print("MENU", top.title, "|", item.title, "|", item.keyEquivalent, item.keyEquivalentModifierMask.rawValue, "|", item.action.map(NSStringFromSelector) ?? "nil", "| target:", item.target.map { String(describing: type(of: $0)) } ?? "nil")
+                    }
+                }
+                let fr = NSApp.keyWindow?.firstResponder
+                print("MENU firstResponder", fr.map { String(describing: type(of: $0)) } ?? "nil")
+                let pasteTarget = NSApp.target(forAction: #selector(NSText.paste(_:)))
+                print("MENU paste target", pasteTarget.map { String(describing: type(of: $0)) } ?? "nil")
+            }
             if let out = env["FOLIO_SNAPSHOT"], let rep = root.bitmapImageRepForCachingDisplay(in: root.bounds) {
                 root.cacheDisplay(in: root.bounds, to: rep)
                 try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))

@@ -67,10 +67,7 @@ struct NoteEditorView: View {
                 withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
             }
             .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
-            .onPasteCommand(of: [.fileURL, .image, .png, .tiff]) { providers in
-                // ⌘V while no text block has focus (e.g. after clicking an embed): append at the end.
-                _ = handleDrop(providers)
-            }
+
             .overlay {
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
@@ -104,6 +101,9 @@ struct NoteEditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             AttachmentSync.syncExternalEdits(in: doc)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .folioPasteboard)) { note in
+            if let pb = note.object as? NSPasteboard { pasteWithoutTextFocus(pb) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioInsert)) { note in
             if let kind = note.object as? String { handleInsert(kind) }
@@ -281,6 +281,22 @@ struct NoteEditorView: View {
         return true
     }
 
+    /// Pastes files or an image at the end of the note (or at the last cursor position in a text block).
+    private func pasteWithoutTextFocus(_ pb: NSPasteboard) {
+        if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil {
+            print("LAYOUT editor paste", doc.meta.title, pb.types ?? [], (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? [])
+        }
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            insertFiles(urls, after: formatting.activeBlockID ?? doc.blocks.last?.id)
+        } else if let data = FolioTextView.imageData(in: pb) {
+            insertBlock(AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc),
+                        after: formatting.activeBlockID ?? doc.blocks.last?.id)
+        } else if let text = pb.string(forType: .string), !text.isEmpty, let last = doc.blocks.last(where: { $0.kind == .text }) {
+            formatting.focus(blockID: last.id)
+            DispatchQueue.main.async { formatting.textView(for: last.id)?.insertText(text, replacementRange: formatting.textView(for: last.id)?.selectedRange() ?? NSRange(location: 0, length: 0)) }
+        }
+    }
+
     private func focusEnd() {
         if let last = doc.blocks.last, last.kind == .text {
             formatting.focus(blockID: last.id)
@@ -310,6 +326,8 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Posted with the pasteboard when ⌘V reaches the app without a text field handling it.
+    static let folioPasteboard = Notification.Name("folio.pasteboard")
 }
 
 extension FormattingController {
