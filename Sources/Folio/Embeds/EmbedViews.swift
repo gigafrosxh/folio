@@ -388,7 +388,7 @@ struct WebBlockView: View {
                 Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 HStack {
                     Button("Erneut versuchen") { loadState = .loading; reload += 1 }
-                    Button("Als Vorschau") { block.mode = "preview"; doc.markDirty() }
+                    if !isLocal { Button("Als Vorschau") { block.mode = "preview"; doc.markDirty() } }
                     Button("Im Browser öffnen") { NSWorkspace.shared.open(url) }
                 }
             }
