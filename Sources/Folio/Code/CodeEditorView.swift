@@ -228,7 +228,9 @@ struct CodeEditorView: NSViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: CodeEditorContainer, context: Context) -> CGSize? {
         guard let w = proposal.width, w > 0, w.isFinite else { return nil }
-        return CGSize(width: w, height: nsView.contentHeight(forWidth: w))
+        let h = nsView.contentHeight(forWidth: w)
+        if abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } }
+        return CGSize(width: w, height: h)
     }
 
     static func dismantleNSView(_ container: CodeEditorContainer, coordinator: Coordinator) {

@@ -23,7 +23,7 @@ struct CodeBlockView: View {
                            showLineNumbers: theme.settings.showLineNumbers,
                            onChange: { doc.markDirty() }, onRun: run,
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) })
-                .frame(height: height)
+                .frame(minHeight: height)
                 .padding(.bottom, 2)
             if let output = block.output {
                 outputView(output)

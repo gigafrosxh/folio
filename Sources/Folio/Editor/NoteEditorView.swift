@@ -379,7 +379,7 @@ struct BlockRow: View {
                          onPasteFiles: { actions.pasteFiles($0, block.id) },
                          onPasteImage: { actions.pasteImage($0, block.id) },
                          onPasteURL: { actions.pasteURL($0, block.id) })
-                .frame(height: height)
+                .frame(minHeight: height)
         case .code:
             CodeBlockView(block: block, doc: doc)
         case .pdf:
