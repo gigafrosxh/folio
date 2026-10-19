@@ -339,7 +339,9 @@ struct WebBlockView: View {
     @State private var remotePDF: Data?
 
     private var url: URL? { URL(string: block.url) }
-    private var isPage: Bool { block.mode != "preview" }
+    /// Local pages (dev servers) have no link-preview metadata, so they always render as a page.
+    private var isPage: Bool { block.mode != "preview" || isLocal }
+    private var isLocal: Bool { url.map { NoteEditorView.isLocalAddress($0.host() ?? "") } ?? false }
 
     var body: some View {
         if let url {
@@ -398,13 +400,15 @@ struct WebBlockView: View {
 
     @ViewBuilder
     private func actions(_ url: URL) -> some View {
-        Button {
-            block.mode = isPage ? "preview" : "page"
-            doc.markDirty()
-        } label: {
-            Label(isPage ? "Als Vorschau" : "Webseite anzeigen", systemImage: isPage ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+        if !isLocal {
+            Button {
+                block.mode = isPage ? "preview" : "page"
+                doc.markDirty()
+            } label: {
+                Label(isPage ? "Als Vorschau" : "Webseite anzeigen", systemImage: isPage ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+            }
+            .help(isPage ? "Als kompakte Link-Vorschau anzeigen" : "Webseite direkt in der Notiz anzeigen")
         }
-        .help(isPage ? "Als kompakte Link-Vorschau anzeigen" : "Webseite direkt in der Notiz anzeigen")
         if isPage {
             Button { reload += 1 } label: { Label("Neu laden", systemImage: "arrow.clockwise") }.help("Neu laden")
         }

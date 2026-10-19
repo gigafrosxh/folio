@@ -418,8 +418,10 @@ final class FolioTextView: NSTextView {
                 return true
             }
         }
-        if let s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !s.contains(" "), !s.contains("\n"), let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+        if var s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.contains(" "), !s.contains("\n") {
+            // "localhost:3000" or "192.168.1.5:8080" without a scheme still counts as a link (plain http).
+            if !s.contains("://"), NoteEditorView.isLocalAddress(s) { s = "http://" + s }
+            guard let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return false }
             let ns = string as NSString
             let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
             let line = ns.substring(with: para).trimmingCharacters(in: .whitespacesAndNewlines)
