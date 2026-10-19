@@ -205,19 +205,22 @@ struct ImageBlockView: View {
                         }
                 }
                 .aspectRatio(max(image.size.width, 1) / max(image.size.height, 1) / CGFloat(block.width), contentMode: .fit)
-                .onHover { hovering = $0 }
                 .draggable(image)
             } else {
                 Label("Bild fehlt", systemImage: "photo").foregroundStyle(.secondary).frame(height: 80)
             }
-            TextField("Bildunterschrift", text: $block.caption)
-                .textFieldStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .onSubmit { doc.markDirty() }
-                .onChange(of: block.caption) { doc.markDirty() }
+            // The caption field only shows while hovering or once it has text.
+            if hovering || !block.caption.isEmpty {
+                TextField("Bildunterschrift", text: $block.caption)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .onSubmit { doc.markDirty() }
+                    .onChange(of: block.caption) { doc.markDirty() }
+            }
         }
+        .onHover { hovering = $0 }
     }
 
     private var controls: some View {

@@ -449,7 +449,10 @@ struct DrawingBlockView: View {
         }
         panel.setTarget(ColorPanelBridge.shared)
         panel.setAction(#selector(ColorPanelBridge.colorChanged(_:)))
-        panel.orderFront(nil)
+        panel.isContinuous = true
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontColorPanel(nil)
+        panel.makeKeyAndOrderFront(nil)
     }
 
     private func toolButton(_ icon: String, _ help: String, selected: Bool, action: @escaping () -> Void) -> some View {

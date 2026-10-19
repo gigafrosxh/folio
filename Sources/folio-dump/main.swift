@@ -16,7 +16,7 @@ if args.count >= 4, args[1] == "--find" {
 guard args.count >= 2 else { print("Usage: folio-dump <file.folio> [--rtf <outdir>] | --find <text> <dir>"); exit(1) }
 do {
     let file = try NoteFile.read(from: URL(fileURLWithPath: args[1]))
-    print("title:", file.meta.title, "tags:", file.meta.tags, "attachments:", file.attachments.count)
+    print("id:", file.meta.id, "title:", file.meta.title, "tags:", file.meta.tags, "attachments:", file.attachments.count)
     for (i, b) in file.body.blocks.enumerated() {
         print(i, b.kind.rawValue, b.rtf.map { "rtf \($0.count)B" } ?? "", b.url ?? "", b.height.map { "h=\($0)" } ?? "")
         if args.count >= 4, args[2] == "--rtf", let rtf = b.rtf {

@@ -69,6 +69,12 @@ final class FolioTextView: NSTextView {
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
         guard let lm = layoutManager, let tc = textContainer else { return 24 }
         let w = max(width - textContainerInset.width * 2, 10)
+        // SwiftUI also asks for sizes at widths the view never gets; measure at that width, then put the
+        // container back to the real width so the visible text never stays wrapped at a probe width.
+        let live = bounds.width > 1 ? max(bounds.width - textContainerInset.width * 2, 10) : w
+        defer {
+            if abs(tc.containerSize.width - live) > 0.5 { tc.containerSize = NSSize(width: live, height: .greatestFiniteMagnitude) }
+        }
         if tc.containerSize.width != w { tc.containerSize = NSSize(width: w, height: .greatestFiniteMagnitude) }
         lm.ensureLayout(for: tc)
         var h = lm.usedRect(for: tc).height
@@ -104,6 +110,11 @@ final class FolioTextView: NSTextView {
         let ok = super.becomeFirstResponder()
         if ok { onFocus?() }
         return ok
+    }
+
+    override func setAccessibilityFocused(_ focused: Bool) {
+        super.setAccessibilityFocused(focused)
+        if focused, window?.firstResponder !== self { window?.makeFirstResponder(self) }
     }
 
     // MARK: Keys
@@ -352,7 +363,8 @@ struct RichTextView: NSViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FolioTextView, context: Context) -> CGSize? {
         guard let w = proposal.width, w > 0, w.isFinite else { return nil }
         let h = nsView.contentHeight(forWidth: w)
-        if abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } }
+        // Only measurements at the real width may drive the stored height; probes at other widths must not.
+        if abs(w - nsView.bounds.width) < 1, abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } }
         return CGSize(width: w, height: h)
     }
 

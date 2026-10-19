@@ -115,6 +115,9 @@ struct FolioCommands: Commands {
 enum LayoutDebug {
     @MainActor static func runIfRequested() {
         let env = ProcessInfo.processInfo.environment
+        if let mode = env["FOLIO_APPEARANCE"] {
+            NSApp.appearance = NSAppearance(named: mode == "dark" ? .darkAqua : .aqua)
+        }
         if let path = env["FOLIO_OPEN"] {
             let store = NoteStore.shared
             if let ref = store.notes.first(where: { $0.url.path == path }) { store.selectedNoteID = ref.id }
@@ -148,6 +151,11 @@ enum LayoutDebug {
                 v.subviews.forEach(walk)
             }
             walk(root)
+            if let out = env["FOLIO_SNAPSHOT"], let rep = root.bitmapImageRepForCachingDisplay(in: root.bounds) {
+                root.cacheDisplay(in: root.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
+                print("LAYOUT snapshot", out)
+            }
             fflush(stdout)
         }
     }
