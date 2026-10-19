@@ -10,7 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        MainActor.assumeIsolated { NoteStore.shared.currentDocument?.saveNow() }
+        MainActor.assumeIsolated {
+            NoteStore.shared.currentDocument?.saveNow()
+            RunManager.shared.stopAll()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -141,7 +144,14 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed.hasPrefix("list-paste") {
+                if typed == "run-server", let doc = NoteStore.shared.currentDocument {
+                    let block = BlockModel(kind: .code)
+                    block.language = "python"
+                    block.storage.setAttributedString(NSAttributedString(string: "import http.server\nhttp.server.test(http.server.SimpleHTTPRequestHandler, port=8767, bind='127.0.0.1')"))
+                    doc.insert(block, after: doc.blocks.first?.id)
+                    RunManager.shared.start(block: block, doc: doc, theme: .shared)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { RunManager.shared.stopAll() }
+                } else if typed.hasPrefix("list-paste") {
                     tv.window?.makeFirstResponder(nil)
                     if typed.hasPrefix("list-paste-file:") {
                         NSPasteboard.general.clearContents()
@@ -156,6 +166,12 @@ enum LayoutDebug {
                     // Real ⌘V path: Edit › Paste through the responder chain with the general pasteboard.
                     print("LAYOUT menu paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil),
                           NSPasteboard.general.types ?? [])
+                } else if typed.hasPrefix("paste-text:") {
+                    let pb = NSPasteboard(name: NSPasteboard.Name("folio.debug"))
+                    pb.clearContents()
+                    pb.setString(String(typed.dropFirst("paste-text:".count)), forType: .string)
+                    tv.insertNewline(nil)
+                    print("LAYOUT paste text handled:", tv.handlePasteboard(pb))
                 } else if typed.hasPrefix("paste-image:") || typed.hasPrefix("paste-file:") {
                     // Simulates ⌘V on a private pasteboard so the user's clipboard stays untouched.
                     let pb = NSPasteboard(name: NSPasteboard.Name("folio.debug"))

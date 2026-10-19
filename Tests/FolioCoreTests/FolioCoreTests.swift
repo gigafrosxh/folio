@@ -98,3 +98,28 @@ final class CodeRunnerTests: XCTestCase {
         XCTAssertThrowsError(try CodeRun.plan(for: Languages.spec(for: "python"), override: "does-not-exist-xyz {file}"))
     }
 }
+
+final class ServerDetectorTests: XCTestCase {
+    func testURLFromOutput() {
+        XCTAssertEqual(ServerDetector.url(inOutput: " * Running on http://127.0.0.1:5000")?.absoluteString, "http://127.0.0.1:5000")
+        XCTAssertEqual(ServerDetector.url(inOutput: "Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...")?.absoluteString, "http://localhost:8000")
+        XCTAssertEqual(ServerDetector.url(inOutput: "Server listening on port 3000")?.absoluteString, "http://localhost:3000")
+        XCTAssertEqual(ServerDetector.url(inOutput: "  ➜  Local:   http://localhost:5173/")?.absoluteString, "http://localhost:5173")
+        XCTAssertNil(ServerDetector.url(inOutput: "Result: 12:30 and 3.14"))
+    }
+
+    func testSilentServerKeepsRunningPastTimeout() async throws {
+        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        let run = CodeRun()
+        let detected = expectation(description: "server")
+        let code = "import http.server, socketserver\nsocketserver.TCPServer(('127.0.0.1', 0), http.server.SimpleHTTPRequestHandler).serve_forever()"
+        let task = Task { try await run.run(code: code, language: Languages.spec(for: "python"), timeout: 2, onServer: { _ in detected.fulfill() }) }
+        await fulfillment(of: [detected], timeout: 10)
+        try await Task.sleep(for: .seconds(3)) // past the 2 s timeout
+        XCTAssertNotNil(run.serverURL)
+        run.cancel()
+        let result = try await task.value
+        XCTAssertFalse(result.timedOut)
+        XCTAssertTrue(result.cancelled)
+    }
+}

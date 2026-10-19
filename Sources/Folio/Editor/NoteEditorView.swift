@@ -192,6 +192,15 @@ struct NoteEditorView: View {
         insertBlock(block)
     }
 
+    /// localhost, loopback, private network ranges and .local names are reached over plain http.
+    static func isLocalAddress(_ s: String) -> Bool {
+        let host = s.split(separator: "/").first.map { String($0.split(separator: ":").first ?? "") }?.lowercased() ?? ""
+        if host == "localhost" || host.hasSuffix(".local") || host.hasSuffix(".localhost") || host == "0.0.0.0" { return true }
+        let parts = host.split(separator: ".").compactMap { Int($0) }
+        guard parts.count == 4 else { return false }
+        return parts[0] == 127 || parts[0] == 10 || (parts[0] == 192 && parts[1] == 168) || (parts[0] == 172 && (16...31).contains(parts[1]))
+    }
+
     private func webBlock(_ url: URL) -> BlockModel {
         let b = BlockModel(kind: .web)
         b.url = url.absoluteString
@@ -201,7 +210,7 @@ struct NoteEditorView: View {
     private func insertWeb(_ text: String) {
         var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return }
-        if !s.contains("://") { s = "https://" + s }
+        if !s.contains("://") { s = (Self.isLocalAddress(s) ? "http://" : "https://") + s }
         guard let url = URL(string: s), url.host() != nil else { alertMessage = "„\(text)“ ist kein gültiger Link."; return }
         insertBlock(webBlock(url))
     }

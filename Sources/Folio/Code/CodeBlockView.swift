@@ -8,8 +8,7 @@ struct CodeBlockView: View {
     @EnvironmentObject var theme: ThemeManager
     @Environment(\.colorScheme) private var colorScheme
     @State private var height: CGFloat = 40
-    @State private var running: CodeRun?
-    @State private var runInfo: String?
+    @ObservedObject private var runs = RunManager.shared
     @State private var interpreter: String?
 
     private var codeTheme: CodeTheme { theme.codeTheme(dark: colorScheme == .dark) }
@@ -25,6 +24,7 @@ struct CodeBlockView: View {
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) })
                 .frame(height: height)
                 .padding(.bottom, 2)
+            serverBar
             if let output = block.output {
                 outputView(output)
             }
@@ -49,8 +49,8 @@ struct CodeBlockView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 6)
-            if let runInfo {
-                Text(runInfo).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+            if let runInfo = runs.info[block.id] {
+                Text(runInfo).font(.system(size: 10.5)).foregroundStyle(runs.server(block.id) != nil ? Color.green : .secondary).lineLimit(1)
             }
             Menu {
                 ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
@@ -80,8 +80,8 @@ struct CodeBlockView: View {
             headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
 
             if spec.isRunnable {
-                if running != nil {
-                    runButton("Stopp", icon: "stop.fill", color: .red) { running?.cancel() }
+                if runs.isRunning(block.id) {
+                    runButton("Stopp", icon: "stop.fill", color: .red) { runs.stop(block.id) }
                 } else {
                     runButton("Ausführen", icon: "play.fill", color: Color(red: 0.12, green: 0.55, blue: 0.27), action: run)
                         .help("Mit installiertem Interpreter ausführen (⌘↩)")
@@ -125,7 +125,7 @@ struct CodeBlockView: View {
             HStack {
                 Text("Ausgabe").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
-                Button { block.output = nil; runInfo = nil; doc.markDirty() } label: { Image(systemName: "xmark") }
+                Button { block.output = nil; runs.clearInfo(block.id); doc.markDirty() } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
                     .font(.system(size: 9))
                     .help("Ausgabe entfernen")
@@ -155,30 +155,35 @@ struct CodeBlockView: View {
     }
 
     private func run() {
-        guard running == nil, spec.isRunnable else { return }
-        let runner = CodeRun()
-        running = runner
-        runInfo = "läuft…"
-        let code = block.storage.string
-        let lang = spec
-        let override = theme.settings.interpreterOverrides[lang.id]
-        let timeout = theme.settings.runTimeout
-        Task {
-            do {
-                let r = try await runner.run(code: code, language: lang, override: override, timeout: timeout)
-                var text = r.combinedOutput
-                if r.timedOut { text += "\n⏱ Abgebrochen nach \(Int(timeout)) s" }
-                if r.cancelled { text += "\n■ Gestoppt" }
-                block.output = text
-                block.outputIsError = !r.succeeded
-                runInfo = String(format: "%@ · Exit %d · %.2f s", r.command, r.exitCode, r.duration)
-            } catch {
-                block.output = error.localizedDescription
-                block.outputIsError = true
-                runInfo = nil
+        runs.start(block: block, doc: doc, theme: theme)
+    }
+
+    /// Shown while the code runs as a server: open it in the note or the browser, or stop it.
+    @ViewBuilder
+    private var serverBar: some View {
+        if let url = runs.server(block.id) {
+            HStack(spacing: 10) {
+                Image(systemName: "server.rack").foregroundStyle(.green)
+                Text("Server läuft auf \(url.absoluteString)")
+                    .font(.system(size: 12, weight: .medium))
+                    .textSelection(.enabled)
+                Spacer()
+                Button("In Notiz öffnen") { openInNote(url) }
+                Button("Im Browser") { NSWorkspace.shared.open(url) }
+                Button("Stoppen", role: .destructive) { runs.stop(block.id) }
             }
-            running = nil
-            doc.markDirty()
+            .buttonStyle(.borderless)
+            .font(.system(size: 12))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.green.opacity(0.12))
         }
+    }
+
+    private func openInNote(_ url: URL) {
+        if doc.blocks.contains(where: { $0.kind == .web && $0.url == url.absoluteString }) { return }
+        let web = BlockModel(kind: .web)
+        web.url = url.absoluteString
+        doc.insert(web, after: block.id)
     }
 }
