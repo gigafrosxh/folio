@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Needed when started as a bare binary (`swift run`); harmless inside the .app bundle.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        LayoutDebug.runIfRequested()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -105,6 +106,34 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("w", modifiers: [.command, .option])
             Button("Bild mit Image Playground…") { NotificationCenter.default.post(name: .folioInsert, object: "playground") }
                 .keyboardShortcut("p", modifiers: [.command, .option])
+        }
+    }
+}
+
+/// Developer aid: `FOLIO_OPEN=<note path> FOLIO_LAYOUT_DUMP=1` opens a note and prints the frames of
+/// its text views and embedded views, to diagnose overlapping blocks.
+enum LayoutDebug {
+    @MainActor static func runIfRequested() {
+        let env = ProcessInfo.processInfo.environment
+        if let path = env["FOLIO_OPEN"] {
+            let store = NoteStore.shared
+            if let ref = store.notes.first(where: { $0.url.path == path }) { store.selectedNoteID = ref.id }
+        }
+        guard env["FOLIO_LAYOUT_DUMP"] != nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
+            func walk(_ v: NSView) {
+                if v is FolioTextView || v is CodeTextView || String(describing: type(of: v)).contains("WKWebView")
+                    || v is CodeEditorContainer {
+                    let r = v.convert(v.bounds, to: nil)
+                    var extra = ""
+                    if let t = v as? FolioTextView { extra = "content=\(t.contentHeight(forWidth: t.bounds.width)) text=\(t.string.prefix(30).debugDescription)" }
+                    print("LAYOUT", type(of: v), "y=\(Int(r.minY))..\(Int(r.maxY)) h=\(r.height) w=\(r.width)", extra)
+                }
+                v.subviews.forEach(walk)
+            }
+            walk(root)
+            fflush(stdout)
         }
     }
 }

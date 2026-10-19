@@ -22,6 +22,13 @@ let package = Package(
             path: "Sources/Folio",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // Command-line inspector for .folio files.
+        .executableTarget(
+            name: "folio-dump",
+            dependencies: ["FolioCore"],
+            path: "Sources/folio-dump",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .testTarget(
             name: "FolioCoreTests",
             dependencies: ["FolioCore"],

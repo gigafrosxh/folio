@@ -333,6 +333,7 @@ struct WebBlockView: View {
     @ObservedObject var doc: NoteDocument
     @State private var reload = 0
     @State private var loadState: WebLoadState = .loading
+    @State private var remotePDF: Data?
 
     private var url: URL? { URL(string: block.url) }
     private var isPage: Bool { block.mode != "preview" }
@@ -340,12 +341,19 @@ struct WebBlockView: View {
     var body: some View {
         if let url {
             if isPage {
-                EmbedCard(title: url.host() ?? block.url, icon: "globe", height: $block.height, onCommit: { doc.markDirty() }) {
+                EmbedCard(title: remotePDF != nil ? url.lastPathComponent : (url.host() ?? block.url),
+                          icon: remotePDF != nil ? "doc.richtext" : "globe", height: $block.height, onCommit: { doc.markDirty() }) {
                     actions(url)
                 } content: {
-                    WebPageView(url: url, reloadToken: reload, state: $loadState)
-                        .overlay { stateOverlay(url) }
+                    if let remotePDF {
+                        // PDFs on the web get the same fit-to-width, scrollable viewer as attached PDFs.
+                        PDFKitView(data: remotePDF, revision: reload)
+                    } else {
+                        WebPageView(url: url, reloadToken: reload, state: $loadState)
+                            .overlay { stateOverlay(url) }
+                    }
                 }
+                .task(id: "\(block.url)#\(reload)") { remotePDF = await RemotePDF.fetch(url) }
             } else {
                 VStack(alignment: .trailing, spacing: 4) {
                     LinkPreview(url: url)
@@ -399,5 +407,24 @@ struct WebBlockView: View {
         }
         Button { NSWorkspace.shared.open(url) } label: { Label("Im Browser öffnen", systemImage: "safari") }
             .help("Im Browser öffnen")
+    }
+}
+
+/// Downloads a linked PDF with the cookies of the embedded browser, so files behind a login
+/// (e.g. Moodle) work once you have signed in inside a web embed.
+enum RemotePDF {
+    @MainActor static func fetch(_ url: URL) async -> Data? {
+        guard url.pathExtension.lowercased() == "pdf" || url.absoluteString.lowercased().contains(".pdf") else { return nil }
+        let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
+        var request = URLRequest(url: url)
+        request.setValue(WebPageView.userAgent, forHTTPHeaderField: "User-Agent")
+        let header = HTTPCookie.requestHeaderFields(with: cookies.filter { cookie in
+            guard let host = url.host() else { return false }
+            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+            return host == domain || host.hasSuffix("." + domain)
+        })
+        for (k, v) in header { request.setValue(v, forHTTPHeaderField: k) }
+        guard let (data, _) = try? await URLSession.shared.data(for: request), data.starts(with: Array("%PDF".utf8)) else { return nil }
+        return data
     }
 }
