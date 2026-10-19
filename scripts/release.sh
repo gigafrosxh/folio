@@ -22,7 +22,7 @@ gh auth status >/dev/null 2>&1 || die "gh ist nicht angemeldet (gh auth login)"
 [[ -z "$(git status --porcelain -- "$PLIST" CHANGELOG.md)" ]] || die "$PLIST oder CHANGELOG.md hat uncommittete Änderungen."
 [[ "$(git rev-parse --abbrev-ref HEAD)" == main ]] || die "Releases nur von main."
 git fetch -q origin main
-[[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || die "main ist nicht auf dem Stand von origin/main."
+git merge-base --is-ancestor origin/main HEAD || die "main liegt hinter origin/main zurück – erst pullen."
 
 CURRENT="$(pb 'Print :CFBundleShortVersionString')"
 IFS=. read -r MA MI PA <<<"$CURRENT"
