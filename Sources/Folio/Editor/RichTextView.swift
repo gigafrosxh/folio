@@ -73,7 +73,10 @@ final class FolioTextView: NSTextView {
         lm.ensureLayout(for: tc)
         var h = lm.usedRect(for: tc).height
         if lm.extraLineFragmentTextContainer != nil { h = max(h, lm.extraLineFragmentRect.maxY) }
-        return ceil(max(h, (typingFont?.boundingRectForFont.height ?? 18)) + textContainerInset.height * 2)
+        // Extra room below the last line so descenders of large headings never touch the next block.
+        let lastFont = (textStorage?.length ?? 0) > 0 ? textStorage?.attribute(.font, at: textStorage!.length - 1, effectiveRange: nil) as? NSFont : typingFont
+        let descent = abs(lastFont?.descender ?? 4)
+        return ceil(max(h, (typingFont?.boundingRectForFont.height ?? 18)) + textContainerInset.height * 2 + descent * 0.5 + 2)
     }
 
     private var typingFont: NSFont? { typingAttributes[.font] as? NSFont }
@@ -94,6 +97,7 @@ final class FolioTextView: NSTextView {
     override func didChangeText() {
         super.didChangeText()
         reportHeight()
+        invalidateIntrinsicContentSize()
     }
 
     override func becomeFirstResponder() -> Bool {

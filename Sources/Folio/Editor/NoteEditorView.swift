@@ -341,6 +341,7 @@ struct BlockRow: View {
             content
         }
         .contentShape(Rectangle())
+        .zIndex(block.kind == .text ? 1 : 0)
         .onHover(perform: setHover)
         .contextMenu {
             if block.kind != .text {

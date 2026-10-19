@@ -120,6 +120,21 @@ enum LayoutDebug {
             if let ref = store.notes.first(where: { $0.url.path == path }) { store.selectedNoteID = ref.id }
         }
         guard env["FOLIO_LAYOUT_DUMP"] != nil else { return }
+        if let typed = env["FOLIO_TYPE"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
+                func find(_ v: NSView) -> FolioTextView? {
+                    if let t = v as? FolioTextView, !t.string.isEmpty { return t }
+                    for s in v.subviews { if let f = find(s) { return f } }
+                    return nil
+                }
+                guard let tv = find(root) else { print("LAYOUT no text view"); return }
+                tv.window?.makeFirstResponder(tv)
+                tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+                tv.insertNewline(nil)
+                tv.insertText(typed, replacementRange: tv.selectedRange())
+            }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
             guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
             func walk(_ v: NSView) {

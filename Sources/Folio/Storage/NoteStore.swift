@@ -52,7 +52,9 @@ final class NoteStore: ObservableObject {
     static let defaultFolderName = "Notizen"
 
     private init() {
-        rootURL = URL(fileURLWithPath: ThemeManager.shared.settings.libraryPath, isDirectory: true)
+        // FOLIO_LIBRARY overrides the library folder (used for debugging without touching real notes).
+        let path = ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] ?? ThemeManager.shared.settings.libraryPath
+        rootURL = URL(fileURLWithPath: path, isDirectory: true)
         prepareRoot()
         reload()
     }
