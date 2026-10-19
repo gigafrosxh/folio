@@ -12,6 +12,10 @@ final class CodeTextView: NSTextView {
     var predictionsEnabled: () -> Bool = { false }
     var ghostColor: NSColor = .tertiaryLabelColor
     var completionEnabled: () -> Bool = { true }
+    /// Code of earlier linked blocks (same note and language), so completion knows their names.
+    var linkedPrelude: () -> String = { "" }
+    /// Live session of the note for this language, asked for the names it currently holds.
+    var liveKernel: () -> Kernel? = { nil }
     var accentColor: NSColor = .controlAccentColor
 
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
@@ -356,16 +360,33 @@ final class CodeTextView: NSTextView {
         completionTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(manual ? 0 : 90))
             guard !Task.isCancelled else { return }
-            var items = await CompletionEngine.shared.complete(ctx)
+            var items = await self?.completions(for: ctx) ?? []
             if items.isEmpty, ctx.receiver != nil, !Task.isCancelled {
                 // Language servers may still be parsing imports right after start; ask once more.
                 try? await Task.sleep(for: .milliseconds(900))
                 guard !Task.isCancelled else { return }
-                items = await CompletionEngine.shared.complete(ctx)
+                items = await self?.completions(for: ctx) ?? []
             }
             guard !Task.isCancelled, let self, self.selectedRange().location == location else { return }
             self.showCompletion(items, prefix: ctx.prefix, anchor: location - (ctx.prefix as NSString).length)
         }
+    }
+
+    /// Completion sources plus what linked blocks define: the live session's names first, then the
+    /// engine run on the earlier blocks' code followed by this block.
+    private func completions(for ctx: CompletionContext) async -> [CompletionItem] {
+        let prelude = linkedPrelude()
+        var combined = ctx
+        if !prelude.isEmpty {
+            combined = CompletionContext(code: prelude + "\n" + ctx.code, offset: (prelude as NSString).length + 1 + ctx.offset, language: ctx.language)
+        }
+        var items = await CompletionEngine.shared.complete(combined)
+        if let kernel = liveKernel() {
+            let names = await kernel.complete(receiver: ctx.receiver)
+            let live = names.map { CompletionItem(label: $0, kind: ctx.receiver == nil ? .variable : .property, detail: "Sitzung") }
+            items = CompletionFilter.filter(live + items, prefix: ctx.prefix)
+        }
+        return items
     }
 
     private func showCompletion(_ items: [CompletionItem], prefix: String, anchor: Int) {
@@ -529,6 +550,8 @@ struct CodeEditorView: NSViewRepresentable {
     var onRun: () -> Void
     var onFocus: () -> Void
     var onFormat: () -> Void = {}
+    var linkedPrelude: () -> String = { "" }
+    var liveKernel: () -> Kernel? = { nil }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -580,6 +603,8 @@ struct CodeEditorView: NSViewRepresentable {
         tv.predictionsEnabled = { [theme = ThemeManager.shared] in theme.settings.aiPredictions && theme.settings.codePredictions }
         tv.ghostColor = codeTheme.foregroundColor.withAlphaComponent(0.38)
         tv.completionEnabled = { ThemeManager.shared.settings.codeCompletion }
+        tv.linkedPrelude = linkedPrelude
+        tv.liveKernel = liveKernel
         tv.accentColor = ThemeManager.shared.accentNSColor
         container.showsGutter = showLineNumbers
         container.gutter.font = .monospacedDigitSystemFont(ofSize: max(font.pointSize - 2, 9), weight: .regular)

@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NoteStore.shared.currentDocument?.saveNow()
             RunManager.shared.stopAll()
             LSPCompleter.shared.shutdownAll()
+            KernelManager.shared.shutdownAll()
         }
     }
 
@@ -152,7 +153,19 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed.hasPrefix("chat:"), let doc = NoteStore.shared.currentDocument {
+                if typed == "linked-run", let doc = NoteStore.shared.currentDocument {
+                    let a = BlockModel(kind: .code), b = BlockModel(kind: .code)
+                    a.language = "python"; b.language = "python"
+                    a.storage.setAttributedString(NSAttributedString(string: "a = 10\nnamen = ['Ada', 'Linus']"))
+                    b.storage.setAttributedString(NSAttributedString(string: "print(a)\nlen(namen) * a"))
+                    doc.insert(a, after: doc.blocks.first?.id)
+                    doc.insert(b, after: a.id)
+                    Task { @MainActor in
+                        await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
+                        await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
+                        print("LAYOUT linked:", b.output ?? "-"); fflush(stdout)
+                    }
+                } else if typed.hasPrefix("chat:"), let doc = NoteStore.shared.currentDocument {
                     NotificationCenter.default.post(name: .folioToggleChat, object: nil)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         let started = Date()

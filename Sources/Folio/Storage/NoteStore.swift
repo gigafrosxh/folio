@@ -205,6 +205,8 @@ final class NoteStore: ObservableObject {
     private func openSelected() {
         if let doc = currentDocument {
             doc.saveNow()
+            // Closing a note ends its shared code sessions (variables of linked code blocks).
+            if doc.id != selectedNoteID { KernelManager.shared.shutdown(note: doc.id) }
         }
         guard let id = selectedNoteID, let ref = notes.first(where: { $0.id == id }) else {
             currentDocument = nil

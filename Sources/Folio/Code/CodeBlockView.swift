@@ -9,6 +9,7 @@ struct CodeBlockView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var height: CGFloat = 40
     @ObservedObject private var runs = RunManager.shared
+    @ObservedObject private var kernels = KernelManager.shared
     @State private var interpreter: String?
 
     private var codeTheme: CodeTheme { theme.codeTheme(dark: colorScheme == .dark) }
@@ -22,7 +23,9 @@ struct CodeBlockView: View {
                            showLineNumbers: theme.settings.showLineNumbers,
                            onChange: { doc.markDirty() }, onRun: run,
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
-                           onFormat: formatCode)
+                           onFormat: formatCode,
+                           linkedPrelude: linkedPrelude,
+                           liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: block.language) : nil })
                 .frame(height: height)
                 .padding(.bottom, 2)
             serverBar
@@ -43,7 +46,8 @@ struct CodeBlockView: View {
             Text("main.\(spec.fileExtension)")
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
-            if spec.isRunnable {
+            if isLinked { sessionChip }
+            if spec.isRunnable && !isLinked {
                 Text(interpreter ?? "kein Interpreter gefunden")
                     .font(.system(size: 10.5))
                     .foregroundStyle(interpreter == nil ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)).opacity(0.8))
@@ -79,6 +83,7 @@ struct CodeBlockView: View {
                 NSPasteboard.general.setString(block.storage.string, forType: .string)
             }
             headerButton("wand.and.rays", formatHelp, action: formatCode)
+            sessionMenu
             headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
 
             if spec.isRunnable {
@@ -159,6 +164,62 @@ struct CodeBlockView: View {
     }
 
     @State private var formatterName: String?
+
+    /// Linked blocks run in the note's shared session for their language (variables carry over).
+    private var isLinked: Bool { block.mode != "isolated" && KernelManager.supportsSharing(block.language) }
+    private var sessionRunning: Bool {
+        _ = kernels.alive
+        return KernelManager.shared.isRunning(note: doc.id, language: block.language)
+    }
+
+    /// Code of the linked blocks above this one (same language), for autocomplete.
+    private func linkedPrelude() -> String {
+        guard isLinked, let index = doc.blocks.firstIndex(where: { $0.id == block.id }) else { return "" }
+        return doc.blocks[..<index]
+            .filter { $0.kind == .code && $0.language == block.language && $0.mode != "isolated" }
+            .map(\.storage.string)
+            .joined(separator: "\n")
+    }
+
+    private var sessionChip: some View {
+        HStack(spacing: 4) {
+            Circle().fill(sessionRunning ? Color.green : Color.secondary.opacity(0.5)).frame(width: 6, height: 6)
+            Image(systemName: "link").font(.system(size: 9, weight: .semibold))
+            Text(sessionRunning ? "\(spec.name)-Sitzung" : "verknüpft")
+        }
+        .font(.system(size: 10.5, weight: .medium))
+        .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Color.primary.opacity(0.06), in: Capsule())
+        .help(sessionRunning
+              ? "Läuft in der gemeinsamen \(spec.name)-Sitzung dieser Notiz: Variablen aus anderen Blöcken sind verfügbar."
+              : "Wird in der gemeinsamen \(spec.name)-Sitzung dieser Notiz ausgeführt, sobald du ihn startest.")
+    }
+
+    private var sessionMenu: some View {
+        Menu {
+            Button("Alle Code-Blöcke der Notiz ausführen") { runs.runAll(doc: doc, theme: theme) }
+            if KernelManager.supportsSharing(block.language) {
+                Divider()
+                Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
+                    get: { block.mode != "isolated" },
+                    set: { block.mode = $0 ? "" : "isolated"; doc.markDirty() }))
+                Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: block.language) }
+                    .disabled(!sessionRunning)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sitzung und Ausführung")
+    }
 
     private var formatHelp: String {
         if let tool = formatterName { return "Code formatieren mit \(tool) (⌥⇧F)" }

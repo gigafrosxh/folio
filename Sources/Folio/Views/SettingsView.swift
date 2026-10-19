@@ -18,7 +18,16 @@ struct SettingsView: View {
         NSFont(name: $0, size: 13)?.isFixedPitch == true
     } + ["SF Mono", "Menlo"])).sorted()
 
+    /// "Folio 0.5.1 (7)" from the app bundle; "Folio (Entwicklung)" when run outside the .app.
+    static var versionString: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        guard let version = info["CFBundleShortVersionString"] as? String else { return "Folio (Entwicklungsversion)" }
+        let build = info["CFBundleVersion"] as? String
+        return "Folio \(version)" + (build.map { " (\($0))" } ?? "")
+    }
+
     var body: some View {
+        VStack(spacing: 0) {
         TabView {
             general.tabItem { Label("Allgemein", systemImage: "gearshape") }
             editor.tabItem { Label("Editor", systemImage: "textformat") }
@@ -26,7 +35,15 @@ struct SettingsView: View {
             execution.tabItem { Label("Ausführung", systemImage: "play.circle") }
             appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }
         }
-        .frame(width: 620, height: 520)
+            Divider()
+            Text(Self.versionString)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+        }
+        .frame(width: 620, height: 548)
         .tint(theme.accent)
         .preferredColorScheme(theme.settings.appearance.colorScheme)
         .onAppear { previewDark = (theme.settings.appearance.colorScheme ?? colorScheme) == .dark }

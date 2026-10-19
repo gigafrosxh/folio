@@ -7,6 +7,11 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Verknüpfte Code-Blöcke wie in einem Notebook: Blöcke derselben Sprache in einer Notiz teilen sich eine laufende Sitzung (Python, JavaScript, Ruby, Bash, Zsh), z. B. `a = 10` in einem Block und `print(a)` im nächsten. Der letzte Ausdruck eines Blocks wird wie in einer REPL angezeigt. Im Code-Kopf: Sitzungsanzeige, „Alle Code-Blöcke ausführen“, „Sitzung neu starten“ und Verknüpfung pro Block abschaltbar. Stoppen unterbricht nur den laufenden Code, Variablen bleiben. Die Sitzung endet beim Schließen der Notiz oder der App.
+- Autovervollständigung kennt Variablen aus verknüpften Blöcken und fragt die laufende Sitzung nach ihren Namen.
+- Die aktuelle Version steht unten im Einstellungsfenster.
+
 ## [0.5.1] – 2026-10-19
 
 ### Behoben
