@@ -19,7 +19,7 @@ section() { awk -v h="## [$1]" 'index($0, h) == 1 { on = 1; next } /^## \[/ { on
 [[ $# -eq 1 ]] || die "Aufruf: $0 patch|minor|major|X.Y.Z"
 command -v gh >/dev/null || die "gh fehlt (brew install gh)"
 gh auth status >/dev/null 2>&1 || die "gh ist nicht angemeldet (gh auth login)"
-[[ -z "$(git status --porcelain)" ]] || die "Arbeitskopie hat uncommittete Änderungen – erst committen."
+[[ -z "$(git status --porcelain -- "$PLIST" CHANGELOG.md)" ]] || die "$PLIST oder CHANGELOG.md hat uncommittete Änderungen."
 [[ "$(git rev-parse --abbrev-ref HEAD)" == main ]] || die "Releases nur von main."
 git fetch -q origin main
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || die "main ist nicht auf dem Stand von origin/main."
@@ -47,18 +47,22 @@ if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
 \\
 ## [$VERSION] – $(date +%F)/" CHANGELOG.md
 fi
-if [[ -n "$(git status --porcelain)" ]]; then
+if [[ -n "$(git status --porcelain -- "$PLIST" CHANGELOG.md)" ]]; then
     git commit -q -m "Version $VERSION" -- "$PLIST" CHANGELOG.md
 fi
 git tag -a "$TAG" -m "Folio $VERSION"
 
+# Gebaut wird aus einem Export des Tags, nicht aus der Arbeitskopie: uncommittete Änderungen landen nie im Release.
+WORK="$(mktemp -d)"
+NOTES="$WORK/notes.md"
+trap 'rm -rf "$WORK"' EXIT
+mkdir "$WORK/src" && git archive "$TAG" | tar -x -C "$WORK/src"
 echo "Baue Installer für $VERSION …"
-OUT="$(scripts/make-installer.sh)"
-DMG="$(grep '\.dmg$' <<<"$OUT")"
-PKG="$(grep '\.pkg$' <<<"$OUT")"
-
-NOTES="$(mktemp)"
-trap 'rm -f "$NOTES"' EXIT
+OUT="$("$WORK/src/scripts/make-installer.sh")"
+mkdir -p dist
+cp "$(grep '\.dmg$' <<<"$OUT")" "$(grep '\.pkg$' <<<"$OUT")" dist/
+DMG="dist/Folio-$VERSION-arm64.dmg"
+PKG="dist/Folio-$VERSION-arm64.pkg"
 section "$VERSION" >"$NOTES"
 cat >>"$NOTES" <<'EOF'
 

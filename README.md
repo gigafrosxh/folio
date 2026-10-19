@@ -87,7 +87,7 @@ Die Dateitypdeklaration registriert `.folio` als `de.daniel.folio.note` mit der 
 
 Folio folgt [Semantic Versioning](https://semver.org/lang/de/). Die Version steht in `Resources/Info.plist` (`CFBundleShortVersionString`), jede veröffentlichte Version hat einen Git-Tag `vX.Y.Z` und einen Abschnitt in [CHANGELOG.md](CHANGELOG.md). Änderungen werden laufend unter **Unreleased** im Changelog notiert.
 
-Ein Release ist ein Befehl (sauberer Stand auf `main`, `gh` angemeldet):
+Ein Release ist ein Befehl (auf `main`, aktuell mit GitHub, `gh` angemeldet; gebaut wird aus dem getaggten Stand, nicht aus der Arbeitskopie):
 
 ```bash
 make release V=minor
