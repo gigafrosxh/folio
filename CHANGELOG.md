@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.16.1] – 2026-10-20
+
 ### Behoben
 - Im Ablage-Menü fehlten seit 0.16.0 Sichern, Schnell öffnen, Zuletzt geöffnet, Vorlagen, Markdown-Import/-Export, Versionsverlauf und PDF-Export samt ihren Kürzeln (⌘S, ⌘P, ⇧⌘Y, ⇧⌘E, ⌥⌘E). Sie sind wieder da (#73).
 
