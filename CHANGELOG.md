@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.16.3] – 2026-10-20
+
 ### Behoben
 - Fokusmodus mit geöffneter Split View: Menübefehle und Kürzel wirkten auf die ausgeblendete rechte Notiz; jetzt gehen sie an die sichtbare (#75).
 
