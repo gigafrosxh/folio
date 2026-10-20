@@ -15,11 +15,14 @@ final class KernelManager: ObservableObject {
     static func supportsSharing(_ language: String) -> Bool { KernelLanguages.spec(for: language) != nil }
 
     /// The running session, starting one if needed.
-    func kernel(note: UUID, language: String) throws -> Kernel? {
+    func kernel(note: UUID, language: String, environment env: RunEnvironment? = nil) throws -> Kernel? {
         guard let spec = KernelLanguages.spec(for: language) else { return nil }
         let k = key(note, language)
         if let existing = kernels[k], existing.isAlive { return existing }
-        let kernel = try Kernel(language: spec)
+        let env = env ?? NoteStore.shared.document(for: note)?.meta.environment
+        // A per-note interpreter ("python3.12 {file}") replaces the session's executable.
+        let exe = env?.interpreters[language]?.split(separator: " ").first.map(String.init)
+        let kernel = try Kernel(language: spec, executable: exe, directory: env?.workingDirectoryURL, environment: env?.variables ?? [:])
         kernels[k] = kernel
         alive.insert(k)
         return kernel

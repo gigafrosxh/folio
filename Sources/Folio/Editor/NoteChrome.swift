@@ -20,6 +20,21 @@ struct NoteActionsBar: View {
             button("apple.intelligence", "Chat mit Apple Intelligence (⌥⌘I)", tint: theme.accent) {
                 NotificationCenter.default.post(name: .folioToggleChat, object: nil)
             }
+            Menu {
+                Button("Terminal ein-/ausblenden (⌃`)") { NotificationCenter.default.post(name: .folioToggleTerminal, object: nil) }
+                Button("Ausführungsumgebung …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
+                Divider()
+                Button("Alle Code-Blöcke ausführen") { NotificationCenter.default.post(name: .folioInsert, object: "runall") }
+            } label: {
+                Image(systemName: doc.meta.environment == nil ? "terminal" : "terminal.fill")
+                    .frame(width: 30, height: 28)
+            } primaryAction: {
+                NotificationCenter.default.post(name: .folioToggleTerminal, object: nil)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Terminal (⌃`) – gedrückt halten: Ausführungsumgebung")
             button("clock.arrow.circlepath", "Versionsverlauf (⇧⌘Y)") {
                 NotificationCenter.default.post(name: .folioShowHistory, object: nil)
             }

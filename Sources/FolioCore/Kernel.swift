@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// How to start a persistent interpreter ("kernel") for a language and talk to it.
 ///
@@ -34,7 +35,7 @@ public enum KernelLanguages {
     public static let python = KernelLanguage(
         id: "python", command: ["python3", "-u", "{script}"], fileExtension: "py", supportsCompletion: true,
         script: #"""
-import ast, json, sys, traceback, builtins
+import ast, io, json, sys, traceback, builtins
 ns = {"__name__": "__main__", "__builtins__": builtins}
 MARK = "\x1e"
 
@@ -73,7 +74,13 @@ for line in sys.stdin:
         if msg.get("op") == "complete":
             print(json.dumps(names(msg.get("receiver") or "")))
         else:
-            run(msg.get("code", ""))
+            # Input for input()/sys.stdin comes with the message; reading past it raises EOFError.
+            real_stdin = sys.stdin
+            sys.stdin = io.StringIO(msg.get("stdin", ""))
+            try:
+                run(msg.get("code", ""))
+            finally:
+                sys.stdin = real_stdin
     except KeyboardInterrupt:
         status = "error"
         print("KeyboardInterrupt", file=sys.stderr)
@@ -100,17 +107,21 @@ public final class Kernel: @unchecked Sendable {
     private var outBuffer = Data()
     private var errBuffer = Data()
     private var current: (id: String, onOutput: (@Sendable (String) -> Void)?, outDone: Bool, errDone: Bool,
-                          stdout: String, stderr: String, status: String, finish: (() -> Void)?)? = nil
+                          stdout: OutputLimiter, stderr: OutputLimiter, status: String, finish: (() -> Void)?)? = nil
     private var queue: [() -> Void] = []
     private var busy = false
 
     public var isAlive: Bool { process.isRunning }
     public var pid: pid_t { process.processIdentifier }
 
-    public init(language: KernelLanguage, locator: InterpreterLocator = .shared) throws {
+    /// `executable` replaces the language's interpreter (a per-note setting); `directory` and
+    /// `environment` set where and with which variables the session runs.
+    public init(language: KernelLanguage, locator: InterpreterLocator = .shared, executable: String? = nil,
+                directory: URL? = nil, environment extra: [String: String] = [:]) throws {
         self.language = language
-        guard let exe = locator.find(language.command[0]) else {
-            throw CodeRunnerError.interpreterMissing(language.id, [language.command[0]])
+        let wanted = executable ?? language.command[0]
+        guard let exe = locator.find(wanted) else {
+            throw CodeRunnerError.interpreterMissing(language.id, [wanted])
         }
         let script = FileManager.default.temporaryDirectory.appendingPathComponent("folio-kernel-\(UUID().uuidString).\(language.fileExtension)")
         scriptURL = script
@@ -119,13 +130,15 @@ public final class Kernel: @unchecked Sendable {
         process.arguments = language.command.dropFirst().map { $0.replacingOccurrences(of: "{script}", with: script.path) }
         var env = locator.environment
         env["PYTHONIOENCODING"] = "utf-8"
+        for (k, v) in extra { env[k] = v }
         process.environment = env
-        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        process.currentDirectoryURL = directory ?? FileManager.default.homeDirectoryForCurrentUser
         let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
         process.standardInput = inPipe
         process.standardOutput = outPipe
         process.standardError = errPipe
         input = inPipe.fileHandleForWriting
+        _ = fcntl(input.fileDescriptor, F_SETNOSIGPIPE, 1)
         outPipe.fileHandleForReading.readabilityHandler = { [weak self] h in self?.receive(h.availableData, isErr: false) }
         errPipe.fileHandleForReading.readabilityHandler = { [weak self] h in self?.receive(h.availableData, isErr: true) }
         process.terminationHandler = { [weak self] _ in self?.terminated() }
@@ -145,16 +158,25 @@ public final class Kernel: @unchecked Sendable {
         // Programs started by the code (e.g. `sleep` in a shell session) get the interrupt too.
         for child in ServerDetector.descendants(of: process.processIdentifier) { kill(child, SIGINT) }
         kill(process.processIdentifier, SIGINT)
+        lock.lock(); let interruptedID = current?.id; lock.unlock()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, let interruptedID else { return }
+            self.lock.lock(); let active = self.current?.id == interruptedID; self.lock.unlock()
+            if active { self.shutdown() }
+        }
     }
 
     // MARK: Running code
 
     /// Runs `code` in the shared namespace. Output streams through `onOutput`; runs are queued.
-    public func execute(_ code: String, timeout: TimeInterval = 30, onOutput: (@Sendable (String) -> Void)? = nil,
+    public func execute(_ code: String, timeout: TimeInterval = 30, stdin: String? = nil, limits: ResourceLimits = ResourceLimits(), onOutput: (@Sendable (String) -> Void)? = nil,
                         onServer: (@Sendable (URL) -> Void)? = nil) async -> RunResult {
         let start = Date()
         let server = LockedBool()
-        let (out, err, status, timedOut) = await send(["op": "exec", "code": code], timeout: timeout, keepRunning: { server.value },
+        let memoryHit = LockedBool()
+        var message = ["op": "exec", "code": code]
+        if let stdin { message["stdin"] = stdin }
+        let (out, err, status, timedOut) = await send(message, timeout: timeout, keepRunning: { server.value }, limits: limits, memoryHit: memoryHit,
                                                       onOutput: { chunk in
             onOutput?(chunk)
             if let url = ServerDetector.url(inOutput: chunk), !server.value { server.set(); onServer?(url) }
@@ -162,6 +184,8 @@ public final class Kernel: @unchecked Sendable {
         var result = RunResult(stdout: out, stderr: err, exitCode: status == "ok" ? 0 : 1, duration: Date().timeIntervalSince(start),
                                command: "\(language.id)-Sitzung", timedOut: timedOut, cancelled: false)
         if server.value { result.serverURL = ServerDetector.url(inOutput: out + err) }
+        result.memoryExceeded = memoryHit.value
+        result.fileName = "<block>"
         return result
     }
 
@@ -175,6 +199,7 @@ public final class Kernel: @unchecked Sendable {
     }
 
     private func send(_ message: [String: String], timeout: TimeInterval, keepRunning: @escaping @Sendable () -> Bool,
+                      limits: ResourceLimits = ResourceLimits(), memoryHit: LockedBool = LockedBool(),
                       onOutput: (@Sendable (String) -> Void)?) async -> (String, String, String, Bool) {
         await withCheckedContinuation { cont in
             let id = UUID().uuidString
@@ -186,21 +211,40 @@ public final class Kernel: @unchecked Sendable {
                 }
                 let timedOut = LockedBool()
                 self.lock.lock()
-                self.current = (id, onOutput, false, false, "", "", "ok", nil)
+                self.current = (id, onOutput, false, false, OutputLimiter(limit: limits.maxOutputBytes), OutputLimiter(limit: limits.maxOutputBytes / 2), "ok", nil)
                 self.current?.finish = { [weak self] in
                     guard let self else { return }
+                    self.lock.lock()
+                    guard self.current?.id == id else { self.lock.unlock(); return }
                     let c = self.current
                     self.current = nil
                     self.busy = false
                     let next = self.queue.isEmpty ? nil : self.queue.removeFirst()
-                    cont.resume(returning: (c?.stdout ?? "", c?.stderr ?? "", c?.status ?? "error", timedOut.value))
-                    if let next { self.busy = true; DispatchQueue.global().async(execute: next) }
+                    if next != nil { self.busy = true }
+                    self.lock.unlock()
+                    cont.resume(returning: (c?.stdout.text ?? "", c?.stderr.text ?? "", c?.status ?? "error", timedOut.value))
+                    if let next { DispatchQueue.global().async(execute: next) }
                 }
                 self.lock.unlock()
                 var msg: [String: String] = message
                 msg["id"] = id
                 guard let data = try? JSONSerialization.data(withJSONObject: msg) else { return }
                 try? self.input.write(contentsOf: data + Data("\n".utf8))
+                if limits.maxMemoryMB > 0 {
+                    DispatchQueue.global().async { [weak self] in
+                        while let self, self.process.isRunning {
+                            self.lock.lock(); let active = self.current?.id == id; self.lock.unlock()
+                            guard active else { return }
+                            let tree = [self.pid] + ServerDetector.descendants(of: self.pid)
+                            if ServerDetector.residentMemoryMB(of: tree) > limits.maxMemoryMB {
+                                memoryHit.set()
+                                self.shutdown()
+                                return
+                            }
+                            Thread.sleep(forTimeInterval: 0.5)
+                        }
+                    }
+                }
                 DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
                     guard let self else { return }
                     self.lock.lock(); let stillRunning = self.current?.id == id; self.lock.unlock()
@@ -259,14 +303,14 @@ public final class Kernel: @unchecked Sendable {
 
     /// Called with `lock` held.
     private func emit(_ text: String, isErr: Bool) {
-        if isErr { current?.stderr += text } else { current?.stdout += text }
+        if isErr { current?.stderr.append(Data(text.utf8)) } else { current?.stdout.append(Data(text.utf8)) }
         if let cb = current?.onOutput { DispatchQueue.global().async { cb(text) } }
     }
 
     private func terminated() {
         lock.lock()
         current?.status = "error"
-        current?.stderr += "\nDie Sitzung wurde beendet."
+        current?.stderr.append(Data("\nDie Sitzung wurde beendet.".utf8))
         let finish = current?.finish
         let pending = queue
         queue.removeAll()

@@ -248,6 +248,21 @@ struct SettingsView: View {
         Form {
             Section {
                 settingSlider("Zeitlimit", value: $theme.settings.runTimeout, range: 5...300, unit: "s")
+                settingSlider("Max. Ausgabe", value: $theme.settings.maxOutputKB, range: 50...10_000, unit: "KB")
+                Picker("Arbeitsspeicher-Limit", selection: $theme.settings.maxMemoryMB) {
+                    Text("Keins").tag(0.0)
+                    Text("256 MB").tag(256.0)
+                    Text("512 MB").tag(512.0)
+                    Text("1 GB").tag(1024.0)
+                    Text("2 GB").tag(2048.0)
+                    Text("4 GB").tag(4096.0)
+                }
+                Toggle("Hintergrundprozesse nach dem Ende beenden", isOn: $theme.settings.killOrphans)
+            } header: {
+                Text("Grenzen")
+            } footer: {
+                Text("Gelten für jeden Lauf eines Code-Blocks. Bei zu viel Ausgabe bleiben Anfang und Ende erhalten. Erkannte Server laufen weiter, bis du sie stoppst. Zeitlimit, Interpreter, Arbeitsverzeichnis und Variablen lassen sich pro Notiz festlegen (Terminal-Symbol › Ausführungsumgebung).")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 ForEach(Languages.runnable) { language in

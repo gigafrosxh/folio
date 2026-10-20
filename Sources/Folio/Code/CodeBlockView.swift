@@ -12,6 +12,8 @@ struct CodeBlockView: View {
     @ObservedObject private var runs = RunManager.shared
     @ObservedObject private var kernels = KernelManager.shared
     @State private var interpreter: String?
+    @State private var showStdin = false
+    @State private var typed = ""
 
     private var codeTheme: CodeTheme { theme.codeTheme(dark: colorScheme == .dark) }
     private var spec: LanguageSpec { Languages.spec(for: block.language) }
@@ -22,15 +24,29 @@ struct CodeBlockView: View {
             header
             CodeEditorView(block: block, height: $height, codeTheme: codeTheme, font: theme.codeFont(),
                            showLineNumbers: theme.settings.showLineNumbers,
-                           onChange: { doc.markDirty() }, onRun: run,
+                           onChange: {
+                               doc.markDirty()
+                               // Error markers belong to the code as it was run.
+                               if !block.diagnostics.isEmpty { block.diagnostics = [] }
+                           }, onRun: run,
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
                            onFormat: formatCode,
                            linkedPrelude: linkedPrelude,
                            liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: block.language) : nil })
                 .frame(height: height)
                 .padding(.bottom, 2)
+                .onChange(of: block.diagnostics) { markDiagnostics() }
+                .onAppear { markDiagnostics() }
+            if showStdin || !(block.stdin ?? "").isEmpty {
+                stdinEditor
+                    .transition(Motion.slideUp)
+            }
             serverBar
                 .transition(Motion.slideUp)
+            if runs.acceptsInput(block.id) {
+                interactiveInput
+                    .transition(Motion.slideUp)
+            }
             if usesDatabase {
                 databaseResult
                     .transition(Motion.slideUp)
@@ -142,27 +158,161 @@ struct CodeBlockView: View {
     }
 
     private func outputView(_ output: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Ausgabe").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+        let lineCount = output.isEmpty ? 0 : output.components(separatedBy: "\n").count
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Button {
+                    withAnimation(Motion.quick) { block.outputCollapsed.toggle() }
+                    doc.markDirty()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: block.outputCollapsed ? "chevron.right" : "chevron.down").font(.system(size: 8, weight: .bold))
+                        Text("Ausgabe").font(.system(size: 10, weight: .semibold))
+                        if block.outputCollapsed || lineCount > 12 {
+                            Text("· \(lineCount) Zeile\(lineCount == 1 ? "" : "n")").font(.system(size: 10))
+                        }
+                    }
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(block.outputCollapsed ? "Ausgabe aufklappen" : "Ausgabe einklappen")
                 Spacer()
-                Button { block.output = nil; runs.clearInfo(block.id); doc.markDirty() } label: { Image(systemName: "xmark") }
+                Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(output, forType: .string) } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 9))
+                .help("Ausgabe kopieren")
+                Button {
+                    block.output = nil
+                    block.diagnostics = []
+                    runs.clearInfo(block.id)
+                    doc.markDirty()
+                } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
                     .font(.system(size: 9))
-                    .help("Ausgabe entfernen")
+                    .help("Ausgabe leeren")
             }
-            ScrollView {
-                Text(output.isEmpty ? "(keine Ausgabe)" : output)
-                    .font(Font(theme.codeFont()))
-                    .foregroundStyle(block.outputIsError ? Color.red : Color(nsColor: codeTheme.foregroundColor))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if !block.outputCollapsed {
+                if !block.diagnostics.isEmpty { diagnosticList }
+                ScrollView {
+                    Text(output.isEmpty ? "(keine Ausgabe)" : output)
+                        .font(Font(theme.codeFont()))
+                        .foregroundStyle(block.outputIsError ? Color.red : Color(nsColor: codeTheme.foregroundColor))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 260)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxHeight: 260)
-            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .background(Color(nsColor: NSColor(hex: codeTheme.outputBackground) ?? .windowBackgroundColor))
+    }
+
+    /// The lines the run complained about; a click puts the cursor there (#30).
+    private var diagnosticList: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(block.diagnostics, id: \.self) { d in
+                Button { jump(to: d) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: d.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(d.severity == .error ? Color.red : Color.orange)
+                        Text("Zeile \(d.line)\(d.column.map { ":\($0)" } ?? "")").fontWeight(.semibold)
+                        Text(d.message).lineLimit(2).foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 11))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Zur Zeile springen")
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    /// Marks the lines with errors in the editor (red background, orange for warnings).
+    private func markDiagnostics() {
+        guard let tv = FormattingController.shared.codeView(for: block.id), tv.textStorage === block.storage,
+              let lm = tv.layoutManager else { return }
+        let ns = tv.string as NSString
+        lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: ns.length))
+        lm.removeTemporaryAttribute(.toolTip, forCharacterRange: NSRange(location: 0, length: ns.length))
+        for d in block.diagnostics {
+            guard let r = lineRange(d.line, in: ns) else { continue }
+            let color = d.severity == .error ? NSColor.systemRed : NSColor.systemOrange
+            lm.addTemporaryAttributes([.backgroundColor: color.withAlphaComponent(0.22), .toolTip: d.message], forCharacterRange: r)
+        }
+    }
+
+    private func lineRange(_ line: Int, in ns: NSString) -> NSRange? {
+        var current = 1, start = 0
+        while current < line {
+            let r = ns.range(of: "\n", range: NSRange(location: start, length: ns.length - start))
+            guard r.location != NSNotFound else { return nil }
+            start = r.location + 1
+            current += 1
+        }
+        guard start <= ns.length else { return nil }
+        return ns.lineRange(for: NSRange(location: start, length: 0))
+    }
+
+    private func jump(to d: CodeDiagnostic) {
+        guard let tv = FormattingController.shared.codeView(for: block.id), let r = lineRange(d.line, in: tv.string as NSString) else { return }
+        let col = max((d.column ?? 1) - 1, 0)
+        let loc = min(r.location + col, NSMaxRange(r))
+        tv.window?.makeFirstResponder(tv)
+        tv.setSelectedRange(NSRange(location: loc, length: 0))
+        tv.scrollRangeToVisible(r)
+    }
+
+    /// Text given to the program as standard input (#24).
+    private var stdinEditor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Label("Eingabe (stdin)", systemImage: "keyboard").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Text(isLinked && block.language == "python" ? "input() liest diese Zeilen" : "wird beim Start eingegeben")
+                    .font(.system(size: 10)).foregroundStyle(.tertiary)
+            }
+            TextEditor(text: Binding(get: { block.stdin ?? "" }, set: { block.stdin = $0; doc.markDirty() }))
+                .font(Font(theme.codeFont()))
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 44, maxHeight: 120)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.04))
+    }
+
+    /// While an interactive run waits for input.
+    private var interactiveInput: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right.2").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.accent)
+            TextField("Eingabe an das Programm, ↩ sendet", text: $typed)
+                .textFieldStyle(.plain)
+                .font(Font(theme.codeFont()))
+                .onSubmit {
+                    runs.send(typed + "\n", to: block.id)
+                    block.output = (block.output ?? "") + typed + "\n"
+                    typed = ""
+                }
+            Button("Ende (⌃D)") { runs.endInput(block.id) }
+                .buttonStyle(.borderless)
+                .font(.system(size: 10.5))
+                .help("Eingabe beenden, damit das Programm weiterläuft")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(theme.accent.opacity(0.08))
+    }
+
+    private func runInTerminal() {
+        let override = doc.meta.environment?.interpreters[block.language] ?? theme.settings.interpreterOverrides[block.language]
+        NotificationCenter.default.post(name: .folioShowTerminal, object: doc.id)
+        TerminalSession.session(for: doc.id).run(block, override: override)
     }
 
     private func resolveInterpreter() async {
@@ -217,6 +367,21 @@ struct CodeBlockView: View {
     private var sessionMenu: some View {
         Menu {
             Button("Alle Code-Blöcke der Notiz ausführen") { runs.runAll(doc: doc, theme: theme) }
+            if spec.isRunnable && !usesDatabase {
+                Button("Im Terminal ausführen") { runInTerminal() }
+                    .help("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
+                Divider()
+                Toggle("Eingabe (stdin) vorgeben", isOn: Binding(
+                    get: { showStdin || !(block.stdin ?? "").isEmpty },
+                    set: { v in
+                        showStdin = v
+                        if !v, !(block.stdin ?? "").isEmpty { doc.changeBlock(block, "Eingabe entfernen") { block.stdin = nil } }
+                    }))
+                Toggle("Während der Ausführung eingeben (interaktiv)", isOn: Binding(
+                    get: { block.interactive },
+                    set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
+            }
+            Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
             if KernelManager.supportsSharing(block.language) {
                 Divider()
                 Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(

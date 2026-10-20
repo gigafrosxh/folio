@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // An unanswered conflict on quit: keep both versions rather than lose either.
             if let conflict = NoteStore.shared.conflict { NoteStore.shared.resolve(conflict, .keepBoth) }
             NoteStore.shared.saveAll()
+            TerminalSession.closeAll()
             RunManager.shared.stopAll()
             LSPCompleter.shared.shutdownAll()
             KernelManager.shared.shutdownAll()
@@ -142,6 +143,9 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("f", modifiers: [.command, .option])
             Button("Fokusmodus") { NotificationCenter.default.post(name: .folioToggleFocus, object: nil) }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
+            Button("Terminal ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleTerminal, object: nil) }
+                .keyboardShortcut("`", modifiers: [.control])
+            Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
         }
         // After "New": a .saveItem group disappears once the app has a second scene (note windows).
         CommandGroup(after: .newItem) {
@@ -364,6 +368,9 @@ enum LayoutDebug {
         // FOLIO_SAFETY_TEST=1 (with a throwaway FOLIO_LIBRARY): versions, trash, conflicts and backups end to end.
         if env["FOLIO_SAFETY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await SafetySelfTest.run() }
+        }
+        if env["FOLIO_DEV_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await DevSelfTest.run() }
         }
         if env["FOLIO_EDITOR_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await EditorSelfTest.run() }

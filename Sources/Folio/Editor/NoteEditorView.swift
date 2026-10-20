@@ -26,6 +26,8 @@ struct NoteEditorView: View {
     @State private var showHistory = false
     @StateObject private var find = FindModel()
     @State private var showFind = false
+    @State private var showTerminal = false
+    @State private var showEnvironment = false
     /// Focus mode hides the toolbar until the pointer comes near the top.
     @AppStorage("folio.focusMode") private var focusMode = false
     @State private var headerHover = false
@@ -97,12 +99,18 @@ struct NoteEditorView: View {
                 withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
             }
             .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
-
             .overlay {
                 if dropTargeted {
                     RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
                 }
             }
+            if showTerminal {
+                Divider()
+                TerminalPanel(session: TerminalSession.session(for: doc.id)) { withAnimation(Motion.quick) { showTerminal = false } }
+                    .frame(height: 250)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
         }
         .overlay(alignment: .bottomTrailing) {
             if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
@@ -119,6 +127,7 @@ struct NoteEditorView: View {
                     .padding([.trailing, .bottom], 12)
             }
         }
+        .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
         .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
         .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in if isActive { showHistory = true } }
         .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in
@@ -491,6 +500,28 @@ struct NoteEditorView: View {
     }
 }
 
+/// Terminal and run-environment commands of one editor (kept apart so the editor body type-checks quickly).
+private struct DeveloperPanels: ViewModifier {
+    @ObservedObject var doc: NoteDocument
+    var isActive: Bool
+    @Binding var showTerminal: Bool
+    @Binding var showEnvironment: Bool
+    @EnvironmentObject var theme: ThemeManager
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $showEnvironment) { RunEnvironmentSheet(doc: doc).environmentObject(theme) }
+            .onReceive(NotificationCenter.default.publisher(for: .folioToggleTerminal)) { _ in
+                if isActive { withAnimation(Motion.quick) { showTerminal.toggle() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .folioShowTerminal)) { note in
+                if (note.object as? UUID) == doc.id { withAnimation(Motion.quick) { showTerminal = true } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .folioRunEnvironment)) { _ in if isActive { showEnvironment = true } }
+            .animation(Motion.quick, value: showTerminal)
+    }
+}
+
 /// Callbacks the toolbar and blocks use to insert content.
 struct EditorActions {
     var insertCode: (String) -> Void
@@ -509,6 +540,12 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Shows or hides the focused note's terminal panel.
+    static let folioToggleTerminal = Notification.Name("folio.toggleTerminal")
+    /// Shows the terminal of the note whose id is `object`.
+    static let folioShowTerminal = Notification.Name("folio.showTerminal")
+    /// Opens the run environment settings of the focused note.
+    static let folioRunEnvironment = Notification.Name("folio.runEnvironment")
     /// Opens the quick-open panel; `object` is a `QuickOpenMode`.
     static let folioQuickOpen = Notification.Name("folio.quickOpen")
     /// Opens the version history of the open note.

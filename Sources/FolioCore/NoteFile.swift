@@ -16,6 +16,8 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
     /// Kinds of blocks in the note (e.g. "code", "image"), for search filters; nil in notes saved
     /// before Folio 0.15 (then the body is read once when a filter needs it).
     public var kinds: [String]?
+    /// How this note's code runs (interpreters, working directory, variables, time limit); nil = app settings.
+    public var environment: RunEnvironment?
 
     public init(id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
                 created: Date = Date(), modified: Date = Date(), pinned: Bool = false, searchText: String = "") {
@@ -41,6 +43,7 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
         searchText = try c.decodeIfPresent(String.self, forKey: .searchText) ?? ""
         links = try c.decodeIfPresent([UUID].self, forKey: .links) ?? []
         kinds = try c.decodeIfPresent([String].self, forKey: .kinds)
+        environment = try? c.decodeIfPresent(RunEnvironment.self, forKey: .environment)
     }
 }
 
@@ -88,6 +91,12 @@ public struct BlockRecord: Codable, Sendable, Identifiable {
     public var syncedAt: Date?
     /// Connection of a database block (the password is kept in the Keychain, not here).
     public var connection: DatabaseConnection?
+    /// Code blocks: text fed to standard input.
+    public var stdin: String?
+    /// Code blocks: keep standard input open for typing while running.
+    public var interactive: Bool?
+    /// Code blocks: output folded away.
+    public var outputCollapsed: Bool?
 
     public init(id: UUID = UUID(), kind: BlockKind) {
         self.id = id

@@ -366,8 +366,9 @@ final class NoteStore: ObservableObject {
     func releaseUnused() {
         for (id, doc) in documents where !isVisible(id) && !tabs.contains(id) {
             doc.saveNow()
-            // Closing a note ends its shared code sessions (variables of linked code blocks).
+            // Closing a note ends its shared code sessions (variables of linked code blocks) and terminal.
             KernelManager.shared.shutdown(note: id)
+            TerminalSession.close(note: id)
             documents[id] = nil
         }
     }

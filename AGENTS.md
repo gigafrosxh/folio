@@ -73,9 +73,9 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.16.5** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **0.17.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
-0.15 Organisation, 0.16 Editor & Multitasking.
+0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32).
 
 ### Offene Punkte, die noch niemand geprüft hat
 
@@ -98,7 +98,7 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
 - **Distribution:** #63 signierte/notarisierte Releases, #65 CI, #66 Issue-/PR-Vorlagen, #67 CONTRIBUTING + Architektur,
   #68 große SwiftUI-Dateien aufteilen, #69 Migrationstests, #70 Shortcuts/AppleScript, #71 Obsidian-Import, #72 Datenschutz-Doku.
 - **KI:** #33–#42 (Chatverlauf speichern, Quellen, Tag-Vorschläge, KI-Suche, Ollama-Opt-in, Fallback ohne Apple Intelligence …).
-- **Code:** #23–#32 (Terminal-Panel, stdin, getrennte Umgebungen, Abhängigkeiten, Ausgaben einklappen, Export, Tests, Fehlerstellen, Diff, Ressourcenlimits).
+- **Code:** #26, #28, #29, #31 (Abhängigkeiten, Export, automatische Blocktests, Diff).
 - **Medien:** #43–#46, #49, #50 (PDF-Suche/Annotationen, Bilder zuschneiden, Alt-Texte, Anhang-Metadaten, Web-Clipping).
 - **Organisation:** #13 manuelle Sortierung, #14 gespeicherte Suchen, #15 Favoriten, #19 Metadaten/Wortstatistik.
 - **Doppelte Issues:** #22 entspricht dem erledigten #20 (Schnellwechsel), #21 entspricht #19 – mit dem Nutzer klären und schließen.
@@ -111,3 +111,10 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
   Einträge ohne Kürzel). Achtung: macOS belegt ⌥⌘W („Alle schließen“); eine `CommandGroup(after: .saveItem)` verschwindet,
   sobald die App mehr als eine Szene hat.
 - `swift test` nicht parallel zu einem anderen Agenten laufen lassen (die Datenbanktests teilen sich Ports/Sockets).
+
+### Entwicklerfunktionen ab 0.17
+
+- `Sources/FolioTerminal`: kleiner C-Adapter für `forkpty` (steuerndes Terminal; auch fish).
+- `FOLIO_DEV_TEST=1` prüft stdin, Umgebungen, Fehlerzeilen, Ressourcenlimits und Terminal gegen `FOLIO_LIBRARY`.
+- `python3 scripts/dev-regression.py` führt alle vier App-Selbsttests mit frischen Testbibliotheken aus und behält Logs/Fixtures im temporären Ordner. Vorher `make build`.
+- Der Editor-Selbsttest benötigt eine zweite Notiz mit Anhang; das Skript erzeugt diese über `FOLIO_SAMPLE_MEDIA`.

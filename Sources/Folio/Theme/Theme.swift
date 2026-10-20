@@ -132,6 +132,11 @@ struct ThemeSettings: Codable, Equatable {
     /// Look for a new Folio release on GitHub at every start and ask whether to install it. On by default;
     /// a new key name, so installations that stored the old opt-in value (`checkUpdatesOnLaunch`) get it too.
     var askForUpdatesOnLaunch = true
+    /// Code runs: output kept per run (KB), memory limit for the process tree (MB, 0 = none),
+    /// stop processes a program leaves behind (#27, #32).
+    var maxOutputKB: Double = 1000
+    var maxMemoryMB: Double = 0
+    var killOrphans = true
     /// Days a deleted note stays in Folio's trash (0 = until emptied by hand).
     var trashRetentionDays = 30
     /// Automatic zip backups of the library.
@@ -179,6 +184,9 @@ struct ThemeSettings: Codable, Equatable {
         savedConnections = v(.savedConnections, d.savedConnections)
         askForUpdatesOnLaunch = v(.askForUpdatesOnLaunch, d.askForUpdatesOnLaunch)
         trashRetentionDays = v(.trashRetentionDays, d.trashRetentionDays)
+        maxOutputKB = v(.maxOutputKB, d.maxOutputKB)
+        maxMemoryMB = v(.maxMemoryMB, d.maxMemoryMB)
+        killOrphans = v(.killOrphans, d.killOrphans)
         backupsEnabled = v(.backupsEnabled, d.backupsEnabled)
         backupIntervalHours = v(.backupIntervalHours, d.backupIntervalHours)
         backupFolder = v(.backupFolder, d.backupFolder)

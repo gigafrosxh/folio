@@ -183,6 +183,7 @@ final class UpdateManager: ObservableObject {
         // the new version waiting forever. Save and clean up ourselves, then quit for sure.
         NoteStore.shared.saveAll()
         RunManager.shared.stopAll()
+        TerminalSession.closeAll()
         KernelManager.shared.shutdownAll()
         LSPCompleter.shared.shutdownAll()
         for window in NSApp.windows {

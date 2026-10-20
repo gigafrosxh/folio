@@ -7,6 +7,18 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Terminal pro Notiz** (#23): interaktive Shell mit Live-Ausgabe, Eingabe, ⌃C/⌃D, Verlauf und Neustart. Öffnen über die Werkzeugleiste oder ⌃`; Codeblöcke lassen sich direkt darin ausführen. Funktioniert auch mit fish als Standardshell; die Ausgabe ist eine begrenzte Textansicht.
+- **Standardeingabe** (#24): stdin pro Codeblock vorgeben oder während eines eigenen Prozesses eingeben. Vorgegebene Eingaben funktionieren auch in verknüpften Python-Sitzungen.
+- **Ausführungsumgebung pro Notiz** (#25): eigene Interpreter, Arbeitsverzeichnis, Umgebungsvariablen und Zeitlimit, zusammen mit der Notiz gespeichert.
+- **Ausgaben verwalten** (#27): einklappen, kopieren und leeren; große Ausgaben werden begrenzt, Anfang und Ende bleiben erhalten.
+- **Fehlerstellen** (#30): Compiler- und Laufzeitdiagnosen markieren betroffene Codezeilen; ein Klick auf die Diagnose springt zur Stelle.
+- **Ressourcenlimits** (#32): konfigurierbare Ausgabe- und Speichergrenzen, Zeitlimit und Aufräumen zurückgelassener Kindprozesse bei eigenen Codeprozessen. Verknüpfte Sitzungen begrenzen Ausgabe und Speicher; nicht abbrechbare Sitzungen werden beendet. Das Terminal bleibt für interaktive Befehle ohne Code-Laufzeitlimit offen.
+
+### Behoben
+- Große stdin-Eingaben blockieren die Oberfläche nicht und können beim Prozessabbruch keinen SIGPIPE-Absturz auslösen.
+- Verzögerte Live-Ausgabe überschreibt nach Laufende keine Fehler- oder Abbruchmeldungen mehr.
+
 ## [0.16.5] – 2026-10-20
 
 ### Behoben

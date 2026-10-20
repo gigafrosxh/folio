@@ -9,9 +9,11 @@ let package = Package(
         .library(name: "FolioCore", targets: ["FolioCore"]),
     ],
     targets: [
+        .target(name: "FolioTerminal", path: "Sources/FolioTerminal", publicHeadersPath: "include"),
         // Platform-independent core: file format, note model, tags, syntax tokens, code execution.
         .target(
             name: "FolioCore",
+            dependencies: ["FolioTerminal"],
             path: "Sources/FolioCore",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Finds executables the way the user's shell would, even when the app was launched from Finder
 /// (whose PATH is only /usr/bin:/bin:/usr/sbin:/sbin).
@@ -23,6 +24,7 @@ public final class InterpreterLocator: @unchecked Sendable {
     }
 
     public func find(_ executable: String) -> String? {
+        let executable = (executable as NSString).expandingTildeInPath
         if executable.hasPrefix("/") { return FileManager.default.isExecutableFile(atPath: executable) ? executable : nil }
         for dir in searchPath {
             let candidate = (dir as NSString).appendingPathComponent(executable)
@@ -87,8 +89,12 @@ public struct RunResult: Sendable {
     public var cancelled: Bool
     /// Local address of a server the program started, if it was recognized as one.
     public var serverURL: URL? = nil
+    /// Stopped because the process tree used more memory than allowed.
+    public var memoryExceeded = false
+    /// The file the code was saved as ("main.py"), for finding error lines in the output.
+    public var fileName = ""
 
-    public var succeeded: Bool { exitCode == 0 && !timedOut && !cancelled }
+    public var succeeded: Bool { exitCode == 0 && !timedOut && !cancelled && !memoryExceeded }
 
     public var combinedOutput: String {
         var parts: [String] = []
@@ -111,11 +117,48 @@ public enum CodeRunnerError: Error, LocalizedError {
     }
 }
 
+/// Everything about a run besides the code: input, environment and limits.
+public struct RunOptions: Sendable {
+    /// Text fed to the program's standard input.
+    public var stdin: String?
+    /// Keep standard input open for typing while the program runs (`CodeRun.send`).
+    public var interactive = false
+    public var workingDirectory: URL?
+    /// Added to (and overriding) the normal environment.
+    public var environment: [String: String] = [:]
+    public var limits = ResourceLimits()
+
+    public init(stdin: String? = nil, interactive: Bool = false, workingDirectory: URL? = nil,
+                environment: [String: String] = [:], limits: ResourceLimits = ResourceLimits()) {
+        self.stdin = stdin
+        self.interactive = interactive
+        self.workingDirectory = workingDirectory
+        self.environment = environment
+        self.limits = limits
+    }
+}
+
 /// Runs a snippet with an installed interpreter or compiler.
 public final class CodeRun: @unchecked Sendable {
     private let lock = NSLock()
     private var current: Process?
     private var isCancelled = false
+    private var input: FileHandle?
+    private var memoryHit = false
+
+    /// Sends text to the running program's standard input (interactive runs).
+    public func send(_ text: String) {
+        lock.lock(); let h = input; lock.unlock()
+        try? h?.write(contentsOf: Data(text.utf8))
+    }
+
+    /// Closes standard input (like ⌃D in a terminal), so programs reading until the end can finish.
+    public func closeInput() {
+        lock.lock(); let h = input; input = nil; lock.unlock()
+        try? h?.close()
+    }
+
+    public var acceptsInput: Bool { lock.lock(); defer { lock.unlock() }; return input != nil }
 
     public init() {}
 
@@ -170,6 +213,15 @@ public final class CodeRun: @unchecked Sendable {
                     locator: InterpreterLocator = .shared,
                     onOutput: (@Sendable (String) -> Void)? = nil,
                     onServer: (@Sendable (URL) -> Void)? = nil) async throws -> RunResult {
+        try await run(code: code, language: language, override: override,
+                      options: RunOptions(limits: ResourceLimits(timeout: timeout)), locator: locator, onOutput: onOutput, onServer: onServer)
+    }
+
+    public func run(code: String, language: LanguageSpec, override: String? = nil, options: RunOptions,
+                    locator: InterpreterLocator = .shared,
+                    onOutput: (@Sendable (String) -> Void)? = nil,
+                    onServer: (@Sendable (URL) -> Void)? = nil) async throws -> RunResult {
+        let timeout = options.limits.timeout
         let plan = try Self.plan(for: language, override: override, locator: locator)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-run-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -190,7 +242,13 @@ public final class CodeRun: @unchecked Sendable {
             }
             // Only the last step (the program itself) can be a server; compile steps keep the timeout.
             let isLast = index == plan.count - 1
-            let r = try await runProcess(args, in: dir, environment: locator.environment, timeout: timeout,
+            var env = locator.environment
+            for (k, v) in options.environment { env[k] = v }
+            // Compile steps run next to the source; the program itself in the chosen working directory.
+            let cwd = isLast ? (options.workingDirectory ?? dir) : dir
+            let r = try await runProcess(args, in: cwd, environment: env, timeout: timeout,
+                                         stdin: isLast ? options.stdin : nil, interactive: isLast && options.interactive,
+                                         limits: options.limits,
                                          onOutput: onOutput, onServer: isLast ? onServer : nil, detectServer: isLast)
             stdout += r.0
             stderr += r.1
@@ -198,11 +256,15 @@ public final class CodeRun: @unchecked Sendable {
             timedOut = r.3
             if exitCode != 0 || timedOut || cancelledNow { break }
         }
-        return RunResult(stdout: stdout, stderr: stderr, exitCode: exitCode, duration: Date().timeIntervalSince(start),
-                         command: Self.describe(plan), timedOut: timedOut, cancelled: cancelledNow, serverURL: serverURL)
+        var result = RunResult(stdout: stdout, stderr: stderr, exitCode: exitCode, duration: Date().timeIntervalSince(start),
+                               command: Self.describe(plan), timedOut: timedOut, cancelled: cancelledNow, serverURL: serverURL)
+        result.memoryExceeded = memoryExceededNow
+        result.fileName = file.lastPathComponent
+        return result
     }
 
     private var cancelledNow: Bool { lock.lock(); defer { lock.unlock() }; return isCancelled }
+    private var memoryExceededNow: Bool { lock.lock(); defer { lock.unlock() }; return memoryHit }
 
     /// Set once the running program was recognized as a server.
     public var serverURL: URL? { lock.lock(); defer { lock.unlock() }; return detectedServer }
@@ -216,6 +278,7 @@ public final class CodeRun: @unchecked Sendable {
     }
 
     private func runProcess(_ args: [String], in dir: URL, environment: [String: String], timeout: TimeInterval,
+                            stdin: String? = nil, interactive: Bool = false, limits: ResourceLimits = ResourceLimits(),
                             onOutput: (@Sendable (String) -> Void)?, onServer: (@Sendable (URL) -> Void)?,
                             detectServer: Bool) async throws -> (String, String, Int32, Bool) {
         let p = Process()
@@ -223,12 +286,20 @@ public final class CodeRun: @unchecked Sendable {
         p.arguments = Array(args.dropFirst())
         p.currentDirectoryURL = dir
         p.environment = environment
-        p.standardInput = FileHandle.nullDevice
+        var inPipe: Pipe?
+        if stdin != nil || interactive {
+            let pipe = Pipe()
+            p.standardInput = pipe
+            inPipe = pipe
+        } else {
+            p.standardInput = FileHandle.nullDevice
+        }
         let outPipe = Pipe(), errPipe = Pipe()
         p.standardOutput = outPipe
         p.standardError = errPipe
 
-        let outBuffer = LockedData(), errBuffer = LockedData()
+        let outBuffer = LockedData(limit: limits.maxOutputBytes), errBuffer = LockedData(limit: limits.maxOutputBytes / 2)
+        let seen = LockedPIDs()
         let found: (URL) -> Void = { [weak self] url in
             guard let self, self.markServer(url) else { return }
             onServer?(url)
@@ -246,9 +317,14 @@ public final class CodeRun: @unchecked Sendable {
 
         let timedOut = LockedFlag()
         return try await withCheckedThrowingContinuation { cont in
-            p.terminationHandler = { proc in
+            p.terminationHandler = { [weak self] proc in
                 outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
+                self?.closeInput()
+                // Background processes the program left behind would otherwise run on forever.
+                if limits.killOrphans, self?.serverURL == nil {
+                    for pid in seen.all where kill(pid, 0) == 0 { kill(pid, SIGTERM) }
+                }
                 outBuffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
                 errBuffer.append(errPipe.fileHandleForReading.readDataToEndOfFile())
                 cont.resume(returning: (outBuffer.string, errBuffer.string, proc.terminationStatus, timedOut.value))
@@ -257,7 +333,30 @@ public final class CodeRun: @unchecked Sendable {
                 lock.lock(); current = p; let cancelled = isCancelled; lock.unlock()
                 if cancelled { cont.resume(returning: ("", "", -1, false)); return }
                 try p.run()
+                if let inPipe {
+                    let h = inPipe.fileHandleForWriting
+                    _ = fcntl(h.fileDescriptor, F_SETNOSIGPIPE, 1)
+                    if interactive { lock.lock(); input = h; lock.unlock() }
+                    // A large input must not block the caller or delay installing the timeout.
+                    DispatchQueue.global().async {
+                        if let stdin, !stdin.isEmpty { try? h.write(contentsOf: Data((stdin.hasSuffix("\n") ? stdin : stdin + "\n").utf8)) }
+                        if !interactive { try? h.close() }
+                    }
+                }
                 let pid = p.processIdentifier
+                // Watch the process tree: remember children (to clean up orphans) and enforce the memory limit.
+                DispatchQueue.global().async { [weak self] in
+                    while p.isRunning {
+                        let tree = ServerDetector.descendants(of: pid)
+                        seen.add(tree)
+                        if limits.maxMemoryMB > 0, ServerDetector.residentMemoryMB(of: [pid] + tree) > limits.maxMemoryMB {
+                            self?.lock.lock(); self?.memoryHit = true; self?.lock.unlock()
+                            ServerDetector.terminateTree(pid)
+                            break
+                        }
+                        Thread.sleep(forTimeInterval: 0.5)
+                    }
+                }
                 // Servers often print nothing; also look for listening sockets of the process tree.
                 if detectServer {
                     DispatchQueue.global().async { [weak self] in
@@ -330,6 +429,14 @@ public enum ServerDetector {
         return nil
     }
 
+    /// Resident memory of the given processes together, in megabytes.
+    public static func residentMemoryMB(of pids: [pid_t]) -> Int {
+        guard !pids.isEmpty else { return 0 }
+        let out = run("/bin/ps", ["-o", "rss=", "-p", pids.map(String.init).joined(separator: ",")])
+        let kb = out.split(whereSeparator: \.isNewline).compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }.reduce(0, +)
+        return kb / 1024
+    }
+
     /// Stops a process and everything it started (dev servers often spawn workers).
     public static func terminateTree(_ pid: pid_t) {
         let all = descendants(of: pid) + [pid]
@@ -355,18 +462,26 @@ public enum ServerDetector {
 
 private final class LockedData: @unchecked Sendable {
     private let lock = NSLock()
-    private var data = Data()
-    private let limit = 2_000_000
+    private var limiter: OutputLimiter
+
+    init(limit: Int = 2_000_000) { limiter = OutputLimiter(limit: limit) }
 
     func append(_ d: Data) {
         lock.lock(); defer { lock.unlock() }
-        if data.count < limit { data.append(d.prefix(limit - data.count)) }
+        limiter.append(d)
     }
 
     var string: String {
         lock.lock(); defer { lock.unlock() }
-        return String(decoding: data, as: UTF8.self)
+        return limiter.text
     }
+}
+
+private final class LockedPIDs: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pids = Set<pid_t>()
+    func add(_ p: [pid_t]) { lock.lock(); pids.formUnion(p); lock.unlock() }
+    var all: [pid_t] { lock.lock(); defer { lock.unlock() }; return Array(pids) }
 }
 
 private final class LockedFlag: @unchecked Sendable {

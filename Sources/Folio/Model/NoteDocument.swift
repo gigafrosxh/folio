@@ -22,6 +22,12 @@ final class BlockModel: ObservableObject, Identifiable {
     @Published var revision = 0
     var syncedAt: Date?
     @Published var connection: DatabaseConnection?
+    /// Code blocks: standard input, interactive mode, folded output (#24, #27).
+    @Published var stdin: String?
+    @Published var interactive = false
+    @Published var outputCollapsed = false
+    /// Lines the last run complained about (not saved; cleared when the code changes) (#30).
+    @Published var diagnostics: [CodeDiagnostic] = []
     /// Ran without error in the note's shared session (not saved); used to rebuild the session after a delete.
     var ranInSession = false
     /// Its last run started a server (those are never replayed automatically).
@@ -50,6 +56,9 @@ final class BlockModel: ObservableObject, Identifiable {
         default: break
         }
         connection = r.connection
+        stdin = r.stdin
+        interactive = r.interactive ?? false
+        outputCollapsed = r.outputCollapsed ?? false
         language = r.language ?? language
         output = r.output
         outputIsError = r.outputIsError ?? false
@@ -74,6 +83,9 @@ final class BlockModel: ObservableObject, Identifiable {
         mode = r.mode ?? ""
         caption = r.caption ?? ""
         connection = r.connection
+        stdin = r.stdin
+        interactive = r.interactive ?? false
+        outputCollapsed = r.outputCollapsed ?? false
         if let code = r.code, kind != .text, storage.string != code { storage.setAttributedString(NSAttributedString(string: code)) }
         revision += 1
     }
@@ -94,6 +106,9 @@ final class BlockModel: ObservableObject, Identifiable {
             r.output = output
             r.outputIsError = outputIsError
             r.connection = connection
+            if let stdin, !stdin.isEmpty { r.stdin = stdin }
+            if interactive { r.interactive = true }
+            if outputCollapsed { r.outputCollapsed = true }
         case .database:
             r.code = storage.string
             r.language = "sql"
@@ -196,6 +211,12 @@ final class NoteDocument: ObservableObject, Identifiable {
         let used = Set(blocks.compactMap(\.attachmentID))
         let atts = attachments.values.filter { used.contains($0.id) }
         return NoteFile(meta: meta, body: NoteBody(blocks: blocks.map { $0.record() }), attachments: atts)
+    }
+
+    /// Sets how this note's code runs (#25).
+    func setEnvironment(_ env: RunEnvironment?) {
+        meta.environment = (env?.isEmpty ?? true) ? nil : env
+        markDirty()
     }
 
     func setPinned(_ pinned: Bool) {
