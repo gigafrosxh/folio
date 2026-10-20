@@ -225,8 +225,9 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("d", modifiers: [.command, .option])
             Button("Skizze/Foto vom iPhone oder iPad…") { NotificationCenter.default.post(name: .folioInsert, object: "device") }
                 .keyboardShortcut("d", modifiers: [.command, .option, .shift])
+            // ⌥⌘W belongs to macOS ("Alle schließen").
             Button("Webseite…") { NotificationCenter.default.post(name: .folioInsert, object: "web") }
-                .keyboardShortcut("w", modifiers: [.command, .option])
+                .keyboardShortcut("l", modifiers: [.command, .option])
             Button("Bild mit Image Playground…") { NotificationCenter.default.post(name: .folioInsert, object: "playground") }
                 .keyboardShortcut("p", modifiers: [.command, .option])
         }

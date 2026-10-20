@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- „Webseite einbetten“ hat ein funktionierendes Kürzel: ⌥⌘L. ⌥⌘W gehört macOS („Alle schließen“) und kam nie an (#74).
+
 ## [0.16.1] – 2026-10-20
 
 ### Behoben
