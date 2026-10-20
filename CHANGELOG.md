@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.20.4] – 2026-10-20
+
 ### Behoben
 - Schnellerfassung in eine leere Notiz machte die Datumszeile („— 20. Okt. 2026, 19:31 —“) zum Titel. Datumszeilen der Schnellerfassung zählen nicht mehr als Titel; eine leere Notiz heißt danach wie die erste erfasste Zeile (#95).
 
