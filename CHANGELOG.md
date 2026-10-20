@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.8.2] – 2026-10-20
+
 ### Behoben
 - Die Popup-Animation des KI-Chats lief nicht: Die Sichtbarkeit hing an einer gespeicherten Einstellung, deren Änderung außerhalb der Animation ankommt. Das Panel wird jetzt eingefügt und danach in einem eigenen Schritt aus dem ✨-Knopf herausgefedert (und vor dem Entfernen dorthin zurückgeschrumpft).
 
