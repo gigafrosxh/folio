@@ -118,7 +118,13 @@ enum NoteLinkInserter {
     /// Inserts the note's title as a link (folio://note/<id>) at the cursor of the focused text block.
     static func insert(_ ref: NoteRef) {
         let f = FormattingController.shared
-        guard let tv = f.activeTextView, tv.window != nil else { return }
+        let doc = NoteStore.shared.currentDocument
+        guard let tv = f.activeTextView, tv.window != nil, let blockID = tv.blockID, doc?.block(blockID) != nil else {
+            // No text cursor in this note (nothing focused, or the cursor is in a code block):
+            // the link goes on a new line at the end of the note instead of getting lost.
+            appendAtEnd(ref, in: doc)
+            return
+        }
         var attrs = tv.typingAttributes
         attrs[.link] = NoteLink.url(for: ref.id)
         let title = ref.meta.title.isEmpty ? "Notiz" : ref.meta.title
@@ -134,6 +140,32 @@ enum NoteLinkInserter {
             tv.setSelectedRange(NSRange(location: range.location + s.length, length: 0))
             tv.typingAttributes = plain
         }
+    }
+}
+
+extension NoteLinkInserter {
+    static func appendAtEnd(_ ref: NoteRef, in doc: NoteDocument?) {
+        guard let doc else { return }
+        let body = ThemeManager.shared.bodyAttributes
+        let block: BlockModel
+        if let last = doc.blocks.last(where: { $0.kind == .text }) { block = last } else {
+            block = .text()
+            doc.blocks.append(block)
+        }
+        var linkAttrs = body
+        linkAttrs[.link] = NoteLink.url(for: ref.id)
+        let s = NSMutableAttributedString()
+        if block.storage.length > 0 { s.append(NSAttributedString(string: "\n", attributes: body)) }
+        s.append(NSAttributedString(string: ref.meta.title.isEmpty ? "Notiz" : ref.meta.title, attributes: linkAttrs))
+        if let tv = FormattingController.shared.textView(for: block.id), tv.shouldChangeText(in: NSRange(location: block.storage.length, length: 0), replacementString: s.string) {
+            tv.textStorage?.append(s)
+            tv.didChangeText()
+        } else {
+            block.storage.append(s)
+            block.revision += 1
+        }
+        doc.markDirty()
+        FormattingController.shared.focus(blockID: block.id)
     }
 }
 

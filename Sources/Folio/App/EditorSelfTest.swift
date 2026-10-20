@@ -72,6 +72,14 @@ enum EditorSelfTest {
         find.detach()
         doc.saveNow()
 
+        // #76: a note link without a text cursor lands at the end of the note.
+        if let target = store.notes.first(where: { $0.id != doc.id }) {
+            FormattingController.shared.activeTextView = nil
+            NoteLinkInserter.insert(target)
+            doc.saveNow()
+            check(store.notes.first { $0.id == doc.id }?.meta.links.contains(target.id) == true, "Notizlink ohne Textcursor am Ende eingefügt")
+        }
+
         // Tabs and split view (#11, #12)
         guard let other = store.notes.first(where: { $0.id != ref.id }) else { check(false, "zweite Notiz"); return }
         store.openInNewTab(other.id)
