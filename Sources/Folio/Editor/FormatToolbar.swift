@@ -103,17 +103,9 @@ struct FormatToolbar: View {
             plain("cylinder.split.1x2", "Datenbank-Abfrage einfügen (⌃⇧D)") {
                 NotificationCenter.default.post(name: .folioInsert, object: "database")
             }
-            Menu {
-                Button { insert("math") } label: { Label("Formel (LaTeX)", systemImage: "function") }
-                Button { insert("diagram") } label: { Label("Diagramm (Mermaid)", systemImage: "point.3.connected.trianglepath.dotted") }
-                Button { insert("audio") } label: { Label("Audio aufnehmen", systemImage: "mic") }
-            } label: {
-                Image(systemName: "function")
-            } primaryAction: {
-                insert("math")
-            }
-            .help("Formel einfügen – gedrückt halten: Diagramm oder Audioaufnahme")
-            .frame(width: 40)
+            plain("function", "Formel (LaTeX) einfügen (⌃⇧M)") { insert("math") }
+            plain("point.3.connected.trianglepath.dotted", "Diagramm (Mermaid) einfügen (⌃⇧G)") { insert("diagram") }
+            plain("mic", "Audio aufnehmen (⌃⇧A)") { insert("audio") }
             plain("paperclip", "PDF, Bild, Audio oder Dokument einfügen", actions.insertFile)
             Menu {
                 Button { actions.insertDrawing() } label: { Label("Hier zeichnen", systemImage: "scribble.variable") }

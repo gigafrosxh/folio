@@ -130,6 +130,7 @@ struct FolioCommands: Commands {
             Button("Formel (LaTeX)") { NotificationCenter.default.post(name: .folioInsert, object: "math") }
                 .keyboardShortcut("m", modifiers: [.command, .option])
             Button("Diagramm (Mermaid)") { NotificationCenter.default.post(name: .folioInsert, object: "diagram") }
+                .keyboardShortcut("g", modifiers: [.command, .option])
             Button("Audioaufnahme") { NotificationCenter.default.post(name: .folioInsert, object: "audio") }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }
@@ -267,6 +268,19 @@ enum LayoutDebug {
                             print("EXPORT error", error.localizedDescription)
                         }
                         fflush(stdout)
+                    }
+                }
+            }
+        }
+        // FOLIO_PERFORM=<tool> (e.g. diagram): runs a toolbar/shortcut action once the note is open.
+        if let tool = env["FOLIO_PERFORM"], let action = ShortcutAction(rawValue: tool) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                MainActor.assumeIsolated {
+                    ShortcutCenter.shared.perform(action)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        MainActor.assumeIsolated {
+                            print("PERFORM", tool, NoteStore.shared.currentDocument?.blocks.map(\.kind.rawValue) ?? []); fflush(stdout)
+                        }
                     }
                 }
             }

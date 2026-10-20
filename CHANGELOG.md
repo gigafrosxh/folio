@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Mermaid-Diagramme waren in der Formatleiste nicht zu finden: Formel, Diagramm und Audioaufnahme haben jetzt eigene Symbole (ƒ(x), Diagramm, Mikrofon). Im Menü Einfügen › Diagramm (Mermaid) gibt es zusätzlich das Kürzel ⌥⌘G.
+
 ## [0.13.0] – 2026-10-20
 
 ### Neu
