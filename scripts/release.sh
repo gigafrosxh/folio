@@ -25,14 +25,15 @@ git fetch -q origin main
 git merge-base --is-ancestor origin/main HEAD || die "main liegt hinter origin/main zurück – erst pullen."
 
 CURRENT="$(pb 'Print :CFBundleShortVersionString')"
-IFS=. read -r MA MI PA <<<"$CURRENT"
+IFS=. read -r MA MI PA <<<"${CURRENT%%-*}"
 case "$1" in
     major) VERSION="$((MA + 1)).0.0" ;;
     minor) VERSION="$MA.$((MI + 1)).0" ;;
     patch) VERSION="$MA.$MI.$((PA + 1))" ;;
     *)     VERSION="$1" ;;
 esac
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Ungültige Version: $VERSION"
+# X.Y.Z or a SemVer pre-release such as 1.0.0-rc.1 (the update check orders those correctly).
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]] || die "Ungültige Version: $VERSION"
 TAG="v$VERSION"
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "Tag $TAG existiert schon."
 
@@ -59,6 +60,7 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir "$WORK/src" && git archive "$TAG" | tar -x -C "$WORK/src"
 echo "Baue Installer für $VERSION …"
 OUT="$("$WORK/src/scripts/make-installer.sh")"
+tail -1 <<<"$OUT"
 mkdir -p dist
 cp "$(grep '\.dmg$' <<<"$OUT")" "$(grep '\.pkg$' <<<"$OUT")" dist/
 DMG="dist/Folio-$VERSION-arm64.dmg"
@@ -68,8 +70,15 @@ cat >>"$NOTES" <<'EOF'
 
 ---
 **Installation:** `Folio-…-arm64.dmg` öffnen und Folio auf „Programme“ ziehen, oder das `.pkg` ausführen. Nur für Macs mit Apple Silicon, macOS 15.2 oder neuer.
+EOF
+if grep -q "NOTARIZED=yes" <<<"$OUT"; then
+    echo "Folio ist mit einer Developer ID signiert und von Apple notarisiert." >>"$NOTES"
+else
+    cat >>"$NOTES" <<'EOF'
 Folio ist nicht notarisiert. Beim ersten Start meldet macOS deshalb, dass die App nicht überprüft werden kann: in **Systemeinstellungen → Datenschutz & Sicherheit** auf „Trotzdem öffnen“ klicken, oder im Terminal `xattr -dr com.apple.quarantine /Applications/Folio.app` ausführen.
 EOF
+fi
+echo "Datenschutz und Sicherheit: [docs/PRIVACY.md](https://github.com/gigafrosxh/folio/blob/$TAG/docs/PRIVACY.md)" >>"$NOTES"
 
 git push -q origin main "$TAG"
 gh release create "$TAG" "$DMG" "$PKG" --title "Folio $VERSION" --notes-file "$NOTES" --verify-tag

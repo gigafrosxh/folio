@@ -11,6 +11,18 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertFalse(UpdateChecker.isNewer("kaputt", than: "0.1.0"))
     }
 
+    func testPrereleaseOrder() {
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.0-rc.1", than: "0.20.4"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.0-rc.2", than: "1.0.0-rc.1"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.0-rc.10", than: "1.0.0-rc.2"), "numeric identifiers compare as numbers")
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.0", than: "1.0.0-rc.3"), "the release outranks its candidates")
+        XCTAssertFalse(UpdateChecker.isNewer("1.0.0-rc.3", than: "1.0.0"))
+        XCTAssertFalse(UpdateChecker.isNewer("1.0.0-rc.1", than: "1.0.0-rc.1"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.0-rc.1", than: "1.0.0-beta.2"), "rc after beta")
+        XCTAssertEqual(SemVer("v1.0.0-rc.1+build.7")?.description, "1.0.0-rc.1")
+        XCTAssertNil(SemVer("1.0.0-"))
+    }
+
     func testParseRelease() throws {
         let json = """
         {"tag_name":"v0.12.0","html_url":"https://github.com/gigafrosxh/folio/releases/tag/v0.12.0","body":"### Neu\\n- Update",

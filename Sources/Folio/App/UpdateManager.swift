@@ -119,6 +119,7 @@ final class UpdateManager: ObservableObject {
 
     /// Mounts the disk image, checks the new app, puts the old one in the Trash and moves the new one in.
     nonisolated static func replace(app: URL, withAppIn dmg: URL, expectedVersion: String,
+                                    bundleID: String = Bundle.main.bundleIdentifier ?? "de.daniel.folio",
                                     report: @Sendable (Double, String) -> Void = { _, _ in }) throws -> URL {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: dmg) }
@@ -132,12 +133,13 @@ final class UpdateManager: ObservableObject {
         report(0.86, "Prüfe die neue Version …")
         let mounted = mountPoint.appendingPathComponent("Folio.app")
         guard let info = NSDictionary(contentsOf: mounted.appendingPathComponent("Contents/Info.plist")),
-              info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier ?? "de.daniel.folio" else {
+              info["CFBundleIdentifier"] as? String == bundleID else {
             throw InstallError.step("Das heruntergeladene Abbild enthält keine gültige Folio-App.")
         }
         if let v = info["CFBundleShortVersionString"] as? String, v != expectedVersion {
             throw InstallError.step("Unerwartete Version im Download (\(v) statt \(expectedVersion)).")
         }
+        try verifySignature(of: mounted, matching: app)
         // Copy next to the old app first, so a failure never leaves the user without Folio.
         report(0.9, "Kopiere die neue Version …")
         let staged = app.deletingLastPathComponent().appendingPathComponent(".Folio-update-\(UUID().uuidString.prefix(8)).app")
@@ -152,6 +154,27 @@ final class UpdateManager: ObservableObject {
         }
         try fm.moveItem(at: staged, to: app)
         return app
+    }
+
+    /// The new app must have an intact signature, and once Folio is signed with a Developer ID (#63) the
+    /// update must come from the same team: a tampered or foreign download is never installed.
+    nonisolated static func verifySignature(of new: URL, matching current: URL) throws {
+        guard let newInfo = signingInfo(new), newInfo.valid else {
+            throw InstallError.step("Die Signatur der heruntergeladenen Version ist ungültig.")
+        }
+        if let team = signingInfo(current)?.team, newInfo.team != team {
+            throw InstallError.step("Die heruntergeladene Version ist nicht vom selben Entwickler signiert.")
+        }
+    }
+
+    nonisolated static func signingInfo(_ app: URL) -> (valid: Bool, team: String?)? {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code else { return nil }
+        let valid = SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode), nil) == errSecSuccess
+        var info: CFDictionary?
+        SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &info)
+        let team = (info as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String
+        return (valid, team)
     }
 
     @discardableResult

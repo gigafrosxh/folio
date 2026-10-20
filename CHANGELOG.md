@@ -7,6 +7,19 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+Release Candidate für Folio 1.0: keine neuen Funktionen mehr, nur noch Fehlerbehebungen bis 1.0.0.
+
+### Sicherheit
+- Signierte und notarisierte Releases vorbereitet (#63): Die Release-Skripte signieren mit einer „Developer ID“ (Hardened Runtime, nur die nötigen Entitlements für Mikrofon und Apple Events), signieren das Installationspaket, lassen DMG und PKG von Apple notarisieren und heften das Ticket an. Ohne Zertifikat bleibt es bei der Ad-hoc-Signatur; die Release-Notizen sagen, welcher Fall gilt. Einrichtung in `docs/SIGNING.md`.
+- Der Updater installiert eine neue Version nur noch, wenn ihre Signatur intakt ist, und – sobald Folio mit einer Developer ID signiert ist – nur vom selben Entwickler-Team. Ein veränderter oder fremder Download wird abgelehnt.
+
+### Geändert
+- Updates erkennen Vorabversionen: `1.0.0-rc.1` gilt als neuer als 0.20.x und älter als 1.0.0, `rc.10` als neuer als `rc.2`.
+
+### Dokumentation
+- `docs/PRIVACY.md`: wo Folio Daten speichert, wann es ins Netz geht, KI und Spracherkennung auf dem Gerät, Berechtigungen, Risiken der Code-Ausführung, keine Telemetrie (#72).
+- `SECURITY.md`: wie man Sicherheitslücken vertraulich meldet.
+
 ## [0.20.4] – 2026-10-20
 
 ### Behoben

@@ -1,25 +1,49 @@
 import Foundation
 
-/// A semantic version like 0.11.0 (a leading "v" is ignored).
+/// A semantic version like 0.11.0 or 1.0.0-rc.1 (a leading "v" is ignored). A pre-release sorts before
+/// the release it leads up to: 1.0.0-rc.1 < 1.0.0-rc.2 < 1.0.0.
 public struct SemVer: Comparable, Sendable, CustomStringConvertible {
     public var major: Int, minor: Int, patch: Int
+    /// Pre-release identifiers ("rc", "1"); empty for a release.
+    public var prerelease: [String] = []
 
     public init?(_ text: String) {
         var t = text.trimmingCharacters(in: .whitespaces)
         if t.hasPrefix("v") || t.hasPrefix("V") { t.removeFirst() }
-        let core = t.split(separator: "-").first.map(String.init) ?? t
+        t = String(t.split(separator: "+", maxSplits: 1).first ?? "")   // build metadata does not count
+        let parts0 = t.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        let core = parts0.first ?? t
         let parts = core.split(separator: ".").map { Int($0) }
         guard parts.count >= 2, parts.count <= 3, parts.allSatisfy({ $0 != nil }) else { return nil }
         major = parts[0]!
         minor = parts[1]!
         patch = parts.count == 3 ? parts[2]! : 0
+        if parts0.count == 2 {
+            prerelease = parts0[1].split(separator: ".").map(String.init)
+            guard !prerelease.isEmpty, prerelease.allSatisfy({ !$0.isEmpty }) else { return nil }
+        }
     }
 
     public static func < (a: SemVer, b: SemVer) -> Bool {
-        (a.major, a.minor, a.patch) < (b.major, b.minor, b.patch)
+        if (a.major, a.minor, a.patch) != (b.major, b.minor, b.patch) { return (a.major, a.minor, a.patch) < (b.major, b.minor, b.patch) }
+        // A release outranks its pre-releases.
+        if a.prerelease.isEmpty != b.prerelease.isEmpty { return !a.prerelease.isEmpty }
+        for (x, y) in zip(a.prerelease, b.prerelease) where x != y {
+            switch (Int(x), Int(y)) {
+            case let (i?, j?): return i < j
+            case (.some, nil): return true          // numbers sort before words
+            case (nil, .some): return false
+            default: return x < y
+            }
+        }
+        return a.prerelease.count < b.prerelease.count
     }
 
-    public var description: String { "\(major).\(minor).\(patch)" }
+    public static func == (a: SemVer, b: SemVer) -> Bool {
+        (a.major, a.minor, a.patch) == (b.major, b.minor, b.patch) && a.prerelease == b.prerelease
+    }
+
+    public var description: String { "\(major).\(minor).\(patch)" + (prerelease.isEmpty ? "" : "-" + prerelease.joined(separator: ".")) }
 }
 
 /// The newest published release on GitHub.
