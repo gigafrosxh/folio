@@ -21,6 +21,26 @@ enum SidebarItem: Hashable {
     case pinned
     case folder(URL)
     case tag(String)
+    /// Folio's own trash (deleted notes and folders).
+    case trash
+    /// Note files that could not be read.
+    case damaged
+}
+
+/// A note file that cannot be opened, with what the diagnosis found and could rescue.
+struct DamagedNote: Identifiable {
+    var url: URL
+    var report: DiagnosticReport
+    var id: URL { url }
+}
+
+/// The open note was changed outside Folio while it had unsaved edits.
+struct NoteConflict: Identifiable {
+    let id = UUID()
+    var doc: NoteDocument
+    /// The file as it is on disk now (nil when it was deleted).
+    var diskData: Data?
+    var diskFile: NoteFile?
 }
 
 /// A note that the Apple Notes importer produced, ready to be written into the library.
@@ -48,6 +68,18 @@ final class NoteStore: ObservableObject {
     @Published private(set) var currentDocument: NoteDocument?
     @Published var searchText = ""
     @Published var lastError: String?
+    /// Items in Folio's trash.
+    @Published private(set) var trashItems: [TrashItem] = []
+    /// Note files in the library that cannot be read at all.
+    @Published private(set) var damagedNotes: [DamagedNote] = []
+    /// The selected note could not be opened; the editor shows the diagnosis instead.
+    @Published private(set) var openFailure: DamagedNote?
+    /// An external change collided with unsaved edits; the window asks what to do.
+    @Published var conflict: NoteConflict?
+
+    var history: NoteHistory { NoteHistory(library: rootURL) }
+    var trash: LibraryTrash { LibraryTrash(library: rootURL) }
+    private var watchTimer: Timer?
 
     static let defaultFolderName = "Notizen"
 
@@ -57,6 +89,11 @@ final class NoteStore: ObservableObject {
         rootURL = URL(fileURLWithPath: path, isDirectory: true)
         prepareRoot()
         reload()
+        purgeTrash()
+        // Notices when another app or a sync service changes the open note.
+        watchTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            MainActor.assumeIsolated { NoteStore.shared.checkExternalChange() }
+        }
     }
 
     // MARK: Library
@@ -69,6 +106,7 @@ final class NoteStore: ObservableObject {
         ThemeManager.shared.settings.libraryPath = url.path
         prepareRoot()
         reload()
+        purgeTrash()
     }
 
     private func prepareRoot() {
@@ -83,6 +121,7 @@ final class NoteStore: ObservableObject {
     func reload() {
         let fm = FileManager.default
         var found: [NoteRef] = []
+        var damaged: [DamagedNote] = []
         func scan(_ dir: URL) -> [FolderNode] {
             guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
                                                           options: [.skipsHiddenFiles]) else { return [] }
@@ -91,6 +130,7 @@ final class NoteStore: ObservableObject {
                 let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
                 if item.pathExtension == FolioArchive.fileExtension {
                     if let meta = try? NoteFile.readMetadata(at: item) { found.append(NoteRef(meta: meta, url: item)) }
+                    else { damaged.append(DamagedNote(url: item, report: FolioDiagnostics.diagnose(at: item))) }
                 } else if values?.isDirectory == true && values?.isPackage != true {
                     let children = scan(item)
                     nodes.append(FolderNode(url: item, name: item.lastPathComponent, children: children.isEmpty ? nil : children))
@@ -100,6 +140,9 @@ final class NoteStore: ObservableObject {
         }
         folders = scan(rootURL)
         notes = found
+        damagedNotes = damaged
+        trashItems = trash.items()
+        if sidebarSelection == .damaged, damaged.isEmpty { sidebarSelection = .all }
         if let id = selectedNoteID, !notes.contains(where: { $0.id == id }) { selectedNoteID = nil }
     }
 
@@ -112,6 +155,7 @@ final class NoteStore: ObservableObject {
         case .pinned: list = list.filter(\.meta.pinned)
         case .folder(let url): list = list.filter { $0.folderURL.standardizedFileURL == url.standardizedFileURL }
         case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
+        case .trash, .damaged: list = []
         }
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty {
@@ -208,30 +252,61 @@ final class NoteStore: ObservableObject {
             // Closing a note ends its shared code sessions (variables of linked code blocks).
             if doc.id != selectedNoteID { KernelManager.shared.shutdown(note: doc.id) }
         }
+        openFailure = nil
         guard let id = selectedNoteID, let ref = notes.first(where: { $0.id == id }) else {
             currentDocument = nil
             return
         }
+        open(ref.url)
+    }
+
+    /// Loads a note into the editor. A file that cannot be decoded is diagnosed instead of opened.
+    private func open(_ url: URL) {
+        guard let data = try? Data(contentsOf: url) else {
+            openFailure = DamagedNote(url: url, report: FolioDiagnostics.diagnose(at: url))
+            currentDocument = nil
+            return
+        }
         do {
-            let file = try NoteFile.read(from: ref.url)
-            let doc = NoteDocument(file: file, url: ref.url)
+            let file = try NoteFile.decode(data)
+            let doc = NoteDocument(file: file, url: url)
             doc.store = self
+            doc.diskFingerprint = FileFingerprint(data: data)
             currentDocument = doc
             AttachmentSync.syncExternalEdits(in: doc)
+            // The state on disk before any edit is always in the history.
+            recordVersion(data, noteID: file.meta.id, force: true)
         } catch {
-            lastError = "„\(ref.meta.title)“ konnte nicht geöffnet werden: \(error.localizedDescription)"
+            openFailure = DamagedNote(url: url, report: FolioDiagnostics.diagnose(data))
             currentDocument = nil
         }
     }
 
+    /// Writes a version in the background (versions never slow down typing).
+    func recordVersion(_ data: Data, noteID: UUID, force: Bool = false) {
+        let history = self.history
+        Task.detached(priority: .utility) { _ = try? history.record(data, noteID: noteID, force: force) }
+    }
+
     func save(_ doc: NoteDocument) {
+        // Never overwrite a change made outside Folio since the note was loaded or last saved.
+        if conflict?.doc === doc { return }
+        if let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url), current != expected {
+            raiseConflict(doc)
+            return
+        }
         let file = doc.makeFile()
+        let data: Data
         do {
-            try file.write(to: doc.url)
+            data = try file.encoded()
+            try data.write(to: doc.url, options: .atomic)
         } catch {
+            doc.markDirtyWithoutSaving()
             lastError = "Speichern fehlgeschlagen: \(error.localizedDescription)"
             return
         }
+        doc.diskFingerprint = FileFingerprint(data: data)
+        recordVersion(data, noteID: doc.id)
         renameIfNeeded(doc)
         if let i = notes.firstIndex(where: { $0.id == doc.id }) {
             notes[i] = NoteRef(meta: file.meta, url: doc.url)
@@ -266,17 +341,21 @@ final class NoteStore: ObservableObject {
         if let i = notes.firstIndex(where: { $0.id == id }) { notes[i].meta = file.meta }
     }
 
+    /// Moves a note into Folio's trash (restorable; its versions are kept).
     func delete(_ id: UUID) {
         guard let ref = notes.first(where: { $0.id == id }) else { return }
-        if currentDocument?.id == id {
+        if let doc = currentDocument, doc.id == id {
+            doc.saveNow()
             currentDocument = nil
         }
+        if let data = try? Data(contentsOf: ref.url) { try? history.record(data, noteID: id, force: true) }
         do {
-            try FileManager.default.trashItem(at: ref.url, resultingItemURL: nil)
+            try trash.moveToTrash(ref.url, title: ref.meta.title.isEmpty ? nil : ref.meta.title)
         } catch {
             lastError = "Löschen fehlgeschlagen: \(error.localizedDescription)"
             return
         }
+        trashItems = trash.items()
         let list = filteredNotes
         let idx = list.firstIndex(where: { $0.id == id })
         notes.removeAll { $0.id == id }
@@ -339,14 +418,194 @@ final class NoteStore: ObservableObject {
             currentDocument = nil
             selectedNoteID = nil
         }
+        currentDocument?.saveNow()
         do {
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            try trash.moveToTrash(url)
         } catch {
             lastError = "Ordner konnte nicht gelöscht werden: \(error.localizedDescription)"
         }
         sidebarSelection = .all
         reload()
     }
+
+    // MARK: Trash
+
+    func restore(_ item: TrashItem) {
+        do {
+            let url = try trash.restore(item)
+            reload()
+            if item.isFolder {
+                sidebarSelection = .folder(url)
+            } else if let ref = notes.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
+                sidebarSelection = .all
+                selectedNoteID = ref.id
+            }
+        } catch {
+            lastError = "Wiederherstellen fehlgeschlagen: \(error.localizedDescription)"
+            trashItems = trash.items()
+        }
+    }
+
+    func deletePermanently(_ item: TrashItem) {
+        do { try trash.deletePermanently(item, history: history) } catch {
+            lastError = "Endgültiges Löschen fehlgeschlagen: \(error.localizedDescription)"
+        }
+        trashItems = trash.items()
+    }
+
+    func emptyTrash() {
+        trash.empty(history: history)
+        trashItems = trash.items()
+    }
+
+    /// Items older than the setting (30 days by default) leave the trash for good.
+    private func purgeTrash() {
+        let days = ThemeManager.shared.settings.trashRetentionDays
+        if days > 0, trash.purge(olderThan: days, history: history) > 0 { trashItems = trash.items() }
+    }
+
+    // MARK: Versions
+
+    /// Replaces the open note with an earlier version (the current state becomes a version first).
+    func restoreVersion(_ version: NoteVersion, of doc: NoteDocument) {
+        do {
+            var file = try history.read(version)
+            doc.saveNow()
+            if let current = try? Data(contentsOf: doc.url) { try? history.record(current, noteID: doc.id, force: true) }
+            file.meta.id = doc.id
+            file.meta.pinned = doc.meta.pinned
+            file.meta.modified = Date()
+            let data = try file.encoded()
+            try data.write(to: doc.url, options: .atomic)
+            reloadCurrent(from: doc.url)
+        } catch {
+            lastError = "Die Version konnte nicht wiederhergestellt werden: \(error.localizedDescription)"
+        }
+    }
+
+    /// Saves an earlier version (or any note file) as a separate new note next to `folder`.
+    @discardableResult
+    func saveAsNewNote(_ file: NoteFile, in folder: URL, suffix: String) -> NoteRef? {
+        var f = file
+        f.meta.id = UUID()
+        f.meta.title = (f.meta.title.isEmpty ? "Notiz" : f.meta.title) + " " + suffix
+        f.meta.modified = Date()
+        let url = uniqueURL(in: folder, base: Self.sanitize(f.meta.title))
+        do { try f.write(to: url) } catch {
+            lastError = "Die Kopie konnte nicht gesichert werden: \(error.localizedDescription)"
+            return nil
+        }
+        let ref = NoteRef(meta: f.meta, url: url)
+        notes.append(ref)
+        return ref
+    }
+
+    /// Reopens the current note from disk (after a restore or when taking the external version).
+    private func reloadCurrent(from url: URL) {
+        if let doc = currentDocument { KernelManager.shared.shutdown(note: doc.id) }
+        currentDocument = nil
+        open(url)
+        if let doc = currentDocument, let i = notes.firstIndex(where: { $0.id == doc.id }) {
+            notes[i] = NoteRef(meta: doc.meta, url: url)
+        }
+    }
+
+    // MARK: External changes
+
+    /// Called every few seconds and when Folio becomes active.
+    func checkExternalChange() {
+        guard let doc = currentDocument, conflict == nil, let expected = doc.diskFingerprint else { return }
+        guard let current = FileFingerprint.of(doc.url) else { return }   // moved/deleted: the next save recreates it
+        guard current != expected else { return }
+        if doc.isDirty {
+            raiseConflict(doc)
+        } else {
+            // No unsaved edits here: follow the other app's version (our state stays in the history).
+            reloadCurrent(from: doc.url)
+        }
+    }
+
+    private func raiseConflict(_ doc: NoteDocument) {
+        let data = try? Data(contentsOf: doc.url)
+        doc.markDirtyWithoutSaving()
+        conflict = NoteConflict(doc: doc, diskData: data, diskFile: data.flatMap { try? NoteFile.decode($0) })
+    }
+
+    enum ConflictChoice { case keepMine, takeTheirs, keepBoth }
+
+    /// Resolves a conflict; whatever is not kept stays in the version history.
+    func resolve(_ conflict: NoteConflict, _ choice: ConflictChoice) {
+        let doc = conflict.doc
+        self.conflict = nil
+        let mine = doc.makeFile()
+        switch choice {
+        case .keepMine:
+            if let theirs = conflict.diskData { try? history.record(theirs, noteID: doc.id, force: true) }
+            doc.diskFingerprint = FileFingerprint.of(doc.url)
+            doc.markDirty()
+            doc.saveNow()
+        case .takeTheirs:
+            if let data = try? mine.encoded() { try? history.record(data, noteID: doc.id, force: true) }
+            reloadCurrent(from: doc.url)
+        case .keepBoth:
+            let stamp = Date().formatted(date: .numeric, time: .shortened).replacingOccurrences(of: ":", with: ".")
+            saveAsNewNote(mine, in: doc.url.deletingLastPathComponent(), suffix: "(Konflikt \(stamp))")
+            reloadCurrent(from: doc.url)
+        }
+        if currentDocument == nil, conflict.diskData == nil { reload() }
+    }
+
+    // MARK: Damaged notes
+
+    /// Saves what could be rescued as a new note and moves the damaged file aside (never deletes it).
+    func salvage(_ damaged: DamagedNote) {
+        guard let file = damaged.report.salvagedFile() else { return }
+        let url = uniqueURL(in: damaged.url.deletingLastPathComponent(), base: Self.sanitize(file.meta.title))
+        do {
+            try file.write(to: url)
+            try quarantine(damaged.url)
+        } catch {
+            lastError = "Retten fehlgeschlagen: \(error.localizedDescription)"
+            return
+        }
+        openFailure = nil
+        reload()
+        sidebarSelection = .all
+        selectedNoteID = file.meta.id
+    }
+
+    /// Restores the newest intact version of a damaged note in place (the damaged file is kept aside).
+    func restoreLatestVersion(_ damaged: DamagedNote) {
+        guard let id = damaged.report.meta?.id, let version = history.versions(of: id).first(where: { (try? history.read($0)) != nil }),
+              var file = try? history.read(version) else { return }
+        do {
+            try quarantine(damaged.url)
+            file.meta.modified = Date()
+            try file.write(to: damaged.url)
+        } catch {
+            lastError = "Wiederherstellen fehlgeschlagen: \(error.localizedDescription)"
+            return
+        }
+        openFailure = nil
+        reload()
+        selectedNoteID = nil
+        selectedNoteID = id
+    }
+
+    /// The newest readable version of a damaged note, if the history has one.
+    func latestIntactVersion(of damaged: DamagedNote) -> NoteVersion? {
+        guard let id = damaged.report.meta?.id else { return nil }
+        return history.versions(of: id).first { (try? history.read($0)) != nil }
+    }
+
+    /// Damaged originals go to `.folio/damaged/`, so they can still be examined or sent in.
+    private func quarantine(_ url: URL) throws {
+        let dir = LibraryData.folder(rootURL, "damaged")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: url, to: dir.appendingPathComponent(Stamp.string(Date()) + "-" + url.lastPathComponent))
+    }
+
+    var quarantineFolder: URL { LibraryData.folder(rootURL, "damaged") }
 
     // MARK: Helpers
 
@@ -358,7 +617,7 @@ final class NoteStore: ObservableObject {
         return String(s.prefix(80))
     }
 
-    private func uniqueURL(in dir: URL, base: String) -> URL {
+    func uniqueURL(in dir: URL, base: String) -> URL {
         let fm = FileManager.default
         var url = dir.appendingPathComponent(base).appendingPathExtension(FolioArchive.fileExtension)
         var n = 2

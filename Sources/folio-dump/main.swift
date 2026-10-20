@@ -2,7 +2,7 @@ import Foundation
 import FolioCore
 
 // Small inspection tool: prints a .folio file's metadata and blocks, or searches a library.
-// Usage: folio-dump <file.folio> [--rtf <outdir>]  |  folio-dump --find <text> <library dir>
+// Usage: folio-dump <file.folio> [--rtf <outdir>]  |  folio-dump --find <text> <library dir>  |  folio-dump --check <file or dir>
 let args = CommandLine.arguments
 if args.count >= 3, args[1] == "--seed" {
     // A small note with one text block, for scripted UI checks.
@@ -11,6 +11,29 @@ if args.count >= 3, args[1] == "--seed" {
     let file = NoteFile(meta: NoteMetadata(title: "Testnotiz"), body: NoteBody(blocks: [block]))
     do { try file.write(to: URL(fileURLWithPath: args[2])); print(args[2]) } catch { print("error:", error); exit(1) }
     exit(0)
+}
+if args.count >= 3, args[1] == "--check" {
+    // Diagnoses one file or every note in a folder: exit status 1 when anything is damaged.
+    let target = URL(fileURLWithPath: args[2])
+    var isDir: ObjCBool = false
+    FileManager.default.fileExists(atPath: target.path, isDirectory: &isDir)
+    var files: [URL] = [target]
+    if isDir.boolValue {
+        files = []
+        let e = FileManager.default.enumerator(at: target, includingPropertiesForKeys: nil)
+        while let url = e?.nextObject() as? URL { if url.pathExtension == FolioArchive.fileExtension { files.append(url) } }
+    }
+    var damaged = 0
+    for url in files {
+        let r = FolioDiagnostics.diagnose(at: url)
+        if r.isHealthy { if !isDir.boolValue { print("OK", url.path) }; continue }
+        damaged += 1
+        print("BESCHÄDIGT", url.path)
+        for p in r.problems { print("  -", p.message) }
+        print("  rettbar: \(r.blocks.count) Blöcke, \(r.attachments.count) Anhänge")
+    }
+    if isDir.boolValue { print("\(files.count) Notizen geprüft, \(damaged) beschädigt") }
+    exit(damaged == 0 ? 0 : 1)
 }
 if args.count >= 4, args[1] == "--find" {
     let needle = args[2]

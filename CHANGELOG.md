@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Versionsverlauf** (#1): Folio sichert beim Bearbeiten alle 5 Minuten eine Version, beim Öffnen den Ausgangsstand und immer, bevor etwas die Notiz ersetzt. Über das Uhr-Symbol oder Ablage › Versionsverlauf (⇧⌘Y) siehst du alle Stände mit Vergleich zum aktuellen und kannst einen wiederherstellen oder als neue Notiz sichern. Ältere Versionen werden ausgedünnt (stündlich, täglich, wöchentlich, max. ein Jahr).
+- **Papierkorb** (#2): Gelöschte Notizen und Ordner landen in Folios eigenem Papierkorb (Seitenleiste) und lassen sich an ihren alten Ort zurückholen oder endgültig löschen. Nach 30 Tagen werden sie automatisch entfernt (einstellbar).
+- **Konflikte erkennen** (#53): Ändert ein anderes Programm oder iCloud die offene Notiz, während du ungesicherte Änderungen hast, überschreibt Folio nichts. Ein Dialog zeigt die Unterschiede und bietet „Meine Version behalten“, „Geänderte Datei übernehmen“ oder „Beide behalten“. Ohne eigene Änderungen wird die neue Fassung einfach geladen.
+- **Beschädigte Dateien** (#54): Statt einer Fehlermeldung zeigt Folio, was an der Datei kaputt ist (Prüfsumme, Kopf, Inhalt, Anhänge), und rettet den lesbaren Teil als neue Notiz oder stellt die letzte intakte Version wieder her. Das Original wird nie gelöscht. Unlesbare Dateien erscheinen unter „Beschädigt“ in der Seitenleiste; `folio-dump --check <Ordner>` prüft eine ganze Bibliothek.
+- **Automatische Backups** (#55): Täglich (einstellbar) eine Zip-Sicherung der Bibliothek nach `~/Library/Application Support/Folio/Backups`, direkt nach dem Schreiben vollständig geprüft und rotierend ausgedünnt. Unter Einstellungen › Sicherheit: jetzt sichern, prüfen und als eigenen Ordner wiederherstellen, ohne vorhandene Notizen anzufassen.
+
 ## [0.13.1] – 2026-10-20
 
 ### Behoben

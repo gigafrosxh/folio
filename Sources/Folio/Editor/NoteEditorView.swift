@@ -23,6 +23,7 @@ struct NoteEditorView: View {
     /// changes to @AppStorage arrive outside the animation transaction and would skip the animation.
     @AppStorage("folio.chatVisible") private var chatRemembered = false
     @State private var showChat = false
+    @State private var showHistory = false
     @State private var chatPopped = false
 
     var body: some View {
@@ -97,6 +98,8 @@ struct NoteEditorView: View {
                     .padding([.trailing, .bottom], 12)
             }
         }
+        .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
+        .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in showHistory = true }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
             setChat(!showChat)
         }
@@ -461,6 +464,8 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Opens the version history of the open note.
+    static let folioShowHistory = Notification.Name("folio.showHistory")
     /// Shows or hides the Apple Intelligence chat panel.
     static let folioToggleChat = Notification.Name("folio.toggleChat")
     /// Posted with the pasteboard when ⌘V reaches the app without a text field handling it.

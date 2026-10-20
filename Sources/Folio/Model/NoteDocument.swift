@@ -122,6 +122,8 @@ final class NoteDocument: ObservableObject, Identifiable {
     weak var store: NoteStore?
     private var saveTask: Task<Void, Never>?
     private(set) var isDirty = false
+    /// The file on disk as this document last read or wrote it (to notice changes by other apps).
+    var diskFingerprint: FileFingerprint?
 
     init(file: NoteFile, url: URL) {
         id = file.meta.id
@@ -144,6 +146,9 @@ final class NoteDocument: ObservableObject, Identifiable {
             self?.saveNow()
         }
     }
+
+    /// After a failed save: stays dirty so the next change or quit tries again.
+    func markDirtyWithoutSaving() { isDirty = true }
 
     func saveNow() {
         saveTask?.cancel()

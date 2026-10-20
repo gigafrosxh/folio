@@ -34,6 +34,10 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         row(icon: "tray.full", title: "Alle Notizen", count: store.notes.count, item: .all)
                         row(icon: "pin", title: "Angepinnt", count: store.notes.filter(\.meta.pinned).count, item: .pinned)
+                        row(icon: "trash", title: "Papierkorb", count: store.trashItems.count, item: .trash)
+                        if !store.damagedNotes.isEmpty {
+                            row(icon: "exclamationmark.triangle", title: "Beschädigt", count: store.damagedNotes.count, item: .damaged)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 2) {

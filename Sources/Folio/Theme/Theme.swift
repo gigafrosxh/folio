@@ -132,6 +132,14 @@ struct ThemeSettings: Codable, Equatable {
     /// Look for a new Folio release on GitHub at every start and ask whether to install it. On by default;
     /// a new key name, so installations that stored the old opt-in value (`checkUpdatesOnLaunch`) get it too.
     var askForUpdatesOnLaunch = true
+    /// Days a deleted note stays in Folio's trash (0 = until emptied by hand).
+    var trashRetentionDays = 30
+    /// Automatic zip backups of the library.
+    var backupsEnabled = true
+    /// Hours between automatic backups.
+    var backupIntervalHours: Double = 24
+    /// Folder for backups; empty = ~/Library/Application Support/Folio/Backups.
+    var backupFolder = ""
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -170,6 +178,10 @@ struct ThemeSettings: Codable, Equatable {
         animations = v(.animations, d.animations)
         savedConnections = v(.savedConnections, d.savedConnections)
         askForUpdatesOnLaunch = v(.askForUpdatesOnLaunch, d.askForUpdatesOnLaunch)
+        trashRetentionDays = v(.trashRetentionDays, d.trashRetentionDays)
+        backupsEnabled = v(.backupsEnabled, d.backupsEnabled)
+        backupIntervalHours = v(.backupIntervalHours, d.backupIntervalHours)
+        backupFolder = v(.backupFolder, d.backupFolder)
     }
 }
 

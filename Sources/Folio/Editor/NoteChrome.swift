@@ -20,6 +20,9 @@ struct NoteActionsBar: View {
             button("apple.intelligence", "Chat mit Apple Intelligence (⌥⌘I)", tint: theme.accent) {
                 NotificationCenter.default.post(name: .folioToggleChat, object: nil)
             }
+            button("clock.arrow.circlepath", "Versionsverlauf (⇧⌘Y)") {
+                NotificationCenter.default.post(name: .folioShowHistory, object: nil)
+            }
             button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
             button("trash", "In den Papierkorb legen") { store.delete(doc.id) }
         }

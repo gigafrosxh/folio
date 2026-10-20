@@ -13,12 +13,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { UpdateManager.shared.check(silently: true) }
         }
         LayoutDebug.runIfRequested()
+        MainActor.assumeIsolated { BackupManager.shared.start() }
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
+            // An unanswered conflict on quit: keep both versions rather than lose either.
+            if let conflict = NoteStore.shared.conflict { NoteStore.shared.resolve(conflict, .keepBoth) }
             NoteStore.shared.currentDocument?.saveNow()
             RunManager.shared.stopAll()
             LSPCompleter.shared.shutdownAll()
@@ -89,6 +92,8 @@ struct FolioCommands: Commands {
         CommandGroup(after: .saveItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
                 .keyboardShortcut("s")
+            Button("Versionsverlauf …") { NotificationCenter.default.post(name: .folioShowHistory, object: nil) }
+                .keyboardShortcut("y", modifiers: [.command, .shift])
             Button("Als PDF exportieren …") { NotificationCenter.default.post(name: .folioInsert, object: "exportpdf") }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
         }
@@ -271,6 +276,10 @@ enum LayoutDebug {
                     }
                 }
             }
+        }
+        // FOLIO_SAFETY_TEST=1 (with a throwaway FOLIO_LIBRARY): versions, trash, conflicts and backups end to end.
+        if env["FOLIO_SAFETY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await SafetySelfTest.run() }
         }
         // FOLIO_PERFORM=<tool> (e.g. diagram): runs a toolbar/shortcut action once the note is open.
         if let tool = env["FOLIO_PERFORM"], let action = ShortcutAction(rawValue: tool) {

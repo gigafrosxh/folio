@@ -18,15 +18,25 @@ struct ContentView: View {
                     .padding(.trailing, 12)
                     .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
             }
-            NoteListView(sidebarVisible: $sidebarVisible)
-                .frame(width: CGFloat(listWidth))
-                .frame(maxHeight: .infinity)
-                .panel(theme: theme)
-            ColumnResizer(width: $listWidth, range: 240...460)
-            editor
-                .animation(Motion.quick, value: store.currentDocument?.id)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            if store.sidebarSelection == .trash {
+                TrashView(sidebarVisible: $sidebarVisible)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            } else if store.sidebarSelection == .damaged {
+                DamagedListView(sidebarVisible: $sidebarVisible)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            } else {
+                NoteListView(sidebarVisible: $sidebarVisible)
+                    .frame(width: CGFloat(listWidth))
+                    .frame(maxHeight: .infinity)
+                    .panel(theme: theme)
+                ColumnResizer(width: $listWidth, range: 240...460)
+                editor
+                    .animation(Motion.quick, value: store.currentDocument?.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            }
         }
         .padding(12)
         .background(AmbientBackground(accent: theme.accent))
@@ -42,6 +52,12 @@ struct ContentView: View {
             if case .available = state, !showUpdates, ThemeManager.shared.settings.askForUpdatesOnLaunch { showUpdates = true }
         }
         .sheet(isPresented: $showUpdates) { UpdateSheet() }
+        .sheet(item: $store.conflict) { conflict in
+            ConflictSheet(conflict: conflict).environmentObject(store).environmentObject(theme)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            store.checkExternalChange()
+        }
         .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {
             Button("OK") {}
         } message: {
@@ -51,9 +67,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var editor: some View {
-        if let doc = store.currentDocument {
+        if let damaged = store.openFailure {
+            DamagedNoteView(damaged: damaged)
+        } else if let doc = store.currentDocument {
             NoteEditorView(doc: doc)
-                .id(doc.id)
+                // A reloaded note (restored version, external change) is a new document with the same id.
+                .id(ObjectIdentifier(doc))
                 .transition(Motion.enabled ? .opacity.combined(with: .offset(y: 8)) : .identity)
         } else {
             ZStack {

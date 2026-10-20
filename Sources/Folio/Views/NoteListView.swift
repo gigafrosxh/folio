@@ -150,6 +150,8 @@ struct NoteListView: View {
         case .pinned: return "Angepinnt"
         case .folder(let url): return url.lastPathComponent
         case .tag(let t): return "#\(t)"
+        case .trash: return "Papierkorb"
+        case .damaged: return "Beschädigte Notizen"
         }
     }
 
