@@ -12,6 +12,7 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 - Direkt nach ⌘N Getipptes landet vollständig in der neuen Notiz, auch wenn vorher das Suchfeld aktiv war; bisher gingen die ersten Zeichen ins Suchfeld (#100).
 - Mehrzeiliger Text, der in die Titelzeile eingefügt wird, macht nur noch die erste Zeile zum Titel; der Rest ist normaler Fließtext (#101).
 - Eine neue Notiz ist auch bei aktiver Suche in der Liste sichtbar: Anlegen setzt die Suche zurück (#102).
+- Die Formatleiste schneidet bei schmalerem Fenster keine Werkzeuge mehr ab: Code, Tabelle, Formel, Diagramm, Audio, Datei, Zeichnung und Webseite wandern in ein Menü „Einfügen“, bei noch weniger Platz Ausrichtung, Link und Writing Tools in „Mehr“ (#103).
 
 ## [1.0.0-rc.1] – 2026-10-20
 

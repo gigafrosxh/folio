@@ -335,9 +335,12 @@ struct NoteEditorView: View {
     /// Opaque header like in Apple Notes: content scrolls underneath it, and a hairline plus a soft
     /// shadow appear once something is behind it.
     private var header: some View {
+        // Narrower windows fold tools into menus instead of cutting them off (#103).
         ViewThatFits(in: .horizontal) {
-            bars
-            ScrollView(.horizontal) { bars.padding(.horizontal, 2) }.scrollIndicators(.never)
+            bars(.full)
+            bars(.compact)
+            bars(.minimal)
+            ScrollView(.horizontal) { bars(.minimal).padding(.horizontal, 2) }.scrollIndicators(.automatic)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -350,9 +353,9 @@ struct NoteEditorView: View {
         .zIndex(1)
     }
 
-    private var bars: some View {
+    private func bars(_ layout: FormatToolbar.Layout) -> some View {
         HStack(spacing: 10) {
-            FormatToolbar(actions: actions)
+            FormatToolbar(actions: actions, layout: layout)
             NoteActionsBar(doc: doc)
         }
         .fixedSize()

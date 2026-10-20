@@ -177,6 +177,16 @@ enum LayoutDebug {
                 MainActor.assumeIsolated { AccessibilityAudit.run() }
             }
         }
+        // FOLIO_WINDOW_SIZE=900x700: main window size, e.g. to check narrow layouts (#103).
+        if let size = env["FOLIO_WINDOW_SIZE"]?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                MainActor.assumeIsolated {
+                    if let w = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
+                        w.setFrame(NSRect(x: 40, y: 80, width: size[0], height: size[1]), display: true)
+                    }
+                }
+            }
+        }
         if env["FOLIO_QUICKOPEN"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open)
