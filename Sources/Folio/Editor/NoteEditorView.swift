@@ -19,7 +19,11 @@ struct NoteEditorView: View {
     @State private var alertMessage: String?
     @State private var dropTargeted = false
     @State private var scrolled = false
-    @AppStorage("folio.chatVisible") private var showChat = false
+    /// Remembered across launches; the panel itself is driven by `showChat`/`chatPopped` below, because
+    /// changes to @AppStorage arrive outside the animation transaction and would skip the animation.
+    @AppStorage("folio.chatVisible") private var chatRemembered = false
+    @State private var showChat = false
+    @State private var chatPopped = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,6 +66,7 @@ struct NoteEditorView: View {
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
                 .padding(.trailing, showChat ? 36 + 372 : 36)
+                .animation(Motion.standard, value: showChat)
                 .padding(.top, 18)
                 .frame(maxWidth: .infinity)
             }
@@ -82,17 +87,20 @@ struct NoteEditorView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showChat {
-                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { withAnimation(Motion.popup) { showChat = false } })
+                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { setChat(false) })
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
                     .frame(width: 360)
+                    // The popup grows out of the ✨ button (top right) and shrinks back into it.
+                    .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
+                    .opacity(chatPopped ? 1 : 0)
                     .padding(.top, 62)
                     .padding([.trailing, .bottom], 12)
-                    .transition(Motion.popupTransition)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
-            withAnimation(Motion.popup) { showChat.toggle() }
+            setChat(!showChat)
         }
+        .onAppear { if chatRemembered { showChat = true; chatPopped = true } }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
                               concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]) { url in
@@ -126,6 +134,25 @@ struct NoteEditorView: View {
         }
         .onAppear {
             if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
+        }
+    }
+
+    /// Opens or closes the chat popup: the view is inserted first, then scaled up in a separate
+    /// transaction (and scaled down before it is removed), so the spring always plays.
+    private func setChat(_ open: Bool) {
+        chatRemembered = open
+        guard let popup = Motion.popup else {
+            showChat = open
+            chatPopped = open
+            return
+        }
+        if open {
+            showChat = true
+            chatPopped = false
+            DispatchQueue.main.async { withAnimation(popup) { chatPopped = true } }
+        } else {
+            withAnimation(.easeIn(duration: 0.18)) { chatPopped = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { if !chatPopped { showChat = false } }
         }
     }
 
