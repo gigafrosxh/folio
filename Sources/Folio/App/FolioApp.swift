@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         ShortcutCenter.shared.install()
+        if ThemeManager.shared.settings.checkUpdatesOnLaunch {
+            // Quietly; the sheet only appears when an update is actually available.
+            MainActor.assumeIsolated { UpdateManager.shared.check(silently: true) }
+        }
         LayoutDebug.runIfRequested()
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
@@ -65,6 +69,9 @@ struct FolioCommands: Commands {
     private var f: FormattingController { .shared }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Nach Updates suchen …") { NotificationCenter.default.post(name: .folioShowUpdates, object: nil) }
+        }
         CommandGroup(replacing: .newItem) {
             Button("Neue Notiz") { store.createNote() }
                 .keyboardShortcut("n")
@@ -134,6 +141,29 @@ struct FolioCommands: Commands {
 /// its text views and embedded views, to diagnose overlapping blocks.
 enum LayoutDebug {
     @MainActor static func runIfRequested() {
+        if ProcessInfo.processInfo.environment["FOLIO_UPDATE_TEST"] != nil {
+            // End-to-end update check: find the newest release and install it over this app.
+            let updates = UpdateManager.shared
+            updates.check()
+            func poll() {
+                switch updates.state {
+                case .available(let r): print("UPDATE available", r.version); fflush(stdout); updates.install(r)
+                case .upToDate: print("UPDATE up to date"); fflush(stdout)
+                case .failed(let m): print("UPDATE failed", m); fflush(stdout)
+                default: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll() } }
+                    return
+                }
+                if case .available = updates.state { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } } }
+            }
+            func poll2() {
+                switch updates.state {
+                case .failed(let m): print("UPDATE failed", m); fflush(stdout)
+                case .downloading, .installing, .available: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } }
+                default: print("UPDATE state", updates.state); fflush(stdout)
+                }
+            }
+            poll()
+        }
         if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil { print("LAYOUT start", NSApp.windows.count); fflush(stdout) }
         let env = ProcessInfo.processInfo.environment
         if let mode = env["FOLIO_APPEARANCE"] {

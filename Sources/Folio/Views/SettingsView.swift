@@ -91,6 +91,10 @@ struct SettingsView: View {
 
     private var general: some View {
         Form {
+            Section("Updates") {
+                UpdateView()
+                Toggle("Beim Start automatisch nach Updates suchen", isOn: $theme.settings.checkUpdatesOnLaunch)
+            }
             Section {
                 Picker("Erscheinungsbild", selection: $theme.settings.appearance) {
                     ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }

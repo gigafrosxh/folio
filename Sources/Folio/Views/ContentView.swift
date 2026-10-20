@@ -8,6 +8,7 @@ struct ContentView: View {
     @AppStorage("folio.sidebarVisible") private var sidebarVisible = true
     @AppStorage("folio.listWidth") private var listWidth: Double = 300
     @StateObject private var windowState = WindowState()
+    @State private var showUpdates = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -35,6 +36,12 @@ struct ContentView: View {
         .ignoresSafeArea()
         .animation(Motion.standard, value: sidebarVisible)
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
+        .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }
+        .onReceive(UpdateManager.shared.$state) { state in
+            // A background check that finds a new version brings up the update sheet.
+            if case .available = state, !showUpdates, ThemeManager.shared.settings.checkUpdatesOnLaunch { showUpdates = true }
+        }
+        .sheet(isPresented: $showUpdates) { UpdateSheet() }
         .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {
             Button("OK") {}
         } message: {
@@ -98,6 +105,7 @@ struct ColumnResizer: View {
 
 extension Notification.Name {
     static let folioToggleSidebar = Notification.Name("folio.toggleSidebar")
+    static let folioShowUpdates = Notification.Name("folio.showUpdates")
 }
 
 extension View {
