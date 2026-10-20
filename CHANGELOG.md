@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.17.0] – 2026-10-20
+
 ### Neu
 - **Terminal pro Notiz** (#23): interaktive Shell mit Live-Ausgabe, Eingabe, ⌃C/⌃D, Verlauf und Neustart. Öffnen über die Werkzeugleiste oder ⌃`; Codeblöcke lassen sich direkt darin ausführen. Funktioniert auch mit fish als Standardshell; die Ausgabe ist eine begrenzte Textansicht.
 - **Standardeingabe** (#24): stdin pro Codeblock vorgeben oder während eines eigenen Prozesses eingeben. Vorgegebene Eingaben funktionieren auch in verknüpften Python-Sitzungen.
