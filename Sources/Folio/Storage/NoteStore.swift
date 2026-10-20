@@ -3,10 +3,21 @@ import Combine
 import FolioCore
 
 struct NoteRef: Identifiable, Hashable {
-    var meta: NoteMetadata
+    var meta: NoteMetadata { didSet { haystack = SearchFilter.haystack(for: meta) } }
     var url: URL
+    /// Title and text lowercased once, so typing in the search field stays fast in big libraries (#62).
+    private(set) var haystack: String
     var id: UUID { meta.id }
     var folderURL: URL { url.deletingLastPathComponent() }
+
+    init(meta: NoteMetadata, url: URL) {
+        self.meta = meta
+        self.url = url
+        haystack = SearchFilter.haystack(for: meta)
+    }
+
+    static func == (a: NoteRef, b: NoteRef) -> Bool { a.meta == b.meta && a.url == b.url }
+    func hash(into h: inout Hasher) { h.combine(meta.id); h.combine(url) }
 }
 
 struct FolderNode: Identifiable, Hashable {
@@ -60,7 +71,7 @@ final class NoteStore: ObservableObject {
 
     @Published private(set) var rootURL: URL
     @Published private(set) var folders: [FolderNode] = []
-    @Published private(set) var notes: [NoteRef] = []
+    @Published private(set) var notes: [NoteRef] = [] { didSet { notesVersion += 1 } }
     @Published var sidebarSelection: SidebarItem? = .all {
         didSet { if oldValue != sidebarSelection, let id = selectedNoteID, !filteredNotes.contains(where: { $0.id == id }) { selectedNoteID = filteredNotes.first?.id } }
     }
@@ -124,6 +135,12 @@ final class NoteStore: ObservableObject {
     }
     /// Note templates.
     @Published private(set) var templates: [NoteRef] = []
+    /// Symbolic links in the library that were not followed (outside the library or a loop) (#56).
+    @Published private(set) var skippedLinks: [String] = []
+    private let scanner = LibraryScanner()
+    /// Last result of `filteredNotes` and what it was computed from (it is read on every redraw) (#62).
+    private var filterMemo: (key: String, notes: [NoteRef])?
+    private var notesVersion = 0
     /// Block kinds of notes saved before 0.15 (read once, when a type filter needs them).
     private var kindsCache: [URL: [String]] = [:]
     @Published var lastError: String?
@@ -165,6 +182,7 @@ final class NoteStore: ObservableObject {
         closeAllDocuments()
         AIChatModel.resetCache()
         rootURL = url
+        scanner.clearCache()
         ThemeManager.shared.settings.libraryPath = url.path
         prepareRoot()
         reload()
@@ -181,28 +199,15 @@ final class NoteStore: ObservableObject {
     }
 
     func reload() {
-        let fm = FileManager.default
-        var found: [NoteRef] = []
-        var damaged: [DamagedNote] = []
-        func scan(_ dir: URL) -> [FolderNode] {
-            guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
-                                                          options: [.skipsHiddenFiles]) else { return [] }
-            var nodes: [FolderNode] = []
-            for item in items.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
-                let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
-                if item.pathExtension == FolioArchive.fileExtension {
-                    if let meta = try? NoteFile.readMetadata(at: item) { found.append(NoteRef(meta: meta, url: item)) }
-                    else { damaged.append(DamagedNote(url: item, report: FolioDiagnostics.diagnose(at: item))) }
-                } else if values?.isDirectory == true && values?.isPackage != true {
-                    let children = scan(item)
-                    nodes.append(FolderNode(url: item, name: item.lastPathComponent, children: children.isEmpty ? nil : children))
-                }
-            }
-            return nodes
+        let result = scanner.scan(rootURL)
+        func nodes(_ fs: [LibraryScanner.Folder]) -> [FolderNode] {
+            fs.map { FolderNode(url: $0.url, name: $0.name, children: $0.children.isEmpty ? nil : nodes($0.children)) }
         }
-        folders = scan(rootURL)
-        notes = found
+        folders = nodes(result.folders)
+        notes = result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }
+        let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
         damagedNotes = damaged
+        skippedLinks = result.skippedLinks.map { "\($0.url.lastPathComponent): \($0.reason)" }
         trashItems = trash.items()
         templates = Self.scanTemplates(LibraryData.folder(rootURL, "templates"))
         if sidebarSelection == .damaged, damaged.isEmpty { sidebarSelection = .all }
@@ -220,6 +225,14 @@ final class NoteStore: ObservableObject {
     var isSearching: Bool { !activeSearch.isEmpty }
 
     var filteredNotes: [NoteRef] {
+        let key = "\(notesVersion)|\(String(describing: sidebarSelection))|\(searchText)|\(String(describing: searchFilter))|\(searchEverywhere)|\(includeSubfolders)|\(templates.count)"
+        if let memo = filterMemo, memo.key == key { return memo.notes }
+        let result = computeFilteredNotes()
+        filterMemo = (key, result)
+        return result
+    }
+
+    private func computeFilteredNotes() -> [NoteRef] {
         if sidebarSelection == .templates { return templates.sorted { $0.meta.title.localizedStandardCompare($1.meta.title) == .orderedAscending } }
         var list = notes
         let search = activeSearch
@@ -233,9 +246,13 @@ final class NoteStore: ObservableObject {
             }
         }
         if !search.isEmpty {
+            let root = rootURL.standardizedFileURL.path
             list = list.filter { ref in
-                search.matches(ref.meta, folderPath: relativeFolderName(ref.folderURL),
-                               kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref))
+                let folder = ref.folderURL.standardizedFileURL.path
+                let rel = folder.hasPrefix(root) ? String(folder.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")) : ref.folderURL.lastPathComponent
+                return search.matches(ref.meta, folderPath: rel,
+                                      kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref),
+                                      haystack: ref.haystack)
             }
         }
         return list.sorted { a, b in

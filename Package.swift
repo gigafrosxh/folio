@@ -35,6 +35,14 @@ let package = Package(
             name: "FolioCoreTests",
             dependencies: ["FolioCore"],
             path: "Tests/FolioCoreTests",
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        // Editor model tests (block operations, undo); runs the app module without its UI.
+        .testTarget(
+            name: "FolioAppTests",
+            dependencies: ["Folio"],
+            path: "Tests/FolioAppTests",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]

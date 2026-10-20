@@ -178,7 +178,7 @@ public struct SearchFilter: Equatable, Sendable {
 
     /// Whether a note matches. `folderPath` is its folder relative to the library; `kinds` its block
     /// kinds when the metadata does not have them.
-    public func matches(_ meta: NoteMetadata, folderPath: String, kinds: [String]? = nil, now: Date = Date()) -> Bool {
+    public func matches(_ meta: NoteMetadata, folderPath: String, kinds: [String]? = nil, now: Date = Date(), haystack: String? = nil) -> Bool {
         if !tags.isEmpty {
             // A tag filter also matches nested tags: "projekt" finds "projekt/alpha".
             let noteTags = meta.tags.map { $0.lowercased() }
@@ -197,11 +197,16 @@ public struct SearchFilter: Equatable, Sendable {
             }
         }
         // Every word must appear in title or text (in any order).
-        for word in text.lowercased().split(separator: " ") {
-            if !meta.title.lowercased().contains(word) && !meta.searchText.lowercased().contains(word) { return false }
-        }
+        let words = text.lowercased().split(separator: " ")
+        guard !words.isEmpty else { return true }
+        // Lowercasing a long note for every search is the slow part; callers can pass it once (#62).
+        let hay = haystack ?? Self.haystack(for: meta)
+        for word in words where !hay.contains(word) { return false }
         return true
     }
+
+    /// Title and text of a note, lowercased, for repeated searches.
+    public static func haystack(for meta: NoteMetadata) -> String { (meta.title + "\n" + meta.searchText).lowercased() }
 }
 
 // MARK: - Tags (#18)
