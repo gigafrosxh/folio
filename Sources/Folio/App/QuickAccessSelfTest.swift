@@ -48,7 +48,8 @@ enum QuickAccessSelfTest {
         r = service.save(CaptureItem(text: "In die geschlossene Notiz", target: .note(other.id)))
         let otherAfter = store.notes.first { $0.id == other.id }
         check(r.ok && otherAfter?.meta.searchText.contains("In die geschlossene Notiz") == true, "Erfassung in geschlossene Notiz")
-        check(otherAfter?.meta.title == titleBefore, "Titel der Zielnotiz bleibt (\(titleBefore ?? "-") → \(otherAfter?.meta.title ?? "-"))")
+        // An empty target takes the first captured line as title, never the date line (#95).
+        check(otherAfter?.meta.title == "In die geschlossene Notiz", "Leere Zielnotiz heißt wie die erste erfasste Zeile (\(titleBefore ?? "-") → \(otherAfter?.meta.title ?? "-"))")
 
         // Library not writable: the capture waits and is delivered later (#93)
         let root = store.rootURL

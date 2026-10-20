@@ -73,7 +73,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.20.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **0.20.4** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -139,3 +139,16 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
   `CaptureService`, Deep Links, Einstellungen). Wartende Erfassungen liegen in `~/Library/Application Support/Folio/Wartende Erfassungen`;
   in Tests mit `FOLIO_CAPTURE_QUEUE=<ordner>` umlenken.
 - Nicht geprüft: echtes globales Kürzel aus einer anderen App, Menüleisten-Fenster, Einfügen von Bildern in die Schnellerfassung.
+
+### Testlauf nach 0.20 (Stand 0.20.4)
+
+- Gefunden und behoben: #94 Start-Hänger durch `MenuBarExtra`-Bindung (0.20.1), #96 Listenzeichen im Titel (0.20.2),
+  #97 Titelverlust bei Notizen ohne Text (0.20.3), #95 Datumszeile als Titel nach Schnellerfassung (0.20.4).
+- Weitere Selbsttests: `FOLIO_QUICK_TEST` (braucht `FOLIO_CAPTURE_QUEUE`), `FOLIO_AI_TEST` (echtes Apple Intelligence),
+  `FOLIO_SWEEP_TEST=<ausgabeordner>` gegen eine Kopie der echten Bibliothek (prüft jede Notiz auf stabile Titel/Tags/Text,
+  Markdown-Rundweg, PDF-Export, Duplikat, Diagnose).
+- Achtung bei SwiftUI-Bindungen auf `ThemeManager.settings`: jede Zuweisung löst ein Update aus, auch mit gleichem Wert –
+  nur bei Änderung zuweisen (sonst Endlosschleife wie #94).
+- Noch nicht geprüft: globales Kürzel aus einer anderen App, Menüleisten-Fenster, Bilder in der Schnellerfassung,
+  Mikrofonaufnahme, eigenes Notizfenster als echtes Fenster, Update-Fenster im Dunkelmodus (Schnappschuss zeigt es leer,
+  vermutlich nur ein Effekt von `cacheDisplay`).

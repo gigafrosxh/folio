@@ -22,6 +22,12 @@ final class NoteTitleTests: XCTestCase {
         XCTAssertEqual(title("Neu"), "Neu", "text still sets the title")
     }
 
+    func testCaptureDateLineIsNoTitle() {
+        XCTAssertEqual(title("— 20. Okt. 2026, 19:31 —\nIdee für das Projekt"), "Idee für das Projekt")
+        XCTAssertEqual(title("Meine Notiz\n— 20. Okt. 2026, 19:31 —\nNeu"), "Meine Notiz")
+        XCTAssertEqual(title("— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —"), "— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —")
+    }
+
     func testListMarkersAreNotPartOfTheTitle() {
         XCTAssertEqual(title("•\tJuli 14\n•\tAugust"), "Juli 14")
         XCTAssertEqual(title("1\tTM SMR 125 (2025) 43PS"), "TM SMR 125 (2025) 43PS")

@@ -198,11 +198,17 @@ final class NoteDocument: ObservableObject, Identifiable {
         return s.trimmingCharacters(in: .whitespaces)
     }
 
+    static func isCaptureSeparator(_ line: String) -> Bool {
+        line.hasPrefix("— ") && line.hasSuffix(" —") && line.count < 60
+    }
+
     func makeFile() -> NoteFile {
         let textBlocks = blocks.filter { $0.kind == .text }
         let fullText = textBlocks.map(\.storage.string).joined(separator: "\n")
         // List markers, checkboxes and indentation are formatting, not part of the title or preview (#96).
-        let lines = fullText.split(whereSeparator: \.isNewline).map { Self.plainLine(String($0)) }.filter { !$0.isEmpty }
+        // Quick capture's date lines ("— 20. Okt. 2026, 19:31 —") separate entries; they are no title (#95).
+        let lines = fullText.split(whereSeparator: \.isNewline).map { Self.plainLine(String($0)) }
+            .filter { !$0.isEmpty && !Self.isCaptureSeparator($0) }
         // A note without any text (only an image, code …) keeps the title it has (#97).
         if let first = lines.first { meta.title = String(first.prefix(120)) }
         meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description

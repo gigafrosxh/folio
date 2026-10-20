@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parent.parent
 RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
 print(f"Test libraries and logs: {RUN}", flush=True)
 failed = False
-for flag, prefix in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("A11Y", "A11Y")]:
+for flag, prefix in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("A11Y", "A11Y")]:
     library = RUN / flag
     library.mkdir()
     log = RUN / f"{flag}.log"
-    env = dict(os.environ, FOLIO_LIBRARY=str(library))
+    env = dict(os.environ, FOLIO_LIBRARY=str(library), FOLIO_CAPTURE_QUEUE=str(RUN / f"{flag}-queue"))
     env[f"FOLIO_{flag}_TEST"] = "1"
     if flag == "A11Y":
         # Accessibility audit (#60) of a note with every kind of block.

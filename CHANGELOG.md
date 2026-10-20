@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Schnellerfassung in eine leere Notiz machte die Datumszeile („— 20. Okt. 2026, 19:31 —“) zum Titel. Datumszeilen der Schnellerfassung zählen nicht mehr als Titel; eine leere Notiz heißt danach wie die erste erfasste Zeile (#95).
+
+### Intern
+- Neue Selbsttests: `FOLIO_QUICK_TEST` (Schnellerfassung, Warteschlange, Links, Kürzel), `FOLIO_AI_TEST` (echte Antworten von Apple Intelligence), `FOLIO_SWEEP_TEST=<ordner>` (jede Notiz einer Bibliothekskopie öffnen, speichern, exportieren).
+
 ## [0.20.3] – 2026-10-20
 
 ### Behoben
