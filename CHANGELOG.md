@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.7.1] – 2026-10-20
+
 ### Behoben
 - Gelöschte Code-Blöcke lebten in der gemeinsamen Sitzung weiter (z. B. blieb `a` nach dem Löschen von `a = 10` verfügbar). Beim Löschen wird die Sitzung jetzt neu gestartet, die übrigen verknüpften Blöcke werden im Hintergrund neu ausgeführt (außer Server), und ein laufender Block wird gestoppt.
 
