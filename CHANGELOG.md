@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.20.2] – 2026-10-20
+
 ### Behoben
 - Beginnt eine Notiz mit einer Liste, enthielten Titel und Dateiname das Listenzeichen und einen Tabulator („•	Juli 14“). Listenzeichen, Checkboxen und Einrückung gehören jetzt nicht mehr zum Titel und zur Vorschau (#96).
 
