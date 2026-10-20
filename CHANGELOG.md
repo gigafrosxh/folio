@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.12.3] – 2026-10-20
+
 ### Behoben
 - Update blieb nach der Installation hängen: Das offene Update-Fenster verhinderte, dass sich die alte Version beendet, deshalb startete die neue nie. Folio speichert jetzt selbst, schließt das Fenster und beendet sich sicher; die neue Version startet wenige Sekunden nach dem Download.
 
