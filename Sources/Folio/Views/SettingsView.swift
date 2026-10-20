@@ -93,7 +93,7 @@ struct SettingsView: View {
         Form {
             Section("Updates") {
                 UpdateView()
-                Toggle("Beim Start automatisch nach Updates suchen", isOn: $theme.settings.checkUpdatesOnLaunch)
+                Toggle("Bei jedem Start nach Updates suchen und fragen", isOn: $theme.settings.askForUpdatesOnLaunch)
             }
             Section {
                 Picker("Erscheinungsbild", selection: $theme.settings.appearance) {

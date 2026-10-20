@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         ShortcutCenter.shared.install()
-        if ThemeManager.shared.settings.checkUpdatesOnLaunch {
+        if ThemeManager.shared.settings.askForUpdatesOnLaunch {
             // Quietly; the sheet only appears when an update is actually available.
             MainActor.assumeIsolated { UpdateManager.shared.check(silently: true) }
         }

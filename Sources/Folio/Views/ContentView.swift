@@ -39,7 +39,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }
         .onReceive(UpdateManager.shared.$state) { state in
             // A background check that finds a new version brings up the update sheet.
-            if case .available = state, !showUpdates, ThemeManager.shared.settings.checkUpdatesOnLaunch { showUpdates = true }
+            if case .available = state, !showUpdates, ThemeManager.shared.settings.askForUpdatesOnLaunch { showUpdates = true }
         }
         .sheet(isPresented: $showUpdates) { UpdateSheet() }
         .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {

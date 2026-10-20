@@ -129,8 +129,9 @@ struct ThemeSettings: Codable, Equatable {
     var animations = true
     /// Database connections created in Folio, offered in SQL code blocks (passwords stay in the Keychain).
     var savedConnections: [DatabaseConnection] = []
-    /// Look for a new Folio release on GitHub when the app starts (opt-in).
-    var checkUpdatesOnLaunch = false
+    /// Look for a new Folio release on GitHub at every start and ask whether to install it. On by default;
+    /// a new key name, so installations that stored the old opt-in value (`checkUpdatesOnLaunch`) get it too.
+    var askForUpdatesOnLaunch = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -168,7 +169,7 @@ struct ThemeSettings: Codable, Equatable {
         shortcuts = v(.shortcuts, d.shortcuts)
         animations = v(.animations, d.animations)
         savedConnections = v(.savedConnections, d.savedConnections)
-        checkUpdatesOnLaunch = v(.checkUpdatesOnLaunch, d.checkUpdatesOnLaunch)
+        askForUpdatesOnLaunch = v(.askForUpdatesOnLaunch, d.askForUpdatesOnLaunch)
     }
 }
 
