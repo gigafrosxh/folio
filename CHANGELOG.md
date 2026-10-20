@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] – 2026-10-20
+
 ### Behoben
 - Der Schnellwechsel (⌘P) bekommt sofort den Tastaturfokus. Bisher landete Getipptes im Suchfeld der Seitenleiste oder sogar in der Notiz dahinter (#99).
 - Direkt nach ⌘N Getipptes landet vollständig in der neuen Notiz, auch wenn vorher das Suchfeld aktiv war; bisher gingen die ersten Zeichen ins Suchfeld (#100).
