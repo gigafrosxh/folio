@@ -1,10 +1,13 @@
-.PHONY: build test app run install installer release clean
+.PHONY: build test regression app run install installer release clean
 
 build:
 	swift build
 
 test:
 	swift test
+
+regression:
+	./scripts/ui-regression.sh
 
 app:
 	./scripts/build-app.sh

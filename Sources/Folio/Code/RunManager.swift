@@ -80,6 +80,10 @@ final class RunManager: ObservableObject {
                 if stopped { text += r.serverURL != nil ? "\n■ Server gestoppt" : "\n■ Gestoppt" }
                 block.output = text
                 block.outputIsError = !r.succeeded && !(stopped && r.serverURL != nil)
+                if kernel != nil {
+                    block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
+                    block.startedServer = r.serverURL != nil
+                }
                 info[id] = kernel != nil
                     ? String(format: "%@ · %.2f s", r.succeeded ? "verknüpft" : "Fehler", r.duration)
                     : String(format: "%@ · Exit %d · %.2f s", r.command, r.exitCode, r.duration)

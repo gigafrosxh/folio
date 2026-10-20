@@ -4,6 +4,14 @@ import FolioCore
 // Small inspection tool: prints a .folio file's metadata and blocks, or searches a library.
 // Usage: folio-dump <file.folio> [--rtf <outdir>]  |  folio-dump --find <text> <library dir>
 let args = CommandLine.arguments
+if args.count >= 3, args[1] == "--seed" {
+    // A small note with one text block, for scripted UI checks.
+    var block = BlockRecord(kind: .text)
+    block.rtf = Data(#"{\rtf1\ansi{\fonttbl\f0 Helvetica;}\f0\fs30 Testnotiz\par Inhalt}"#.utf8)
+    let file = NoteFile(meta: NoteMetadata(title: "Testnotiz"), body: NoteBody(blocks: [block]))
+    do { try file.write(to: URL(fileURLWithPath: args[2])); print(args[2]) } catch { print("error:", error); exit(1) }
+    exit(0)
+}
 if args.count >= 4, args[1] == "--find" {
     let needle = args[2]
     let e = FileManager.default.enumerator(at: URL(fileURLWithPath: args[3]), includingPropertiesForKeys: nil)

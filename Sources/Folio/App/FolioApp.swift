@@ -140,7 +140,9 @@ enum LayoutDebug {
         }
         if let path = env["FOLIO_OPEN"] {
             let store = NoteStore.shared
-            if let ref = store.notes.first(where: { $0.url.path == path }) { store.selectedNoteID = ref.id }
+            let wanted = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+            if let ref = store.notes.first(where: { $0.url.resolvingSymlinksInPath().path == wanted }) { store.selectedNoteID = ref.id }
+            else { print("LAYOUT open failed:", path, store.notes.map(\.url.path)) }
         }
         guard env["FOLIO_LAYOUT_DUMP"] != nil else { return }
         if let typed = env["FOLIO_TYPE"] {
@@ -154,7 +156,39 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed == "keys", let doc = NoteStore.shared.currentDocument {
+                if typed == "delete-test2", let doc = NoteStore.shared.currentDocument {
+                    let a = BlockModel(kind: .code), b = BlockModel(kind: .code), c = BlockModel(kind: .code)
+                    for x in [a, b, c] { x.language = "python" }
+                    a.storage.setAttributedString(NSAttributedString(string: "x = 1"))
+                    b.storage.setAttributedString(NSAttributedString(string: "y = 2"))
+                    c.storage.setAttributedString(NSAttributedString(string: "print(y)\nprint('x' in globals())"))
+                    doc.insert(a, after: doc.blocks.first?.id); doc.insert(b, after: a.id); doc.insert(c, after: b.id)
+                    Task { @MainActor in
+                        await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
+                        await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
+                        doc.remove(a.id)
+                        try? await Task.sleep(for: .milliseconds(1500))
+                        await RunManager.shared.start(block: c, doc: doc, theme: .shared)?.value
+                        print("LAYOUT delete-test2: \((c.output ?? "-").debugDescription)"); fflush(stdout)
+                    }
+                } else if typed == "delete-test", let doc = NoteStore.shared.currentDocument {
+                    let a = BlockModel(kind: .code), b = BlockModel(kind: .code)
+                    a.language = "python"; b.language = "python"
+                    a.storage.setAttributedString(NSAttributedString(string: "geheim = 42\nprint('A lief')"))
+                    b.storage.setAttributedString(NSAttributedString(string: "print(geheim)"))
+                    doc.insert(a, after: doc.blocks.first?.id)
+                    doc.insert(b, after: a.id)
+                    Task { @MainActor in
+                        await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
+                        doc.remove(a.id)
+                        doc.saveNow()
+                        try? await Task.sleep(for: .milliseconds(800))
+                        await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
+                        let codes = doc.blocks.filter { $0.kind == .code }.map { $0.storage.string }
+                        print("LAYOUT delete-test: code blocks now \(codes), B output: \((b.output ?? "-").debugDescription)")
+                        fflush(stdout)
+                    }
+                } else if typed == "keys", let doc = NoteStore.shared.currentDocument {
                     // Real key events through the event queue: ⌃C inserts a code block, typing lands in it, ⇧↩ runs it.
                     func key(_ chars: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags) {
                         guard let w = tv.window, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
@@ -188,7 +222,7 @@ enum LayoutDebug {
                     Task { @MainActor in
                         await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
                         await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
-                        print("LAYOUT linked:", b.output ?? "-"); fflush(stdout)
+                        print("LAYOUT linked-run:", b.output ?? "-"); fflush(stdout)
                     }
                 } else if typed.hasPrefix("chat:"), let doc = NoteStore.shared.currentDocument {
                     NotificationCenter.default.post(name: .folioToggleChat, object: nil)

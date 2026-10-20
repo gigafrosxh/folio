@@ -21,6 +21,10 @@ final class BlockModel: ObservableObject, Identifiable {
     @Published var caption: String
     @Published var revision = 0
     var syncedAt: Date?
+    /// Ran without error in the note's shared session (not saved); used to rebuild the session after a delete.
+    var ranInSession = false
+    /// Its last run started a server (those are never replayed automatically).
+    var startedServer = false
 
     init(kind: BlockKind, id: UUID = UUID()) {
         self.id = id
@@ -185,7 +189,12 @@ final class NoteDocument: ObservableObject, Identifiable {
 
     func remove(_ id: UUID) {
         guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
-        blocks.remove(at: i)
+        let removed = blocks.remove(at: i)
+        if removed.kind == .code {
+            // Its variables must not live on in the shared session, and a run in progress stops.
+            RunManager.shared.stop(removed.id)
+            KernelManager.shared.blockRemoved(removed, from: self)
+        }
         mergeAdjacentText(around: i)
         if blocks.isEmpty { blocks = [.text()] }
         markDirty()
