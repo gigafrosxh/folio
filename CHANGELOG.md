@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.12.4] – 2026-10-20
+
 ### Geändert
 - Das Update-Fenster zeigt den Changelog aller neueren Versionen als formatiertes Markdown (Überschriften, Listen, Fett, Code).
 
