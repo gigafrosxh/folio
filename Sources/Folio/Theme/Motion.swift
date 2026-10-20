@@ -22,6 +22,15 @@ enum Motion {
             : .identity
     }
 
+    /// Popovers that grow out of the button that opened them (the AI chat comes from the ✨ button top right).
+    static var popup: Animation? { enabled ? .spring(response: 0.36, dampingFraction: 0.72) : nil }
+    static var popupTransition: AnyTransition {
+        enabled
+            ? .asymmetric(insertion: .scale(scale: 0.15, anchor: .topTrailing).combined(with: .opacity),
+                          removal: .scale(scale: 0.3, anchor: .topTrailing).combined(with: .opacity))
+            : .identity
+    }
+
     static var slideUp: AnyTransition {
         enabled ? .opacity.combined(with: .move(edge: .bottom)) : .identity
     }

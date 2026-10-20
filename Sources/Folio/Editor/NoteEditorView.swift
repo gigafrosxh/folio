@@ -82,16 +82,16 @@ struct NoteEditorView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showChat {
-                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { Motion.animate { showChat = false } })
+                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { withAnimation(Motion.popup) { showChat = false } })
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
                     .frame(width: 360)
                     .padding(.top, 62)
                     .padding([.trailing, .bottom], 12)
-                    .transition(Motion.enabled ? .move(edge: .trailing).combined(with: .opacity) : .identity)
+                    .transition(Motion.popupTransition)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
-            Motion.animate { showChat.toggle() }
+            withAnimation(Motion.popup) { showChat.toggle() }
         }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
