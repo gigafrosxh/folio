@@ -23,7 +23,7 @@ Drive, Dropbox o. Ä. synchronisiert, gibt die Dateien diesem Anbieter.
 
 | Wann | Wohin | Was übertragen wird |
 | --- | --- | --- |
-| Beim Start und bei „Nach Updates suchen“ | `api.github.com`, `github.com`, `raw.githubusercontent.com` | Eine normale Anfrage nach dem neuesten Release und dem Changelog. Keine Kennung, keine Notizinhalte. GitHub sieht wie bei jedem Webseitenaufruf deine IP-Adresse. |
+| Beim Start (abschaltbar: Einstellungen → „Bei jedem Start nach Updates suchen und fragen“) und bei „Nach Updates suchen“ | `api.github.com`, `github.com`, `raw.githubusercontent.com` | Eine normale Anfrage nach dem neuesten Release und dem Changelog. Keine Kennung, keine Notizinhalte. GitHub sieht wie bei jedem Webseitenaufruf deine IP-Adresse. |
 | Beim Installieren eines Updates | `github.com` (Release-Download) | Download des DMG. Folio installiert es nur, wenn Bundle-ID, Version und Signatur stimmen (siehe unten). |
 | Web-Block, Link-Vorschau, verlinkte PDFs | Die Adresse, die in der Notiz steht | Die Seite wird wie in Safari geladen, sobald die Notiz offen ist; die Seite sieht deine IP-Adresse und ihre Cookies. |
 | Datenbank-Block, SQL-Code-Block mit Verbindung | Der eingetragene Datenbankserver | Beim Öffnen der Notiz lädt Folio das Schema (Tabellen und Spalten), Abfragen nur auf Knopfdruck. |
