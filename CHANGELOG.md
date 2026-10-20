@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Notizen ohne Text (z. B. nur ein Bild oder ein Code-Block, auch neue leere Notizen) verloren beim Speichern ihren Titel und hießen danach „Ohne Titel“. Sie behalten ihn jetzt (#97).
+
 ## [0.20.2] – 2026-10-20
 
 ### Behoben

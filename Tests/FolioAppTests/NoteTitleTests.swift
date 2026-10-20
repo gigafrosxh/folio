@@ -12,6 +12,16 @@ final class NoteTitleTests: XCTestCase {
         return NoteDocument(file: NoteFile(meta: NoteMetadata(title: "Alt"), body: NoteBody(blocks: [b])), url: URL(fileURLWithPath: "/dev/null")).makeFile().meta.title
     }
 
+    func testNoteWithoutTextKeepsItsTitle() {
+        var image = BlockRecord(kind: .image)
+        image.attachmentID = UUID()
+        let doc = NoteDocument(file: NoteFile(meta: NoteMetadata(title: "1+1="), body: NoteBody(blocks: [BlockRecord(kind: .text), image])),
+                               url: URL(fileURLWithPath: "/dev/null"))
+        XCTAssertEqual(doc.makeFile().meta.title, "1+1=")
+        XCTAssertEqual(title(""), "Alt", "an empty note keeps its title too")
+        XCTAssertEqual(title("Neu"), "Neu", "text still sets the title")
+    }
+
     func testListMarkersAreNotPartOfTheTitle() {
         XCTAssertEqual(title("•\tJuli 14\n•\tAugust"), "Juli 14")
         XCTAssertEqual(title("1\tTM SMR 125 (2025) 43PS"), "TM SMR 125 (2025) 43PS")

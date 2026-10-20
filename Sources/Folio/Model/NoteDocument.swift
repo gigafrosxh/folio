@@ -203,7 +203,8 @@ final class NoteDocument: ObservableObject, Identifiable {
         let fullText = textBlocks.map(\.storage.string).joined(separator: "\n")
         // List markers, checkboxes and indentation are formatting, not part of the title or preview (#96).
         let lines = fullText.split(whereSeparator: \.isNewline).map { Self.plainLine(String($0)) }.filter { !$0.isEmpty }
-        meta.title = lines.first.map { String($0.prefix(120)) } ?? ""
+        // A note without any text (only an image, code …) keeps the title it has (#97).
+        if let first = lines.first { meta.title = String(first.prefix(120)) }
         meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
         meta.tags = TagParser.tags(in: fullText)
         meta.searchText = blocks.map(\.plainText).joined(separator: "\n")
