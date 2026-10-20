@@ -17,6 +17,16 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
 5. Systemänderungen (z. B. `brew install …`) nur nach ausdrücklicher Zustimmung des Nutzers.
 6. Nichts löschen, was der Nutzer nicht ausdrücklich freigibt; beschädigte Notizen werden nie gelöscht, nur nach
    `.folio/damaged` verschoben.
+7. **Jedes Issue hat eine Priorität** als Label `P0`–`P3` (P0 kritisch: Datenverlust, Absturz, Eingabe am falschen Ort;
+   P1 hoch; P2 mittel; P3 niedrig). Neue Issues werden beim Anlegen priorisiert.
+8. **Release-Ablauf pro Version** (ab 1.0, Vorgabe des Nutzers), z. B. für 1.1.0:
+   `1.1.0-rc.1` → testen → P0 fixen → `rc.2` → testen → P0 fixen (falls vorhanden) → `rc.3` → P1 fixen → `rc.4` →
+   P2 fixen → `rc.5` → P3 fixen → `rc.6` → Abschlusstests → `1.1.0` (stabil). Nach **jedem** RC wird getestet und neue
+   Issues werden priorisiert angelegt; neue P0-Issues haben sofort Vorrang. Jede Version durchläuft denselben Ablauf.
+9. **Übergabe bei knappem Kontingent:** Bevor Claudes Kontingent ausgeht, bekommt Codex im Terminal den Auftrag, genau
+   dort weiterzumachen (Version, offene Issues, letzter Commit). Geht Codex' Kontingent aus, schreibt Codex in den
+   Projekt-Thread, wo Claude weitermachen soll. Der Auftrag wird auch dann geschickt, wenn der andere gerade kein
+   Kontingent hat – er wird dann eingeplant.
 
 ## Aufbau
 
@@ -94,9 +104,24 @@ Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als
 - Ein Entwicklungs-Build aus `build/Folio.app` lief zeitweise beim Nutzer und hat dabei Versionen/Backups in der echten
   Bibliothek angelegt – das ist normales App-Verhalten, aber auf `/Applications/Folio.app` achten.
 
-### Nächste geplante Arbeit (offene Issues)
+### Roadmap des Nutzers (Stand 20.10.2026)
 
-Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` abgleichen.
+| Version | Schwerpunkt | Issues |
+| --- | --- | --- |
+| 1.0.0-rc.2 | Kritische Editor- und Navigationsfehler | #100, #101, #102, #107 (dazu schon fertig: #99, #103, #104) |
+| 1.0.0-rc.3 | Weitere UI- und Fokusprobleme | #105, #106, #108 (#105 liegt als `git stash` „rc3 #105 Regler“ bereit) |
+| 1.0.0 | Stabil: Regressionstests, Signieren prüfen | #63 |
+| 1.1.0 | Organisation und Notizverwaltung | #13, #14, #15, #19 |
+| 1.2.0 | Codeblöcke und Entwicklerfunktionen | #26, #28, #29, #31 |
+| 1.3.0 | Medien, PDFs und Anhänge | #43–#46, #49 |
+| 1.4.0 | KI-Erweiterungen und Ollama | #36, #37, #40, #42 |
+| 1.5.0 | macOS-Integration und Quick Access | #50, #70, #90–#92 |
+| 1.6.0 | Desktop-Widgets | #78–#84 |
+| 1.7.0 | Obsidian-Import und Projektqualität | #61, #66, #67, #71 |
+
+Jede Version folgt Regel 8 (rc.1 … rc.6, dann stabil).
+
+### Themen der offenen Issues
 
 - **Qualität:** #61 Absturzberichte.
 - **Distribution:** #63 signierte/notarisierte Releases, #66 Issue-/PR-Vorlagen, #67 CONTRIBUTING + Architektur,
@@ -105,7 +130,6 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
 - **Code:** #26, #28, #29, #31 (Abhängigkeiten, Export, automatische Blocktests, Diff).
 - **Medien:** #43–#46, #49, #50 (PDF-Suche/Annotationen, Bilder zuschneiden, Alt-Texte, Anhang-Metadaten, Web-Clipping).
 - **Organisation:** #13 manuelle Sortierung, #14 gespeicherte Suchen, #15 Favoriten, #19 Metadaten/Wortstatistik.
-- **Doppelte Issues:** #22 entspricht dem erledigten #20 (Schnellwechsel), #21 entspricht #19 – mit dem Nutzer klären und schließen.
 
 ### Arbeitsweise, die sich bewährt hat
 
