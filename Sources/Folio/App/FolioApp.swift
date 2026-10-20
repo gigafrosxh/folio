@@ -153,12 +153,15 @@ enum LayoutDebug {
                 default: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll() } }
                     return
                 }
-                if case .available = updates.state { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } } }
+                if case .installing = updates.state { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated { poll2() } } }
             }
             func poll2() {
                 switch updates.state {
                 case .failed(let m): print("UPDATE failed", m); fflush(stdout)
-                case .downloading, .installing, .available: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } }
+                case .installing(let p):
+                    print("UPDATE progress", Int(p.fraction * 100), p.step, p.detail); fflush(stdout)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated { poll2() } }
+                case .available: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } }
                 default: print("UPDATE state", updates.state); fflush(stdout)
                 }
             }

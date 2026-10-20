@@ -15,9 +15,15 @@ final class UpdateManager: ObservableObject {
         case checking
         case upToDate
         case available(ReleaseInfo)
-        case downloading(Double)
-        case installing
+        /// Download and installation: overall fraction 0…1, the current step and a detail line (MB).
+        case installing(UpdateProgress)
         case failed(String)
+    }
+
+    struct UpdateProgress: Equatable {
+        var fraction: Double
+        var step: String
+        var detail: String = ""
     }
 
     @Published private(set) var state: State = .idle
@@ -32,8 +38,7 @@ final class UpdateManager: ObservableObject {
     }
 
     func check(silently: Bool = false) {
-        if case .downloading = state { return }
-        if state == .installing { return }
+        if case .installing = state { return }
         state = .checking
         Task {
             do {
@@ -59,12 +64,20 @@ final class UpdateManager: ObservableObject {
             return
         }
         NoteStore.shared.currentDocument?.saveNow()
-        state = .downloading(0)
+        // One bar for the whole update: download 0–80 %, then check, install and restart.
+        state = .installing(UpdateProgress(fraction: 0, step: "Lade Folio \(release.version) herunter …"))
         Task {
             do {
-                let dmg = try await download(dmgURL)
-                state = .installing
-                let newApp = try await Task.detached { try Self.replace(app: app, withAppIn: dmg, expectedVersion: release.version) }.value
+                let dmg = try await download(dmgURL, version: release.version)
+                state = .installing(UpdateProgress(fraction: 0.82, step: "Prüfe die neue Version …"))
+                let report: @Sendable (Double, String) -> Void = { fraction, step in
+                    Task { @MainActor in UpdateManager.shared.state = .installing(UpdateProgress(fraction: fraction, step: step)) }
+                }
+                let newApp = try await Task.detached {
+                    try Self.replace(app: app, withAppIn: dmg, expectedVersion: release.version, report: report)
+                }.value
+                state = .installing(UpdateProgress(fraction: 1, step: "Starte Folio \(release.version) neu …"))
+                try? await Task.sleep(for: .milliseconds(600))
                 relaunch(newApp)
             } catch {
                 state = .failed(error.localizedDescription)
@@ -72,17 +85,24 @@ final class UpdateManager: ObservableObject {
         }
     }
 
-    private func download(_ url: URL) async throws -> URL {
-        let delegate = ProgressDelegate { [weak self] p in
-            Task { @MainActor in self?.state = .downloading(p) }
+    /// Downloads with a data task so progress (bytes received) is reported reliably.
+    private func download(_ url: URL, version: String) async throws -> URL {
+        let target = FileManager.default.temporaryDirectory.appendingPathComponent("Folio-Update-\(UUID().uuidString).dmg")
+        let delegate = DownloadDelegate(target: target) { received, total in
+            Task { @MainActor in
+                let fraction = total > 0 ? Double(received) / Double(total) : 0
+                let mb = { (b: Int64) in String(format: "%.1f MB", Double(b) / 1_048_576) }
+                UpdateManager.shared.state = .installing(UpdateProgress(
+                    fraction: fraction * 0.8, step: "Lade Folio \(version) herunter …",
+                    detail: total > 0 ? "\(mb(received)) von \(mb(total)) · \(Int(fraction * 100)) %" : mb(received)))
+            }
         }
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
-        let (tmp, response) = try await session.download(from: url)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw InstallError.step("Download fehlgeschlagen.") }
-        let target = FileManager.default.temporaryDirectory.appendingPathComponent("Folio-Update-\(UUID().uuidString).dmg")
-        try FileManager.default.moveItem(at: tmp, to: target)
-        return target
+        return try await withCheckedThrowingContinuation { cont in
+            delegate.continuation = cont
+            session.downloadTask(with: url).resume()
+        }
     }
 
     enum InstallError: Error, LocalizedError {
@@ -91,7 +111,8 @@ final class UpdateManager: ObservableObject {
     }
 
     /// Mounts the disk image, checks the new app, puts the old one in the Trash and moves the new one in.
-    nonisolated static func replace(app: URL, withAppIn dmg: URL, expectedVersion: String) throws -> URL {
+    nonisolated static func replace(app: URL, withAppIn dmg: URL, expectedVersion: String,
+                                    report: @Sendable (Double, String) -> Void = { _, _ in }) throws -> URL {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: dmg) }
         let mountPoint = fm.temporaryDirectory.appendingPathComponent("folio-update-mnt-\(UUID().uuidString.prefix(8))")
@@ -101,6 +122,7 @@ final class UpdateManager: ObservableObject {
             _ = try? run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-force"])
             try? fm.removeItem(at: mountPoint)
         }
+        report(0.86, "Prüfe die neue Version …")
         let mounted = mountPoint.appendingPathComponent("Folio.app")
         guard let info = NSDictionary(contentsOf: mounted.appendingPathComponent("Contents/Info.plist")),
               info["CFBundleIdentifier"] as? String == Bundle.main.bundleIdentifier ?? "de.daniel.folio" else {
@@ -110,9 +132,11 @@ final class UpdateManager: ObservableObject {
             throw InstallError.step("Unerwartete Version im Download (\(v) statt \(expectedVersion)).")
         }
         // Copy next to the old app first, so a failure never leaves the user without Folio.
+        report(0.9, "Kopiere die neue Version …")
         let staged = app.deletingLastPathComponent().appendingPathComponent(".Folio-update-\(UUID().uuidString.prefix(8)).app")
         try run("/usr/bin/ditto", [mounted.path, staged.path])
         _ = try? run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", staged.path])
+        report(0.96, "Ersetze die alte Version …")
         do {
             try fm.trashItem(at: app, resultingItemURL: nil)
         } catch {
@@ -152,15 +176,40 @@ final class UpdateManager: ObservableObject {
     }
 }
 
-private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let onProgress: @Sendable (Double) -> Void
-    init(onProgress: @escaping @Sendable (Double) -> Void) { self.onProgress = onProgress }
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    let target: URL
+    let onProgress: @Sendable (Int64, Int64) -> Void
+    var continuation: CheckedContinuation<URL, Error>?
+
+    init(target: URL, onProgress: @escaping @Sendable (Int64, Int64) -> Void) {
+        self.target = target
+        self.onProgress = onProgress
+    }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+        onProgress(totalBytesWritten, totalBytesExpectedToWrite)
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            continuation?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen (HTTP \(status))."))
+            continuation = nil
+            return
+        }
+        do {
+            try FileManager.default.moveItem(at: location, to: target)
+            continuation?.resume(returning: target)
+        } catch {
+            continuation?.resume(throwing: error)
+        }
+        continuation = nil
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let error else { return }
+        continuation?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen: \(error.localizedDescription)"))
+        continuation = nil
+    }
 }

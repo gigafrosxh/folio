@@ -45,10 +45,19 @@ struct UpdateView: View {
                     Text("Deine Notizen und Einstellungen bleiben erhalten; nur die App wird ersetzt. Die alte Version landet im Papierkorb.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-            case .downloading(let p):
-                ProgressView(value: p) { Text("Lade herunter … \(Int(p * 100)) %") }
-            case .installing:
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Installiere und starte neu …") }
+            case .installing(let p):
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: p.fraction)
+                        .animation(Motion.quick, value: p.fraction)
+                    HStack {
+                        Text(p.step).font(.callout)
+                        Spacer()
+                        Text("\(Int(p.fraction * 100)) %").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    if !p.detail.isEmpty {
+                        Text(p.detail).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }
             case .failed(let message):
                 Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -58,7 +67,7 @@ struct UpdateView: View {
 
     private var busy: Bool {
         switch updates.state {
-        case .checking, .downloading, .installing: return true
+        case .checking, .installing: return true
         default: return false
         }
     }
