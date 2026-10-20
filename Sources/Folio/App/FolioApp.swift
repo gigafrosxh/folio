@@ -90,7 +90,7 @@ struct FolioApp: App {
 
         // Menu bar icon (#85), optional in Settings › Schnellzugriff.
         MenuBarExtra("Folio", systemImage: "note.text", isInserted: Binding(
-            get: { theme.settings.menuBarIcon }, set: { theme.settings.menuBarIcon = $0 })) {
+            get: { theme.settings.menuBarIcon }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })) {
             MenuBarPanel()
                 .environmentObject(store)
                 .environmentObject(theme)

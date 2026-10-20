@@ -37,6 +37,16 @@ enum KeyboardSelfTest {
         await wait(0.4)
     }
 
+    /// Esc in whatever window is key (a sheet), like closing it with the keyboard.
+    private static func escapeInKeyWindow() async {
+        guard let w = NSApp.keyWindow,
+              let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: w.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                       isARepeat: false, keyCode: 53) else { return }
+        NSApp.postEvent(e, atStart: false)
+        await wait(0.5)
+    }
+
     /// The menu item a shortcut is bound to.
     private static func menuItem(_ key: String, _ mods: NSEvent.ModifierFlags) -> (NSMenu, Int)? {
         func find(_ m: NSMenu?) -> (NSMenu, Int)? {
@@ -98,6 +108,8 @@ enum KeyboardSelfTest {
         await press("\u{1b}", [])
         await press("y", [.command, .option])
         check(seen.names.contains(Notification.Name.folioShowHistory.rawValue), "⌥⌘Y öffnet den Versionsverlauf")
+        // Close the version history sheet again, otherwise the main window is not key for the next checks.
+        await escapeInKeyWindow()
 
         let sidebar = UserDefaults.standard.object(forKey: "folio.sidebarVisible") as? Bool ?? true
         await press("s", [.command, .option])

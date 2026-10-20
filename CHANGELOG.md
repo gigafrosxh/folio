@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Folio 0.20.0 hing direkt nach dem Start (100 % CPU, keine Reaktion): Das Menüleisten-Symbol löste eine endlose Neuberechnung der Oberfläche aus (#94).
+
 ## [0.20.0] – 2026-10-20
 
 ### Neu
