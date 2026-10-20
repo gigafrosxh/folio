@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.15.0] – 2026-10-20
+
 ### Neu
 - **Markdown-Import und -Export** (#4): Ablage › Markdown importieren (Dateien oder ganze Ordner) und Als Markdown exportieren (⌥⌘E), auch für ganze Ordner über das Kontextmenü. Überschriften, Listen, Checklisten, Fett/Kursiv/Durchgestrichen, Links und Code-Fences bleiben erhalten; Mermaid wird zum Diagramm, `$$` zur Formel. Anhänge landen beim Export in einem Ordner „… Dateien“ neben der .md-Datei, Bilder werden beim Import übernommen.
 - **Vorlagen** (#6): Seitenleiste › Vorlagen mit Startvorlagen für Meeting, Lernnotiz und Projekt. Vorlagen sind normale Notizen zum Bearbeiten; {{datum}}, {{uhrzeit}}, {{wochentag}} und {{kw}} werden beim Anlegen ersetzt. Neue Notiz aus Vorlage über das gedrückt gehaltene Neu-Symbol oder Ablage › Neu aus Vorlage; jede Notiz lässt sich als Vorlage sichern.
