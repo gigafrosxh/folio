@@ -13,6 +13,13 @@ struct SidebarView: View {
     @State private var folderName = ""
     @State private var showImport = false
     @State private var collapsed: Set<URL> = []
+    @State private var tagAction: TagActionRequest?
+
+    struct TagActionRequest: Identifiable {
+        var tag: String
+        var action: TagEditSheet.Action
+        var id: String { tag + "\(action)" }
+    }
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -34,6 +41,8 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         row(icon: "tray.full", title: "Alle Notizen", count: store.notes.count, item: .all)
                         row(icon: "pin", title: "Angepinnt", count: store.notes.filter(\.meta.pinned).count, item: .pinned)
+                        row(icon: "doc.on.doc", title: "Vorlagen", count: store.templates.count, item: .templates)
+                            .simultaneousGesture(TapGesture().onEnded { store.ensureStarterTemplates() })
                         row(icon: "trash", title: "Papierkorb", count: store.trashItems.count, item: .trash)
                         if !store.damagedNotes.isEmpty {
                             row(icon: "exclamationmark.triangle", title: "Beschädigt", count: store.damagedNotes.count, item: .damaged)
@@ -50,7 +59,9 @@ struct SidebarView: View {
                     if !store.tagCounts.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             sectionTitle("Tags")
-                            TagCloud(tags: store.tagCounts, selection: $store.sidebarSelection)
+                            TagCloud(tags: store.tagCounts, selection: $store.sidebarSelection) { tag, action in
+                                tagAction = TagActionRequest(tag: tag, action: action)
+                            }
                                 .padding(.horizontal, 4)
                         }
                     }
@@ -74,6 +85,7 @@ struct SidebarView: View {
                 Spacer()
                 Menu {
                     Button("Apple Notizen importieren…") { showImport = true }
+                    Button("Markdown importieren…") { MarkdownTransfer.importWithPanel() }
                     Button("Bibliothek im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([store.rootURL]) }
                     Button("Neu laden") { store.reload() }
                     Divider()
@@ -101,6 +113,9 @@ struct SidebarView: View {
             TextField("Name", text: $folderName)
             Button("Umbenennen") { if let url = renaming, !folderName.isEmpty { store.renameFolder(url, to: folderName) } }
             Button("Abbrechen", role: .cancel) {}
+        }
+        .sheet(item: $tagAction) { req in
+            TagEditSheet(tag: req.tag, action: req.action).environmentObject(store)
         }
         .sheet(isPresented: $showImport) {
             ImportView().environmentObject(store).environmentObject(theme)
@@ -212,6 +227,8 @@ struct SidebarView: View {
                     renaming = folder.url
                 }
                 Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
+                Button("Als Markdown exportieren …") { MarkdownTransfer.exportFolderWithPanel(folder.url) }
+                Toggle("Unterordner einbeziehen", isOn: $store.includeSubfolders)
                 Divider()
                 Button("In den Papierkorb legen", role: .destructive) { store.deleteFolder(folder.url) }
             }
@@ -222,6 +239,7 @@ struct SidebarView: View {
 struct TagCloud: View {
     var tags: [(tag: String, count: Int)]
     @Binding var selection: SidebarItem?
+    var onAction: (String, TagEditSheet.Action) -> Void = { _, _ in }
     @EnvironmentObject var theme: ThemeManager
 
     var body: some View {
@@ -241,6 +259,12 @@ struct TagCloud: View {
                     .background(selected ? theme.accent.opacity(0.32) : Color.primary.opacity(0.07), in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button("Umbenennen …") { onAction(item.tag, .rename) }
+                    Button("Zusammenführen mit …") { onAction(item.tag, .merge) }
+                    Divider()
+                    Button("Aus allen Notizen entfernen …", role: .destructive) { onAction(item.tag, .remove) }
+                }
             }
         }
     }

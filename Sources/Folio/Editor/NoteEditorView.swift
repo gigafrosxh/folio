@@ -58,6 +58,8 @@ struct NoteEditorView: View {
                         BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
                             .transition(Motion.blockTransition)
                     }
+                    BacklinksView(noteID: doc.id)
+                        .padding(.top, 8)
                     Color.clear
                         .frame(height: 220)
                         .contentShape(Rectangle())
@@ -464,6 +466,8 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Opens the quick-open panel; `object` is a `QuickOpenMode`.
+    static let folioQuickOpen = Notification.Name("folio.quickOpen")
     /// Opens the version history of the open note.
     static let folioShowHistory = Notification.Name("folio.showHistory")
     /// Shows or hides the Apple Intelligence chat panel.

@@ -7,6 +7,15 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Markdown-Import und -Export** (#4): Ablage › Markdown importieren (Dateien oder ganze Ordner) und Als Markdown exportieren (⌥⌘E), auch für ganze Ordner über das Kontextmenü. Überschriften, Listen, Checklisten, Fett/Kursiv/Durchgestrichen, Links und Code-Fences bleiben erhalten; Mermaid wird zum Diagramm, `$$` zur Formel. Anhänge landen beim Export in einem Ordner „… Dateien“ neben der .md-Datei, Bilder werden beim Import übernommen.
+- **Vorlagen** (#6): Seitenleiste › Vorlagen mit Startvorlagen für Meeting, Lernnotiz und Projekt. Vorlagen sind normale Notizen zum Bearbeiten; {{datum}}, {{uhrzeit}}, {{wochentag}} und {{kw}} werden beim Anlegen ersetzt. Neue Notiz aus Vorlage über das gedrückt gehaltene Neu-Symbol oder Ablage › Neu aus Vorlage; jede Notiz lässt sich als Vorlage sichern.
+- **Notizlinks und Rückverweise** (#7): „[[“ tippen oder ⌥⌘K öffnet die Notizsuche und fügt einen Link ein. Links nutzen die feste Notiz-ID und funktionieren auch nach dem Umbenennen. Am Ende jeder Notiz stehen die Notizen, die auf sie verweisen. „Notizlink kopieren“ liefert folio://-Links, die auch aus anderen Apps öffnen.
+- **Suche mit Filtern** (#8): Filter-Symbol in der Notizliste für Tags, Ordner, Zeitraum und Inhalt (Code, Bilder, PDFs, Audio, Formeln …), als Chips sichtbar und einzeln entfernbar. Auch tippbar: `tag:`, `ordner:`, `typ:`, `seit:`. Die Suche durchsucht standardmäßig die ganze Bibliothek; die einfache Suche funktioniert wie bisher.
+- **Unterordner einbeziehen** (#17): Ein Ordner kann auf Wunsch auch die Notizen aller Unterordner zeigen (Ordner-Kontextmenü oder Filter).
+- **Tags verwalten** (#18): Rechtsklick auf einen Tag: Umbenennen, Zusammenführen oder aus allen Notizen entfernen, mit Fortschritt und Liste der Fehler. Vor jeder Änderung wird eine Version gesichert.
+- **Schnell öffnen** (#20): ⌘P öffnet eine Liste mit den zuletzt geöffneten Notizen zuerst und unscharfer Suche über alle Titel; ↑/↓ und ↩ reichen. Außerdem Ablage › Zuletzt geöffnet.
+
 ## [0.14.0] – 2026-10-20
 
 ### Neu

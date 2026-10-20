@@ -555,6 +555,24 @@ struct RichTextView: NSViewRepresentable {
             highlightTags(in: tv)
             parent.onChange()
             tv.schedulePrediction()
+            // "[[" starts a link to another note: the two brackets go away and the note picker opens.
+            let sel = tv.selectedRange()
+            if sel.length == 0, sel.location >= 2, (tv.string as NSString).substring(with: NSRange(location: sel.location - 2, length: 2)) == "[[" {
+                let r = NSRange(location: sel.location - 2, length: 2)
+                if tv.shouldChangeText(in: r, replacementString: "") {
+                    tv.textStorage?.replaceCharacters(in: r, with: "")
+                    tv.didChangeText()
+                }
+                NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.link)
+            }
+        }
+
+        /// Links to other notes (folio://note/…) open inside Folio; others go to the browser.
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            let url = (link as? URL) ?? (link as? String).flatMap(URL.init(string:))
+            guard let url, let id = NoteLink.id(from: url) else { return false }
+            NoteStore.shared.open(noteID: id)
+            return true
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

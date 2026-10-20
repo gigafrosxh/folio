@@ -29,6 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// folio://note/<id> links from other apps (or a copied note link) open the note.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated {
+            for url in urls { if let id = NoteLink.id(from: url) { NoteStore.shared.open(noteID: id) } }
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     /// ⌘V when no text field has focus (e.g. right after picking a note in the list): the end of the
@@ -92,6 +99,32 @@ struct FolioCommands: Commands {
         CommandGroup(after: .saveItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
                 .keyboardShortcut("s")
+            Button("Schnell öffnen …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open) }
+                .keyboardShortcut("p")
+            Menu("Zuletzt geöffnet") {
+                let store = NoteStore.shared
+                ForEach(store.recent.ids.prefix(15).compactMap { id in store.notes.first { $0.id == id } }, id: \.id) { ref in
+                    Button(ref.meta.title.isEmpty ? "Ohne Titel" : ref.meta.title) { store.open(noteID: ref.id) }
+                }
+            }
+            Menu("Neu aus Vorlage") {
+                let store = NoteStore.shared
+                ForEach(store.templates, id: \.id) { t in
+                    Button(t.meta.title) { store.createNote(from: t) }
+                }
+                Divider()
+                Button("Vorlagen verwalten …") { store.ensureStarterTemplates(); store.sidebarSelection = .templates }
+            }
+            Button("Als Vorlage sichern") {
+                if let doc = NoteStore.shared.currentDocument { NoteStore.shared.saveAsTemplate(doc) }
+            }
+            Divider()
+            Button("Markdown importieren …") { MarkdownTransfer.importWithPanel() }
+            Button("Als Markdown exportieren …") {
+                if let doc = NoteStore.shared.currentDocument { MarkdownTransfer.exportWithPanel(doc) }
+            }
+            .keyboardShortcut("e", modifiers: [.command, .option])
+            Divider()
             Button("Versionsverlauf …") { NotificationCenter.default.post(name: .folioShowHistory, object: nil) }
                 .keyboardShortcut("y", modifiers: [.command, .shift])
             Button("Als PDF exportieren …") { NotificationCenter.default.post(name: .folioInsert, object: "exportpdf") }
@@ -118,6 +151,8 @@ struct FolioCommands: Commands {
             Button("Ausrücken") { f.indent(-1) }.keyboardShortcut("[")
             Divider()
             Button("Link…") { NotificationCenter.default.post(name: .folioInsert, object: "link") }.keyboardShortcut("k")
+            Button("Link zu Notiz …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.link) }
+                .keyboardShortcut("k", modifiers: [.command, .option])
             Button("Writing Tools …") { f.showWritingTools() }.keyboardShortcut("w", modifiers: [.command, .shift])
             Button("Chat mit Apple Intelligence") { NotificationCenter.default.post(name: .folioToggleChat, object: nil) }
                 .keyboardShortcut("i", modifiers: [.command, .option])
@@ -280,6 +315,14 @@ enum LayoutDebug {
         // FOLIO_SAFETY_TEST=1 (with a throwaway FOLIO_LIBRARY): versions, trash, conflicts and backups end to end.
         if env["FOLIO_SAFETY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await SafetySelfTest.run() }
+        }
+        if env["FOLIO_ORG_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await OrganizationSelfTest.run() }
+        }
+        if env["FOLIO_QUICKOPEN"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open)
+            }
         }
         // FOLIO_PERFORM=<tool> (e.g. diagram): runs a toolbar/shortcut action once the note is open.
         if let tool = env["FOLIO_PERFORM"], let action = ShortcutAction(rawValue: tool) {

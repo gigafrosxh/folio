@@ -166,6 +166,15 @@ final class NoteDocument: ObservableObject, Identifiable {
         meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
         meta.tags = TagParser.tags(in: fullText)
         meta.searchText = blocks.map(\.plainText).joined(separator: "\n")
+        meta.kinds = Array(Set(blocks.filter { $0.kind != .text || $0.storage.length > 0 }.map(\.kind.rawValue))).sorted()
+        var links: [UUID] = []
+        for b in textBlocks {
+            b.storage.enumerateAttribute(.link, in: NSRange(location: 0, length: b.storage.length)) { value, _, _ in
+                let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+                if let id = url.flatMap(NoteLink.id(from:)), id != meta.id, !links.contains(id) { links.append(id) }
+            }
+        }
+        meta.links = links
         meta.modified = Date()
 
         let used = Set(blocks.compactMap(\.attachmentID))

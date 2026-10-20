@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import FolioCore
 
 /// Note list as rounded cards grouped by date, with a header that carries the "new note" button.
 struct NoteListView: View {
@@ -8,6 +9,7 @@ struct NoteListView: View {
     @EnvironmentObject var theme: ThemeManager
     @EnvironmentObject var windowState: WindowState
     @FocusState private var focused: Bool
+    @State private var showFilters = false
 
     var body: some View {
         let notes = store.filteredNotes
@@ -67,6 +69,7 @@ struct NoteListView: View {
         VStack(alignment: .leading, spacing: 12) {
             if !sidebarVisible { WindowControls(window: windowState.window) }
             headerRow(count: count)
+            FilterChips()
         }
         .padding(.horizontal, 14)
         .padding(.top, 16)
@@ -86,8 +89,33 @@ struct NoteListView: View {
             if sidebarVisible {
                 iconButton("sidebar.left", help: "Seitenleiste ausblenden") { sidebarVisible = false }
             }
-            iconButton("square.and.pencil", help: "Neue Notiz (⌘N)", prominent: true) {
-                store.createNote(initialTag: currentTag)
+            iconButton(store.searchFilter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+                       help: "Suchfilter: Tag, Ordner, Zeitraum, Inhalt") { showFilters.toggle() }
+                .popover(isPresented: $showFilters, arrowEdge: .bottom) { SearchFilterPopover().environmentObject(store) }
+            if store.sidebarSelection == .templates {
+                iconButton("plus", help: "Neue Vorlage", prominent: true) { store.createTemplate() }
+            } else {
+                Menu {
+                    Button("Leere Notiz") { store.createNote(initialTag: currentTag) }
+                    Section("Aus Vorlage") {
+                        ForEach(store.templates, id: \.id) { t in Button(t.meta.title) { store.createNote(from: t) } }
+                        Button("Vorlagen verwalten …") { store.ensureStarterTemplates(); store.sidebarSelection = .templates }
+                    }
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 34, height: 34)
+                        .background(theme.accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .foregroundStyle(theme.accent)
+                } primaryAction: {
+                    store.createNote(initialTag: currentTag)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Neue Notiz (⌘N) – gedrückt halten: aus Vorlage")
+                .onAppear { store.ensureStarterTemplates() }
             }
         }
     }
@@ -152,18 +180,29 @@ struct NoteListView: View {
         case .tag(let t): return "#\(t)"
         case .trash: return "Papierkorb"
         case .damaged: return "Beschädigte Notizen"
+        case .templates: return "Vorlagen"
         }
     }
 
     private func subtitle(_ count: Int) -> String {
+        if store.sidebarSelection == .templates { return "\(count) Vorlage\(count == 1 ? "" : "n") · {{datum}} wird beim Anlegen ersetzt" }
         var s = "\(count) Notiz\(count == 1 ? "" : "en")"
-        if !store.searchText.isEmpty { s += " · Suche „\(store.searchText)“" }
+        if store.isSearching {
+            s += store.searchText.isEmpty ? " · gefiltert" : " · Suche „\(store.searchText)“"
+            if store.searchEverywhere, store.sidebarSelection != .all { s += " in allen Notizen" }
+        } else if case .folder = store.sidebarSelection, store.includeSubfolders {
+            s += " · mit Unterordnern"
+        }
         return s
     }
 
     @ViewBuilder
     private func menu(for note: NoteRef) -> some View {
         Button(note.meta.pinned ? "Loslösen" : "Anpinnen") { store.togglePin(note.id) }
+        Button("Notizlink kopieren") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(NoteLink.url(for: note.id).absoluteString, forType: .string)
+        }
         Menu("Bewegen nach") {
             ForEach(store.allFolderURLs, id: \.self) { url in
                 Button(store.relativeFolderName(url)) { store.move(note.id, to: url) }

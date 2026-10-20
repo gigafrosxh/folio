@@ -11,6 +11,11 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
     public var pinned: Bool
     /// Full plain text, used for search without decoding the body.
     public var searchText: String
+    /// Notes this note links to (`folio://note/<id>`), for backlinks without opening every note.
+    public var links: [UUID] = []
+    /// Kinds of blocks in the note (e.g. "code", "image"), for search filters; nil in notes saved
+    /// before Folio 0.15 (then the body is read once when a filter needs it).
+    public var kinds: [String]?
 
     public init(id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
                 created: Date = Date(), modified: Date = Date(), pinned: Bool = false, searchText: String = "") {
@@ -34,6 +39,8 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
         modified = try c.decodeIfPresent(Date.self, forKey: .modified) ?? created
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
         searchText = try c.decodeIfPresent(String.self, forKey: .searchText) ?? ""
+        links = try c.decodeIfPresent([UUID].self, forKey: .links) ?? []
+        kinds = try c.decodeIfPresent([String].self, forKey: .kinds)
     }
 }
 

@@ -9,6 +9,7 @@ struct ContentView: View {
     @AppStorage("folio.listWidth") private var listWidth: Double = 300
     @StateObject private var windowState = WindowState()
     @State private var showUpdates = false
+    @State private var quickOpen: QuickOpenMode?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -50,6 +51,20 @@ struct ContentView: View {
         .onReceive(UpdateManager.shared.$state) { state in
             // A background check that finds a new version brings up the update sheet.
             if case .available = state, !showUpdates, ThemeManager.shared.settings.askForUpdatesOnLaunch { showUpdates = true }
+        }
+        .overlay(alignment: .top) {
+            if let mode = quickOpen {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.18).ignoresSafeArea().onTapGesture { quickOpen = nil }
+                    QuickOpenView(mode: mode) { quickOpen = nil }
+                        .padding(.top, 90)
+                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+                }
+            }
+        }
+        .animation(Motion.quick, value: quickOpen)
+        .onReceive(NotificationCenter.default.publisher(for: .folioQuickOpen)) { note in
+            quickOpen = (note.object as? QuickOpenMode) ?? .open
         }
         .sheet(isPresented: $showUpdates) { UpdateSheet() }
         .sheet(item: $store.conflict) { conflict in

@@ -25,6 +25,8 @@ enum SidebarItem: Hashable {
     case trash
     /// Note files that could not be read.
     case damaged
+    /// Note templates (kept in the library's hidden `.folio/templates`).
+    case templates
 }
 
 /// A note file that cannot be opened, with what the diagnosis found and could rescue.
@@ -67,6 +69,27 @@ final class NoteStore: ObservableObject {
     }
     @Published private(set) var currentDocument: NoteDocument?
     @Published var searchText = ""
+    /// Filters chosen in the search filter menu (combined with typed `tag:` … filters).
+    @Published var searchFilter = SearchFilter()
+    /// Searching looks through the whole library, not only the selected folder or tag.
+    @Published var searchEverywhere = UserDefaults.standard.object(forKey: "folio.searchEverywhere") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(searchEverywhere, forKey: "folio.searchEverywhere") }
+    }
+    /// A selected folder also shows the notes of its subfolders.
+    @Published var includeSubfolders = UserDefaults.standard.bool(forKey: "folio.includeSubfolders") {
+        didSet { UserDefaults.standard.set(includeSubfolders, forKey: "folio.includeSubfolders") }
+    }
+    /// Recently opened notes, newest first.
+    @Published private(set) var recent: RecentList = {
+        if let d = UserDefaults.standard.data(forKey: "folio.recent"), let r = try? JSONDecoder().decode(RecentList.self, from: d) { return r }
+        return RecentList()
+    }() {
+        didSet { if let d = try? JSONEncoder().encode(recent) { UserDefaults.standard.set(d, forKey: "folio.recent") } }
+    }
+    /// Note templates.
+    @Published private(set) var templates: [NoteRef] = []
+    /// Block kinds of notes saved before 0.15 (read once, when a type filter needs them).
+    private var kindsCache: [URL: [String]] = [:]
     @Published var lastError: String?
     /// Items in Folio's trash.
     @Published private(set) var trashItems: [TrashItem] = []
@@ -142,29 +165,53 @@ final class NoteStore: ObservableObject {
         notes = found
         damagedNotes = damaged
         trashItems = trash.items()
+        templates = Self.scanTemplates(LibraryData.folder(rootURL, "templates"))
         if sidebarSelection == .damaged, damaged.isEmpty { sidebarSelection = .all }
         if let id = selectedNoteID, !notes.contains(where: { $0.id == id }) { selectedNoteID = nil }
     }
 
     // MARK: Queries
 
+    /// The search as typed plus the filter menu.
+    var activeSearch: SearchFilter { SearchFilter.parse(searchText).merged(with: searchFilter) }
+    var isSearching: Bool { !activeSearch.isEmpty }
+
     var filteredNotes: [NoteRef] {
+        if sidebarSelection == .templates { return templates.sorted { $0.meta.title.localizedStandardCompare($1.meta.title) == .orderedAscending } }
         var list = notes
-        switch sidebarSelection ?? .all {
-        case .all: break
-        case .pinned: list = list.filter(\.meta.pinned)
-        case .folder(let url): list = list.filter { $0.folderURL.standardizedFileURL == url.standardizedFileURL }
-        case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
-        case .trash, .damaged: list = []
+        let search = activeSearch
+        if !(search.isEmpty == false && searchEverywhere) {
+            switch sidebarSelection ?? .all {
+            case .all: break
+            case .pinned: list = list.filter(\.meta.pinned)
+            case .folder(let url): list = list.filter { isInFolder($0.folderURL, url) }
+            case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
+            case .trash, .damaged, .templates: list = []
+            }
         }
-        let q = searchText.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty {
-            list = list.filter { $0.meta.title.localizedCaseInsensitiveContains(q) || $0.meta.searchText.localizedCaseInsensitiveContains(q) }
+        if !search.isEmpty {
+            list = list.filter { ref in
+                search.matches(ref.meta, folderPath: relativeFolderName(ref.folderURL),
+                               kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref))
+            }
         }
         return list.sorted { a, b in
             if a.meta.pinned != b.meta.pinned { return a.meta.pinned }
             return a.meta.modified > b.meta.modified
         }
+    }
+
+    /// Whether `noteFolder` is `folder` itself or (with "include subfolders") below it.
+    func isInFolder(_ noteFolder: URL, _ folder: URL) -> Bool {
+        let a = noteFolder.standardizedFileURL.path, b = folder.standardizedFileURL.path
+        return a == b || (includeSubfolders && a.hasPrefix(b + "/"))
+    }
+
+    private func kinds(of ref: NoteRef) -> [String] {
+        if let k = kindsCache[ref.url] { return k }
+        let k = (try? NoteFile.read(from: ref.url)).map { Array(Set($0.body.blocks.map(\.kind.rawValue))) } ?? []
+        kindsCache[ref.url] = k
+        return k
     }
 
     var tagCounts: [(tag: String, count: Int)] {
@@ -174,7 +221,7 @@ final class NoteStore: ObservableObject {
     }
 
     func noteCount(in folder: URL) -> Int {
-        notes.filter { $0.folderURL.standardizedFileURL == folder.standardizedFileURL }.count
+        notes.filter { isInFolder($0.folderURL, folder) }.count
     }
 
     func relativeFolderName(_ url: URL) -> String {
@@ -253,11 +300,12 @@ final class NoteStore: ObservableObject {
             if doc.id != selectedNoteID { KernelManager.shared.shutdown(note: doc.id) }
         }
         openFailure = nil
-        guard let id = selectedNoteID, let ref = notes.first(where: { $0.id == id }) else {
+        guard let id = selectedNoteID, let ref = notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id }) else {
             currentDocument = nil
             return
         }
         open(ref.url)
+        if notes.contains(where: { $0.id == id }) { recent.opened(id) }
     }
 
     /// Loads a note into the editor. A file that cannot be decoded is diagnosed instead of opened.
@@ -308,11 +356,189 @@ final class NoteStore: ObservableObject {
         doc.diskFingerprint = FileFingerprint(data: data)
         recordVersion(data, noteID: doc.id)
         renameIfNeeded(doc)
-        if let i = notes.firstIndex(where: { $0.id == doc.id }) {
+        if isTemplate(doc.url) {
+            if let i = templates.firstIndex(where: { $0.id == doc.id }) { templates[i] = NoteRef(meta: file.meta, url: doc.url) }
+        } else if let i = notes.firstIndex(where: { $0.id == doc.id }) {
             notes[i] = NoteRef(meta: file.meta, url: doc.url)
         } else {
             notes.append(NoteRef(meta: file.meta, url: doc.url))
         }
+    }
+
+    /// Opens a note by id (note links, backlinks, quick open), leaving filters that would hide it.
+    func open(noteID: UUID) {
+        guard notes.contains(where: { $0.id == noteID }) else {
+            lastError = "Die verlinkte Notiz gibt es nicht mehr (vielleicht im Papierkorb)."
+            return
+        }
+        if !filteredNotes.contains(where: { $0.id == noteID }) {
+            searchText = ""
+            searchFilter = SearchFilter()
+            sidebarSelection = .all
+        }
+        selectedNoteID = noteID
+    }
+
+    // MARK: Tags
+
+    struct TagEditProgress: Equatable {
+        var done = 0
+        var total = 0
+        var changed = 0
+        var failures: [String] = []
+        var finished = false
+    }
+
+    @Published var tagEdit: TagEditProgress?
+
+    /// Renames (or merges, when `newTag` already exists) or removes (`newTag` nil) a tag in every note
+    /// that has it. Each changed note gets a version first; failures are listed, the rest continues.
+    func editTag(_ tag: String, to newTag: String?) async {
+        currentDocument?.saveNow()
+        let affected = notes.filter { ref in ref.meta.tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
+        tagEdit = TagEditProgress(total: affected.count)
+        let openID = currentDocument?.id
+        if openID != nil, affected.contains(where: { $0.id == openID }) { currentDocument = nil }
+        for ref in affected {
+            do {
+                let data = try Data(contentsOf: ref.url)
+                var file = try NoteFile.decode(data)
+                var changed = false
+                for i in file.body.blocks.indices where file.body.blocks[i].kind == .text {
+                    guard let rtf = file.body.blocks[i].rtf else { continue }
+                    let s = RichTextCodec.attributedString(from: rtf)
+                    let edits = TagEdit.edits(in: s.string, tag: tag, to: newTag)
+                    guard !edits.isEmpty else { continue }
+                    for e in edits.reversed() { s.replaceCharacters(in: e.range, with: e.replacement) }
+                    file.body.blocks[i].rtf = RichTextCodec.rtfData(from: s)
+                    changed = true
+                }
+                if changed {
+                    try? history.record(data, noteID: file.meta.id, force: true)
+                    let doc = NoteDocument(file: file, url: ref.url)
+                    let updated = doc.makeFile()
+                    try updated.write(to: ref.url)
+                    if let i = notes.firstIndex(where: { $0.id == ref.id }) { notes[i].meta = updated.meta }
+                    tagEdit?.changed += 1
+                }
+            } catch {
+                tagEdit?.failures.append("\(ref.meta.title.isEmpty ? ref.url.lastPathComponent : ref.meta.title): \(error.localizedDescription)")
+            }
+            tagEdit?.done += 1
+            await Task.yield()
+        }
+        tagEdit?.finished = true
+        if case .tag(let t) = sidebarSelection, t == tag { sidebarSelection = newTag.map { .tag($0) } ?? .all }
+        if let openID {
+            selectedNoteID = nil
+            selectedNoteID = openID
+        }
+    }
+
+    // MARK: Templates
+
+    var templatesFolder: URL { LibraryData.folder(rootURL, "templates") }
+
+    func isTemplate(_ url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix(templatesFolder.standardizedFileURL.path + "/")
+    }
+
+    static func scanTemplates(_ dir: URL) -> [NoteRef] {
+        let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return items.filter { $0.pathExtension == FolioArchive.fileExtension }
+            .compactMap { url in (try? NoteFile.readMetadata(at: url)).map { NoteRef(meta: $0, url: url) } }
+    }
+
+    /// Creates the starter templates (Meeting, Lernnotiz, Projekt) the first time templates are used.
+    func ensureStarterTemplates() {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: templatesFolder.path) else { return }
+        try? fm.createDirectory(at: templatesFolder, withIntermediateDirectories: true)
+        for t in StarterTemplates.all { _ = writeTemplate(t) }
+        templates = Self.scanTemplates(templatesFolder)
+    }
+
+    private func writeTemplate(_ file: NoteFile) -> URL? {
+        try? FileManager.default.createDirectory(at: templatesFolder, withIntermediateDirectories: true)
+        let url = uniqueURL(in: templatesFolder, base: Self.sanitize(file.meta.title))
+        do { try file.write(to: url) } catch {
+            lastError = "Die Vorlage konnte nicht gesichert werden: \(error.localizedDescription)"
+            return nil
+        }
+        return url
+    }
+
+    /// A new note from a template: placeholders like {{datum}} filled in, new id, in the target folder.
+    @discardableResult
+    func createNote(from template: NoteRef, in folder: URL? = nil) -> NoteRef? {
+        guard var file = try? NoteFile.read(from: template.url) else {
+            lastError = "Die Vorlage „\(template.meta.title)“ ist nicht lesbar."
+            return nil
+        }
+        let values = TemplateText.values()
+        for i in file.body.blocks.indices {
+            let b = file.body.blocks[i]
+            if b.kind == .text, let rtf = b.rtf {
+                let s = RichTextCodec.attributedString(from: rtf)
+                for (key, value) in values {
+                    s.mutableString.replaceOccurrences(of: "{{\(key)}}", with: value, options: .caseInsensitive,
+                                                       range: NSRange(location: 0, length: s.length))
+                }
+                file.body.blocks[i].rtf = RichTextCodec.rtfData(from: s)
+            } else if let code = b.code {
+                file.body.blocks[i].code = TemplateText.fill(code)
+            }
+            file.body.blocks[i].id = UUID()
+        }
+        file.meta.id = UUID()
+        file.meta.title = TemplateText.fill(file.meta.title)
+        file.meta.created = Date()
+        file.meta.modified = Date()
+        file.meta.pinned = false
+        let dir = folder ?? (sidebarSelection == .templates ? rootURL.appendingPathComponent(Self.defaultFolderName) : targetFolder)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = uniqueURL(in: dir, base: Self.sanitize(file.meta.title.isEmpty ? "Neue Notiz" : file.meta.title))
+        do { try file.write(to: url) } catch {
+            lastError = "Notiz konnte nicht angelegt werden: \(error.localizedDescription)"
+            return nil
+        }
+        let ref = NoteRef(meta: file.meta, url: url)
+        notes.append(ref)
+        if sidebarSelection == .templates || sidebarSelection == .trash || sidebarSelection == .damaged || sidebarSelection == .pinned {
+            sidebarSelection = .all
+        }
+        selectedNoteID = ref.id
+        return ref
+    }
+
+    /// Saves a copy of a note as a new template.
+    func saveAsTemplate(_ doc: NoteDocument) {
+        doc.saveNow()
+        var file = doc.makeFilePreview()
+        file.meta.id = UUID()
+        file.meta.pinned = false
+        if file.meta.title.isEmpty { file.meta.title = "Vorlage" }
+        guard writeTemplate(file) != nil else { return }
+        templates = Self.scanTemplates(templatesFolder)
+        sidebarSelection = .templates
+        selectedNoteID = file.meta.id
+    }
+
+    /// An empty template, opened for editing.
+    func createTemplate() {
+        var b = BlockRecord(kind: .text)
+        b.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: "Neue Vorlage\n{{datum}}\n", attributes: ThemeManager.shared.bodyAttributes))
+        let file = NoteFile(meta: NoteMetadata(title: "Neue Vorlage"), body: NoteBody(blocks: [b]))
+        guard writeTemplate(file) != nil else { return }
+        templates = Self.scanTemplates(templatesFolder)
+        sidebarSelection = .templates
+        selectedNoteID = file.meta.id
+    }
+
+    func deleteTemplate(_ ref: NoteRef) {
+        if currentDocument?.id == ref.id { currentDocument = nil; selectedNoteID = nil }
+        try? FileManager.default.trashItem(at: ref.url, resultingItemURL: nil)
+        templates = Self.scanTemplates(templatesFolder)
     }
 
     /// Keeps file names readable: the file is named after the note's title.
@@ -343,6 +569,7 @@ final class NoteStore: ObservableObject {
 
     /// Moves a note into Folio's trash (restorable; its versions are kept).
     func delete(_ id: UUID) {
+        if let t = templates.first(where: { $0.id == id }) { deleteTemplate(t); return }
         guard let ref = notes.first(where: { $0.id == id }) else { return }
         if let doc = currentDocument, doc.id == id {
             doc.saveNow()
