@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.8.1] – 2026-10-20
+
 ### Geändert
 - Der KI-Chat öffnet sich mit einer Popup-Animation: Das Panel federt aus dem ✨-Knopf oben rechts heraus und schrumpft beim Schließen dorthin zurück.
 
