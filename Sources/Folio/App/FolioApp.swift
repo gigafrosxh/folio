@@ -396,7 +396,7 @@ enum LayoutDebug {
                 try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
                 print("LAYOUT snapshot", out)
                 // Child panels (e.g. the completion list) are separate windows: snapshot them too.
-                for (i, w) in NSApp.windows.enumerated() where w.isVisible && w is NSPanel {
+                for (i, w) in NSApp.windows.enumerated() where w.isVisible && (w is NSPanel || w.isSheet) {
                     guard let v = w.contentView, let r = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { continue }
                     v.cacheDisplay(in: v.bounds, to: r)
                     let path = out.replacingOccurrences(of: ".png", with: "-panel\(i).png")

@@ -28,6 +28,8 @@ final class UpdateManager: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lastChecked: Date?
+    /// Changes of all versions newer than the installed one (Markdown), shown in the update window.
+    @Published private(set) var changelog: String?
 
     var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0" }
 
@@ -44,7 +46,12 @@ final class UpdateManager: ObservableObject {
             do {
                 let release = try await UpdateChecker.latestRelease()
                 lastChecked = Date()
-                state = UpdateChecker.isNewer(release.version, than: currentVersion) ? .available(release) : .upToDate
+                if UpdateChecker.isNewer(release.version, than: currentVersion) {
+                    changelog = await UpdateChecker.changelog(since: currentVersion)
+                    state = .available(release)
+                } else {
+                    state = .upToDate
+                }
             } catch {
                 state = silently ? .idle : .failed(error.localizedDescription)
             }

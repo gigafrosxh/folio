@@ -25,6 +25,34 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertNotNil(r.published)
     }
 
+    func testChangelogSections() {
+        let md = """
+        # Changelog
+
+        ## [Unreleased]
+
+        ## [0.12.3] – 2026-10-20
+
+        ### Behoben
+        - Update hing
+
+        ## [0.12.2] – 2026-10-20
+
+        ### Geändert
+        - **Fortschritt** mit `MB`
+
+        ## [0.12.1] – 2026-10-20
+        - alt
+        """
+        let out = UpdateChecker.changelogSections(md, newerThan: "0.12.1")!
+        XCTAssertTrue(out.hasPrefix("## Folio 0.12.3 · 2026-10-20"))
+        XCTAssertTrue(out.contains("### Behoben\n- Update hing"))
+        XCTAssertTrue(out.contains("## Folio 0.12.2"))
+        XCTAssertFalse(out.contains("0.12.1"))
+        XCTAssertFalse(out.contains("Unreleased"))
+        XCTAssertNil(UpdateChecker.changelogSections(md, newerThan: "0.12.3"))
+    }
+
     func testLiveLatestRelease() async throws {
         let r: ReleaseInfo
         do { r = try await UpdateChecker.latestRelease() } catch { throw XCTSkip("GitHub nicht erreichbar: \(error)") }

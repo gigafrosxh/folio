@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert
+- Das Update-Fenster zeigt den Changelog aller neueren Versionen als formatiertes Markdown (Überschriften, Listen, Fett, Code).
+
+### Behoben
+- Update-Prüfung funktioniert auch, wenn das GitHub-API-Limit erreicht ist (Ausweichen auf die Release-Seite).
+
 ## [0.12.3] – 2026-10-20
 
 ### Behoben

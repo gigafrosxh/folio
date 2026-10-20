@@ -59,7 +59,7 @@ public enum UpdateChecker {
             ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
         let formatter = ISO8601DateFormatter()
         return ReleaseInfo(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag,
-                           notes: json["body"] as? String ?? "",
+                           notes: stripFooter(json["body"] as? String ?? ""),
                            pageURL: page,
                            dmgURL: (dmg?["browser_download_url"] as? String).flatMap(URL.init(string:)),
                            published: (json["published_at"] as? String).flatMap(formatter.date(from:)))
@@ -73,8 +73,65 @@ public enum UpdateChecker {
         do { (data, response) = try await session.data(for: request) } catch { throw UpdateError.network(error.localizedDescription) }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 404 { throw UpdateError.noRelease }
+        // The anonymous API allows 60 requests per hour; when that is used up, read the release page instead.
+        if status == 403 || status == 429 { return try await latestFromReleasePage(session: session) }
         guard status == 200 else { throw UpdateError.network("HTTP \(status)") }
         return try parse(data)
+    }
+
+    /// Without the API: github.com/…/releases/latest redirects to …/tag/vX.Y.Z, and the assets follow a fixed name.
+    static func latestFromReleasePage(session: URLSession) async throws -> ReleaseInfo {
+        let url = URL(string: "https://github.com/\(repository)/releases/latest")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "HEAD"
+        let response: URLResponse
+        do { (_, response) = try await session.data(for: request) } catch { throw UpdateError.network(error.localizedDescription) }
+        guard let final = response.url, final.path.contains("/tag/") else { throw UpdateError.noRelease }
+        let tag = final.lastPathComponent
+        let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        guard SemVer(version) != nil else { throw UpdateError.badResponse }
+        return ReleaseInfo(version: version, notes: "", pageURL: final,
+                           dmgURL: URL(string: "https://github.com/\(repository)/releases/download/\(tag)/Folio-\(version)-arm64.dmg"),
+                           published: nil)
+    }
+
+    /// The changes of every version newer than `current`, newest first, taken from CHANGELOG.md on GitHub
+    /// (one "## [X.Y.Z] – date" section per version, Markdown kept as written).
+    public static func changelog(since current: String, session: URLSession = .shared) async -> String? {
+        let url = URL(string: "https://raw.githubusercontent.com/\(repository)/main/CHANGELOG.md")!
+        guard let (data, response) = try? await session.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return changelogSections(String(decoding: data, as: UTF8.self), newerThan: current)
+    }
+
+    public static func changelogSections(_ markdown: String, newerThan current: String) -> String? {
+        var sections: [(SemVer, String, [String])] = []
+        for line in markdown.components(separatedBy: "\n") {
+            if line.hasPrefix("## [") {
+                let inside = line.dropFirst(4).prefix { $0 != "]" }
+                if let v = SemVer(String(inside)) {
+                    let date = line.components(separatedBy: "] ").dropFirst().joined(separator: "] ").trimmingCharacters(in: CharacterSet(charactersIn: "–- "))
+                    sections.append((v, date, []))
+                } else {
+                    sections.append((SemVer("0.0.0")!, "", []))   // [Unreleased]: skipped below
+                }
+                continue
+            }
+            if !sections.isEmpty { sections[sections.count - 1].2.append(line) }
+        }
+        let newer = sections.filter { isNewer($0.0.description, than: current) }.sorted { $0.0 > $1.0 }
+        guard !newer.isEmpty else { return nil }
+        return newer.map { v, date, lines in
+            let body = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            // Version headings become level 2, the section headings inside them level 3.
+            return "## Folio \(v)\(date.isEmpty ? "" : " · " + date)\n\n" + body
+        }.joined(separator: "\n\n")
+    }
+
+    /// Release bodies end with a "---" block about installing; inside the app that is noise.
+    public static func stripFooter(_ body: String) -> String {
+        if let r = body.range(of: "\n---\n") { return String(body[..<r.lowerBound]) }
+        return body
     }
 
     /// True when `latest` is newer than `current`.

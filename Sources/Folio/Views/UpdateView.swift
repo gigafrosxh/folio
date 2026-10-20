@@ -27,15 +27,14 @@ struct UpdateView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Folio \(release.version) ist verfügbar.", systemImage: "arrow.down.circle.fill")
                         .font(.headline).foregroundStyle(Color.accentColor)
-                    if !release.notes.isEmpty {
+                    let notes = updates.changelog ?? release.notes
+                    if !notes.isEmpty {
                         ScrollView {
-                            Text((try? AttributedString(markdown: release.notes,
-                                                        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(release.notes))
-                                .font(.callout)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
+                            MarkdownView(markdown: notes)
+                                .padding(10)
                         }
-                        .frame(maxHeight: compact ? 160 : 200)
+                        .frame(maxHeight: compact ? 260 : 220)
+                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
                     }
                     HStack {
                         Button("Jetzt installieren und neu starten") { updates.install(release) }
@@ -84,7 +83,7 @@ struct UpdateSheet: View {
             HStack { Spacer(); Button("Schließen") { dismiss() }.keyboardShortcut(.cancelAction) }
         }
         .padding(22)
-        .frame(width: 460)
+        .frame(width: 540)
         .onAppear { UpdateManager.shared.check() }
     }
 }
