@@ -23,6 +23,10 @@ Release Candidate für Folio 1.0: keine neuen Funktionen mehr, nur noch Fehlerbe
 - `docs/PRIVACY.md`: wo Folio Daten speichert, wann es ins Netz geht, KI und Spracherkennung auf dem Gerät, Berechtigungen, Risiken der Code-Ausführung, keine Telemetrie (#72).
 - `SECURITY.md`: wie man Sicherheitslücken vertraulich meldet.
 
+### Prüfung
+- 164 Unit-Tests ohne Fehler (ein umgebungsabhängiger Test übersprungen), sieben App-Selbsttests unter Hardened Runtime und vollständiger Bibliothekstest auf einer Kopie mit 137 Notizen.
+- Der Bibliothekstest unterscheidet bekannte Titelnormalisierungen älterer Importe von unerwarteten Titeländerungen und prüft Wortgrenzen zwischen Textblöcken korrekt.
+
 ## [0.20.4] – 2026-10-20
 
 ### Behoben

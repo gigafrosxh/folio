@@ -12,6 +12,29 @@ final class NoteTitleTests: XCTestCase {
         return NoteDocument(file: NoteFile(meta: NoteMetadata(title: "Alt"), body: NoteBody(blocks: [b])), url: URL(fileURLWithPath: "/dev/null")).makeFile().meta.title
     }
 
+    func testSweepOnlyAllowsKnownLegacyTitleNormalization() {
+        XCTAssertTrue(LibrarySweepTest.isLegacyTitleNormalization("Ein langer Titel …", "Ein langer Titel mit weiteren Wörtern"))
+        XCTAssertTrue(LibrarySweepTest.isLegacyTitleNormalization("Zwei   Wörter", "Zwei Wörter"))
+        XCTAssertFalse(LibrarySweepTest.isLegacyTitleNormalization("Eigener Titel", "Anderer Titel"))
+        XCTAssertFalse(LibrarySweepTest.isLegacyTitleNormalization("…", "Beliebig"))
+        XCTAssertFalse(LibrarySweepTest.isLegacyTitleNormalization("Alt …", "Neu und anders"))
+    }
+
+    func testSweepKeepsWordBoundariesBetweenTextBlocks() {
+        let blocks = ["Geschichte", "Großdeutsche Lösung"].map { text in
+            var block = BlockRecord(kind: .text)
+            block.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: text))
+            return block
+        }
+        let file = NoteFile(meta: NoteMetadata(title: "Geschichte"), body: NoteBody(blocks: blocks))
+        XCTAssertEqual(LibrarySweepTest.text(in: file), "Geschichte\nGroßdeutsche Lösung")
+        let markdown = MarkdownTransfer.markdown(for: file, filesFolder: "Dateien").0
+        let back = MarkdownTransfer.note(fromMarkdown: markdown, title: "Geschichte", baseURL: nil)
+        for word in ["geschichte", "großdeutsche", "lösung"] {
+            XCTAssertTrue(back.meta.searchText.lowercased().contains(word))
+        }
+    }
+
     func testNoteWithoutTextKeepsItsTitle() {
         var image = BlockRecord(kind: .image)
         image.attachmentID = UUID()

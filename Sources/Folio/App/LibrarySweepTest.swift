@@ -5,6 +5,21 @@ import FolioCore
 /// Markdown export and import, PDF export, duplicate, diagnose (FOLIO_SWEEP_TEST=<output folder>).
 @MainActor
 enum LibrarySweepTest {
+    /// Older imports kept Apple's shortened title; saving derives it from the first text line.
+    /// Only known display normalization is allowed here, never an arbitrary title replacement.
+    static func isLegacyTitleNormalization(_ old: String, _ new: String) -> Bool {
+        let normalized = NoteDocument.plainLine(old)
+        if normalized == new { return true }
+        guard normalized.hasSuffix("…") else { return false }
+        let prefix = normalized.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+        return !prefix.isEmpty && new.hasPrefix(prefix)
+    }
+
+    static func text(in file: NoteFile) -> String {
+        file.body.blocks.filter { $0.kind == .text }
+            .map { RichTextCodec.attributedString(from: $0.rtf).string }.joined(separator: "\n")
+    }
+
     static func run(out: URL) async {
         let store = NoteStore.shared
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
@@ -22,13 +37,21 @@ enum LibrarySweepTest {
             // Opening and saving without changes must not change title, tags, text or blocks.
             let doc = NoteDocument(file: original, url: ref.url)
             let again = doc.makeFile()
-            if again.meta.title != original.meta.title { fail(ref, "Titel ändert sich beim Speichern: „\(original.meta.title)“ → „\(again.meta.title)“") }
+            if again.meta.title != original.meta.title {
+                if isLegacyTitleNormalization(original.meta.title, again.meta.title) {
+                    print("SWEEP INFO", i, "bekannte Titelnormalisierung eines älteren Imports"); fflush(stdout)
+                } else {
+                    fail(ref, "Titel ändert sich beim Speichern: „\(original.meta.title)“ → „\(again.meta.title)“")
+                }
+            }
+            let reopened = NoteDocument(file: again, url: ref.url).makeFile()
+            if reopened.meta.title != again.meta.title { fail(ref, "Titel bleibt nach erneutem Öffnen nicht stabil") }
             if Set(again.meta.tags) != Set(original.meta.tags) { fail(ref, "Tags ändern sich: \(original.meta.tags) → \(again.meta.tags)") }
             let origKinds = original.body.blocks.map(\.kind).filter { $0 != .text }
             let newKinds = again.body.blocks.map(\.kind).filter { $0 != .text }
             if origKinds != newKinds { fail(ref, "Blöcke ändern sich: \(origKinds) → \(newKinds)") }
-            let origText = original.body.blocks.filter { $0.kind == .text }.map { RichTextCodec.attributedString(from: $0.rtf).string }.joined()
-            let newText = again.body.blocks.filter { $0.kind == .text }.map { RichTextCodec.attributedString(from: $0.rtf).string }.joined()
+            let origText = text(in: original)
+            let newText = text(in: again)
             if origText != newText { fail(ref, "Text ändert sich beim Speichern (\(origText.count) → \(newText.count) Zeichen)") }
             if again.attachments.count != original.attachments.count { fail(ref, "Anhänge: \(original.attachments.count) → \(again.attachments.count)") }
 

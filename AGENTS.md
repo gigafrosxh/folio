@@ -50,8 +50,11 @@ make release V=X.Y.Z  # Info.plist + CHANGELOG hochzählen, taggen, DMG/PKG baue
 ```
 
 `release.sh` baut aus dem Tag in einem temporären Ordner; vorher müssen `Info.plist` und `CHANGELOG.md` committet
-sein und unter `[Unreleased]` muss etwas stehen. Signiert wird nur ad hoc (kein Developer-ID-Zertifikat, keine
-Notarisierung, siehe Issue #63).
+sein und unter `[Unreleased]` muss etwas stehen. Vorabversionen wie `make release V=1.0.0-rc.2` sind erlaubt (SemVer,
+der Updater ordnet sie richtig ein; Releases bleiben „latest“, nicht „pre-release“, sonst findet der Updater sie nicht).
+Signieren/Notarisieren (#63) läuft automatisch, sobald „Developer ID“-Zertifikate und das notarytool-Profil
+`folio-notary` im Schlüsselbund sind (`docs/SIGNING.md`); bis dahin ad hoc. Der Updater prüft Signatur und Team-ID
+(`UpdateManager.verifySignature`).
 
 ### Ohne Bildschirmzugriff testen (Debug-Harness)
 
@@ -73,7 +76,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.20.4** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.0.0-rc.1** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -140,6 +143,19 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
   in Tests mit `FOLIO_CAPTURE_QUEUE=<ordner>` umlenken.
 - Nicht geprüft: echtes globales Kürzel aus einer anderen App, Menüleisten-Fenster, Einfügen von Bildern in die Schnellerfassung.
 
+### Release Candidate 1.0.0-rc.1
+
+- Ab rc.1 keine neuen Funktionen mehr, nur Bugfixes bis 1.0.0 (Bugfix-Releases als rc.2, rc.3 …).
+- Doku: `docs/PRIVACY.md` (#72), `SECURITY.md`, `docs/SIGNING.md`. Bei neuen Netzwerkzugriffen oder Speicherorten
+  `docs/PRIVACY.md` mitpflegen.
+- Hardened Runtime testen ohne Zertifikat: `codesign --force --options runtime --entitlements Resources/Folio.entitlements
+  --sign - .build/debug/Folio`, dann `scripts/dev-regression.py`.
+- Erststart auf „frischem System“ ohne Systemänderung: App aus dem DMG in den Scratch-Ordner kopieren und mit
+  `CFFIXED_USER_HOME=<leer> HOME=<leer> FOLIO_LIBRARY=<leer>/Documents/Folio` starten – so bleiben die echten
+  Einstellungen (`de.daniel.folio`) unberührt. Ein echter neuer macOS-Benutzer oder eine VM braucht die Zustimmung des Nutzers.
+- Notizen werden mit `.sortedKeys` kodiert (#98), gleicher Inhalt ergibt gleiche Bytes.
+- Auf dem Mac des Nutzers liegt in `/Applications` noch Folio 0.9.0 (ohne eingebauten Updater) – nicht anfassen.
+
 ### Testlauf nach 0.20 (Stand 0.20.4)
 
 - Gefunden und behoben: #94 Start-Hänger durch `MenuBarExtra`-Bindung (0.20.1), #96 Listenzeichen im Titel (0.20.2),
@@ -152,3 +168,12 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
 - Noch nicht geprüft: globales Kürzel aus einer anderen App, Menüleisten-Fenster, Bilder in der Schnellerfassung,
   Mikrofonaufnahme, eigenes Notizfenster als echtes Fenster, Update-Fenster im Dunkelmodus (Schnappschuss zeigt es leer,
   vermutlich nur ein Effekt von `cacheDisplay`).
+
+### Abschlussprüfung rc.1
+
+- 164 Unit-Tests, keine Fehler, ein Datenbanktest wegen fehlender Umgebung übersprungen.
+- Alle sieben App-Selbsttests unter Hardened Runtime grün (DEV, SAFETY, ORG, EDITOR, KEY, QUICK, A11Y).
+- Bibliothekskopie: 137 Notizen, 0 Fehler; acht bekannte Titelnormalisierungen älterer Importe separat als INFO.
+- Der Sweep trennt Textblöcke mit Zeilenumbrüchen, damit an Blockgrenzen keine künstlichen Wörter entstehen.
+  Unbekannte Titeländerungen und instabile Titel beim erneuten Öffnen bleiben Fehler.
+- Details und Grenzen: `docs/RELEASE-1.0.0-rc.1.md`. Developer ID fehlt weiterhin; #63 bleibt offen.
