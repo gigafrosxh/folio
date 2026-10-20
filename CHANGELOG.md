@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Neuer Tab „Feedback“ in den Einstellungen: Er öffnet die Issues-Seite von Folio auf GitHub, wahlweise mit einem neuen Eintrag, in dem App- und macOS-Version schon stehen.
+
 ## [0.8.2] – 2026-10-20
 
 ### Behoben
