@@ -92,7 +92,7 @@ struct KeyCombo: Codable, Hashable {
 
 /// Tools that can be triggered from the keyboard; every one can be rebound in the settings.
 enum ShortcutAction: String, CaseIterable, Identifiable {
-    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll
+    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll, database
 
     var id: String { rawValue }
 
@@ -109,6 +109,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .chat: return "Chat mit Apple Intelligence"
         case .writingTools: return "Writing Tools"
         case .runAll: return "Alle Code-Blöcke ausführen"
+        case .database: return "Datenbank-Abfrage einfügen"
         }
     }
 
@@ -125,6 +126,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .chat: return "apple.intelligence"
         case .writingTools: return "apple.writing.tools"
         case .runAll: return "play.rectangle"
+        case .database: return "cylinder.split.1x2"
         }
     }
 
@@ -142,6 +144,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .chat: return KeyCombo(key: "j", control: true)
         case .writingTools: return KeyCombo(key: "r", control: true)
         case .runAll: return KeyCombo(key: "r", control: true, shift: true)
+        case .database: return KeyCombo(key: "d", control: true, shift: true)
         }
     }
 }
@@ -238,6 +241,7 @@ final class ShortcutCenter {
         case .chat: NotificationCenter.default.post(name: .folioToggleChat, object: nil)
         case .writingTools: f.showWritingTools()
         case .runAll: post("runall")
+        case .database: post("database")
         }
     }
 

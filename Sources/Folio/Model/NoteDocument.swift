@@ -21,6 +21,7 @@ final class BlockModel: ObservableObject, Identifiable {
     @Published var caption: String
     @Published var revision = 0
     var syncedAt: Date?
+    @Published var connection: DatabaseConnection?
     /// Ran without error in the note's shared session (not saved); used to rebuild the session after a delete.
     var ranInSession = false
     /// Its last run started a server (those are never replayed automatically).
@@ -30,10 +31,10 @@ final class BlockModel: ObservableObject, Identifiable {
         self.id = id
         self.kind = kind
         storage = NSTextStorage()
-        language = "python"
+        language = kind == .database ? "sql" : "python"
         outputIsError = false
         url = ""
-        height = kind == .pdf ? 520 : kind == .web ? 480 : kind == .file ? 420 : kind == .drawing ? 380 : 0
+        height = kind == .pdf ? 520 : kind == .web ? 480 : kind == .file ? 420 : kind == .drawing ? 380 : kind == .database ? 260 : 0
         width = 1
         mode = kind == .web ? "page" : ""
         caption = ""
@@ -44,10 +45,11 @@ final class BlockModel: ObservableObject, Identifiable {
         switch r.kind {
         case .text:
             storage.setAttributedString(RichTextCodec.attributedString(from: r.rtf))
-        case .code:
+        case .code, .database:
             storage.setAttributedString(NSAttributedString(string: r.code ?? ""))
         default: break
         }
+        connection = r.connection
         language = r.language ?? language
         output = r.output
         outputIsError = r.outputIsError ?? false
@@ -75,6 +77,10 @@ final class BlockModel: ObservableObject, Identifiable {
             r.language = language
             r.output = output
             r.outputIsError = outputIsError
+        case .database:
+            r.code = storage.string
+            r.language = "sql"
+            r.connection = connection
         default: break
         }
         if !url.isEmpty { r.url = url }
@@ -91,7 +97,7 @@ final class BlockModel: ObservableObject, Identifiable {
 
     var plainText: String {
         switch kind {
-        case .text, .code: return storage.string
+        case .text, .code, .database: return storage.string
         case .web: return url
         default: return caption
         }

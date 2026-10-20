@@ -117,6 +117,7 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Button("Datei, PDF oder Bild…") { NotificationCenter.default.post(name: .folioInsert, object: "file") }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
+            Button("Datenbank-Abfrage") { NotificationCenter.default.post(name: .folioInsert, object: "database") }
             Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }
                 .keyboardShortcut("d", modifiers: [.command, .option])
             Button("Skizze/Foto vom iPhone oder iPad…") { NotificationCenter.default.post(name: .folioInsert, object: "device") }

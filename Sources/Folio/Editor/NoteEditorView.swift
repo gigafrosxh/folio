@@ -284,6 +284,7 @@ struct NoteEditorView: View {
         case "playground": openPlayground()
         case "drawing": insertBlock(BlockModel(kind: .drawing))
         case "runall": RunManager.shared.runAll(doc: doc, theme: theme)
+        case "database": insertBlock(BlockModel(kind: .database))
         case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
         case "link": promptText = ""; showLinkPrompt = true
         default: break
@@ -543,6 +544,8 @@ struct BlockRow: View {
             FileBlockView(block: block, doc: doc)
         case .drawing:
             DrawingBlockView(block: block, doc: doc)
+        case .database:
+            DatabaseBlockView(block: block, doc: doc)
         }
     }
 

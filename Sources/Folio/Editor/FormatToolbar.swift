@@ -100,6 +100,9 @@ struct FormatToolbar: View {
             .frame(width: 40)
 
             plain("tablecells", "Numbers-Tabelle erstellen", actions.insertNumbers)
+            plain("cylinder.split.1x2", "Datenbank-Abfrage einfügen (⌃⇧D)") {
+                NotificationCenter.default.post(name: .folioInsert, object: "database")
+            }
             plain("paperclip", "PDF, Bild oder Dokument einfügen", actions.insertFile)
             Menu {
                 Button { actions.insertDrawing() } label: { Label("Hier zeichnen", systemImage: "scribble.variable") }

@@ -52,6 +52,8 @@ public enum BlockKind: String, Codable, Sendable, CaseIterable {
     case file
     /// A hand-drawn sketch; the attachment holds a PencilKit `PKDrawing` data representation.
     case drawing
+    /// SQL against a database connection (SQLite, PostgreSQL, MySQL), with a result table.
+    case database
 }
 
 /// One block of a note's body. Fields not used by a block's kind stay nil.
@@ -71,6 +73,8 @@ public struct BlockRecord: Codable, Sendable, Identifiable {
     public var caption: String?
     /// When an attachment edited in another app (e.g. Numbers) was last pulled back in.
     public var syncedAt: Date?
+    /// Connection of a database block (the password is kept in the Keychain, not here).
+    public var connection: DatabaseConnection?
 
     public init(id: UUID = UUID(), kind: BlockKind) {
         self.id = id
