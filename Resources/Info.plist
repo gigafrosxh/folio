@@ -34,9 +34,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.12.4</string>
+	<string>0.13.0</string>
 	<key>CFBundleVersion</key>
-	<string>21</string>
+	<string>22</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
@@ -52,12 +52,12 @@
 	<string>Folio benötigt Zugriff auf Notizen, um Notizen zu importieren, und auf Numbers, um Tabellen zu erstellen.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Folio zeigt Webseiten aus deinem lokalen Netzwerk (z. B. localhost oder Entwicklungsserver) in Notizen an.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Folio nimmt mit dem Mikrofon Audio auf und speichert es in deiner Notiz.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Folio transkribiert Audioaufnahmen lokal auf deinem Mac. Es wird nichts hochgeladen.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Folio zeigt Webseiten aus deinem lokalen Netzwerk (z. B. localhost oder Entwicklungsserver) in Notizen an.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

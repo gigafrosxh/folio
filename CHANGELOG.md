@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.13.0] – 2026-10-20
+
 ### Neu
 - **PDF-Export** (#5): Ablage › Als PDF exportieren (⇧⌘E) schreibt die ganze Notiz als A4-PDF mit Seitenumbrüchen: Text mit Formatierung, Bilder, Zeichnungen, eingebettete PDFs, Code mit Syntaxfarben, Formeln und Diagramme als Vektorgrafik und Transkripte. Code-Ausgaben lassen sich im Sichern-Dialog ein- oder ausschließen.
 - **Formelblock (LaTeX)** (#52): Formeln mit Live-Vorschau über KaTeX, Fehlermeldung bei falscher Syntax; Export als PNG/PDF oder in die Zwischenablage. Einfügen über das ƒ(x)-Symbol, ⌥⌘M oder ⌃⇧M.
