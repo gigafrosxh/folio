@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.18.0] – 2026-10-20
+
 ### Neu
 - **Chatverlauf bleibt erhalten** (#33): Unterhaltungen mit Apple Intelligence werden pro Notiz in der Bibliothek gespeichert (`.folio/chats`) und sind nach dem Schließen, Wechseln und Neustarten wieder da. „Neu“ beginnt von vorn und löscht den gespeicherten Verlauf.
 - **Notizen vergleichen** (#34): Im Chat fügt „+ Notiz“ weitere Notizen hinzu (oder Rechtsklick in der Liste › „Zum KI-Chat hinzufügen“). Alle ausgewählten Notizen bilden den gemeinsamen Kontext; die Schnellaktion „Vergleichen“ zeigt Gemeinsamkeiten, Unterschiede und Widersprüche.
