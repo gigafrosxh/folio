@@ -352,8 +352,37 @@ final class FolioTextView: NSTextView {
     // MARK: Paste & drop
 
     override func paste(_ sender: Any?) {
-        if handlePasteboard(NSPasteboard.general) { return }
-        super.paste(sender)
+        paste(from: NSPasteboard.general)
+    }
+
+    func paste(from pb: NSPasteboard) {
+        if handlePasteboard(pb) { return }
+        let ns = string as NSString
+        let start = selectedRange().location
+        let inTitle = isFirstBlock && !ns.substring(to: start).contains("\n")
+        let titleFont = typingAttributes[.font] as? NSFont
+        guard readSelection(from: pb) else { NSSound.beep(); return }
+        if inTitle, let titleFont { demotePastedLinesAfterTitle(from: start, to: selectedRange().location, titleFont: titleFont) }
+    }
+
+    /// Pasting several lines into the title line keeps only the first as title; the rest becomes body
+    /// text, as if the lines had been typed with Return (#101).
+    private func demotePastedLinesAfterTitle(from start: Int, to end: Int, titleFont: NSFont) {
+        guard let storage = textStorage, end > start else { return }
+        let ns = storage.string as NSString
+        let firstBreak = ns.range(of: "\n", options: [], range: NSRange(location: start, length: end - start))
+        guard firstBreak.location != NSNotFound else { return }
+        let rest = NSRange(location: NSMaxRange(firstBreak), length: end - NSMaxRange(firstBreak))
+        guard rest.length > 0, shouldChangeText(in: rest, replacementString: nil) else { return }
+        let body = bodyAttributes()
+        storage.beginEditing()
+        storage.enumerateAttribute(.font, in: rest) { value, range, _ in
+            // Only text that took over the title's look; pasted rich text keeps its own formatting.
+            if (value as? NSFont) == titleFont { storage.setAttributes(body, range: range) }
+        }
+        storage.endEditing()
+        didChangeText()
+        typingAttributes = body
     }
 
     // Files and images dropped onto the text become blocks. With `importsGraphics` off, NSTextView would
