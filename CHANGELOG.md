@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.16.0] – 2026-10-20
+
 ### Neu
 - **Undo/Redo für Blöcke** (#3): Einfügen, Löschen und Verschieben von Blöcken sowie Einstellungen wie Codesprache, Bildgröße oder Papier lassen sich mit ⌘Z/⇧⌘Z rückgängig machen und wiederholen, in einer Reihenfolge mit dem Tippen.
 - **Suchen und Ersetzen** (#9): ⌘F sucht in der offenen Notiz über Text-, Code- und SQL-Blöcke mit Hervorhebung aller Treffer, ⌘G/⇧⌘G springen weiter, ⌃⌘F öffnet gleich das Ersetzen (einzeln oder alle, rückgängig machbar). Optionen für Groß-/Kleinschreibung und ganze Wörter.
