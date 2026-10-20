@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.14.0] – 2026-10-20
+
 ### Neu
 - **Versionsverlauf** (#1): Folio sichert beim Bearbeiten alle 5 Minuten eine Version, beim Öffnen den Ausgangsstand und immer, bevor etwas die Notiz ersetzt. Über das Uhr-Symbol oder Ablage › Versionsverlauf (⇧⌘Y) siehst du alle Stände mit Vergleich zum aktuellen und kannst einen wiederherstellen oder als neue Notiz sichern. Ältere Versionen werden ausgedünnt (stündlich, täglich, wöchentlich, max. ein Jahr).
 - **Papierkorb** (#2): Gelöschte Notizen und Ordner landen in Folios eigenem Papierkorb (Seitenleiste) und lassen sich an ihren alten Ort zurückholen oder endgültig löschen. Nach 30 Tagen werden sie automatisch entfernt (einstellbar).
