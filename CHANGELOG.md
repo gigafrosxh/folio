@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.20.0] – 2026-10-20
+
 ### Neu
 - **Menüleiste** (#85): Ein Folio-Symbol in der Menüleiste sucht Notizen, zeigt angepinnte und zuletzt geöffnete und öffnet die Schnellerfassung, auch wenn das Hauptfenster geschlossen ist. Abschaltbar unter Einstellungen › Schnellzugriff; mit Symbol läuft Folio weiter, wenn das letzte Fenster zu ist (Dock-Klick öffnet es wieder).
 - **Globales Kürzel** (#86): ⌃⌥⌘N öffnet die Schnellerfassung aus jeder App (ohne Bedienungshilfen-Freigabe). Das Kürzel lässt sich ändern oder abschalten; ist es von einer anderen App belegt, sagt Folio das.
