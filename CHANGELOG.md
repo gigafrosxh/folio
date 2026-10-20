@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.12.0] – 2026-10-20
+
 ### Hinzugefügt
 - Software-Update (#64): „Nach Updates suchen …“ im Folio-Menü und unter Einstellungen › Allgemein vergleicht die installierte Version mit dem neuesten GitHub-Release, zeigt die Änderungen und installiert auf Knopfdruck: Download, Prüfung der App, alte Version in den Papierkorb, neue an dieselbe Stelle, Neustart. Notizen und Einstellungen bleiben unberührt. Optional automatische Prüfung beim Start.
 
