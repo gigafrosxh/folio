@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.12.1] – 2026-10-20
+
 ### Geändert
 - Folio sucht jetzt bei jedem Start nach einer neuen Version und fragt, ob sie installiert werden soll (Update-Fenster mit Änderungen). Gilt auch für bestehende Installationen; abschaltbar unter Einstellungen › Allgemein › Updates.
 
