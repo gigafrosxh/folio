@@ -133,11 +133,11 @@ struct TerminalPanel: View {
                 Circle().fill(session.running ? Color.green : Color.secondary.opacity(0.5)).frame(width: 7, height: 7)
                 if let error = session.error { Text(error).font(.caption).foregroundStyle(.red).lineLimit(1) }
                 Spacer()
-                Button("⌃C") { session.interrupt() }.help("Laufendes Programm abbrechen")
-                Button("⌃D") { session.endOfInput() }.help("Eingabe beenden")
-                Button { session.clear() } label: { Image(systemName: "eraser") }.help("Leeren")
-                Button { session.restart() } label: { Image(systemName: "arrow.clockwise") }.help("Neu starten")
-                Button { onClose() } label: { Image(systemName: "chevron.down") }.help("Ausblenden (⌃`)")
+                Button("⌃C") { session.interrupt() }.helpLabel("Laufendes Programm abbrechen")
+                Button("⌃D") { session.endOfInput() }.helpLabel("Eingabe beenden")
+                Button { session.clear() } label: { Image(systemName: "eraser") }.helpLabel("Leeren")
+                Button { session.restart() } label: { Image(systemName: "arrow.clockwise") }.helpLabel("Neu starten")
+                Button { onClose() } label: { Image(systemName: "chevron.down") }.helpLabel("Ausblenden (⌃`)")
             }
             .buttonStyle(.borderless)
             .font(.system(size: 11.5, weight: .medium))

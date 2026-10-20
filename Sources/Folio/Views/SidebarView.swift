@@ -88,6 +88,11 @@ struct SidebarView: View {
                     Button("Markdown importieren…") { MarkdownTransfer.importWithPanel() }
                     Button("Bibliothek im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([store.rootURL]) }
                     Button("Neu laden") { store.reload() }
+                    if !store.skippedLinks.isEmpty {
+                        Section("Nicht gefolgte Verknüpfungen (aus Sicherheitsgründen)") {
+                            ForEach(store.skippedLinks, id: \.self) { Text($0) }
+                        }
+                    }
                     Divider()
                     SettingsLink { Text("Einstellungen…") }
                 } label: {
@@ -191,6 +196,10 @@ struct SidebarView: View {
         .contentShape(Rectangle())
         .animation(Motion.quick, value: selected)
         .onTapGesture { store.sidebarSelection = item }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityValue("\(count) Notizen")
+        .accessibilityAction { store.sidebarSelection = item }
     }
 
     private var flatFolders: [(node: FolderNode, depth: Int)] {

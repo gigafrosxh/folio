@@ -21,24 +21,19 @@ struct FolioCommands: Commands {
             Divider()
             Button("In neuem Fenster öffnen") { if let id = store.currentDocument?.id { openWindow(id: "note", value: id) } }
                 .keyboardShortcut("o", modifiers: [.command, .option])
-                .disabled(store.currentDocument == nil)
             Button(store.splitNoteID == nil ? "Rechts daneben öffnen" : "Teilung schließen") {
                 if store.splitNoteID != nil { store.splitNoteID = nil }
                 else if let id = store.selectedNoteID { store.openInSplit(id) }
             }
             .keyboardShortcut("\\", modifiers: [.command, .option])
             Button("Tab schließen") { if let id = store.selectedNoteID { store.closeTab(id) } }
-                .disabled(store.tabs.count < 2)
             Button("Nächster Tab") { store.selectTab(offset: 1) }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
-                .disabled(store.tabs.count < 2)
             Button("Vorheriger Tab") { store.selectTab(offset: -1) }
                 .keyboardShortcut("[", modifiers: [.command, .shift])
-                .disabled(store.tabs.count < 2)
             Divider()
             Button("Notiz duplizieren") { if let id = store.currentDocument?.id { store.duplicate(id) } }
                 .keyboardShortcut("d")
-                .disabled(store.currentDocument == nil)
             Divider()
             Button("Apple Notizen importieren…") { NotificationCenter.default.post(name: .folioShowImport, object: nil) }
         }
@@ -95,7 +90,7 @@ struct FolioCommands: Commands {
             .keyboardShortcut("e", modifiers: [.command, .option])
             Divider()
             Button("Versionsverlauf …") { NotificationCenter.default.post(name: .folioShowHistory, object: nil) }
-                .keyboardShortcut("y", modifiers: [.command, .shift])
+                .keyboardShortcut("y", modifiers: [.command, .option])
             Button("Als PDF exportieren …") { NotificationCenter.default.post(name: .folioInsert, object: "exportpdf") }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
         }

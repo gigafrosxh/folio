@@ -56,7 +56,7 @@ struct WindowControls: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
         .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

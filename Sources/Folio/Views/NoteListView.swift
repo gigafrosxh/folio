@@ -37,6 +37,11 @@ struct NoteListView: View {
                                         else { store.selectedNoteID = note.id }
                                         focused = true
                                     }
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityAddTraits(store.selectedNoteID == note.id ? [.isButton, .isSelected] : .isButton)
+                                    .accessibilityAction { store.selectedNoteID = note.id }
+                                    .accessibilityAction(named: "In neuem Tab öffnen") { store.openInNewTab(note.id) }
+                                    .accessibilityAction(named: "Rechts daneben öffnen") { store.openInSplit(note.id) }
                                     .draggable(note.id.uuidString)
                                     .contextMenu { menu(for: note) }
                                     .transition(Motion.blockTransition)
@@ -122,7 +127,7 @@ struct NoteListView: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help("Neue Notiz (⌘N) – gedrückt halten: aus Vorlage")
+                .helpLabel("Neue Notiz (⌘N) – gedrückt halten: aus Vorlage")
                 .onAppear { store.ensureStarterTemplates() }
             }
         }
@@ -138,7 +143,7 @@ struct NoteListView: View {
                 .foregroundStyle(prominent ? theme.accent : .primary)
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 
     private func step(_ delta: Int, in notes: [NoteRef], proxy: ScrollViewProxy) {

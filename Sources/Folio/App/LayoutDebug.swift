@@ -139,6 +139,9 @@ enum LayoutDebug {
         if env["FOLIO_EDITOR_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await EditorSelfTest.run() }
         }
+        if env["FOLIO_KEY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await KeyboardSelfTest.run() }
+        }
         if env["FOLIO_ORG_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await OrganizationSelfTest.run() }
         }
@@ -157,6 +160,12 @@ enum LayoutDebug {
                         NotificationCenter.default.post(name: .folioFind, object: true)
                     }
                 }
+            }
+        }
+        // FOLIO_A11Y_AUDIT=1: lists controls VoiceOver cannot name (#60); with FOLIO_OPEN on a note.
+        if env["FOLIO_A11Y_AUDIT"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (Double(env["FOLIO_DUMP_DELAY"] ?? "") ?? 4)) {
+                MainActor.assumeIsolated { AccessibilityAudit.run() }
             }
         }
         if env["FOLIO_QUICKOPEN"] != nil {

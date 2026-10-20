@@ -392,7 +392,7 @@ struct DrawingBlockView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Form")
+            .helpLabel("Form")
             Divider().frame(height: 18).padding(.horizontal, 3)
             ForEach(Self.palette, id: \.self) { color in
                 Button { model.color = color; if model.tool == .eraser { model.tool = .pen } } label: {
@@ -410,7 +410,7 @@ struct DrawingBlockView: View {
                     .overlay(Circle().stroke(Color.primary.opacity(isCustomColor ? 0.9 : 0.15), lineWidth: isCustomColor ? 2 : 1).padding(-2))
             }
             .buttonStyle(.plain)
-            .help("Eigene Farbe")
+            .helpLabel("Eigene Farbe")
             Divider().frame(height: 18).padding(.horizontal, 3)
             Menu {
                 ForEach([1.5, 3, 5, 8, 12] as [CGFloat], id: \.self) { w in
@@ -427,7 +427,7 @@ struct DrawingBlockView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Strichstärke")
+            .helpLabel("Strichstärke")
             toolButton("arrow.uturn.backward", "Rückgängig", selected: false, action: model.undo).disabled(!model.canUndo)
             toolButton("arrow.uturn.forward", "Wiederholen", selected: false, action: model.redo).disabled(!model.canRedo)
         }
@@ -463,7 +463,7 @@ struct DrawingBlockView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 
     private func save(_ drawing: PKDrawing) {

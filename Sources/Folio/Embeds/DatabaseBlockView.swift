@@ -176,7 +176,7 @@ struct DatabaseBlockView: View {
             Image(systemName: icon).font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 26, height: 26).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 
     private func resultSummary(_ r: QueryResult) -> String {

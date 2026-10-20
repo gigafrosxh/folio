@@ -16,7 +16,7 @@ struct NoteActionsBar: View {
                 Image(systemName: "square.and.arrow.up").frame(width: 30, height: 28)
             }
             .buttonStyle(.plain)
-            .help("Teilen")
+            .helpLabel("Teilen")
             let ai = AIAvailability.current
             button("apple.intelligence", ai.isAvailable ? "Chat mit Apple Intelligence (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
                    tint: ai.isAvailable ? theme.accent : .secondary) {
@@ -36,8 +36,8 @@ struct NoteActionsBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Terminal (⌃`) – gedrückt halten: Ausführungsumgebung")
-            button("clock.arrow.circlepath", "Versionsverlauf (⇧⌘Y)") {
+            .helpLabel("Terminal (⌃`) – gedrückt halten: Ausführungsumgebung")
+            button("clock.arrow.circlepath", "Versionsverlauf (⌥⌘Y)") {
                 NotificationCenter.default.post(name: .folioShowHistory, object: nil)
             }
             button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
@@ -57,7 +57,7 @@ struct NoteActionsBar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 }
 

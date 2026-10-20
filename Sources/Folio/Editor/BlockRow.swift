@@ -115,7 +115,7 @@ struct BlockRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 
     private func deleteEmptyText() {

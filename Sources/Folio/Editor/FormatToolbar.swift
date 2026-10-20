@@ -23,7 +23,7 @@ struct FormatToolbar: View {
             } label: {
                 Image(systemName: "textformat.size")
             }
-            .help("Absatzstil")
+            .helpLabel("Absatzstil")
             .frame(width: 34)
 
             sep
@@ -51,7 +51,7 @@ struct FormatToolbar: View {
             } label: {
                 Image(systemName: "paintpalette")
             }
-            .help("Farbe & Größe")
+            .helpLabel("Farbe & Größe")
             .frame(width: 34)
 
             sep
@@ -65,7 +65,7 @@ struct FormatToolbar: View {
             } label: {
                 Image(systemName: "list.bullet")
             }
-            .help("Listen")
+            .helpLabel("Listen")
             .frame(width: 34)
 
             plain("checklist", "Checkliste") { f.toggleList(.checklist) }
@@ -80,7 +80,7 @@ struct FormatToolbar: View {
             } label: {
                 Image(systemName: "text.alignleft")
             }
-            .help("Ausrichtung")
+            .helpLabel("Ausrichtung")
             .frame(width: 34)
 
             plain("link", "Link hinzufügen (⌘K)", actions.addLink)
@@ -96,7 +96,7 @@ struct FormatToolbar: View {
             } primaryAction: {
                 actions.insertCode("python")
             }
-            .help("Code-Block einfügen")
+            .helpLabel("Code-Block einfügen")
             .frame(width: 40)
 
             plain("tablecells", "Numbers-Tabelle erstellen", actions.insertNumbers)
@@ -115,7 +115,7 @@ struct FormatToolbar: View {
             } primaryAction: {
                 actions.insertDrawing()
             }
-            .help("Zeichnen – Klick: hier zeichnen, gedrückt halten: vom iPhone oder iPad")
+            .helpLabel("Zeichnen – Klick: hier zeichnen, gedrückt halten: vom iPhone oder iPad")
             .frame(width: 40)
             plain("globe", "Webseite einbetten", actions.insertWeb)
             plain("apple.image.playground", "Bild mit Image Playground erstellen", actions.insertImagePlayground)
@@ -143,14 +143,14 @@ struct FormatToolbar: View {
                 .frame(width: 26, height: 22)
                 .background(on ? theme.accent.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 6))
         }
-        .help(help)
+        .helpLabel(help)
     }
 
     private func plain(_ icon: String, _ help: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon).frame(width: 26, height: 22)
         }
-        .help(help)
+        .helpLabel(help)
     }
 
     private func colorLabel(_ name: String, _ color: NSColor?) -> some View {

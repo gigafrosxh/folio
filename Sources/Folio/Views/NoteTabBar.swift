@@ -21,7 +21,7 @@ struct NoteTabBar: View {
                 Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).frame(width: 26, height: 26)
             }
             .buttonStyle(.plain)
-            .help("Neue Notiz in neuem Tab (⌘T)")
+            .helpLabel("Neue Notiz in neuem Tab (⌘T)")
             .padding(.trailing, 8)
         }
         .padding(.vertical, 6)
@@ -47,12 +47,16 @@ struct NoteTabBar: View {
                     .background(Color.primary.opacity(0.06), in: Circle())
             }
             .buttonStyle(.plain)
-            .help("Tab schließen")
+            .helpLabel("Tab schließen")
         }
         .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
         .background(selected ? theme.accent.opacity(0.2) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { store.selectedNoteID = id }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Tab \(title(id))")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { store.selectedNoteID = id }
         .contextMenu {
             Button("Rechts daneben öffnen") { store.openInSplit(id) }
             Button("In neuem Fenster öffnen") { openWindow(id: "note", value: id) }

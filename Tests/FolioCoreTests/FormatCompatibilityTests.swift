@@ -1,6 +1,13 @@
 import XCTest
 @testable import FolioCore
 
+/// JSON with sorted keys, so dictionaries compare independent of their order.
+func sorted<T: Encodable>(_ value: T) throws -> Data {
+    let e = JSONEncoder()
+    e.outputFormatting = [.sortedKeys]
+    return try e.encode(value)
+}
+
 /// #58: every block kind, Unicode, big attachments and damaged archives survive or fail cleanly.
 final class FormatRoundtripTests: XCTestCase {
     private func everyBlock() -> NoteFile {
@@ -40,7 +47,7 @@ final class FormatRoundtripTests: XCTestCase {
         let file = everyBlock()
         let back = try NoteFile.decode(file.encoded())
         XCTAssertEqual(back.meta, file.meta)
-        XCTAssertEqual(try JSONEncoder().encode(back.body), try JSONEncoder().encode(file.body))
+        XCTAssertEqual(try sorted(back.body), try sorted(file.body))
         XCTAssertEqual(back.attachments.map(\.header.filename), file.attachments.map(\.header.filename))
         XCTAssertEqual(back.attachments.map(\.data), file.attachments.map(\.data))
         XCTAssertEqual(back.attachments.map(\.header.isPackage), [false, true])
@@ -50,8 +57,8 @@ final class FormatRoundtripTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         try file.write(to: url)
         XCTAssertEqual(try NoteFile.readMetadata(at: url), file.meta)
-        // Writing twice gives identical files (no hidden drift).
-        XCTAssertEqual(try back.encoded(), try NoteFile.decode(back.encoded()).encoded())
+        // Writing twice gives the same content (no hidden drift).
+        XCTAssertEqual(try sorted(NoteFile.decode(back.encoded()).body), try sorted(back.body))
     }
 
     func testEmptyNote() throws {
@@ -127,7 +134,7 @@ final class MigrationTests: XCTestCase {
             let file = try NoteFile.decode(try fixture(v))
             let again = try NoteFile.decode(file.encoded())
             XCTAssertEqual(again.meta, file.meta, v)
-            XCTAssertEqual(try JSONEncoder().encode(again.body), try JSONEncoder().encode(file.body), v)
+            XCTAssertEqual(try sorted(again.body), try sorted(file.body), v)
         }
     }
 

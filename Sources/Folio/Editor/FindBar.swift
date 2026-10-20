@@ -146,7 +146,7 @@ struct FindBar: View {
                     Image(systemName: model.showReplace ? "chevron.down" : "chevron.right").font(.system(size: 10, weight: .bold)).frame(width: 14)
                 }
                 .buttonStyle(.plain)
-                .help("Ersetzen ein-/ausblenden")
+                .helpLabel("Ersetzen ein-/ausblenden")
                 field("In Notiz suchen", text: $model.query, field: .query)
                     .onSubmit { NSEvent.modifierFlags.contains(.shift) ? model.previous() : model.next() }
                 Text(model.query.isEmpty ? "" : model.matches.isEmpty ? "0" : "\(model.current + 1)/\(model.matches.count)")
@@ -161,9 +161,9 @@ struct FindBar: View {
                 }
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help("Suchoptionen")
-                Button { model.previous() } label: { Image(systemName: "chevron.up") }.help("Vorheriger Treffer (⇧⌘G)")
-                Button { model.next() } label: { Image(systemName: "chevron.down") }.help("Nächster Treffer (⌘G)")
+                .helpLabel("Suchoptionen")
+                Button { model.previous() } label: { Image(systemName: "chevron.up") }.helpLabel("Vorheriger Treffer (⇧⌘G)")
+                Button { model.next() } label: { Image(systemName: "chevron.down") }.helpLabel("Nächster Treffer (⌘G)")
                 Button("Fertig", action: onClose).keyboardShortcut(.cancelAction).fixedSize()
             }
             if model.showReplace {
@@ -173,7 +173,7 @@ struct FindBar: View {
                         .onSubmit { model.replaceCurrent() }
                     Button("Ersetzen") { model.replaceCurrent() }.disabled(model.matches.isEmpty).fixedSize()
                     Button("Alle") { model.replaceAll() }.disabled(model.matches.isEmpty).fixedSize()
-                        .help("Alle ersetzen")
+                        .helpLabel("Alle ersetzen")
                 }
             }
         }

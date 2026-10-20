@@ -84,7 +84,7 @@ struct AIChatView: View {
                         .padding(.vertical, 6)
                 }
                 .disabled(chat.messages.isEmpty)
-                .help("Neue Unterhaltung (die gespeicherte wird gelöscht)")
+                .helpLabel("Neue Unterhaltung (die gespeicherte wird gelöscht)")
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .medium))
@@ -92,7 +92,7 @@ struct AIChatView: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Chat schließen")
-                .help("Chat schließen")
+                .helpLabel("Chat schließen")
             }
             if let onScope {
                 Picker("", selection: Binding(get: { isLibrary }, set: { lib in
@@ -103,7 +103,7 @@ struct AIChatView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .help("Fragen zur offenen Notiz oder zu allen Notizen (mit Quellenangaben)")
+                .helpLabel("Fragen zur offenen Notiz oder zu allen Notizen (mit Quellenangaben)")
             }
         }
         .buttonStyle(.plain)
@@ -157,7 +157,7 @@ struct AIChatView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Wie viel der Notizen das Sprachmodell sieht (Grenze des Modells: \(ContextBuilder.modelContext) Token)")
+            .helpLabel("Wie viel der Notizen das Sprachmodell sieht (Grenze des Modells: \(ContextBuilder.modelContext) Token)")
             if showContext { contextDetails(lastAnswer?.sources ?? plan.passages, omitted: lastAnswer?.omitted ?? plan.omitted) }
         }
         .padding(.horizontal, 14)
@@ -217,7 +217,7 @@ struct AIChatView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Weitere Notizen hinzufügen, um sie zu vergleichen")
+            .helpLabel("Weitere Notizen hinzufügen, um sie zu vergleichen")
         }
     }
 
@@ -228,7 +228,7 @@ struct AIChatView: View {
             if let removable {
                 Button(action: removable) { Image(systemName: "xmark").font(.system(size: 7.5, weight: .bold)) }
                     .buttonStyle(.plain)
-                    .help("Aus dem Gespräch nehmen")
+                    .helpLabel("Aus dem Gespräch nehmen")
             }
         }
         .font(.system(size: 11, weight: .medium))
@@ -366,7 +366,7 @@ struct AIChatView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Stelle in der Notiz zeigen")
+        .helpLabel("Stelle in der Notiz zeigen")
     }
 
     private func reveal(_ id: UUID, passage: Int?, text: String? = nil) {

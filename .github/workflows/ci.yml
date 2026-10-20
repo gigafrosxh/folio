@@ -1,0 +1,50 @@
+# Build and test Folio on every pull request and push to main (#65).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Tests (macOS)
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)" || true
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build
+        run: swift build
+
+      - name: Unit tests
+        # Database tests skip themselves when PostgreSQL/MySQL/MSSQL tools are not installed.
+        run: swift test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+
+      - name: App bundle
+        run: ./scripts/build-app.sh
+
+      - name: Test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: test.log

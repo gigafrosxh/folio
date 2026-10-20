@@ -121,7 +121,7 @@ struct CodeBlockView: View {
                     runButton("Stopp", icon: "stop.fill", color: .red) { runs.stop(block.id) }
                 } else {
                     runButton("Ausführen", icon: "play.fill", color: Color(red: 0.12, green: 0.55, blue: 0.27), action: run)
-                        .help("Mit installiertem Interpreter ausführen (⌘↩)")
+                        .helpLabel("Mit installiertem Interpreter ausführen (⌘↩)")
                         .disabled(interpreter == nil)
                         .opacity(interpreter == nil ? 0.5 : 1)
                 }
@@ -142,7 +142,7 @@ struct CodeBlockView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .helpLabel(help)
     }
 
     private func runButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -183,7 +183,7 @@ struct CodeBlockView: View {
                 }
                 .buttonStyle(.borderless)
                 .font(.system(size: 9))
-                .help("Ausgabe kopieren")
+                .helpLabel("Ausgabe kopieren")
                 Button {
                     block.output = nil
                     block.diagnostics = []
@@ -192,7 +192,7 @@ struct CodeBlockView: View {
                 } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
                     .font(.system(size: 9))
-                    .help("Ausgabe leeren")
+                    .helpLabel("Ausgabe leeren")
             }
             if !block.outputCollapsed {
                 if !block.diagnostics.isEmpty { diagnosticList }
@@ -226,7 +226,7 @@ struct CodeBlockView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Zur Zeile springen")
+                .helpLabel("Zur Zeile springen")
             }
         }
         .padding(.bottom, 4)
@@ -302,7 +302,7 @@ struct CodeBlockView: View {
             Button("Ende (⌃D)") { runs.endInput(block.id) }
                 .buttonStyle(.borderless)
                 .font(.system(size: 10.5))
-                .help("Eingabe beenden, damit das Programm weiterläuft")
+                .helpLabel("Eingabe beenden, damit das Programm weiterläuft")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -369,7 +369,7 @@ struct CodeBlockView: View {
             Button("Alle Code-Blöcke der Notiz ausführen") { runs.runAll(doc: doc, theme: theme) }
             if spec.isRunnable && !usesDatabase {
                 Button("Im Terminal ausführen") { runInTerminal() }
-                    .help("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
+                    .helpLabel("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
                 Divider()
                 Toggle("Eingabe (stdin) vorgeben", isOn: Binding(
                     get: { showStdin || !(block.stdin ?? "").isEmpty },
@@ -400,7 +400,7 @@ struct CodeBlockView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Sitzung und Ausführung")
+        .helpLabel("Sitzung und Ausführung")
     }
 
     private var formatHelp: String {
@@ -478,7 +478,7 @@ struct CodeBlockView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Datenbank, auf der das SQL läuft")
+        .helpLabel("Datenbank, auf der das SQL läuft")
         .sheet(isPresented: $editingConnection) {
             DatabaseConnectionSheet(connection: block.connection ?? DatabaseConnection(name: "Neue Verbindung")) { saved in
                 block.connection = saved
