@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.16.4] – 2026-10-20
+
 ### Behoben
 - „Link zu Notiz“ (⌥⌘K) ohne Textcursor (oder mit dem Cursor in einem Codeblock) tat nichts. Der Link kommt jetzt in eine neue Zeile am Ende der Notiz (#76).
 
