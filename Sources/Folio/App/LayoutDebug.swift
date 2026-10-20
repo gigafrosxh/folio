@@ -139,6 +139,15 @@ enum LayoutDebug {
         if env["FOLIO_EDITOR_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await EditorSelfTest.run() }
         }
+        if env["FOLIO_QUICK_TEST"] != nil, env["FOLIO_LIBRARY"] != nil, env["FOLIO_CAPTURE_QUEUE"] != nil {
+            Task { @MainActor in await QuickAccessSelfTest.run() }
+        }
+        if let out = env["FOLIO_SWEEP_TEST"], env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await LibrarySweepTest.run(out: URL(fileURLWithPath: out)) }
+        }
+        if env["FOLIO_AI_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await AISelfTest.run() }
+        }
         if env["FOLIO_KEY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await KeyboardSelfTest.run() }
         }

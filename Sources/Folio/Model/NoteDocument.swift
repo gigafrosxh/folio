@@ -189,10 +189,20 @@ final class NoteDocument: ObservableObject, Identifiable {
     }
 
     /// Builds the file representation and refreshes title, preview and tags.
+    /// A text line without leading list marker (•, ☐, ☑, „1.“, „1“ + Tab …) and with single spaces.
+    static func plainLine(_ line: String) -> String {
+        // Bullets and checkboxes before any space; numbers only as "1." / "1)" or followed by a tab,
+        // so "10 km/h" keeps its number.
+        var s = line.replacingOccurrences(of: #"^[\t ]*(?:[•◦▪‣☐☑✓✔︎–\-*][\t ]+|\d{1,3}[.)][\t ]+|\d{1,3}\t+)"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"[\t ]+"#, with: " ", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespaces)
+    }
+
     func makeFile() -> NoteFile {
         let textBlocks = blocks.filter { $0.kind == .text }
         let fullText = textBlocks.map(\.storage.string).joined(separator: "\n")
-        let lines = fullText.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        // List markers, checkboxes and indentation are formatting, not part of the title or preview (#96).
+        let lines = fullText.split(whereSeparator: \.isNewline).map { Self.plainLine(String($0)) }.filter { !$0.isEmpty }
         meta.title = lines.first.map { String($0.prefix(120)) } ?? ""
         meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
         meta.tags = TagParser.tags(in: fullText)
