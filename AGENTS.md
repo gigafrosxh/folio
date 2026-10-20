@@ -9,6 +9,7 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
 1. **Vor jeder Aufgabe die GitHub-Issues prüfen** (`gh issue list --state open`). Gibt es die Anfrage schon als Issue,
    wird genau dieses Issue abgearbeitet und im Commit mit `Closes #N` geschlossen.
 2. **Jedes Update wird ein Release**: Eintrag unter `## [Unreleased]` in `CHANGELOG.md`, dann `make release V=X.Y.Z`.
+   **Jeder gemeldete Bug („[Bug] …“-Issue) bekommt ein eigenes Patch-Release** (0.16.1, 0.16.2, …), Commit mit `Closes #N`.
 3. **Folio nie selbst auf dem Mac des Nutzers installieren oder aktualisieren** – er aktualisiert selbst über den
    Update-Knopf. Kein `make install`, kein Ersetzen von `/Applications/Folio.app`.
 4. **Nie mit der echten Bibliothek testen** (`~/Documents/Folio`). Immer eine Kopie oder eine leere Testbibliothek
@@ -72,7 +73,8 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.16.0** (siehe `CHANGELOG.md`). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
+Aktuelle Version: **0.16.5** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking.
 
 ### Offene Punkte, die noch niemand geprüft hat
@@ -105,4 +107,7 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
 
 - Logik zuerst in `FolioCore` mit Unit-Tests, dann UI; danach ein Selbsttest im Harness gegen eine Bibliothekskopie.
 - Bei Änderungen am Dokumentmodell (`NoteStore.documents`, Tabs, Split) alle drei Selbsttests erneut laufen lassen.
-- Menükürzel nach jeder Änderung mit `FOLIO_MENU_DUMP=1` auf Doppelbelegungen prüfen.
+- Menükürzel nach jeder Änderung mit `FOLIO_MENU_DUMP=1` auf Doppelbelegungen prüfen (`FOLIO_MENU_DUMP=all` zeigt auch
+  Einträge ohne Kürzel). Achtung: macOS belegt ⌥⌘W („Alle schließen“); eine `CommandGroup(after: .saveItem)` verschwindet,
+  sobald die App mehr als eine Szene hat.
+- `swift test` nicht parallel zu einem anderen Agenten laufen lassen (die Datenbanktests teilen sich Ports/Sockets).

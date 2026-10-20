@@ -608,7 +608,7 @@ enum LayoutDebug {
             walk(root)
             if env["FOLIO_MENU_DUMP"] != nil, let menu = NSApp.mainMenu {
                 for top in menu.items {
-                    for item in top.submenu?.items ?? [] where !item.keyEquivalent.isEmpty {
+                    for item in top.submenu?.items ?? [] where !item.keyEquivalent.isEmpty || ProcessInfo.processInfo.environment["FOLIO_MENU_DUMP"] == "all" {
                         print("MENU", top.title, "|", item.title, "|", item.keyEquivalent, item.keyEquivalentModifierMask.rawValue, "|", item.action.map(NSStringFromSelector) ?? "nil", "| target:", item.target.map { String(describing: type(of: $0)) } ?? "nil")
                     }
                 }
