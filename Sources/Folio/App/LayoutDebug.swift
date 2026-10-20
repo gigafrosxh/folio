@@ -187,6 +187,27 @@ enum LayoutDebug {
                 }
             }
         }
+        // FOLIO_SETTINGS_DUMP=1: opens the settings and reports tabs hidden in the toolbar overflow (#104).
+        if env["FOLIO_SETTINGS_DUMP"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                MainActor.assumeIsolated {
+                    // The app menu's „Einstellungen …“ item, as a click would.
+                    if let appMenu = NSApp.mainMenu?.items.first?.submenu,
+                       let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," }) { appMenu.performActionForItem(at: i) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        MainActor.assumeIsolated {
+                            for w in NSApp.windows where w.isVisible {
+                                guard let toolbar = w.toolbar, w.identifier?.rawValue.hasPrefix("main") != true else { continue }
+                                let all = toolbar.items.map(\.label).filter { !$0.isEmpty }
+                                let visible = Set((toolbar.visibleItems ?? []).map(\.label))
+                                print("SETTINGS width", Int(w.frame.width), "tabs", all.count, "hidden", all.filter { !visible.contains($0) })
+                            }
+                            fflush(stdout)
+                        }
+                    }
+                }
+            }
+        }
         if env["FOLIO_QUICKOPEN"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open)

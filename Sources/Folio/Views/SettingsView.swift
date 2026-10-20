@@ -47,7 +47,8 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
         }
-        .frame(width: 620, height: 548)
+        // Wide enough for all nine tabs; at 620 pt „Feedback“ went into the overflow menu (#104).
+        .frame(width: 760, height: 548)
         .tint(theme.accent)
         .preferredColorScheme(theme.settings.appearance.colorScheme)
         .onAppear { previewDark = (theme.settings.appearance.colorScheme ?? colorScheme) == .dark }
