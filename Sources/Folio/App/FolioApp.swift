@@ -143,7 +143,8 @@ struct FolioCommands: Commands {
             Button("Fokusmodus") { NotificationCenter.default.post(name: .folioToggleFocus, object: nil) }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
         }
-        CommandGroup(after: .saveItem) {
+        // After "New": a .saveItem group disappears once the app has a second scene (note windows).
+        CommandGroup(after: .newItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
                 .keyboardShortcut("s")
             Button("Schnell öffnen …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open) }
