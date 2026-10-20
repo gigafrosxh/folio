@@ -132,6 +132,10 @@ struct ThemeSettings: Codable, Equatable {
     /// Look for a new Folio release on GitHub at every start and ask whether to install it. On by default;
     /// a new key name, so installations that stored the old opt-in value (`checkUpdatesOnLaunch`) get it too.
     var askForUpdatesOnLaunch = true
+    /// Menu bar icon with search and quick capture (#85).
+    var menuBarIcon = true
+    /// Global quick capture shortcut as stored KeyCombo; "" = default (⌃⌥⌘N), "off" = none (#86).
+    var captureHotKey = ""
     /// Code runs: output kept per run (KB), memory limit for the process tree (MB, 0 = none),
     /// stop processes a program leaves behind (#27, #32).
     var maxOutputKB: Double = 1000
@@ -185,6 +189,8 @@ struct ThemeSettings: Codable, Equatable {
         askForUpdatesOnLaunch = v(.askForUpdatesOnLaunch, d.askForUpdatesOnLaunch)
         trashRetentionDays = v(.trashRetentionDays, d.trashRetentionDays)
         maxOutputKB = v(.maxOutputKB, d.maxOutputKB)
+        menuBarIcon = v(.menuBarIcon, d.menuBarIcon)
+        captureHotKey = v(.captureHotKey, d.captureHotKey)
         maxMemoryMB = v(.maxMemoryMB, d.maxMemoryMB)
         killOrphans = v(.killOrphans, d.killOrphans)
         backupsEnabled = v(.backupsEnabled, d.backupsEnabled)

@@ -35,6 +35,7 @@ struct SettingsView: View {
             execution.tabItem { Label("Ausführung", systemImage: "play.circle") }
             appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }
             SafetySettingsView().tabItem { Label("Sicherheit", systemImage: "lock.shield") }
+            QuickAccessSettingsView().tabItem { Label("Schnellzugriff", systemImage: "bolt") }
             shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }
             feedback.tabItem { Label("Feedback", systemImage: "bubble.left.and.exclamationmark.bubble.right") }
         }

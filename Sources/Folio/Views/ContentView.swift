@@ -10,6 +10,7 @@ struct ContentView: View {
     @StateObject private var windowState = WindowState()
     @State private var showUpdates = false
     @State private var quickOpen: QuickOpenMode?
+    @Environment(\.openWindow) private var openWindow
     /// Focus mode (#10): only the note, no sidebar, list, tabs or toolbar.
     @AppStorage("folio.focusMode") private var focusMode = false
     @State private var hoverExit = false
@@ -68,7 +69,7 @@ struct ContentView: View {
             }
         }
         .onExitCommand { if focusMode { focusMode = false } }
-        .onAppear { focusMode = false }
+        .onAppear { focusMode = false; QuickAccessSettings.opener = openWindow }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleFocus)) { _ in focusMode.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }

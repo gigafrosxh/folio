@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Menüleiste** (#85): Ein Folio-Symbol in der Menüleiste sucht Notizen, zeigt angepinnte und zuletzt geöffnete und öffnet die Schnellerfassung, auch wenn das Hauptfenster geschlossen ist. Abschaltbar unter Einstellungen › Schnellzugriff; mit Symbol läuft Folio weiter, wenn das letzte Fenster zu ist (Dock-Klick öffnet es wieder).
+- **Globales Kürzel** (#86): ⌃⌥⌘N öffnet die Schnellerfassung aus jeder App (ohne Bedienungshilfen-Freigabe). Das Kürzel lässt sich ändern oder abschalten; ist es von einer anderen App belegt, sagt Folio das.
+- **Schnellerfassung** (#87): Ein kleines schwebendes Fenster speichert Text, Links (als Vorschau) und eingefügte Bilder mit ⌘↩ in die Inbox (`Inbox.folio`, angepinnt) oder eine zuletzt geöffnete Notiz. Esc schließt, der Entwurf bleibt erhalten; „Verwerfen“ löscht ihn bewusst. Auch über Ablage › Schnellerfassung.
+- **Schnellwechsel** (#88): ⌘P findet jetzt neben Notizen auch Ordner und Tags (unscharfe Suche; „/“ nur Ordner, „#“ nur Tags) und springt mit ↩ dorthin.
+- **Folio-Links** (#89): `folio://note/<id>`, `folio://capture?text=…&target=inbox`, `folio://search?q=…`, `folio://new?title=…&text=…` und `folio://open` – für Kurzbefehle, Skripte und andere Apps. Ungültige Links werden mit einer verständlichen Meldung abgelehnt.
+- **Erfassen ohne Datenverlust** (#93): Ist die Bibliothek nicht erreichbar, schreibgeschützt oder wird die Zielnotiz gleichzeitig geändert, landet die Erfassung sicher in einer Warteschlange außerhalb der Bibliothek und wird automatisch nachgetragen (beim Aktivieren und jede Minute). Offene Notizen erhalten Erfassungen über den Editor, ungesicherte Änderungen bleiben erhalten; beschädigte Notizen werden nie überschrieben.
+
 ## [0.19.0] – 2026-10-20
 
 ### Geändert

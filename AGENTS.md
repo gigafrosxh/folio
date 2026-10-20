@@ -73,9 +73,10 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.19.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **0.20.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
-0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69).
+0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
+**Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
 **Vorgabe des Nutzers:** bis einschließlich 0.20 nur bauen, Unit-Tests laufen lassen und veröffentlichen; das gründliche Testen (auch durch Codex) kommt erst nach 0.20.
 
 ### Offene Punkte, die noch niemand geprüft hat
@@ -130,3 +131,11 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
 - `make build` meldet Fehler im Format `error: <pfad>:<zeile>` – mit `grep "error:"` suchen, nicht `" error"`.
 - CI: `.github/workflows/ci.yml` (macOS-26-Runner): Build, `swift test`, App-Paket.
 - `NoteStore` ist auf `NoteStore+*.swift` verteilt; Setter sind `internal(set)`, damit die Erweiterungen sie nutzen können.
+
+### Quick Access ab 0.20
+
+- Kern: `Sources/FolioCore/QuickAccess.swift` (Deep-Link-Parser `FolioURL`, `CaptureWriter`, `CaptureQueue`, `SwitcherEntry`).
+- App: `Sources/Folio/QuickAccess/` (Menüleiste, Schnellerfassung-Panel, globales Kürzel über Carbon `RegisterEventHotKey`,
+  `CaptureService`, Deep Links, Einstellungen). Wartende Erfassungen liegen in `~/Library/Application Support/Folio/Wartende Erfassungen`;
+  in Tests mit `FOLIO_CAPTURE_QUEUE=<ordner>` umlenken.
+- Nicht geprüft: echtes globales Kürzel aus einer anderen App, Menüleisten-Fenster, Einfügen von Bildern in die Schnellerfassung.

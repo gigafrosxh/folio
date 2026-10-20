@@ -16,6 +16,7 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("n")
             Button("Neuer Ordner…") { NotificationCenter.default.post(name: .folioNewFolder, object: nil) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Schnellerfassung …") { QuickCaptureController.shared.show() }
             Button("Neuer Tab") { store.createNoteInNewTab() }
                 .keyboardShortcut("t")
             Divider()

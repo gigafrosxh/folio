@@ -24,15 +24,30 @@ struct QuickOpenView: View {
     @State private var index = 0
     @FocusState private var focused: Bool
 
-    private var results: [NoteRef] {
+    /// Notes (recent ones first) and, when opening, also folders and tags (#88).
+    private var results: [SwitcherEntry] {
         let recentIDs = store.recent.ids
         let byID = Dictionary(store.notes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let recent = recentIDs.compactMap { byID[$0] }
         let others = store.notes.filter { !recentIDs.contains($0.id) }.sorted { $0.meta.modified > $1.meta.modified }
-        var list = recent + others
-        if mode != .open, let current = store.currentDocument?.id { list.removeAll { $0.id == current } }
-        let ranked = FuzzyMatch.rank(list, query: query) { $0.meta.title.isEmpty ? $0.url.deletingPathExtension().lastPathComponent : $0.meta.title }
-        return Array(ranked.prefix(50))
+        var notes = recent + others
+        if mode != .open, let current = store.currentDocument?.id { notes.removeAll { $0.id == current } }
+        var entries = notes.map { ref in
+            SwitcherEntry(kind: .note, title: ref.meta.title.isEmpty ? ref.url.deletingPathExtension().lastPathComponent : ref.meta.title,
+                          detail: store.relativeFolderName(ref.folderURL) + (ref.meta.preview.isEmpty ? "" : " · " + ref.meta.preview),
+                          key: ref.id.uuidString)
+        }
+        if mode == .open {
+            entries += store.allFolderURLs.map { url in
+                SwitcherEntry(kind: .folder, title: url.lastPathComponent, detail: store.relativeFolderName(url), key: url.path)
+            }
+            entries += store.tagCounts.map { t in
+                SwitcherEntry(kind: .tag, title: "#\(t.tag)", detail: "\(t.count) Notiz\(t.count == 1 ? "" : "en")", key: t.tag)
+            }
+            // Without a query only notes are listed; folders and tags come with typing (or "/" and "#").
+            if query.isEmpty { entries = entries.filter { $0.kind == .note } }
+        }
+        return Array(SwitcherEntry.rank(entries, query: query).prefix(50))
     }
 
     var body: some View {
@@ -40,7 +55,7 @@ struct QuickOpenView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: mode == .link ? "link" : mode == .addToChat ? "sparkles" : "magnifyingglass").foregroundStyle(.secondary)
-                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : "Notiz öffnen …", text: $query)
+                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : "Notiz, Ordner (/) oder Tag (#) öffnen …", text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .focused($focused)
@@ -48,12 +63,13 @@ struct QuickOpenView: View {
                     .onKeyPress(.downArrow) { index = min(index + 1, max(items.count - 1, 0)); return .handled }
                     .onKeyPress(.upArrow) { index = max(index - 1, 0); return .handled }
                     .onKeyPress(.escape) { onClose(); return .handled }
+                    .accessibilityLabel("Suche")
                 Text(mode == .link ? "↩ verlinken" : mode == .addToChat ? "↩ hinzufügen" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
             }
             .padding(14)
             Divider()
             if items.isEmpty {
-                Text(store.notes.isEmpty ? "Noch keine Notizen." : "Keine Notiz passt zu „\(query)“.")
+                Text(store.notes.isEmpty ? "Noch keine Notizen." : "Nichts passt zu „\(query)“.")
                     .foregroundStyle(.secondary).padding(20)
             } else {
                 ScrollViewReader { proxy in
@@ -63,10 +79,13 @@ struct QuickOpenView: View {
                                 Text("Zuletzt geöffnet").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.top, 4)
                             }
-                            ForEach(Array(items.enumerated()), id: \.element.id) { i, ref in
-                                row(ref, selected: i == index)
-                                    .id(ref.id)
+                            ForEach(Array(items.enumerated()), id: \.element.id) { i, entry in
+                                row(entry, selected: i == index)
+                                    .id(entry.id)
                                     .onTapGesture { index = i; choose(items) }
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityAddTraits(i == index ? [.isButton, .isSelected] : .isButton)
+                                    .accessibilityAction { index = i; choose(items) }
                             }
                         }
                         .padding(6)
@@ -84,14 +103,18 @@ struct QuickOpenView: View {
         .onChange(of: query) { index = 0 }
     }
 
-    private func row(_ ref: NoteRef, selected: Bool) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: store.recent.ids.contains(ref.id) ? "clock" : "note.text")
-                .foregroundStyle(selected ? theme.accent : .secondary).frame(width: 18)
+    private func row(_ entry: SwitcherEntry, selected: Bool) -> some View {
+        let icon: String
+        switch entry.kind {
+        case .note: icon = UUID(uuidString: entry.key).map { store.recent.ids.contains($0) } == true ? "clock" : "note.text"
+        case .folder: icon = "folder"
+        case .tag: icon = "number"
+        }
+        return HStack(spacing: 10) {
+            Image(systemName: icon).foregroundStyle(selected ? theme.accent : .secondary).frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
-                Text(ref.meta.title.isEmpty ? "Ohne Titel" : ref.meta.title).font(.system(size: 13.5, weight: .medium)).lineLimit(1)
-                Text(store.relativeFolderName(ref.folderURL) + (ref.meta.preview.isEmpty ? "" : " · " + ref.meta.preview))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(entry.title.isEmpty ? "Ohne Titel" : entry.title).font(.system(size: 13.5, weight: .medium)).lineLimit(1)
+                Text(entry.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
         }
@@ -101,14 +124,25 @@ struct QuickOpenView: View {
         .contentShape(Rectangle())
     }
 
-    private func choose(_ items: [NoteRef]) {
+    private func choose(_ items: [SwitcherEntry]) {
         guard items.indices.contains(index) else { return }
-        let ref = items[index]
+        let entry = items[index]
         onClose()
+        switch entry.kind {
+        case .folder:
+            store.searchText = ""
+            store.sidebarSelection = .folder(URL(fileURLWithPath: entry.key, isDirectory: true))
+            return
+        case .tag:
+            store.searchText = ""
+            store.sidebarSelection = .tag(entry.key)
+            return
+        case .note: break
+        }
+        guard let id = UUID(uuidString: entry.key), let ref = store.notes.first(where: { $0.id == id }) else { return }
         switch mode {
         case .open:
-            if !store.filteredNotes.contains(where: { $0.id == ref.id }) { store.sidebarSelection = .all; store.searchText = "" }
-            store.selectedNoteID = ref.id
+            store.open(noteID: ref.id)
         case .link:
             NoteLinkInserter.insert(ref)
         case .addToChat:

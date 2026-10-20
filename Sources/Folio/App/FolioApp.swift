@@ -13,7 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { UpdateManager.shared.check(silently: true) }
         }
         LayoutDebug.runIfRequested()
-        MainActor.assumeIsolated { BackupManager.shared.start() }
+        MainActor.assumeIsolated {
+            BackupManager.shared.start()
+            CaptureService.shared.start()
+            QuickAccessSettings.apply()
+        }
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
     }
@@ -30,14 +34,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// folio://note/<id> links from other apps (or a copied note link) open the note.
+    /// folio:// links from other apps, Shortcuts or the browser (#89).
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated {
-            for url in urls { if let id = NoteLink.id(from: url) { NoteStore.shared.open(noteID: id) } }
+            for url in urls { DeepLinks.handle(url) }
         }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// With the menu bar icon Folio keeps running when the last window closes.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        MainActor.assumeIsolated { !ThemeManager.shared.settings.menuBarIcon }
+    }
+
+    /// Clicking the Dock icon with no window open brings the main window back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { MainActor.assumeIsolated { QuickAccessSettings.showMainWindow(QuickAccessSettings.opener) } }
+        return true
+    }
 
     /// ⌘V when no text field has focus (e.g. right after picking a note in the list): the end of the
     /// responder chain lands here, and files or images go into the open note.
@@ -74,6 +87,15 @@ struct FolioApp: App {
                 .tint(theme.accent)
         }
         .defaultSize(width: 760, height: 820)
+
+        // Menu bar icon (#85), optional in Settings › Schnellzugriff.
+        MenuBarExtra("Folio", systemImage: "note.text", isInserted: Binding(
+            get: { theme.settings.menuBarIcon }, set: { theme.settings.menuBarIcon = $0 })) {
+            MenuBarPanel()
+                .environmentObject(store)
+                .environmentObject(theme)
+        }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()
