@@ -12,7 +12,9 @@ final class DatabaseClientTests: XCTestCase {
         if let (ctl, data) = postgres { _ = try? command(ctl, ["-D", data, "stop", "-m", "immediate", "-w"], timeout: 15) }
         for server in servers where server.isRunning {
             ServerDetector.terminateTree(server.processIdentifier)
-            server.waitUntilExit()
+            let deadline = Date().addingTimeInterval(10)
+            while server.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
+            if server.isRunning { kill(server.processIdentifier, SIGKILL) }
         }
         for directory in directories { try? FileManager.default.removeItem(at: directory) }
         try super.tearDownWithError()

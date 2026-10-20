@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Datenbank-Block wie in DataGrip: Verbindung zu SQLite, PostgreSQL und MySQL/MariaDB direkt in der Notiz (Zylinder-Symbol, Einfügen › Datenbank-Abfrage oder ⌃⇧D). Verbindungsdialog mit „Verbindung testen“, Passwörter im macOS-Schlüsselbund, Schema-Ansicht mit Tabellen, Spalten, Typen und Primärschlüsseln (Doppelklick zeigt den Inhalt), SQL-Feld mit Hervorhebung und Vorschlägen für Tabellen- und Spaltennamen, Ausführen mit ⇧↩, Ergebnistabelle mit Zeilennummern und NULL-Anzeige, Ergebnis als CSV kopieren. Nutzt die installierten Clients sqlite3, psql und mysql.
+
 ## [0.9.0] – 2026-10-20
 
 ### Hinzugefügt

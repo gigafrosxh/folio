@@ -46,7 +46,7 @@ public enum DatabaseClient {
             var sets = try parser.results()
             let changes = sets.last?.columns == [marker] ? sets.removeLast().rows.first?.first ?? nil : nil
             result = sets.last(where: { !$0.rows.isEmpty }) ?? QueryResult(message: changes.flatMap {
-                (Int($0) ?? 0) > 0 ? "\($0) Zeilen geändert" : nil
+                (Int($0) ?? 0) > 0 ? ($0 == "1" ? "1 Zeile geändert" : "\($0) Zeilen geändert") : nil
             } ?? "Ausgeführt.")
         case .postgresql:
             result = try parseCSV(output, nullMarker: marker)
