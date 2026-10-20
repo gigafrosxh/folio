@@ -125,6 +125,8 @@ struct ThemeSettings: Codable, Equatable {
     var codeCompletion = true
     /// Rebound tool shortcuts: action id → "ctrl+c". Missing entries use the defaults.
     var shortcuts: [String: String] = [:]
+    /// Subtle UI animations (also off when the system asks to reduce motion).
+    var animations = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -160,6 +162,7 @@ struct ThemeSettings: Codable, Equatable {
         codePredictions = v(.codePredictions, d.codePredictions)
         codeCompletion = v(.codeCompletion, d.codeCompletion)
         shortcuts = v(.shortcuts, d.shortcuts)
+        animations = v(.animations, d.animations)
     }
 }
 

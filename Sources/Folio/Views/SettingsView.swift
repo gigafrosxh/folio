@@ -248,6 +248,8 @@ struct SettingsView: View {
                 }
                 settingSlider("Eckenradius", value: $theme.settings.cornerRadius, range: 0...28, unit: "pt")
                 Toggle("Schatten", isOn: $theme.settings.shadows)
+                Toggle("Animationen", isOn: $theme.settings.animations)
+                    .help("Dezente Übergänge beim Einfügen, Löschen und Wechseln. Sind in den Systemeinstellungen „Bewegung reduzieren“ aktiv, bleiben sie immer aus.")
             }
             Section("Vorschau") {
                 VStack(alignment: .leading, spacing: 8) {

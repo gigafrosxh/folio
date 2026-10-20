@@ -170,6 +170,7 @@ struct SidebarView: View {
         .frame(height: 32)
         .background(selected ? theme.accent.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
+        .animation(Motion.quick, value: selected)
         .onTapGesture { store.sidebarSelection = item }
     }
 

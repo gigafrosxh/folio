@@ -29,11 +29,13 @@ struct NoteListView: View {
                                     .onTapGesture { store.selectedNoteID = note.id; focused = true }
                                     .draggable(note.id.uuidString)
                                     .contextMenu { menu(for: note) }
+                                    .transition(Motion.blockTransition)
                             }
                         }
                     }
                     .padding(.horizontal, 8)
                     .padding(.bottom, 16)
+                    .animation(Motion.standard, value: notes.map(\.id))
                 }
                 .scrollIndicators(.never)
                 .focusable()
@@ -216,6 +218,8 @@ struct NoteCard: View {
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selected ? theme.accent.opacity(0.5) : .clear, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { hovering = $0 }
+        .animation(Motion.quick, value: selected)
+        .animation(Motion.quick, value: hovering)
     }
 
     private var background: Color {

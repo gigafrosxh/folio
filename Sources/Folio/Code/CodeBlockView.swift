@@ -29,11 +29,16 @@ struct CodeBlockView: View {
                 .frame(height: height)
                 .padding(.bottom, 2)
             serverBar
+                .transition(Motion.slideUp)
             if let output = block.output {
                 outputView(output)
+                    .transition(Motion.slideUp)
             }
         }
         .background(Color(nsColor: codeTheme.backgroundColor))
+        .animation(Motion.standard, value: block.output == nil)
+        .animation(Motion.standard, value: runs.server(block.id) != nil)
+        .animation(Motion.quick, value: runs.isRunning(block.id))
         .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Color.primary.opacity(0.08)))
         .shadow(color: .black.opacity(theme.settings.shadows ? 0.10 : 0), radius: 10, y: 4)

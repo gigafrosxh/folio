@@ -51,12 +51,14 @@ struct NoteEditorView: View {
                     }
                     ForEach(doc.blocks) { block in
                         BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
+                            .transition(Motion.blockTransition)
                     }
                     Color.clear
                         .frame(height: 220)
                         .contentShape(Rectangle())
                         .onTapGesture { focusEnd() }
                 }
+                .animation(Motion.standard, value: doc.blocks.map(\.id))
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
                 .padding(.trailing, showChat ? 36 + 372 : 36)
@@ -80,16 +82,16 @@ struct NoteEditorView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showChat {
-                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { withAnimation(.snappy) { showChat = false } })
+                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { Motion.animate { showChat = false } })
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
                     .frame(width: 360)
                     .padding(.top, 62)
                     .padding([.trailing, .bottom], 12)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(Motion.enabled ? .move(edge: .trailing).combined(with: .opacity) : .identity)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
-            withAnimation(.snappy) { showChat.toggle() }
+            Motion.animate { showChat.toggle() }
         }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
@@ -472,7 +474,7 @@ struct BlockRow: View {
                 Button("Entfernen", role: .destructive) { doc.remove(block.id) }
             }
         }
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(Motion.quick, value: hovering)
     }
 
     /// Hides the controls with a short delay so they don't vanish while the pointer crosses a gap.

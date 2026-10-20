@@ -36,9 +36,24 @@ final class CompletionPopup {
             frame.origin.x = min(frame.origin.x, screen.maxX - frame.width)
         }
         panel.appearance = parent.effectiveAppearance
+        let appearing = !panel.isVisible
         panel.setFrame(frame, display: true)
         if panel.parent == nil { parent.addChildWindow(panel, ordered: .above) }
-        panel.orderFront(nil)
+        if appearing, Motion.enabled {
+            // Fade in from slightly above, like a macOS menu.
+            panel.alphaValue = 0
+            panel.setFrameOrigin(NSPoint(x: frame.minX, y: frame.minY + 6))
+            panel.orderFront(nil)
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.14
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().alphaValue = 1
+                panel.animator().setFrameOrigin(frame.origin)
+            }
+        } else {
+            panel.alphaValue = 1
+            panel.orderFront(nil)
+        }
     }
 
     func hide() {

@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Dezente Animationen: Blöcke erscheinen und verschwinden weich, die Notizliste ordnet sich animiert um, Auswahl und Hover blenden über, Ausgabe und Server-Leiste gleiten ein, Vorschlagsliste und KI-Chat blenden ein, Wechsel zwischen Notizen und das Ein-/Ausblenden der Seitenleiste sind animiert. Schalter unter Einstellungen › Darstellung; mit „Bewegung reduzieren“ in den Systemeinstellungen bleiben sie aus.
+
 ## [0.7.1] – 2026-10-20
 
 ### Behoben

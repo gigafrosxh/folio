@@ -15,7 +15,7 @@ struct ContentView: View {
                 SidebarView()
                     .frame(width: 240)
                     .padding(.trailing, 12)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
             }
             NoteListView(sidebarVisible: $sidebarVisible)
                 .frame(width: CGFloat(listWidth))
@@ -23,6 +23,7 @@ struct ContentView: View {
                 .panel(theme: theme)
             ColumnResizer(width: $listWidth, range: 240...460)
             editor
+                .animation(Motion.quick, value: store.currentDocument?.id)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
         }
@@ -32,7 +33,7 @@ struct ContentView: View {
         .environmentObject(windowState)
         .fontDesign(.rounded)
         .ignoresSafeArea()
-        .animation(.snappy(duration: 0.25), value: sidebarVisible)
+        .animation(Motion.standard, value: sidebarVisible)
         .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
         .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {
             Button("OK") {}
@@ -46,6 +47,7 @@ struct ContentView: View {
         if let doc = store.currentDocument {
             NoteEditorView(doc: doc)
                 .id(doc.id)
+                .transition(Motion.enabled ? .opacity.combined(with: .offset(y: 8)) : .identity)
         } else {
             ZStack {
                 VStack(spacing: 14) {

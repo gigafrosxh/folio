@@ -104,6 +104,7 @@ struct AIChatView: View {
                     }
                     ForEach(chat.messages) { message in
                         messageRow(message)
+                            .transition(Motion.blockTransition)
                     }
                     Color.clear.frame(height: 1).id(bottomID)
                 }
@@ -112,8 +113,10 @@ struct AIChatView: View {
             .frame(maxHeight: .infinity)
             .onAppear { proxy.scrollTo(bottomID, anchor: .bottom) }
             .onChange(of: chat.messages) {
-                proxy.scrollTo(bottomID, anchor: .bottom)
+                if let a = Motion.quick { withAnimation(a) { proxy.scrollTo(bottomID, anchor: .bottom) } }
+                else { proxy.scrollTo(bottomID, anchor: .bottom) }
             }
+            .animation(Motion.standard, value: chat.messages.count)
         }
     }
 
