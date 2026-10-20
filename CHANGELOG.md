@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.12.2] – 2026-10-20
+
 ### Geändert
 - Update-Fenster mit Fortschrittsbalken über das ganze Update: Download mit MB und Prozent, danach Prüfen, Kopieren, Ersetzen und Neustart als eigene Schritte.
 
