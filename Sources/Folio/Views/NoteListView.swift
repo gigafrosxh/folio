@@ -211,6 +211,12 @@ struct NoteListView: View {
         Button("Rechts daneben öffnen") { store.openInSplit(note.id) }
         Button("In neuem Fenster öffnen") { openWindow(id: "note", value: note.id) }
         Button("Duplizieren") { store.duplicate(note.id) }
+        if let current = store.currentDocument?.id, current != note.id {
+            Button("Zum KI-Chat hinzufügen (Vergleich)") {
+                AIChatModel.forNote(current).addNote(note.id)
+                NotificationCenter.default.post(name: .folioOpenChat, object: nil)
+            }
+        }
         Divider()
         Button("Notizlink kopieren") {
             NSPasteboard.general.clearContents()

@@ -27,6 +27,8 @@ struct NoteEditorView: View {
     @StateObject private var find = FindModel()
     @State private var showFind = false
     @State private var showTerminal = false
+    /// The chat asks the whole library instead of this note (#38).
+    @State private var chatLibrary = false
     @State private var showEnvironment = false
     /// Focus mode hides the toolbar until the pointer comes near the top.
     @AppStorage("folio.focusMode") private var focusMode = false
@@ -117,7 +119,8 @@ struct NoteEditorView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showChat {
-                AIChatView(chat: chatModel, onInsert: insertChatAnswer, onClose: { setChat(false) })
+                AIChatView(chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
+                           onInsert: insertChatAnswer, onClose: { setChat(false) })
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
                     .frame(width: 360)
                     // The popup grows out of the ✨ button (top right) and shrinks back into it.
@@ -130,6 +133,19 @@ struct NoteEditorView: View {
         .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
         .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
         .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in if isActive { showHistory = true } }
+        .onReceive(NotificationCenter.default.publisher(for: .folioRevealText)) { note in
+            if let req = note.object as? RevealRequest, req.noteID == doc.id { reveal(req.text) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .folioOpenChat)) { _ in
+            guard isActive else { return }
+            chatLibrary = false
+            if !showChat { setChat(true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .folioAskLibrary)) { _ in
+            guard isActive else { return }
+            chatLibrary = true
+            if !showChat { setChat(true) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in
             guard isActive else { return }
             if let selected = formatting.selectedText, !selected.contains("\n"), !selected.isEmpty { find.query = selected }
@@ -186,6 +202,32 @@ struct NoteEditorView: View {
         }
     }
 
+    /// Selects and shows a cited passage (#35): its first line is looked up in the text and code blocks.
+    private func reveal(_ passage: String) {
+        let lines = passage.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count >= 3 }
+        guard let first = lines.first else { return }
+        let probe = String(first.prefix(60))
+        for b in doc.blocks where b.kind == .text || b.kind == .code || b.kind == .database {
+            let ns = b.storage.string as NSString
+            let r = ns.range(of: probe, options: [.caseInsensitive, .diacriticInsensitive])
+            guard r.location != NSNotFound else { continue }
+            let tv: NSTextView? = FormattingController.shared.textView(for: b.id) ?? FormattingController.shared.codeView(for: b.id)
+            guard let tv, tv.textStorage === b.storage else { continue }
+            // Select the whole passage as far as it is contiguous in this block.
+            var end = NSMaxRange(r)
+            if let last = lines.last, last != first {
+                let lr = ns.range(of: String(last.suffix(60)), options: [.caseInsensitive], range: NSRange(location: r.location, length: ns.length - r.location))
+                if lr.location != NSNotFound, NSMaxRange(lr) - r.location < 4000 { end = NSMaxRange(lr) }
+            }
+            let range = NSRange(location: r.location, length: end - r.location)
+            tv.window?.makeFirstResponder(tv)
+            tv.setSelectedRange(range)
+            tv.scrollRangeToVisible(range)
+            tv.showFindIndicator(for: NSRange(location: r.location, length: min(r.length, range.length)))
+            return
+        }
+    }
+
     private func closeFind() {
         find.detach()
         withAnimation(Motion.quick) { showFind = false }
@@ -215,7 +257,7 @@ struct NoteEditorView: View {
 
     /// The Apple Intelligence chat for this note; it reads the note and the current selection on each question.
     private var chatModel: AIChatModel {
-        let chat = AIChatModel.forNote(doc.id)
+        let chat = chatLibrary ? AIChatModel.forLibrary() : AIChatModel.forNote(doc.id)
         chat.noteProvider = { [weak doc] in
             guard let doc else { return ("", "", nil) }
             let text = doc.blocks.map { b -> String in
@@ -540,6 +582,10 @@ struct EditorActions {
 extension Notification.Name {
     /// Posted by menu commands; `object` is the kind of block to insert.
     static let folioInsert = Notification.Name("folio.insert")
+    /// Opens the chat of the focused note (without toggling it closed).
+    static let folioOpenChat = Notification.Name("folio.openChat")
+    /// Opens the chat in "whole library" mode.
+    static let folioAskLibrary = Notification.Name("folio.askLibrary")
     /// Shows or hides the focused note's terminal panel.
     static let folioToggleTerminal = Notification.Name("folio.toggleTerminal")
     /// Shows the terminal of the note whose id is `object`.

@@ -163,6 +163,7 @@ final class NoteStore: ObservableObject {
         splitNoteID = nil
         selectedNoteID = nil
         closeAllDocuments()
+        AIChatModel.resetCache()
         rootURL = url
         ThemeManager.shared.settings.libraryPath = url.path
         prepareRoot()

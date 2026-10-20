@@ -10,6 +10,8 @@ enum QuickOpenMode: Equatable {
     case open
     /// Insert a link to the chosen note at the cursor.
     case link
+    /// Add the chosen note to the open note's AI chat, for comparing (#34).
+    case addToChat
 }
 
 /// Floating panel with fuzzy search over all notes; the recently opened ones come first.
@@ -28,7 +30,7 @@ struct QuickOpenView: View {
         let recent = recentIDs.compactMap { byID[$0] }
         let others = store.notes.filter { !recentIDs.contains($0.id) }.sorted { $0.meta.modified > $1.meta.modified }
         var list = recent + others
-        if mode == .link, let current = store.currentDocument?.id { list.removeAll { $0.id == current } }
+        if mode != .open, let current = store.currentDocument?.id { list.removeAll { $0.id == current } }
         let ranked = FuzzyMatch.rank(list, query: query) { $0.meta.title.isEmpty ? $0.url.deletingPathExtension().lastPathComponent : $0.meta.title }
         return Array(ranked.prefix(50))
     }
@@ -37,8 +39,8 @@ struct QuickOpenView: View {
         let items = results
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: mode == .link ? "link" : "magnifyingglass").foregroundStyle(.secondary)
-                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : "Notiz öffnen …", text: $query)
+                Image(systemName: mode == .link ? "link" : mode == .addToChat ? "sparkles" : "magnifyingglass").foregroundStyle(.secondary)
+                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : "Notiz öffnen …", text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .focused($focused)
@@ -46,7 +48,7 @@ struct QuickOpenView: View {
                     .onKeyPress(.downArrow) { index = min(index + 1, max(items.count - 1, 0)); return .handled }
                     .onKeyPress(.upArrow) { index = max(index - 1, 0); return .handled }
                     .onKeyPress(.escape) { onClose(); return .handled }
-                Text(mode == .link ? "↩ verlinken" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
+                Text(mode == .link ? "↩ verlinken" : mode == .addToChat ? "↩ hinzufügen" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
             }
             .padding(14)
             Divider()
@@ -109,6 +111,8 @@ struct QuickOpenView: View {
             store.selectedNoteID = ref.id
         case .link:
             NoteLinkInserter.insert(ref)
+        case .addToChat:
+            if let current = store.currentDocument?.id { AIChatModel.forNote(current).addNote(ref.id) }
         }
     }
 }

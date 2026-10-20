@@ -208,6 +208,8 @@ struct FolioCommands: Commands {
             Button("Writing Tools …") { f.showWritingTools() }.keyboardShortcut("w", modifiers: [.command, .shift])
             Button("Chat mit Apple Intelligence") { NotificationCenter.default.post(name: .folioToggleChat, object: nil) }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+            Button("Bibliothek fragen …") { NotificationCenter.default.post(name: .folioAskLibrary, object: nil) }
+                .keyboardShortcut("i", modifiers: [.command, .option, .shift])
             Button("Schrift größer") { f.changeFontSize(by: 2) }.keyboardShortcut("+")
             Button("Schrift kleiner") { f.changeFontSize(by: -2) }.keyboardShortcut("-")
         }

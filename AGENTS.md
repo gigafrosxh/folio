@@ -73,9 +73,10 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **0.17.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **0.18.0** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
-0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32).
+0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41).
+**Vorgabe des Nutzers:** bis einschließlich 0.20 nur bauen, Unit-Tests laufen lassen und veröffentlichen; das gründliche Testen (auch durch Codex) kommt erst nach 0.20.
 
 ### Offene Punkte, die noch niemand geprüft hat
 
@@ -97,7 +98,7 @@ Vom Nutzer noch nicht in Versionen eingeteilt; vor Beginn mit `gh issue list` ab
   Dateiformat, #59 UI-Tests Tastatur, #60 VoiceOver-Audit, #61 Absturzberichte, #62 große Bibliotheken schneller laden.
 - **Distribution:** #63 signierte/notarisierte Releases, #65 CI, #66 Issue-/PR-Vorlagen, #67 CONTRIBUTING + Architektur,
   #68 große SwiftUI-Dateien aufteilen, #69 Migrationstests, #70 Shortcuts/AppleScript, #71 Obsidian-Import, #72 Datenschutz-Doku.
-- **KI:** #33–#42 (Chatverlauf speichern, Quellen, Tag-Vorschläge, KI-Suche, Ollama-Opt-in, Fallback ohne Apple Intelligence …).
+- **KI:** #36, #37, #40, #42 (Kontextmenü-Aktionen, Tag-Vorschläge, Antwort als Block, Ollama-Opt-in). KI-Kern ab 0.18: `Sources/FolioCore/AIContext.swift` (Abschnitte, Kontextbudget, BM25-Suche, Zitate, Chat-Archiv).
 - **Code:** #26, #28, #29, #31 (Abhängigkeiten, Export, automatische Blocktests, Diff).
 - **Medien:** #43–#46, #49, #50 (PDF-Suche/Annotationen, Bilder zuschneiden, Alt-Texte, Anhang-Metadaten, Web-Clipping).
 - **Organisation:** #13 manuelle Sortierung, #14 gespeicherte Suchen, #15 Favoriten, #19 Metadaten/Wortstatistik.

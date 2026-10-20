@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Chatverlauf bleibt erhalten** (#33): Unterhaltungen mit Apple Intelligence werden pro Notiz in der Bibliothek gespeichert (`.folio/chats`) und sind nach dem Schließen, Wechseln und Neustarten wieder da. „Neu“ beginnt von vorn und löscht den gespeicherten Verlauf.
+- **Notizen vergleichen** (#34): Im Chat fügt „+ Notiz“ weitere Notizen hinzu (oder Rechtsklick in der Liste › „Zum KI-Chat hinzufügen“). Alle ausgewählten Notizen bilden den gemeinsamen Kontext; die Schnellaktion „Vergleichen“ zeigt Gemeinsamkeiten, Unterschiede und Widersprüche.
+- **Antworten mit Quellen** (#35): Die KI bekommt nummerierte Abschnitte und zitiert sie als [1], [2]. Zitate und die Quellenliste unter jeder Antwort sind klickbar und springen zur markierten Stelle in der Notiz.
+- **Bibliothek fragen** (#38): Im Chat „Ganze Bibliothek“ wählen oder ⌥⇧⌘I: Folio sucht lokal die passenden Stellen in allen Notizen und beantwortet die Frage mit Quellenangaben.
+- **Kontext sichtbar** (#39): Eine Anzeige zeigt, wie viel vom Kontext des Sprachmodells belegt ist (Token, Abschnitte, Notizen) und welche Ausschnitte es sieht; was nicht mehr hineinpasst, wird genannt.
+- **Ohne Apple Intelligence** (#41): Folio erklärt, warum die KI fehlt (ausgeschaltet, Modell lädt, Mac oder macOS nicht unterstützt), bietet die passenden Systemeinstellungen an und zeigt im Chat passende Fundstellen statt einer Antwort. Das KI-Symbol ist dann gedimmt.
+
 ## [0.17.0] – 2026-10-20
 
 ### Neu

@@ -17,7 +17,9 @@ struct NoteActionsBar: View {
             }
             .buttonStyle(.plain)
             .help("Teilen")
-            button("apple.intelligence", "Chat mit Apple Intelligence (⌥⌘I)", tint: theme.accent) {
+            let ai = AIAvailability.current
+            button("apple.intelligence", ai.isAvailable ? "Chat mit Apple Intelligence (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
+                   tint: ai.isAvailable ? theme.accent : .secondary) {
                 NotificationCenter.default.post(name: .folioToggleChat, object: nil)
             }
             Menu {
