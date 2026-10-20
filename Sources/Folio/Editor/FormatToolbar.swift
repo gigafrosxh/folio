@@ -103,7 +103,18 @@ struct FormatToolbar: View {
             plain("cylinder.split.1x2", "Datenbank-Abfrage einfügen (⌃⇧D)") {
                 NotificationCenter.default.post(name: .folioInsert, object: "database")
             }
-            plain("paperclip", "PDF, Bild oder Dokument einfügen", actions.insertFile)
+            Menu {
+                Button { insert("math") } label: { Label("Formel (LaTeX)", systemImage: "function") }
+                Button { insert("diagram") } label: { Label("Diagramm (Mermaid)", systemImage: "point.3.connected.trianglepath.dotted") }
+                Button { insert("audio") } label: { Label("Audio aufnehmen", systemImage: "mic") }
+            } label: {
+                Image(systemName: "function")
+            } primaryAction: {
+                insert("math")
+            }
+            .help("Formel einfügen – gedrückt halten: Diagramm oder Audioaufnahme")
+            .frame(width: 40)
+            plain("paperclip", "PDF, Bild, Audio oder Dokument einfügen", actions.insertFile)
             Menu {
                 Button { actions.insertDrawing() } label: { Label("Hier zeichnen", systemImage: "scribble.variable") }
                 Button { actions.importFromDevice() } label: { Label("Skizze/Foto vom iPhone oder iPad…", systemImage: "iphone") }
@@ -127,6 +138,8 @@ struct FormatToolbar: View {
         .padding(.vertical, 6)
         .solidBar()
     }
+
+    private func insert(_ kind: String) { NotificationCenter.default.post(name: .folioInsert, object: kind) }
 
     private var sep: some View {
         Divider().frame(height: 16).padding(.horizontal, 4)

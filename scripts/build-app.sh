@@ -38,6 +38,8 @@ cp "$BIN_DIR/Folio" "$APP/Contents/MacOS/Folio"
 chmod +x "$APP/Contents/MacOS/Folio"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# KaTeX, Mermaid and the page that renders formulas and diagrams offline.
+/usr/bin/ditto Resources/Web "$APP/Contents/Resources/Web"
 shopt -s nullglob
 for bundle in "$BIN_DIR"/*.bundle; do
     /usr/bin/ditto "$bundle" "$APP/Contents/Resources/$(basename "$bundle")"

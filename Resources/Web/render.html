@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="katex/katex.min.css">
+<script src="katex/katex.min.js"></script>
+<script src="mermaid/mermaid.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  body { font: 14px -apple-system, system-ui, sans-serif; color: #1f1f24; }
+  body.dark { color: #f2f2f5; }
+  #out { display: block; padding: 6px 4px; text-align: center; }
+  #out.diagram svg { max-width: 100%; height: auto; }
+  .katex-display { margin: 0; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script>
+  // Folio calls folioRender(kind, source, options) and gets {ok, width, height, error, svg} back.
+  let counter = 0;
+  function post(msg) { window.webkit.messageHandlers.folio.postMessage(msg); }
+  // Tight bounds of what was drawn (union of the given elements), with a small margin, in page coordinates.
+  function bounds(els) {
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    els.forEach(el => { const q = el.getBoundingClientRect(); l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); });
+    if (!isFinite(l)) return { x: 0, y: 0, width: 0, height: 0 };
+    const m = 6;
+    l = Math.max(0, l - m); t = Math.max(0, t - m);
+    return { x: Math.floor(l), y: Math.floor(t), width: Math.ceil(r + m - l), height: Math.ceil(b + m - t) };
+  }
+  async function folioRender(kind, source, options) {
+    const out = document.getElementById('out');
+    document.body.classList.toggle('dark', !!options.dark);
+    out.className = kind;
+    try {
+      if (kind === 'math') {
+        out.style.fontSize = (options.fontSize || 18) + 'px';
+        katex.render(source, out, { displayMode: options.displayMode !== false, throwOnError: true, strict: 'ignore', trust: false, output: 'html' });
+        // KaTeX's fonts load on first use; measure (and let Folio snapshot) only once they are there.
+        out.getBoundingClientRect();   // forces layout, which starts the font downloads
+        await document.fonts.ready;
+        await new Promise(r => setTimeout(r, 0));
+        const s = bounds(Array.from(out.querySelectorAll('.base, .katex-html svg')));
+        post(Object.assign({ ok: true, pageHeight: Math.ceil(out.getBoundingClientRect().bottom) }, s));
+      } else {
+        mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: options.dark ? 'dark' : 'default',
+                             flowchart: { htmlLabels: false }, fontFamily: '-apple-system, system-ui, sans-serif' });
+        await mermaid.parse(source);
+        const { svg } = await mermaid.render('folio-diagram-' + (++counter), source);
+        out.innerHTML = svg;
+        const s = bounds([out.querySelector('svg')]);
+        post(Object.assign({ ok: true, svg: svg, pageHeight: Math.ceil(out.getBoundingClientRect().bottom) }, s));
+      }
+    } catch (e) {
+      // Mermaid leaves an error element in the body when rendering fails; remove it.
+      document.querySelectorAll('[id^="dfolio-diagram-"]').forEach(n => n.remove());
+      post({ ok: false, error: String((e && e.message) || e) });
+    }
+  }
+  post({ ok: true, ready: true, width: 0, height: 0 });
+</script>
+</body>
+</html>

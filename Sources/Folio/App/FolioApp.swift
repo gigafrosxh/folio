@@ -89,6 +89,8 @@ struct FolioCommands: Commands {
         CommandGroup(after: .saveItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
                 .keyboardShortcut("s")
+            Button("Als PDF exportieren …") { NotificationCenter.default.post(name: .folioInsert, object: "exportpdf") }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
         }
         CommandMenu("Format") {
             ForEach(TextStyle.allCases) { style in
@@ -125,6 +127,11 @@ struct FolioCommands: Commands {
             Button("Datei, PDF oder Bild…") { NotificationCenter.default.post(name: .folioInsert, object: "file") }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
             Button("Datenbank-Abfrage") { NotificationCenter.default.post(name: .folioInsert, object: "database") }
+            Button("Formel (LaTeX)") { NotificationCenter.default.post(name: .folioInsert, object: "math") }
+                .keyboardShortcut("m", modifiers: [.command, .option])
+            Button("Diagramm (Mermaid)") { NotificationCenter.default.post(name: .folioInsert, object: "diagram") }
+            Button("Audioaufnahme") { NotificationCenter.default.post(name: .folioInsert, object: "audio") }
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }
                 .keyboardShortcut("d", modifiers: [.command, .option])
             Button("Skizze/Foto vom iPhone oder iPad…") { NotificationCenter.default.post(name: .folioInsert, object: "device") }
@@ -171,6 +178,43 @@ enum LayoutDebug {
         }
         if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil { print("LAYOUT start", NSApp.windows.count); fflush(stdout) }
         let env = ProcessInfo.processInfo.environment
+        // FOLIO_RENDER_TEST=<dir>: renders a formula, a diagram and a broken diagram offscreen and writes PNG/SVG/PDF.
+        if let dir = env["FOLIO_RENDER_TEST"] {
+            Task { @MainActor in
+                let cases: [(String, RenderScript.Kind, String)] = [
+                    ("math", .math, RenderSamples.math), ("diagram", .diagram, RenderSamples.diagram),
+                    ("sequence", .diagram, "sequenceDiagram\n  Alice->>Bob: Hallo\n  Bob-->>Alice: Hi"),
+                    ("broken", .diagram, "flowchart LR\n  A --> "), ("brokenmath", .math, "\\frac{1}{"),
+                ]
+                for (name, kind, source) in cases {
+                    do {
+                        let out = try await OffscreenRenderer.render(kind, source: source)
+                        let base = URL(fileURLWithPath: dir).appendingPathComponent(name)
+                        try out.pdf.write(to: base.appendingPathExtension("pdf"))
+                        try OffscreenRenderer.png(from: out)?.write(to: base.appendingPathExtension("png"))
+                        if let svg = out.svg { try Data(svg.utf8).write(to: base.appendingPathExtension("svg")) }
+                        print("RENDER", name, "ok", out.size)
+                    } catch {
+                        print("RENDER", name, "error", error.localizedDescription)
+                    }
+                }
+                fflush(stdout)
+            }
+        }
+        // FOLIO_TRANSCRIBE=<audio file> [FOLIO_LOCALE=de-DE]: transcribes locally and prints the text.
+        if let path = env["FOLIO_TRANSCRIBE"] {
+            Task { @MainActor in
+                do {
+                    let text = try await Transcriber.transcribe(URL(fileURLWithPath: path), locale: Locale(identifier: env["FOLIO_LOCALE"] ?? "de-DE")) {
+                        print("TRANSCRIBE status", $0); fflush(stdout)
+                    }
+                    print("TRANSCRIBE ok", text)
+                } catch {
+                    print("TRANSCRIBE error", error.localizedDescription)
+                }
+                fflush(stdout)
+            }
+        }
         if let mode = env["FOLIO_APPEARANCE"] {
             NSApp.appearance = NSAppearance(named: mode == "dark" ? .darkAqua : .aqua)
         }
@@ -179,6 +223,53 @@ enum LayoutDebug {
             let wanted = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
             if let ref = store.notes.first(where: { $0.url.resolvingSymlinksInPath().path == wanted }) { store.selectedNoteID = ref.id }
             else { print("LAYOUT open failed:", path, store.notes.map(\.url.path)) }
+        }
+        // FOLIO_SAMPLE_MEDIA=<audio file>: creates a note with every kind of block (for export and UI checks).
+        if let audio = env["FOLIO_SAMPLE_MEDIA"], let ref = NoteStore.shared.createNote(), let doc = NoteStore.shared.currentDocument, doc.id == ref.id {
+            let body = ThemeManager.shared.bodyAttributes
+            doc.blocks[0].storage.setAttributedString(NSAttributedString(
+                string: "Medien-Test\nEine Notiz mit Formel, Diagramm, Code, Bild und Audio. #test\n" + String(repeating: "Fülltext für den Seitenumbruch. ", count: env["FOLIO_SAMPLE_SHORT"] == nil ? 60 : 0),
+                attributes: body))
+            let code = BlockModel(kind: .code)
+            code.storage.setAttributedString(NSAttributedString(string: "for i in range(3):\n    print(f\"Zeile {i}\")"))
+            code.output = "Zeile 0\nZeile 1\nZeile 2"
+            let math = BlockModel(kind: .math)
+            math.storage.setAttributedString(NSAttributedString(string: RenderSamples.math))
+            let diagram = BlockModel(kind: .diagram)
+            diagram.storage.setAttributedString(NSAttributedString(string: "sequenceDiagram\n  Folio->>Mac: Aufnahme\n  Mac-->>Folio: Transkript"))
+            let image = NSImage(size: NSSize(width: 400, height: 220), flipped: false) { r in
+                NSColor.systemTeal.setFill(); NSBezierPath(roundedRect: r, xRadius: 30, yRadius: 30).fill(); return true
+            }
+            let imageBlock = AttachmentSync.makeImageBlock(data: NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!, in: doc)
+            var blocks: [BlockModel] = [code, math, diagram, imageBlock]
+            if env["FOLIO_SAMPLE_SHORT"] != nil { blocks = [math] }
+            if let audioBlock = try? AttachmentSync.makeBlock(for: URL(fileURLWithPath: audio), in: doc) {
+                audioBlock.output = "Hallo, das ist ein Test der lokalen Transkription in Folio."
+                blocks.append(audioBlock)
+            }
+            var anchor = doc.blocks[0].id
+            for b in blocks { doc.insert(b, after: anchor); anchor = b.id }
+            doc.markDirty()
+            doc.saveNow()
+            print("SAMPLE note", doc.url.path); fflush(stdout)
+        }
+        // FOLIO_EXPORT_PDF=<path> together with FOLIO_OPEN: exports the opened note as PDF.
+        if let pdf = env["FOLIO_EXPORT_PDF"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                MainActor.assumeIsolated {
+                    guard let doc = NoteStore.shared.currentDocument else { print("EXPORT no note"); return }
+                    Task { @MainActor in
+                        do {
+                            try await NotePDFExporter.export(doc, to: URL(fileURLWithPath: pdf),
+                                                             options: .init(includeOutputs: env["FOLIO_EXPORT_NO_OUTPUT"] == nil))
+                            print("EXPORT ok", pdf)
+                        } catch {
+                            print("EXPORT error", error.localizedDescription)
+                        }
+                        fflush(stdout)
+                    }
+                }
+            }
         }
         guard env["FOLIO_LAYOUT_DUMP"] != nil else { return }
         if let typed = env["FOLIO_TYPE"] {

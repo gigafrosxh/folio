@@ -54,6 +54,12 @@ public enum BlockKind: String, Codable, Sendable, CaseIterable {
     case drawing
     /// SQL against a database connection (SQLite, PostgreSQL, MySQL), with a result table.
     case database
+    /// A LaTeX formula (source in `code`), rendered with KaTeX.
+    case math
+    /// A Mermaid diagram (source in `code`), rendered locally with mermaid.js.
+    case diagram
+    /// An audio recording or file (attachment); `output` holds its transcript.
+    case audio
 }
 
 /// One block of a note's body. Fields not used by a block's kind stay nil.

@@ -92,7 +92,7 @@ struct KeyCombo: Codable, Hashable {
 
 /// Tools that can be triggered from the keyboard; every one can be rebound in the settings.
 enum ShortcutAction: String, CaseIterable, Identifiable {
-    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll, database
+    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll, database, math, diagram, audio
 
     var id: String { rawValue }
 
@@ -110,6 +110,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .writingTools: return "Writing Tools"
         case .runAll: return "Alle Code-Blöcke ausführen"
         case .database: return "Datenbank-Abfrage einfügen"
+        case .math: return "Formel (LaTeX) einfügen"
+        case .diagram: return "Diagramm (Mermaid) einfügen"
+        case .audio: return "Audio aufnehmen"
         }
     }
 
@@ -127,6 +130,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .writingTools: return "apple.writing.tools"
         case .runAll: return "play.rectangle"
         case .database: return "cylinder.split.1x2"
+        case .math: return "function"
+        case .diagram: return "point.3.connected.trianglepath.dotted"
+        case .audio: return "mic"
         }
     }
 
@@ -145,6 +151,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .writingTools: return KeyCombo(key: "r", control: true)
         case .runAll: return KeyCombo(key: "r", control: true, shift: true)
         case .database: return KeyCombo(key: "d", control: true, shift: true)
+        case .math: return KeyCombo(key: "m", control: true, shift: true)
+        case .diagram: return KeyCombo(key: "g", control: true, shift: true)
+        case .audio: return KeyCombo(key: "a", control: true, shift: true)
         }
     }
 }
@@ -242,6 +251,9 @@ final class ShortcutCenter {
         case .writingTools: f.showWritingTools()
         case .runAll: post("runall")
         case .database: post("database")
+        case .math: post("math")
+        case .diagram: post("diagram")
+        case .audio: post("audio")
         }
     }
 

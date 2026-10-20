@@ -102,6 +102,7 @@ enum AttachmentSync {
         let kind: BlockKind
         if type.conforms(to: .pdf) { kind = .pdf }
         else if type.conforms(to: .image) && !content.isPackage { kind = .image }
+        else if type.conforms(to: .audio) && !content.isPackage { kind = .audio }
         else { kind = .file }
         let id = doc.addAttachment(filename: url.lastPathComponent, typeIdentifier: type.identifier,
                                    data: content.data, isPackage: content.isPackage)

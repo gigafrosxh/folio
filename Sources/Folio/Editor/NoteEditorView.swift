@@ -285,6 +285,10 @@ struct NoteEditorView: View {
         case "drawing": insertBlock(BlockModel(kind: .drawing))
         case "runall": RunManager.shared.runAll(doc: doc, theme: theme)
         case "database": insertBlock(BlockModel(kind: .database))
+        case "math": insertBlock(BlockModel(kind: .math))
+        case "diagram": insertBlock(BlockModel(kind: .diagram))
+        case "audio": insertBlock(AudioBlockView.recordingBlock())
+        case "exportpdf": NotePDFExporter.exportWithPanel(doc)
         case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
         case "link": promptText = ""; showLinkPrompt = true
         default: break
@@ -546,6 +550,12 @@ struct BlockRow: View {
             DrawingBlockView(block: block, doc: doc)
         case .database:
             DatabaseBlockView(block: block, doc: doc)
+        case .math:
+            RenderedBlockView(block: block, doc: doc, kind: .math)
+        case .diagram:
+            RenderedBlockView(block: block, doc: doc, kind: .diagram)
+        case .audio:
+            AudioBlockView(block: block, doc: doc)
         }
     }
 

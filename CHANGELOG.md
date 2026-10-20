@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **PDF-Export** (#5): Ablage › Als PDF exportieren (⇧⌘E) schreibt die ganze Notiz als A4-PDF mit Seitenumbrüchen: Text mit Formatierung, Bilder, Zeichnungen, eingebettete PDFs, Code mit Syntaxfarben, Formeln und Diagramme als Vektorgrafik und Transkripte. Code-Ausgaben lassen sich im Sichern-Dialog ein- oder ausschließen.
+- **Formelblock (LaTeX)** (#52): Formeln mit Live-Vorschau über KaTeX, Fehlermeldung bei falscher Syntax; Export als PNG/PDF oder in die Zwischenablage. Einfügen über das ƒ(x)-Symbol, ⌥⌘M oder ⌃⇧M.
+- **Diagrammblock (Mermaid)** (#51): Flussdiagramme, Sequenzdiagramme usw. werden lokal gerendert, mit Syntaxfehlermeldung und Export als SVG, PNG oder PDF. Einfügen über Einfügen › Diagramm oder ⌃⇧G.
+- **Audioaufnahmen** (#47): Aufnahme direkt in der Notiz (⌥⌘R oder ⌃⇧A) mit Pegelanzeige; danach abspielbar mit Wellenform zum Spulen, ±15 s und Geschwindigkeit. Audiodateien (m4a, mp3, wav …) lassen sich auch einfügen oder hineinziehen.
+- **Lokale Transkription** (#48): Aufnahmen und Audiodateien werden auf dem Mac in Text umgewandelt (Sprache wählbar), ohne Upload. Das Transkript ist durchsuchbar und lässt sich mit einem Klick in die Notiz übernehmen.
+
 ## [0.12.4] – 2026-10-20
 
 ### Geändert

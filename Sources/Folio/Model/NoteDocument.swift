@@ -45,7 +45,7 @@ final class BlockModel: ObservableObject, Identifiable {
         switch r.kind {
         case .text:
             storage.setAttributedString(RichTextCodec.attributedString(from: r.rtf))
-        case .code, .database:
+        case .code, .database, .math, .diagram:
             storage.setAttributedString(NSAttributedString(string: r.code ?? ""))
         default: break
         }
@@ -82,11 +82,16 @@ final class BlockModel: ObservableObject, Identifiable {
             r.code = storage.string
             r.language = "sql"
             r.connection = connection
+        case .math, .diagram:
+            r.code = storage.string
+        case .audio:
+            r.output = output
+            if !language.isEmpty && language != "python" { r.language = language }
         default: break
         }
         if !url.isEmpty { r.url = url }
         r.attachmentID = attachmentID
-        if kind != .text && kind != .code {
+        if ![.text, .code, .math, .diagram, .audio].contains(kind) {
             r.height = height
             r.width = width
         }
@@ -98,8 +103,9 @@ final class BlockModel: ObservableObject, Identifiable {
 
     var plainText: String {
         switch kind {
-        case .text, .code, .database: return storage.string
+        case .text, .code, .database, .math, .diagram: return storage.string
         case .web: return url
+        case .audio: return [caption, output ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
         default: return caption
         }
     }
