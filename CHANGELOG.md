@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] – 2026-10-20
+
 Release Candidate für Folio 1.0: keine neuen Funktionen mehr, nur noch Fehlerbehebungen bis 1.0.0.
 
 ### Sicherheit
