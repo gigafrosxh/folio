@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Der Schnellwechsel (⌘P) bekommt sofort den Tastaturfokus. Bisher landete Getipptes im Suchfeld der Seitenleiste oder sogar in der Notiz dahinter (#99).
+- Direkt nach ⌘N Getipptes landet vollständig in der neuen Notiz, auch wenn vorher das Suchfeld aktiv war; bisher gingen die ersten Zeichen ins Suchfeld (#100).
+- Mehrzeiliger Text, der in die Titelzeile eingefügt wird, macht nur noch die erste Zeile zum Titel; der Rest ist normaler Fließtext (#101).
+- Eine neue Notiz ist auch bei aktiver Suche in der Liste sichtbar: Anlegen setzt die Suche zurück (#102).
+
 ## [1.0.0-rc.1] – 2026-10-20
 
 Release Candidate für Folio 1.0: keine neuen Funktionen mehr, nur noch Fehlerbehebungen bis 1.0.0.

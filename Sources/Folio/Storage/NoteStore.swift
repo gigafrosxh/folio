@@ -272,6 +272,13 @@ final class NoteStore: ObservableObject {
         let ref = NoteRef(meta: meta, url: url)
         notes.append(ref)
         if case .pinned = sidebarSelection ?? .all { sidebarSelection = .all }
+        // An empty new note matches no search; it would be missing from the list (#102).
+        if isSearching {
+            searchText = ""
+            searchFilter = SearchFilter()
+        }
+        // Keys typed right after ⌘N belong to the new note, not to the search field (#100).
+        FormattingController.shared.holdTypingForNewNote()
         selectedNoteID = ref.id
         return ref
     }

@@ -8,7 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         ShortcutCenter.shared.install()
-        if ThemeManager.shared.settings.askForUpdatesOnLaunch {
+        // Test runs against a throwaway library never ask for updates: the sheet would take the keyboard.
+        if ThemeManager.shared.settings.askForUpdatesOnLaunch, ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] == nil {
             // Quietly; the sheet only appears when an update is actually available.
             MainActor.assumeIsolated { UpdateManager.shared.check(silently: true) }
         }

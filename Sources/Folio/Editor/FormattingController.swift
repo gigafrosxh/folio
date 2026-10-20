@@ -116,13 +116,75 @@ final class FormattingController: ObservableObject {
     }
 
     /// Focuses a block's text view and puts the cursor at its end (or start).
-    func focus(blockID: UUID, atEnd: Bool = true) {
+    func focus(blockID: UUID, atEnd: Bool = true, attempts: Int = 10) {
         DispatchQueue.main.async {
-            guard let tv = self.registry[blockID]?.view else { return }
+            // A new note's text view may appear a moment later.
+            guard let tv = self.registry[blockID]?.view, tv.window != nil else {
+                if attempts > 0 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { self.focus(blockID: blockID, atEnd: atEnd, attempts: attempts - 1) }
+                }
+                return
+            }
             tv.window?.makeFirstResponder(tv)
             let loc = atEnd ? (tv.string as NSString).length : 0
             tv.setSelectedRange(NSRange(location: loc, length: 0))
             tv.scrollRangeToVisible(tv.selectedRange())
+            self.releaseHeldTyping(into: tv)
+        }
+    }
+
+    // MARK: Typing right after ⌘N or ⌘P (#100, #99)
+
+    /// Text typed between creating a note and its editor taking focus; nil when nothing is held.
+    private var heldTyping: String?
+    private var holdMonitor: Any?
+
+    /// Until the new note's editor has focus, plain keystrokes are kept here instead of reaching the
+    /// field that had focus before (the sidebar search), and are then typed into the note.
+    func holdTypingForNewNote() { holdTyping(forNote: true) }
+
+    /// Keys typed while the quick switcher appears go into its search field, not into the note.
+    func holdTypingForQuickOpen() { holdTyping(forNote: false) }
+
+    private func holdTyping(forNote: Bool) {
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        heldTyping = ""
+        if holdMonitor == nil {
+            holdMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.heldTyping != nil,
+                      event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+                      let chars = event.characters, !chars.isEmpty else { return event }
+                if chars == "\r" { self.heldTyping! += "\n"; return nil }
+                guard chars.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) else { return event }
+                self.heldTyping! += chars
+                return nil
+            }
+        }
+        // Never hold keys for long. A new note that already has text (a tag, a template) does not focus
+        // itself, so its first text block gets the cursor at the start.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self, self.heldTyping != nil else { return }
+            if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, !tv.isFieldEditor || !forNote {
+                self.releaseHeldTyping(into: tv)
+            } else if forNote, let first = NoteStore.shared.currentDocument?.blocks.first(where: { $0.kind == .text }) {
+                self.focus(blockID: first.id, atEnd: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.releaseHeldTyping(into: nil) }
+            } else {
+                self.releaseHeldTyping(into: nil)
+            }
+        }
+    }
+
+    func releaseHeldTyping(into tv: NSTextView?) {
+        guard let text = heldTyping else { return }
+        heldTyping = nil
+        if let holdMonitor { NSEvent.removeMonitor(holdMonitor) }
+        holdMonitor = nil
+        guard let tv, !text.isEmpty else { return }
+        // Line by line, so Return after the title switches to body text like real typing.
+        for (i, line) in text.components(separatedBy: "\n").enumerated() {
+            if i > 0 { tv.insertNewline(nil) }
+            if !line.isEmpty { tv.insertText(line, replacementRange: tv.selectedRange()) }
         }
     }
 

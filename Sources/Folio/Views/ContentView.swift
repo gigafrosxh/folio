@@ -89,6 +89,7 @@ struct ContentView: View {
         }
         .animation(Motion.quick, value: quickOpen)
         .onReceive(NotificationCenter.default.publisher(for: .folioQuickOpen)) { note in
+            if quickOpen == nil { FormattingController.shared.holdTypingForQuickOpen() }
             quickOpen = (note.object as? QuickOpenMode) ?? .open
         }
         .sheet(isPresented: $showUpdates) { UpdateSheet() }

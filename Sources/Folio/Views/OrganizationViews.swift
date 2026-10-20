@@ -99,7 +99,20 @@ struct QuickOpenView: View {
         .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
-        .onAppear { focused = true }
+        .onAppear {
+            // The editor and the sidebar search are AppKit first responders that SwiftUI focus does not
+            // take over by itself, so typing went into the note behind (#99): release them first.
+            (NSApp.mainWindow ?? NSApp.keyWindow)?.makeFirstResponder(nil)
+            focused = true
+            DispatchQueue.main.async {
+                focused = true
+                DispatchQueue.main.async {
+                    if let field = (NSApp.mainWindow ?? NSApp.keyWindow)?.firstResponder as? NSTextView, field.isFieldEditor {
+                        FormattingController.shared.releaseHeldTyping(into: field)
+                    }
+                }
+            }
+        }
         .onChange(of: query) { index = 0 }
     }
 

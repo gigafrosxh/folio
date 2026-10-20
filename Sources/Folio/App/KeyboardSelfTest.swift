@@ -15,7 +15,7 @@ enum KeyboardSelfTest {
     /// German keyboard layout key codes for the keys used below.
     private static let codes: [String: UInt16] = ["n": 45, "t": 17, "d": 2, "f": 3, "p": 35, "s": 1, "y": 6, "c": 8, "k": 40, "g": 5, "ä": 39, "ö": 41, "\u{1b}": 53]
 
-    private static func press(_ key: String, _ mods: NSEvent.ModifierFlags) async {
+    private static func press(_ key: String, _ mods: NSEvent.ModifierFlags, settle: Double = 0.4) async {
         guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }) else { return }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -34,7 +34,7 @@ enum KeyboardSelfTest {
             // Through the event queue, so menus and Folio's key monitor see it exactly like a key press.
             NSApp.postEvent(event, atStart: false)
         }
-        await wait(0.4)
+        if settle > 0 { await wait(settle) }
     }
 
     /// Esc in whatever window is key (a sheet), like closing it with the keyboard.
@@ -138,6 +138,55 @@ enum KeyboardSelfTest {
             // Tool shortcuts only act in the key window of the active app; a test started in the background skips this.
             print("KEY skip ⌃C (Folio ist nicht die aktive App)")
         }
+        await focusChecks(store)
         print("KEY done"); fflush(stdout)
+    }
+
+    /// Plain typing posted right away, like a fast typist after a shortcut.
+    private static func typeNow(_ text: String) {
+        guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }) else { return }
+        for ch in text {
+            let s = String(ch)
+            guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window.windowNumber, context: nil, characters: s, charactersIgnoringModifiers: s,
+                                           isARepeat: false, keyCode: 0) else { continue }
+            NSApp.postEvent(e, atStart: false)
+        }
+    }
+
+    private static func noteText(_ store: NoteStore) -> String {
+        store.currentDocument?.blocks.map(\.storage.string).joined(separator: "\n") ?? ""
+    }
+
+    /// Focus after shortcuts: new note during a search (#100, #102) and the quick switcher (#99).
+    private static func focusChecks(_ store: NoteStore) async {
+        guard NSApp.isActive else { print("KEY skip Fokusprüfung (Folio ist nicht die aktive App)"); return }
+        store.searchText = "zzzzkeinTreffer"
+        await wait(0.3)
+        await press("n", .command)
+        check(store.searchText.isEmpty && store.filteredNotes.contains { $0.id == store.selectedNoteID },
+              "Neue Notiz bei aktiver Suche ist in der Liste sichtbar (#102)")
+
+        let before = store.notes.count
+        let window = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }
+        if let window, let first = store.currentDocument?.blocks.first, let tv = FormattingController.shared.textView(for: first.id) {
+            window.makeFirstResponder(tv)   // typing goes somewhere else before ⌘N
+        }
+        await press("n", .command, settle: 0)
+        typeNow("Schnell")
+        await wait(1.5)
+        check(store.notes.count == before + 1 && noteText(store).hasPrefix("Schnell"),
+              "Direkt nach ⌘N Getipptes landet in der neuen Notiz (#100: „\(noteText(store).prefix(20))“)")
+
+        let text = noteText(store)
+        if let first = store.currentDocument?.blocks.first { FormattingController.shared.focus(blockID: first.id) }
+        await wait(0.3)
+        await press("p", .command, settle: 0)
+        typeNow("xyz")
+        await wait(0.6)
+        let responder = NSApp.keyWindow?.firstResponder as? NSTextView
+        check(noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "xyz",
+              "⌘P: Getipptes geht in den Schnellwechsel, nicht in die Notiz (#99: \"\(responder?.string ?? "-")\")")
+        await press("\u{1b}", [])
     }
 }
