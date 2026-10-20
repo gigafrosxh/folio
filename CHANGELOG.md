@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.19.0] – 2026-10-20
+
 ### Geändert
 - **Große Bibliotheken schneller** (#62): Der Bibliotheksscan liest Metadaten parallel und merkt sich unveränderte Notizen; die Suche senkt Texte nur einmal ab und die Notizliste wird nicht bei jedem Neuzeichnen neu berechnet. Benchmark mit 3.000 Notizen: Scan unter 0,3 s, Suche je Tastendruck rund 15 ms.
 - **Symbolische Links** (#56): Links in der Bibliothek werden nur verfolgt, wenn sie innerhalb der Bibliothek bleiben; Schleifen werden erkannt. Übersprungene Links stehen im „…“-Menü der Seitenleiste.
