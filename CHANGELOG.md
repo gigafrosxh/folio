@@ -7,6 +7,20 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert
+- **Große Bibliotheken schneller** (#62): Der Bibliotheksscan liest Metadaten parallel und merkt sich unveränderte Notizen; die Suche senkt Texte nur einmal ab und die Notizliste wird nicht bei jedem Neuzeichnen neu berechnet. Benchmark mit 3.000 Notizen: Scan unter 0,3 s, Suche je Tastendruck rund 15 ms.
+- **Symbolische Links** (#56): Links in der Bibliothek werden nur verfolgt, wenn sie innerhalb der Bibliothek bleiben; Schleifen werden erkannt. Übersprungene Links stehen im „…“-Menü der Seitenleiste.
+- **VoiceOver** (#60): Alle Symbolknöpfe haben gesprochene Namen, Seitenleisten-Einträge, Notizkarten und Tabs sind Knöpfe mit Auswahlzustand und Zusatzaktionen. Details in `docs/ACCESSIBILITY.md`.
+- Versionsverlauf hat jetzt das Kürzel **⌥⌘Y** (⇧⌘Y gehört dem macOS-Dienst „Neue Haftnotiz“).
+
+### Behoben
+- „Nächster/Vorheriger Tab“, „Notiz duplizieren“ (⌘D) und „In neuem Fenster öffnen“ blieben im Menü manchmal ausgegraut, sodass ihre Kürzel nichts taten (gefunden durch den neuen Tastaturtest).
+
+### Intern
+- Tests: Regressionstests für Blockoperationen in einem neuen App-Testziel (#57), Roundtrip- und Beschädigungstests für alle Blockarten, Unicode und große Anhänge (#58), Migrationstests mit Dateien, die mit dem Code von 0.1 bis 0.17 geschrieben wurden (#69, `scripts/make-fixtures.sh`), Tastatur-Selbsttest `FOLIO_KEY_TEST` (#59) und Zugänglichkeits-Audit (#60) in `scripts/dev-regression.py`.
+- CI mit GitHub Actions: Build, alle Tests und App-Paket bei jedem Pull Request und Push (#65).
+- `NoteStore`, `FolioApp` und der Editor sind in kleinere Dateien aufgeteilt (#68).
+
 ## [0.18.0] – 2026-10-20
 
 ### Neu
