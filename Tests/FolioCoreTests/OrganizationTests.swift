@@ -135,3 +135,15 @@ final class OrganizationTests: XCTestCase {
         XCTAssertEqual(MarkdownStructure.safeFileName("a/b: c?"), "a-b- c-")
     }
 }
+
+final class FindInTextTests: XCTestCase {
+    func testFindOptions() {
+        let text = "Haus, haus und Häuser; Hausboot. HAUS"
+        XCTAssertEqual(FindInText.ranges(of: "haus", in: text).count, 5, "Häuser counts: umlauts are ignored")
+        XCTAssertEqual(FindInText.ranges(of: "haus", in: text, options: .init(caseSensitive: true)).map(\.location), [6])
+        XCTAssertEqual(FindInText.ranges(of: "haus", in: text, options: .init(wholeWord: true)).count, 3)
+        XCTAssertEqual(FindInText.ranges(of: "hauser", in: text).count, 1, "diacritics are ignored without case sensitivity")
+        XCTAssertEqual(FindInText.ranges(of: "", in: text), [])
+        XCTAssertEqual(FindInText.ranges(of: "aa", in: "aaaa").map(\.location), [0, 2], "matches do not overlap")
+    }
+}

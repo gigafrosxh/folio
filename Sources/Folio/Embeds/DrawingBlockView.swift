@@ -355,7 +355,7 @@ struct DrawingBlockView: View {
         EmbedCard(title: block.caption.isEmpty ? "Zeichnung" : block.caption, icon: "scribble.variable",
                   height: $block.height, onCommit: { doc.markDirty() }) {
             Menu {
-                Picker("Papier", selection: Binding(get: { paper }, set: { block.mode = $0.rawValue; doc.markDirty() })) {
+                Picker("Papier", selection: Binding(get: { paper }, set: { v in doc.changeBlock(block, "Papier ändern") { block.mode = v.rawValue } })) {
                     ForEach(PaperStyle.allCases) { Text($0.label).tag($0) }
                 }
                 Divider()

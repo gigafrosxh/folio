@@ -62,6 +62,22 @@ final class BlockModel: ObservableObject, Identifiable {
         syncedAt = r.syncedAt
     }
 
+    /// Puts back the settings saved in `record()` (for undoing setting changes; text stays as it is).
+    func apply(_ r: BlockRecord) {
+        if let l = r.language { language = l }
+        output = r.output
+        outputIsError = r.outputIsError ?? false
+        url = r.url ?? ""
+        attachmentID = r.attachmentID
+        if let h = r.height { height = h }
+        if let w = r.width { width = w }
+        mode = r.mode ?? ""
+        caption = r.caption ?? ""
+        connection = r.connection
+        if let code = r.code, kind != .text, storage.string != code { storage.setAttributedString(NSAttributedString(string: code)) }
+        revision += 1
+    }
+
     static func text(_ s: NSAttributedString = NSAttributedString()) -> BlockModel {
         let b = BlockModel(kind: .text)
         b.storage.setAttributedString(s)
@@ -191,7 +207,72 @@ final class NoteDocument: ObservableObject, Identifiable {
 
     /// Inserts `block` after `anchor`. When `anchor` is a text block and `splitAt` is inside it,
     /// the text is split there so the new block lands at the cursor, like in Apple Notes.
+    // MARK: Undo for block operations (#3)
+
+    /// The window's undo manager (set by the editor), shared with the text views so ⌘Z undoes typing
+    /// and block operations in the order they happened.
+    weak var undoManager: UndoManager?
+
+    /// The block list and the text of every text block (inserting can split a text block, removing can
+    /// merge two), enough to put the note's structure back exactly.
+    private struct StructureSnapshot {
+        var blocks: [BlockModel]
+        var texts: [UUID: NSAttributedString]
+    }
+
+    private func snapshot() -> StructureSnapshot {
+        StructureSnapshot(blocks: blocks, texts: Dictionary(uniqueKeysWithValues: blocks.filter { $0.kind == .text }
+            .map { ($0.id, NSAttributedString(attributedString: $0.storage)) }))
+    }
+
+    private func restore(_ snap: StructureSnapshot, actionName: String) {
+        let current = snapshot()
+        undoManager?.registerUndo(withTarget: self) { doc in
+            MainActor.assumeIsolated { doc.restore(current, actionName: actionName) }
+        }
+        undoManager?.setActionName(actionName)
+        for b in snap.blocks where b.kind == .text {
+            if let t = snap.texts[b.id], !b.storage.isEqual(to: t) { b.storage.setAttributedString(t); b.revision += 1 }
+        }
+        // Code blocks that disappear again stop running and leave the shared session.
+        let kept = Set(snap.blocks.map(\.id))
+        for b in blocks where b.kind == .code && !kept.contains(b.id) {
+            RunManager.shared.stop(b.id)
+            KernelManager.shared.blockRemoved(b, from: self)
+        }
+        blocks = snap.blocks
+        markDirty()
+    }
+
+    /// Runs a structural change and registers its undo.
+    private func undoable(_ actionName: String, _ change: () -> Void) {
+        let before = snapshot()
+        change()
+        guard let um = undoManager else { return }
+        um.registerUndo(withTarget: self) { doc in
+            MainActor.assumeIsolated { doc.restore(before, actionName: actionName) }
+        }
+        um.setActionName(actionName)
+    }
+
+    /// Changes a block's settings (size, language, mode …) undoably.
+    func changeBlock(_ block: BlockModel, _ actionName: String, _ change: () -> Void) {
+        let before = block.record()
+        change()
+        markDirty()
+        undoManager?.registerUndo(withTarget: self) { doc in
+            MainActor.assumeIsolated {
+                doc.changeBlock(block, actionName) { block.apply(before) }
+            }
+        }
+        undoManager?.setActionName(actionName)
+    }
+
     func insert(_ block: BlockModel, after anchor: UUID?, splitAt location: Int? = nil) {
+        undoable("Block einfügen") { performInsert(block, after: anchor, splitAt: location) }
+    }
+
+    private func performInsert(_ block: BlockModel, after anchor: UUID?, splitAt location: Int?) {
         var index = blocks.count
         if let anchor, let i = blocks.firstIndex(where: { $0.id == anchor }) {
             index = i + 1
@@ -215,6 +296,11 @@ final class NoteDocument: ObservableObject, Identifiable {
     }
 
     func remove(_ id: UUID) {
+        guard let b = blocks.first(where: { $0.id == id }) else { return }
+        undoable(b.kind == .text ? "Text löschen" : "Block löschen") { performRemove(id) }
+    }
+
+    private func performRemove(_ id: UUID) {
         guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
         let removed = blocks.remove(at: i)
         if removed.kind == .code {
@@ -228,6 +314,10 @@ final class NoteDocument: ObservableObject, Identifiable {
     }
 
     func move(_ id: UUID, by offset: Int) {
+        undoable("Block verschieben") { performMove(id, by: offset) }
+    }
+
+    private func performMove(_ id: UUID, by offset: Int) {
         guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
         // Skip over text blocks so embeds jump to the next embed position.
         var j = i + offset

@@ -10,6 +10,7 @@ struct NoteListView: View {
     @EnvironmentObject var windowState: WindowState
     @FocusState private var focused: Bool
     @State private var showFilters = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let notes = store.filteredNotes
@@ -28,7 +29,14 @@ struct NoteListView: View {
                             ForEach(group.notes) { note in
                                 NoteCard(note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected)
                                     .id(note.id)
-                                    .onTapGesture { store.selectedNoteID = note.id; focused = true }
+                                    .onTapGesture {
+                                        // ⌘-click opens the note in a new tab, ⌥-click on the right.
+                                        let mods = NSEvent.modifierFlags
+                                        if mods.contains(.command) { store.openInNewTab(note.id) }
+                                        else if mods.contains(.option) { store.openInSplit(note.id) }
+                                        else { store.selectedNoteID = note.id }
+                                        focused = true
+                                    }
                                     .draggable(note.id.uuidString)
                                     .contextMenu { menu(for: note) }
                                     .transition(Motion.blockTransition)
@@ -199,6 +207,11 @@ struct NoteListView: View {
     @ViewBuilder
     private func menu(for note: NoteRef) -> some View {
         Button(note.meta.pinned ? "Loslösen" : "Anpinnen") { store.togglePin(note.id) }
+        Button("In neuem Tab öffnen") { store.openInNewTab(note.id) }
+        Button("Rechts daneben öffnen") { store.openInSplit(note.id) }
+        Button("In neuem Fenster öffnen") { openWindow(id: "note", value: note.id) }
+        Button("Duplizieren") { store.duplicate(note.id) }
+        Divider()
         Button("Notizlink kopieren") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(NoteLink.url(for: note.id).absoluteString, forType: .string)

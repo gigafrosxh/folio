@@ -55,7 +55,7 @@ final class BackupManager: ObservableObject {
         isRunning = true
         lastError = nil
         status = "Sichere die Bibliothek …"
-        NoteStore.shared.currentDocument?.saveNow()
+        NoteStore.shared.saveAll()
         let library = NoteStore.shared.rootURL, dir = directory
         Task.detached(priority: .utility) {
             let result: Result<(BackupInfo, BackupCheck), Error> = Result {

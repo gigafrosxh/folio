@@ -35,7 +35,7 @@ enum MarkdownTransfer {
         panel.prompt = "Exportieren"
         panel.message = "Zielordner für den Markdown-Export von „\(folder.lastPathComponent)“"
         guard panel.runModal() == .OK, let target = panel.url else { return }
-        NoteStore.shared.currentDocument?.saveNow()
+        NoteStore.shared.saveAll()
         let root = target.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
         var failures: [String] = []
         let e = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])

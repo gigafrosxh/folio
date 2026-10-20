@@ -88,6 +88,8 @@ final class FormattingController: ObservableObject {
     private final class WeakCodeView { weak var view: CodeTextView?; init(_ v: CodeTextView) { view = v } }
     private var codeRegistry: [UUID: WeakCodeView] = [:]
 
+    func codeView(for id: UUID) -> CodeTextView? { codeRegistry[id]?.view }
+
     func registerCode(_ tv: CodeTextView, for id: UUID) {
         codeRegistry = codeRegistry.filter { $0.value.view != nil }
         codeRegistry[id] = WeakCodeView(tv)

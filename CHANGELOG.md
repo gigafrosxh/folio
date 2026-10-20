@@ -7,6 +7,17 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Undo/Redo für Blöcke** (#3): Einfügen, Löschen und Verschieben von Blöcken sowie Einstellungen wie Codesprache, Bildgröße oder Papier lassen sich mit ⌘Z/⇧⌘Z rückgängig machen und wiederholen, in einer Reihenfolge mit dem Tippen.
+- **Suchen und Ersetzen** (#9): ⌘F sucht in der offenen Notiz über Text-, Code- und SQL-Blöcke mit Hervorhebung aller Treffer, ⌘G/⇧⌘G springen weiter, ⌃⌘F öffnet gleich das Ersetzen (einzeln oder alle, rückgängig machbar). Optionen für Groß-/Kleinschreibung und ganze Wörter.
+- **Fokusmodus** (#10): ⇧⌘F blendet Seitenleiste, Notizliste, Tabs, Symbolleiste und Statusanzeige aus; die Symbolleiste erscheint, wenn der Zeiger nach oben geht. Esc oder ⇧⌘F beendet ihn.
+- **Tabs und Fenster** (#11): ⌘-Klick oder „In neuem Tab öffnen“ öffnet eine Notiz zusätzlich in einem Tab, ⌘T legt eine neue Notiz im Tab an, ⇧⌘[ / ⇧⌘] wechseln. „In neuem Fenster öffnen“ (⌥⌘O) zeigt eine Notiz in einem eigenen Fenster.
+- **Split View** (#12): ⌥-Klick oder „Rechts daneben öffnen“ (⌥⌘\\) zeigt zwei Notizen nebeneinander, unabhängig scroll- und bearbeitbar. Die Notiz mit der Akzentlinie empfängt Menübefehle und Kürzel.
+- **Duplizieren** (#16): ⌘D oder Kontextmenü kopiert eine Notiz samt Blöcken und Anhängen mit neuen IDs.
+
+### Geändert
+- Dieselbe Notiz in Tab, Split View und Fenster ist ein einziges Dokument: Änderungen erscheinen überall sofort, gespeichert wird einmal.
+
 ## [0.15.0] – 2026-10-20
 
 ### Neu

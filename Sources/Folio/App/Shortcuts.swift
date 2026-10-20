@@ -224,7 +224,7 @@ final class ShortcutCenter {
         }
         // Only in the note window (not in Settings, sheets or the completion list).
         guard let window = event.window, window.isKeyWindow, !(window is NSPanel),
-              window.identifier?.rawValue.hasPrefix("main") == true, window.attachedSheet == nil else { return false }
+              (window.identifier?.rawValue.hasPrefix("main") == true || window.identifier?.rawValue.hasPrefix("note") == true), window.attachedSheet == nil else { return false }
         // ⌃C inside a running code block stops it, like in a terminal.
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .control, event.charactersIgnoringModifiers == "c",
            let code = window.firstResponder as? CodeTextView, let id = code.blockID, RunManager.shared.isRunning(id) {

@@ -22,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             // An unanswered conflict on quit: keep both versions rather than lose either.
             if let conflict = NoteStore.shared.conflict { NoteStore.shared.resolve(conflict, .keepBoth) }
-            NoteStore.shared.currentDocument?.saveNow()
+            NoteStore.shared.saveAll()
             RunManager.shared.stopAll()
             LSPCompleter.shared.shutdownAll()
             KernelManager.shared.shutdownAll()
@@ -64,6 +64,16 @@ struct FolioApp: App {
         .windowStyle(.hiddenTitleBar)
         .commands { FolioCommands(store: store) }
 
+        // A note in its own window (Ablage › In neuem Fenster öffnen).
+        WindowGroup("Notiz", id: "note", for: UUID.self) { $id in
+            NoteWindowView(noteID: id)
+                .environmentObject(store)
+                .environmentObject(theme)
+                .preferredColorScheme(theme.settings.appearance.colorScheme)
+                .tint(theme.accent)
+        }
+        .defaultSize(width: 760, height: 820)
+
         Settings {
             SettingsView()
                 .environmentObject(theme)
@@ -76,6 +86,7 @@ struct FolioApp: App {
 
 struct FolioCommands: Commands {
     @ObservedObject var store: NoteStore
+    @Environment(\.openWindow) private var openWindow
     private var f: FormattingController { .shared }
 
     var body: some Commands {
@@ -87,14 +98,50 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("n")
             Button("Neuer Ordner…") { NotificationCenter.default.post(name: .folioNewFolder, object: nil) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Neuer Tab") { store.createNoteInNewTab() }
+                .keyboardShortcut("t")
+            Divider()
+            Button("In neuem Fenster öffnen") { if let id = store.currentDocument?.id { openWindow(id: "note", value: id) } }
+                .keyboardShortcut("o", modifiers: [.command, .option])
+                .disabled(store.currentDocument == nil)
+            Button(store.splitNoteID == nil ? "Rechts daneben öffnen" : "Teilung schließen") {
+                if store.splitNoteID != nil { store.splitNoteID = nil }
+                else if let id = store.selectedNoteID { store.openInSplit(id) }
+            }
+            .keyboardShortcut("\\", modifiers: [.command, .option])
+            Button("Tab schließen") { if let id = store.selectedNoteID { store.closeTab(id) } }
+                .disabled(store.tabs.count < 2)
+            Button("Nächster Tab") { store.selectTab(offset: 1) }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+                .disabled(store.tabs.count < 2)
+            Button("Vorheriger Tab") { store.selectTab(offset: -1) }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+                .disabled(store.tabs.count < 2)
+            Divider()
+            Button("Notiz duplizieren") { if let id = store.currentDocument?.id { store.duplicate(id) } }
+                .keyboardShortcut("d")
+                .disabled(store.currentDocument == nil)
             Divider()
             Button("Apple Notizen importieren…") { NotificationCenter.default.post(name: .folioShowImport, object: nil) }
+        }
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("In Notiz suchen …") { NotificationCenter.default.post(name: .folioFind, object: false) }
+                .keyboardShortcut("f")
+            Button("Suchen und ersetzen …") { NotificationCenter.default.post(name: .folioFind, object: true) }
+                .keyboardShortcut("f", modifiers: [.command, .control])
+            Button("Weitersuchen") { NotificationCenter.default.post(name: .folioFindNext, object: 1) }
+                .keyboardShortcut("g")
+            Button("Rückwärts suchen") { NotificationCenter.default.post(name: .folioFindNext, object: -1) }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
         }
         CommandGroup(after: .sidebar) {
             Button("Seitenleiste ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleSidebar, object: nil) }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Notizen durchsuchen") { NotificationCenter.default.post(name: .folioFocusSearch, object: nil) }
                 .keyboardShortcut("f", modifiers: [.command, .option])
+            Button("Fokusmodus") { NotificationCenter.default.post(name: .folioToggleFocus, object: nil) }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
         }
         CommandGroup(after: .saveItem) {
             Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
@@ -316,8 +363,28 @@ enum LayoutDebug {
         if env["FOLIO_SAFETY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await SafetySelfTest.run() }
         }
+        if env["FOLIO_EDITOR_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await EditorSelfTest.run() }
+        }
         if env["FOLIO_ORG_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await OrganizationSelfTest.run() }
+        }
+        // FOLIO_MULTI=1: two tabs, a split view and the find bar, for a UI snapshot.
+        if env["FOLIO_MULTI"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                MainActor.assumeIsolated {
+                    let store = NoteStore.shared
+                    let notes = store.filteredNotes
+                    guard notes.count >= 3 else { return }
+                    store.selectedNoteID = notes[0].id
+                    store.openInNewTab(notes[1].id)
+                    store.openInSplit(notes[2].id)
+                    store.focusedNoteID = notes[1].id
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        NotificationCenter.default.post(name: .folioFind, object: true)
+                    }
+                }
+            }
         }
         if env["FOLIO_QUICKOPEN"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

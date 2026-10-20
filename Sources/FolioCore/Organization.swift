@@ -270,3 +270,41 @@ public enum TemplateText {
         return values
     }
 }
+
+// MARK: - Find in note (#9)
+
+public enum FindInText {
+    public struct Options: Equatable, Sendable {
+        public var caseSensitive = false
+        public var wholeWord = false
+        public init(caseSensitive: Bool = false, wholeWord: Bool = false) {
+            self.caseSensitive = caseSensitive
+            self.wholeWord = wholeWord
+        }
+    }
+
+    /// Ranges (UTF-16) of `query` in `text`; with `wholeWord` a match must not touch letters or digits.
+    public static func ranges(of query: String, in text: String, options: Options = Options()) -> [NSRange] {
+        guard !query.isEmpty else { return [] }
+        let ns = text as NSString
+        var out: [NSRange] = []
+        var search = NSRange(location: 0, length: ns.length)
+        let opts: NSString.CompareOptions = options.caseSensitive ? [] : [.caseInsensitive, .diacriticInsensitive]
+        while search.length > 0 {
+            let r = ns.range(of: query, options: opts, range: search)
+            guard r.location != NSNotFound else { break }
+            if !options.wholeWord || isWordBoundary(ns, r) { out.append(r) }
+            let next = NSMaxRange(r)
+            search = NSRange(location: next, length: ns.length - next)
+        }
+        return out
+    }
+
+    private static func isWordBoundary(_ ns: NSString, _ r: NSRange) -> Bool {
+        func isWordChar(_ i: Int) -> Bool {
+            guard i >= 0, i < ns.length, let scalar = Unicode.Scalar(ns.character(at: i)) else { return false }
+            return CharacterSet.alphanumerics.contains(scalar) || scalar == "_"
+        }
+        return !isWordChar(r.location - 1) && !isWordChar(NSMaxRange(r))
+    }
+}

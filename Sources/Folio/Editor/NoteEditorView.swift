@@ -24,11 +24,30 @@ struct NoteEditorView: View {
     @AppStorage("folio.chatVisible") private var chatRemembered = false
     @State private var showChat = false
     @State private var showHistory = false
+    @StateObject private var find = FindModel()
+    @State private var showFind = false
+    /// Focus mode hides the toolbar until the pointer comes near the top.
+    @AppStorage("folio.focusMode") private var focusMode = false
+    @State private var headerHover = false
+    @Environment(\.undoManager) private var undoManager
     @State private var chatPopped = false
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            if !focusMode || headerHover {
+                header
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onHover { if focusMode { headerHover = $0 } }
+            } else {
+                Color.clear.frame(height: 14).contentShape(Rectangle())
+                    .onHover { if $0 { withAnimation(Motion.quick) { headerHover = true } } }
+            }
+            if showFind {
+                FindBar(model: find) { closeFind() }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(doc.meta.modified.formatted(date: .long, time: .shortened)) · \(doc.url.lastPathComponent)")
@@ -86,7 +105,7 @@ struct NoteEditorView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if !showChat { NoteStatusPill(doc: doc).padding(16) }
+            if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
         }
         .overlay(alignment: .topTrailing) {
             if showChat {
@@ -101,11 +120,25 @@ struct NoteEditorView: View {
             }
         }
         .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
-        .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in showHistory = true }
-        .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
-            setChat(!showChat)
+        .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in if isActive { showHistory = true } }
+        .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in
+            guard isActive else { return }
+            if let selected = formatting.selectedText, !selected.contains("\n"), !selected.isEmpty { find.query = selected }
+            find.showReplace = (note.object as? Bool) ?? find.showReplace
+            find.attach(doc)
+            withAnimation(Motion.quick) { showFind = true }
         }
-        .onAppear { if chatRemembered { showChat = true; chatPopped = true } }
+        .onDisappear { find.detach() }
+        .animation(Motion.quick, value: showFind)
+        .animation(Motion.quick, value: headerHover)
+        .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
+            if isActive { setChat(!showChat) }
+        }
+        // With tabs, split view and windows several editors exist: the one being typed in is "active".
+        .onReceive(formatting.$activeBlockID) { id in
+            if let id, doc.block(id) != nil, store.focusedNoteID != doc.id { store.focusedNoteID = doc.id }
+        }
+        .onAppear { if chatRemembered && store.splitNoteID == nil && store.selectedNoteID == doc.id { showChat = true; chatPopped = true } }
         .background(Color(nsColor: .textBackgroundColor))
         .imagePlaygroundSheet(isPresented: $showPlayground,
                               concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]) { url in
@@ -132,15 +165,25 @@ struct NoteEditorView: View {
             AttachmentSync.syncExternalEdits(in: doc)
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioPasteboard)) { note in
-            if let pb = note.object as? NSPasteboard { pasteWithoutTextFocus(pb) }
+            if isActive, let pb = note.object as? NSPasteboard { pasteWithoutTextFocus(pb) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .folioInsert)) { note in
-            if let kind = note.object as? String { handleInsert(kind) }
+            if isActive, let kind = note.object as? String { handleInsert(kind) }
         }
+        .onAppear { doc.undoManager = undoManager }
+        .onChange(of: undoManager) { doc.undoManager = undoManager }
         .onAppear {
             if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
         }
     }
+
+    private func closeFind() {
+        find.detach()
+        withAnimation(Motion.quick) { showFind = false }
+    }
+
+    /// Whether menu commands and shortcuts are meant for this editor (the focused one).
+    private var isActive: Bool { store.currentDocument === doc }
 
     /// Opens or closes the chat popup: the view is inserted first, then scaled up in a separate
     /// transaction (and scaled down before it is removed), so the spring always plays.

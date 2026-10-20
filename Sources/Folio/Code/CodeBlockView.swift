@@ -73,10 +73,10 @@ struct CodeBlockView: View {
             }
             Menu {
                 ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
-                    Button(lang.name) { block.language = lang.id; doc.markDirty() }
+                    Button(lang.name) { doc.changeBlock(block, "Sprache ändern") { block.language = lang.id } }
                 }
                 Divider()
-                Button("Nur Text") { block.language = "plain"; doc.markDirty() }
+                Button("Nur Text") { doc.changeBlock(block, "Sprache ändern") { block.language = "plain" } }
             } label: {
                 HStack(spacing: 4) {
                     Text(spec.name)
@@ -201,7 +201,9 @@ struct CodeBlockView: View {
             Circle().fill(sessionRunning ? Color.green : Color.secondary.opacity(0.5)).frame(width: 6, height: 6)
             Image(systemName: "link").font(.system(size: 9, weight: .semibold))
             Text(sessionRunning ? "\(spec.name)-Sitzung" : "verknüpft")
+                .lineLimit(1)
         }
+        .fixedSize()
         .font(.system(size: 10.5, weight: .medium))
         .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
         .padding(.horizontal, 7)
@@ -219,7 +221,7 @@ struct CodeBlockView: View {
                 Divider()
                 Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
                     get: { block.mode != "isolated" },
-                    set: { block.mode = $0 ? "" : "isolated"; doc.markDirty() }))
+                    set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
                 Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: block.language) }
                     .disabled(!sessionRunning)
             }

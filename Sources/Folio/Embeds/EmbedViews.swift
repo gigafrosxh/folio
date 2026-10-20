@@ -226,7 +226,7 @@ struct ImageBlockView: View {
     private var controls: some View {
         HStack(spacing: 4) {
             ForEach([(0.5, "S"), (0.75, "M"), (1.0, "L")], id: \.0) { size, label in
-                Button(label) { block.width = size; doc.markDirty() }
+                Button(label) { doc.changeBlock(block, "Bildgröße ändern") { block.width = size } }
                     .buttonStyle(.borderless)
                     .font(.system(size: 11, weight: block.width == size ? .bold : .regular))
                     .frame(width: 22)

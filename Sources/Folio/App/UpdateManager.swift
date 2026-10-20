@@ -70,7 +70,7 @@ final class UpdateManager: ObservableObject {
             state = .failed("Keine Schreibrechte für \(app.deletingLastPathComponent().path). Lade das Update auf GitHub herunter.")
             return
         }
-        NoteStore.shared.currentDocument?.saveNow()
+        NoteStore.shared.saveAll()
         // One bar for the whole update: download 0–80 %, then check, install and restart.
         state = .installing(UpdateProgress(fraction: 0, step: "Lade Folio \(release.version) herunter …"))
         Task {
@@ -181,7 +181,7 @@ final class UpdateManager: ObservableObject {
         try? p.run()
         // An open sheet (like the update window itself) can make AppKit cancel a normal quit, which left
         // the new version waiting forever. Save and clean up ourselves, then quit for sure.
-        NoteStore.shared.currentDocument?.saveNow()
+        NoteStore.shared.saveAll()
         RunManager.shared.stopAll()
         KernelManager.shared.shutdownAll()
         LSPCompleter.shared.shutdownAll()
