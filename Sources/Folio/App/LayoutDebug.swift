@@ -201,6 +201,20 @@ enum LayoutDebug {
                                 let all = toolbar.items.map(\.label).filter { !$0.isEmpty }
                                 let visible = Set((toolbar.visibleItems ?? []).map(\.label))
                                 print("SETTINGS width", Int(w.frame.width), "tabs", all.count, "hidden", all.filter { !visible.contains($0) })
+                                // FOLIO_SETTINGS_TAB=<Reiter> with FOLIO_SNAPSHOT=<png>: picture of that tab.
+                                if let tab = env["FOLIO_SETTINGS_TAB"], let item = toolbar.items.first(where: { $0.label == tab }),
+                                   let path = env["FOLIO_SNAPSHOT"] {
+                                    if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                        MainActor.assumeIsolated {
+                                            guard let view = w.contentView?.superview ?? w.contentView,
+                                                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+                                            view.cacheDisplay(in: view.bounds, to: rep)
+                                            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                                            print("SETTINGS snapshot", path); fflush(stdout)
+                                        }
+                                    }
+                                }
                             }
                             fflush(stdout)
                         }
