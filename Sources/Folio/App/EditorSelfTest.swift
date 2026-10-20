@@ -83,6 +83,12 @@ enum EditorSelfTest {
         check(store.splitNoteID == other.id && store.selectedNoteID == ref.id, "Split View mit zwei Notizen")
         store.closeTab(other.id)
         check(store.tabs == [ref.id] && store.documents[other.id] != nil, "Tab geschlossen, Split hält die Notiz offen")
+        // #75: in focus mode the hidden split note must not receive commands.
+        store.focusedNoteID = other.id
+        UserDefaults.standard.set(true, forKey: "folio.focusMode")
+        check(store.currentDocument?.id == ref.id, "Fokusmodus: Befehle gehen an die sichtbare Notiz")
+        UserDefaults.standard.set(false, forKey: "folio.focusMode")
+        check(store.currentDocument?.id == other.id, "Ohne Fokusmodus: Befehle gehen an die fokussierte Split-Notiz")
         store.splitNoteID = nil
         check(store.documents[other.id] == nil, "Nach dem Schließen wird die Notiz freigegeben")
         store.windowOpened(other.id)

@@ -90,12 +90,18 @@ final class NoteStore: ObservableObject {
 
     /// The note being worked on: the focused editor's note, else the active tab's.
     var currentDocument: NoteDocument? {
-        if let f = focusedNoteID, let d = documents[f], isVisible(f) { return d }
+        if let f = focusedNoteID, let d = documents[f], isOnScreen(f) { return d }
         return selectedNoteID.flatMap { documents[$0] }
     }
 
     /// Saves every open note (before quitting, updating, backing up).
     func saveAll() { for doc in documents.values { doc.saveNow() } }
+
+    /// Like `isVisible`, but focus mode hides the split view, so its note cannot receive commands then.
+    func isOnScreen(_ id: UUID) -> Bool {
+        if UserDefaults.standard.bool(forKey: "folio.focusMode") { return id == selectedNoteID || windowNoteIDs.contains(id) }
+        return isVisible(id)
+    }
 
     func isVisible(_ id: UUID) -> Bool { id == selectedNoteID || id == splitNoteID || windowNoteIDs.contains(id) }
     @Published var searchText = ""
