@@ -85,6 +85,19 @@ final class DataSafetyTests: XCTestCase {
         XCTAssertTrue(history.versions(of: id).isEmpty)
     }
 
+    func testSameContentIgnoresKeyOrder() throws {
+        let meta = try JSONEncoder().encode(NoteMetadata(title: "A"))
+        let a = try FolioArchive(meta: meta, body: Data(#"{"blocks":[{"id":"8B69FAD9-5077-43A0-AD9C-DAE5020C5F7C","kind":"code","code":"x"}]}"#.utf8)).encoded()
+        let b = try FolioArchive(meta: meta, body: Data(#"{"blocks":[{"code":"x","kind":"code","id":"8B69FAD9-5077-43A0-AD9C-DAE5020C5F7C"}]}"#.utf8)).encoded()
+        let c = try FolioArchive(meta: meta, body: Data(#"{"blocks":[{"code":"y","kind":"code","id":"8B69FAD9-5077-43A0-AD9C-DAE5020C5F7C"}]}"#.utf8)).encoded()
+        XCTAssertTrue(NoteHistory.sameContent(a, b), "same body in another key order (#98)")
+        XCTAssertFalse(NoteHistory.sameContent(a, c))
+        var file = note("A", text: "eins")
+        file.meta.modified = Date()
+        XCTAssertEqual(try FolioArchive.decode(file.encoded()).body, try FolioArchive.decode(file.encoded()).body,
+                       "a note always encodes to the same bytes")
+    }
+
     // MARK: Trash
 
     func testTrashMoveRestoreAndDelete() throws {

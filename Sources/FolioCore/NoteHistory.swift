@@ -68,8 +68,15 @@ public struct NoteHistory: Sendable {
     /// Two encoded notes have the same content when body and attachments match (the metadata always
     /// differs because of the modification date).
     static func sameContent(_ a: Data, _ b: Data) -> Bool {
-        guard let x = try? FolioArchive.decode(a), let y = try? FolioArchive.decode(b) else { return false }
-        return x.body == y.body && x.attachments.map(\.data) == y.attachments.map(\.data)
+        guard let x = try? FolioArchive.decode(a), let y = try? FolioArchive.decode(b),
+              x.attachments.map(\.data) == y.attachments.map(\.data) else { return false }
+        // JSONEncoder does not promise a key order, so equal bodies can differ byte for byte (#98).
+        return x.body == y.body || canonical(x.body) == canonical(y.body)
+    }
+
+    private static func canonical(_ json: Data) -> Data? {
+        guard let object = try? JSONSerialization.jsonObject(with: json) else { return nil }
+        return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     public func read(_ version: NoteVersion) throws -> NoteFile { try NoteFile.read(from: version.url) }

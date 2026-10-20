@@ -122,7 +122,11 @@ public struct NoteFile: Sendable {
     }
 
     // Dates are stored as Double seconds (full precision), which also keeps decoding fast.
-    private static let encoder = JSONEncoder()
+    private static let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = .sortedKeys   // the same note always encodes to the same bytes (#98)
+        return e
+    }()
     private static let decoder = JSONDecoder()
 
     public func encoded() throws -> Data {

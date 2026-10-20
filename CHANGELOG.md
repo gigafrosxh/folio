@@ -13,6 +13,9 @@ Release Candidate für Folio 1.0: keine neuen Funktionen mehr, nur noch Fehlerbe
 - Signierte und notarisierte Releases vorbereitet (#63): Die Release-Skripte signieren mit einer „Developer ID“ (Hardened Runtime, nur die nötigen Entitlements für Mikrofon und Apple Events), signieren das Installationspaket, lassen DMG und PKG von Apple notarisieren und heften das Ticket an. Ohne Zertifikat bleibt es bei der Ad-hoc-Signatur; die Release-Notizen sagen, welcher Fall gilt. Einrichtung in `docs/SIGNING.md`.
 - Der Updater installiert eine neue Version nur noch, wenn ihre Signatur intakt ist, und – sobald Folio mit einer Developer ID signiert ist – nur vom selben Entwickler-Team. Ein veränderter oder fremder Download wird abgelehnt.
 
+### Behoben
+- Der Versionsverlauf legte manchmal eine zusätzliche Version an, obwohl sich am Inhalt nichts geändert hatte, weil derselbe Inhalt in unterschiedlicher Reihenfolge gespeichert wurde. Notizen werden jetzt immer gleich kodiert, und der Vergleich ignoriert die Reihenfolge (#98).
+
 ### Geändert
 - Updates erkennen Vorabversionen: `1.0.0-rc.1` gilt als neuer als 0.20.x und älter als 1.0.0, `rc.10` als neuer als `rc.2`.
 
