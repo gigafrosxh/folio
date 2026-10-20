@@ -3,7 +3,7 @@ import Foundation
 /// Database systems a note can connect to. Queries run through the official command-line clients
 /// (sqlite3, psql, mysql), found like interpreters via `InterpreterLocator`.
 public enum DatabaseDriver: String, Codable, CaseIterable, Sendable, Identifiable {
-    case sqlite, postgresql, mysql
+    case sqlite, postgresql, mysql, mssql
     public var id: String { rawValue }
 
     public var name: String {
@@ -11,6 +11,7 @@ public enum DatabaseDriver: String, Codable, CaseIterable, Sendable, Identifiabl
         case .sqlite: return "SQLite"
         case .postgresql: return "PostgreSQL"
         case .mysql: return "MySQL / MariaDB"
+        case .mssql: return "Microsoft SQL Server"
         }
     }
 
@@ -19,6 +20,7 @@ public enum DatabaseDriver: String, Codable, CaseIterable, Sendable, Identifiabl
         case .sqlite: return 0
         case .postgresql: return 5432
         case .mysql: return 3306
+        case .mssql: return 1433
         }
     }
 
@@ -28,6 +30,7 @@ public enum DatabaseDriver: String, Codable, CaseIterable, Sendable, Identifiabl
         case .sqlite: return "sqlite3"
         case .postgresql: return "psql"
         case .mysql: return "mysql"
+        case .mssql: return "sqlcmd"
         }
     }
 }
@@ -121,7 +124,7 @@ public enum DatabaseError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .clientMissing(let c): return "Der Datenbank-Client „\(c)“ ist nicht installiert (z. B. mit Homebrew: brew install \(c == "psql" ? "libpq" : c == "mysql" ? "mysql-client" : c))."
+        case .clientMissing(let c): return "Der Datenbank-Client „\(c)“ ist nicht installiert (z. B. mit Homebrew: brew install \(c == "psql" ? "libpq" : c == "mysql" ? "mysql-client" : c == "sqlcmd" ? "sqlcmd" : c))."
         case .connectionFailed(let m): return "Verbindung fehlgeschlagen: \(m)"
         case .queryFailed(let m): return m
         case .timeout: return "Die Abfrage hat zu lange gedauert und wurde abgebrochen."

@@ -77,6 +77,7 @@ final class BlockModel: ObservableObject, Identifiable {
             r.language = language
             r.output = output
             r.outputIsError = outputIsError
+            r.connection = connection
         case .database:
             r.code = storage.string
             r.language = "sql"

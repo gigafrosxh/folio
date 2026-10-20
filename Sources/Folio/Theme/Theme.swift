@@ -127,6 +127,8 @@ struct ThemeSettings: Codable, Equatable {
     var shortcuts: [String: String] = [:]
     /// Subtle UI animations (also off when the system asks to reduce motion).
     var animations = true
+    /// Database connections created in Folio, offered in SQL code blocks (passwords stay in the Keychain).
+    var savedConnections: [DatabaseConnection] = []
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -163,6 +165,7 @@ struct ThemeSettings: Codable, Equatable {
         codeCompletion = v(.codeCompletion, d.codeCompletion)
         shortcuts = v(.shortcuts, d.shortcuts)
         animations = v(.animations, d.animations)
+        savedConnections = v(.savedConnections, d.savedConnections)
     }
 }
 

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import FolioCore
 
@@ -30,7 +31,10 @@ struct CodeBlockView: View {
                 .padding(.bottom, 2)
             serverBar
                 .transition(Motion.slideUp)
-            if let output = block.output {
+            if usesDatabase {
+                databaseResult
+                    .transition(Motion.slideUp)
+            } else if let output = block.output {
                 outputView(output)
                     .transition(Motion.slideUp)
             }
@@ -44,6 +48,10 @@ struct CodeBlockView: View {
         .shadow(color: .black.opacity(theme.settings.shadows ? 0.10 : 0), radius: 10, y: 4)
         .environment(\.colorScheme, codeTheme.isDark ? .dark : .light)
         .task(id: block.language + (theme.settings.interpreterOverrides[block.language] ?? "")) { await resolveInterpreter() }
+        .onAppear {
+            dbObserver.watch(dbState)
+            if usesDatabase, dbState.schema.isEmpty, let c = block.connection { dbState.loadSchema(c) }
+        }
     }
 
     private var header: some View {
@@ -52,7 +60,8 @@ struct CodeBlockView: View {
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
             if isLinked { sessionChip }
-            if spec.isRunnable && !isLinked {
+            if spec.id == "sql" { connectionMenu }
+            if spec.isRunnable && !isLinked && !usesDatabase {
                 Text(interpreter ?? "kein Interpreter gefunden")
                     .font(.system(size: 10.5))
                     .foregroundStyle(interpreter == nil ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)).opacity(0.8))
@@ -179,6 +188,7 @@ struct CodeBlockView: View {
 
     /// Code of the linked blocks above this one (same language), for autocomplete.
     private func linkedPrelude() -> String {
+        if usesDatabase { return dbState.completionWords }
         guard isLinked, let index = doc.blocks.firstIndex(where: { $0.id == block.id }) else { return "" }
         return doc.blocks[..<index]
             .filter { $0.kind == .code && $0.language == block.language && $0.mode != "isolated" }
@@ -247,7 +257,96 @@ struct CodeBlockView: View {
     }
 
     private func run() {
-        runs.start(block: block, doc: doc, theme: theme)
+        if usesDatabase, let c = block.connection {
+            dbState.run(block.storage.string, on: c)
+        } else {
+            runs.start(block: block, doc: doc, theme: theme)
+        }
+    }
+
+    // MARK: SQL on a database connection
+
+    @ObservedObject private var dbObserver = DatabaseObserver()
+    @State private var editingConnection = false
+
+    /// An SQL block with a chosen connection runs on that database instead of in-memory SQLite.
+    private var usesDatabase: Bool { spec.id == "sql" && block.connection != nil }
+    private var dbState: DatabaseBlockState { DatabaseBlockState.forBlock(block.id) }
+
+    private var connectionMenu: some View {
+        Menu {
+            Button { block.connection = nil; doc.markDirty() } label: {
+                Label("SQLite im Arbeitsspeicher (ohne Verbindung)", systemImage: block.connection == nil ? "checkmark" : "memorychip")
+            }
+            let connections = ConnectionLibrary.all(in: doc)
+            if !connections.isEmpty {
+                Section("Verbindungen") {
+                    ForEach(connections) { c in
+                        Button {
+                            block.connection = c
+                            doc.markDirty()
+                            dbState.loadSchema(c)
+                        } label: {
+                            Label("\(c.name.isEmpty ? c.driver.name : c.name) – \(c.driver.name)",
+                                  systemImage: block.connection?.id == c.id ? "checkmark" : "cylinder.split.1x2")
+                        }
+                    }
+                }
+            }
+            Divider()
+            Button("Neue Verbindung…") { editingConnection = true }
+            if block.connection != nil { Button("Verbindung bearbeiten…") { editingConnection = true } }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "cylinder.split.1x2").font(.system(size: 10))
+                Text(block.connection.map { $0.name.isEmpty ? $0.driver.name : $0.name } ?? "In-Memory")
+                Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
+            }
+            .font(.system(size: 10.5, weight: .medium))
+            .foregroundStyle(block.connection == nil ? Color(nsColor: codeTheme.color(for: .comment)) : theme.accent)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Color.primary.opacity(0.06), in: Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Datenbank, auf der das SQL läuft")
+        .sheet(isPresented: $editingConnection) {
+            DatabaseConnectionSheet(connection: block.connection ?? DatabaseConnection(name: "Neue Verbindung")) { saved in
+                block.connection = saved
+                ConnectionLibrary.remember(saved)
+                doc.markDirty()
+                dbState.loadSchema(saved)
+            }
+            .environmentObject(theme)
+        }
+    }
+
+    @ViewBuilder
+    private var databaseResult: some View {
+        let state = dbState
+        Group {
+            if let error = state.error {
+                Text(error).font(.system(size: 12, design: .monospaced)).foregroundStyle(.red).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+            } else if let r = state.result {
+                if r.columns.isEmpty {
+                    Label(r.message ?? "Ausgeführt.", systemImage: "checkmark.circle").foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("\(r.rows.count)\(r.truncated ? "+" : "") Zeilen · \(Int(r.duration * 1000)) ms")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 12).padding(.top, 6)
+                        ResultGrid(result: r).frame(height: min(CGFloat(r.rows.count) * 22 + 34, 280))
+                    }
+                }
+            } else if state.isRunning {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(10)
+            }
+        }
+        .background(Color(nsColor: NSColor(hex: codeTheme.outputBackground) ?? .windowBackgroundColor))
     }
 
     /// Shown while the code runs as a server: open it in the note or the browser, or stop it.
@@ -277,5 +376,15 @@ struct CodeBlockView: View {
         let web = BlockModel(kind: .web)
         web.url = url.absoluteString
         doc.insert(web, after: block.id)
+    }
+}
+
+/// Re-renders the code block when its database state changes (the state object is shared per block).
+@MainActor
+final class DatabaseObserver: ObservableObject {
+    private var cancellable: Any?
+    func watch(_ state: DatabaseBlockState) {
+        guard cancellable == nil else { return }
+        cancellable = state.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
 }

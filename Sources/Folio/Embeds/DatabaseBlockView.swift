@@ -120,6 +120,7 @@ struct DatabaseBlockView: View {
         .sheet(isPresented: $editingConnection) {
             DatabaseConnectionSheet(connection: block.connection ?? DatabaseConnection(name: "Neue Verbindung")) { saved in
                 block.connection = saved
+                ConnectionLibrary.remember(saved)
                 doc.markDirty()
                 state.loadSchema(saved)
             }
@@ -212,7 +213,7 @@ struct DatabaseBlockView: View {
 
     private func insertSelect(_ table: TableInfo) {
         let name = table.schema.map { "\($0).\(table.name)" } ?? table.name
-        let sql = "SELECT * FROM \(name) LIMIT 100;"
+        let sql = block.connection?.driver == .mssql ? "SELECT TOP 100 * FROM \(name);" : "SELECT * FROM \(name) LIMIT 100;"
         block.storage.replaceCharacters(in: NSRange(location: 0, length: block.storage.length), with: sql)
         block.revision += 1
         doc.markDirty()

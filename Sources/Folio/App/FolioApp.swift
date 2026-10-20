@@ -157,7 +157,20 @@ enum LayoutDebug {
                 guard let tv = find(root) else { print("LAYOUT no text view"); return }
                 tv.window?.makeFirstResponder(tv)
                 tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
-                if typed == "delete-test2", let doc = NoteStore.shared.currentDocument {
+                if typed.hasPrefix("sql-db:"), let doc = NoteStore.shared.currentDocument {
+                    // SQL code block on a SQLite file connection: sql-db:<path>
+                    let block = BlockModel(kind: .code)
+                    block.language = "sql"
+                    block.connection = DatabaseConnection(name: "Test", driver: .sqlite, path: String(typed.dropFirst("sql-db:".count)))
+                    block.storage.setAttributedString(NSAttributedString(string: "SELECT name, stadt FROM kunden ORDER BY name;"))
+                    doc.insert(block, after: doc.blocks.first?.id)
+                    DatabaseBlockState.forBlock(block.id).run(block.storage.string, on: block.connection!)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        let st = DatabaseBlockState.forBlock(block.id)
+                        print("LAYOUT sql-db:", st.result?.rows ?? [], st.error ?? "")
+                        fflush(stdout)
+                    }
+                } else if typed == "delete-test2", let doc = NoteStore.shared.currentDocument {
                     let a = BlockModel(kind: .code), b = BlockModel(kind: .code), c = BlockModel(kind: .code)
                     for x in [a, b, c] { x.language = "python" }
                     a.storage.setAttributedString(NSAttributedString(string: "x = 1"))

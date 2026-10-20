@@ -6,9 +6,15 @@ import Darwin
 final class DatabaseClientTests: XCTestCase {
     private var directories: [URL] = []
     private var servers: [Process] = []
+    private var sqlServer: (String, String)?
+    private var previousSQLCMD: String?
     private var postgres: (String, String)?
 
     override func tearDownWithError() throws {
+        if let (docker, container) = sqlServer {
+            _ = try? command(docker, ["rm", "-f", container], timeout: 30)
+            DatabaseClient.clientOverrides[.mssql] = previousSQLCMD
+        }
         if let (ctl, data) = postgres { _ = try? command(ctl, ["-D", data, "stop", "-m", "immediate", "-w"], timeout: 15) }
         for server in servers where server.isRunning {
             ServerDetector.terminateTree(server.processIdentifier)
@@ -180,6 +186,94 @@ final class DatabaseClientTests: XCTestCase {
         _ = try await DatabaseClient.run("CREATE DATABASE test", on: connection, password: nil)
         connection.database = "test"
         try await roundTrip(connection)
+    }
+
+    func testSQLCMDParser() throws {
+        let sep = "\u{001F}"
+        let result = try DatabaseClient.parseSQLCMD("old\n---\n1\n\ntitle\(sep)id\n-----\(sep)--\nä 🎉\tAnfang\nEnde\(sep)1\nNULL\(sep)2\n\n__folio_changes\n---------------\n2\n")
+        XCTAssertEqual(result.columns, ["title", "id"])
+        XCTAssertEqual(result.rows, [["ä 🎉\tAnfang\nEnde", "1"], [nil, "2"]])
+        XCTAssertEqual(try DatabaseClient.parseSQLCMD("__folio_changes\n---------------\n1\n").message, "1 Zeile geändert")
+    }
+
+    func testSQLServerRoundTrip() async throws {
+        let docker = try binary("docker")
+        do { try command(docker, ["info"], timeout: 10) }
+        catch { throw XCTSkip("Docker ist nicht verfügbar.") }
+        let container = "folio-sql-" + UUID().uuidString.lowercased()
+        let password = "Folio!9a" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        previousSQLCMD = DatabaseClient.clientOverrides[.mssql]
+        sqlServer = (docker, container)
+        do {
+            try command(docker, ["run", "-d", "--platform", "linux/amd64", "--name", container,
+                                 "-p", "127.0.0.1::1433", "-e", "ACCEPT_EULA=Y", "-e", "MSSQL_SA_PASSWORD=" + password,
+                                 "mcr.microsoft.com/mssql/server:2022-latest"], timeout: 30)
+        } catch { throw XCTSkip("SQL-Server-Container konnte nicht gestartet werden: \(error)") }
+        let deadline = Date().addingTimeInterval(180)
+        var ready = false
+        while Date() < deadline {
+            if (try? command(docker, ["exec", container, "/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost",
+                                      "-U", "sa", "-P", password, "-l", "2", "-Q", "SELECT 1"], timeout: min(10, max(1, deadline.timeIntervalSinceNow)))) != nil {
+                ready = true; break
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        guard ready else { throw XCTSkip("SQL Server wurde nicht innerhalb von 180 Sekunden bereit.") }
+        let mapping = try command(docker, ["port", container, "1433/tcp"])
+        let port = try XCTUnwrap(Int(mapping.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":").last.map(String.init) ?? ""))
+        let wrapper = try temporaryDirectory().appendingPathComponent("sqlcmd")
+        func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        // The wrapper removes -i and redirects that host file to docker exec's stdin.
+        let script = """
+        #!/bin/bash
+        args=()
+        input=""
+        while (( $# )); do
+          case "$1" in
+            -S) args+=("-S" "tcp:localhost,1433"); shift 2 ;;
+            -i) input="$2"; shift 2 ;;
+            *) args+=("$1"); shift ;;
+          esac
+        done
+        exec \(quote(docker)) exec -i -e SQLCMDPASSWORD \(quote(container)) /opt/mssql-tools18/bin/sqlcmd "${args[@]}" < "$input"
+        """
+        try script.write(to: wrapper, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
+        DatabaseClient.clientOverrides[.mssql] = wrapper.path
+        let connection = DatabaseConnection(driver: .mssql, host: "127.0.0.1", port: port, database: "master", user: "sa")
+        let special = "Tab\tZeile\nKomma, ä 🎉 Ende"
+        let created = try await DatabaseClient.run("""
+        CREATE TABLE dbo.folio_sample (id INT PRIMARY KEY, title NVARCHAR(200), score DECIMAL(10,2));
+        INSERT INTO dbo.folio_sample VALUES (1, N'\(special)', 1.50), (2, NULL, 2.25), (3, N'', 3.50);
+        """, on: connection, password: password)
+        XCTAssertEqual(created.message, "3 Zeilen geändert")
+        let result = try await DatabaseClient.run("SELECT title, id, score FROM dbo.folio_sample ORDER BY id", on: connection, password: password)
+        XCTAssertEqual(result.columns, ["title", "id", "score"])
+        XCTAssertEqual(result.rows, [[special, "1", "1.50"], [nil, "2", "2.25"], ["", "3", "3.50"]])
+        let multiple = try await DatabaseClient.run("SELECT id FROM dbo.folio_sample; SELECT title, id FROM dbo.folio_sample WHERE id=2; SELECT id FROM dbo.folio_sample WHERE 1=0;", on: connection, password: password)
+        XCTAssertEqual(multiple.columns, ["title", "id"])
+        XCTAssertEqual(multiple.rows, [[nil, "2"]])
+        let changed = try await DatabaseClient.run("UPDATE dbo.folio_sample SET score=4 WHERE id=1", on: connection, password: password)
+        XCTAssertEqual(changed.message, "1 Zeile geändert")
+        let zero = try await DatabaseClient.run("DELETE FROM dbo.folio_sample WHERE id=99", on: connection, password: password)
+        XCTAssertEqual(zero.message, "0 Zeilen geändert")
+        do {
+            _ = try await DatabaseClient.run("SELEC broken syntax", on: connection, password: password)
+            XCTFail("Syntaxfehler wurde nicht erkannt.")
+        } catch DatabaseError.queryFailed(let message) { XCTAssertTrue(message.contains("Msg 102")) }
+        do {
+            _ = try await DatabaseClient.testConnection(connection, password: "Wrong!Password9")
+            XCTFail("Anmeldefehler wurde nicht erkannt.")
+        } catch DatabaseError.connectionFailed(let message) { XCTAssertTrue(message.contains("Login failed")) }
+        let tables = try await DatabaseClient.schema(of: connection, password: password)
+        let table = try XCTUnwrap(tables.first { $0.name == "folio_sample" && $0.schema == "dbo" })
+        XCTAssertEqual(table.columns.map(\.name), ["id", "title", "score"])
+        XCTAssertTrue(table.columns[0].isPrimaryKey)
+        XCTAssertFalse(table.columns[0].nullable)
+        XCTAssertTrue(table.columns[1].nullable)
+        let version = try await DatabaseClient.testConnection(connection, password: password)
+        XCTAssertTrue(version.contains("Microsoft SQL Server"))
+        XCTAssertFalse(version.contains("\n"))
     }
 
     func testCSVQuotedFields() throws {
