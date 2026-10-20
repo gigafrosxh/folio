@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [0.11.0] – 2026-10-20
+
 ### Hinzugefügt
 - Microsoft SQL Server im Datenbank-Block (über `sqlcmd`), inklusive Schema, Primärschlüsseln und Änderungszahlen; getestet gegen einen echten SQL Server in Docker.
 - SQL-Codefelder können auf Datenbanken zugreifen: Im Kopf des Codefelds wählst du eine Verbindung (aus der Notiz oder alle bisher in Folio angelegten) oder legst eine neue an. ⇧↩ führt das SQL darauf aus, das Ergebnis erscheint als Tabelle, und die Vorschläge kennen die Tabellen und Spalten. Ohne Verbindung läuft SQL wie bisher in einer SQLite-Datenbank im Arbeitsspeicher.
