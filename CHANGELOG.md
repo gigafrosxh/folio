@@ -14,6 +14,7 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 - Eine neue Notiz ist auch bei aktiver Suche in der Liste sichtbar: Anlegen setzt die Suche zurück (#102).
 - Die Formatleiste schneidet bei schmalerem Fenster keine Werkzeuge mehr ab: Code, Tabelle, Formel, Diagramm, Audio, Datei, Zeichnung und Webseite wandern in ein Menü „Einfügen“, bei noch weniger Platz Ausrichtung, Link und Writing Tools in „Mehr“ (#103).
 - Alle neun Reiter der Einstellungen sind sichtbar; „Feedback“ verschwand bisher im »-Überlaufmenü (#104).
+- ⌘W schließt bei mehreren offenen Tabs nur den aktuellen Tab, wie in Safari; erst beim letzten Tab das Fenster (#107).
 
 ## [1.0.0-rc.1] – 2026-10-20
 

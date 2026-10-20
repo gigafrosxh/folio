@@ -231,6 +231,16 @@ final class ShortcutCenter {
             RunManager.shared.stop(id)
             return true
         }
+        // ⌘W closes the current tab while several are open, like in Safari; the last one closes the window (#107).
+        if event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "w", window.identifier?.rawValue.hasPrefix("main") == true {
+            let store = NoteStore.shared
+            if store.tabs.count > 1, let id = store.selectedNoteID {
+                store.closeTab(id)
+                return true
+            }
+            return false
+        }
         guard let action = ShortcutAction.allCases.first(where: { combo(for: $0).matches(event) }) else { return false }
         perform(action)
         return true

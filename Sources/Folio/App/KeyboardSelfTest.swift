@@ -13,7 +13,7 @@ enum KeyboardSelfTest {
     private static func wait(_ s: Double) async { try? await Task.sleep(for: .seconds(s)) }
 
     /// German keyboard layout key codes for the keys used below.
-    private static let codes: [String: UInt16] = ["n": 45, "t": 17, "d": 2, "f": 3, "p": 35, "s": 1, "y": 6, "c": 8, "k": 40, "g": 5, "ä": 39, "ö": 41, "\u{1b}": 53]
+    private static let codes: [String: UInt16] = ["w": 13, "n": 45, "t": 17, "d": 2, "f": 3, "p": 35, "s": 1, "y": 6, "c": 8, "k": 40, "g": 5, "ä": 39, "ö": 41, "\u{1b}": 53]
 
     private static func press(_ key: String, _ mods: NSEvent.ModifierFlags, settle: Double = 0.4) async {
         guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }) else { return }
@@ -139,7 +139,18 @@ enum KeyboardSelfTest {
             print("KEY skip ⌃C (Folio ist nicht die aktive App)")
         }
         await focusChecks(store)
+        await closeTabCheck(store)
         print("KEY done"); fflush(stdout)
+    }
+
+    /// ⌘W closes a tab while several are open, and not the window (#107).
+    private static func closeTabCheck(_ store: NoteStore) async {
+        guard NSApp.isActive else { return }
+        await press("t", .command)
+        let tabs = store.tabs.count
+        await press("w", .command)
+        let window = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }
+        check(tabs > 1 && store.tabs.count == tabs - 1 && window != nil, "⌘W schließt bei mehreren Tabs nur den Tab (#107: \(tabs) → \(store.tabs.count))")
     }
 
     /// Plain typing posted right away, like a fast typist after a shortcut.

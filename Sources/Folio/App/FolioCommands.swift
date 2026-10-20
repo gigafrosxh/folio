@@ -27,7 +27,8 @@ struct FolioCommands: Commands {
                 else if let id = store.selectedNoteID { store.openInSplit(id) }
             }
             .keyboardShortcut("\\", modifiers: [.command, .option])
-            Button("Tab schließen") { if let id = store.selectedNoteID { store.closeTab(id) } }
+            // ⌘W itself closes the tab while several are open (ShortcutCenter, #107); the menu's ⌘W item stays „Schließen“.
+            Button("Tab schließen (⌘W)") { if let id = store.selectedNoteID { store.closeTab(id) } }
             Button("Nächster Tab") { store.selectTab(offset: 1) }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
             Button("Vorheriger Tab") { store.selectTab(offset: -1) }
