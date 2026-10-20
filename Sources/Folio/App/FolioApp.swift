@@ -144,6 +144,8 @@ enum LayoutDebug {
         if ProcessInfo.processInfo.environment["FOLIO_UPDATE_TEST"] != nil {
             // End-to-end update check: find the newest release and install it over this app.
             let updates = UpdateManager.shared
+            // Like a user: the update sheet is open while installing.
+            NotificationCenter.default.post(name: .folioShowUpdates, object: nil)
             updates.check()
             func poll() {
                 switch updates.state {

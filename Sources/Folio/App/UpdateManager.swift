@@ -172,7 +172,17 @@ final class UpdateManager: ObservableObject {
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = ["-c", script]
         try? p.run()
+        // An open sheet (like the update window itself) can make AppKit cancel a normal quit, which left
+        // the new version waiting forever. Save and clean up ourselves, then quit for sure.
+        NoteStore.shared.currentDocument?.saveNow()
+        RunManager.shared.stopAll()
+        KernelManager.shared.shutdownAll()
+        LSPCompleter.shared.shutdownAll()
+        for window in NSApp.windows {
+            if let sheet = window.attachedSheet { window.endSheet(sheet) }
+        }
         NSApp.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
     }
 }
 
