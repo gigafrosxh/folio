@@ -157,7 +157,7 @@ extension NoteLinkInserter {
         let s = NSMutableAttributedString()
         if block.storage.length > 0 { s.append(NSAttributedString(string: "\n", attributes: body)) }
         s.append(NSAttributedString(string: ref.meta.title.isEmpty ? "Notiz" : ref.meta.title, attributes: linkAttrs))
-        if let tv = FormattingController.shared.textView(for: block.id), tv.shouldChangeText(in: NSRange(location: block.storage.length, length: 0), replacementString: s.string) {
+        if let tv = FormattingController.shared.textView(for: block.id), tv.textStorage === block.storage, tv.shouldChangeText(in: NSRange(location: block.storage.length, length: 0), replacementString: s.string) {
             tv.textStorage?.append(s)
             tv.didChangeText()
         } else {

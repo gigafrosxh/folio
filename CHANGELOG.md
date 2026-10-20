@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Nach dem Neuladen einer Notiz (Version wiederhergestellt, Tag umbenannt, externe Änderung übernommen) wirkte ⌘Z auf die alte, unsichtbare Fassung. Diese Schritte werden jetzt verworfen, neue Blockoperationen lassen sich sofort rückgängig machen (#77).
+- Suchen/Ersetzen und Notizlinks greifen nach dem Neuladen nicht mehr auf die alte Textansicht zu.
+
 ## [0.16.4] – 2026-10-20
 
 ### Behoben

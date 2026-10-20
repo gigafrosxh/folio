@@ -42,8 +42,12 @@ final class FindModel: ObservableObject {
         doc?.blocks.filter { $0.kind == .text || $0.kind == .code || $0.kind == .database } ?? []
     }
 
+    /// The text view showing a block, if it shows this document's text (after a note was reloaded, an old
+    /// view with the same block id may still be registered).
     private func view(for id: UUID) -> NSTextView? {
-        FormattingController.shared.textView(for: id) ?? FormattingController.shared.codeView(for: id)
+        guard let block = doc?.block(id) else { return nil }
+        let candidates: [NSTextView?] = [FormattingController.shared.textView(for: id), FormattingController.shared.codeView(for: id)]
+        return candidates.compactMap { $0 }.first { $0.textStorage === block.storage }
     }
 
     func search(keepPosition: Bool) {

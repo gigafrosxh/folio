@@ -49,8 +49,21 @@ enum EditorSelfTest {
         um.beginUndoGrouping(); doc.changeBlock(code, "Sprache ändern") { code.language = "ruby" }; um.endUndoGrouping()
         um.undo()
         check(code.language == "python", "Spracheinstellung rückgängig")
+        // #77: after reloading the note, no undo step may point at the old document.
+        um.beginUndoGrouping(); doc.insert(BlockModel(kind: .drawing), after: doc.blocks[0].id); um.endUndoGrouping()
+        doc.saveNow()
+        store.reloadDocument(doc.id)
+        let reloaded = store.document(for: doc.id)
+        check(!um.canUndo && reloaded !== doc && reloaded?.undoManager === um, "Nach Neuladen kein Undo auf die alte Fassung")
+        if let reloaded {
+            um.beginUndoGrouping(); reloaded.insert(BlockModel(kind: .code), after: reloaded.blocks[0].id); um.endUndoGrouping()
+            let n = reloaded.blocks.count
+            um.undo()
+            check(reloaded.blocks.count < n, "Undo wirkt auf die neu geladene Notiz")
+        }
         um.groupsByEvent = true
         await wait(0.8)
+        guard let doc = store.document(for: ref.id) else { check(false, "Notiz nach Neuladen"); return }
 
         // Find & replace (#9)
         let find = FindModel()

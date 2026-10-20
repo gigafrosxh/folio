@@ -913,8 +913,12 @@ final class NoteStore: ObservableObject {
         guard let old = documents[id] else { return }
         let url = old.url
         KernelManager.shared.shutdown(note: id)
+        // Undo steps of the replaced document would change an invisible copy; drop them.
+        let undoManager = old.undoManager
+        undoManager?.removeAllActions(withTarget: old)
         documents[id] = nil
         open(url, id: id)
+        documents[id]?.undoManager = undoManager
         if let doc = documents[id], let i = notes.firstIndex(where: { $0.id == id }) {
             notes[i] = NoteRef(meta: doc.meta, url: url)
         }
