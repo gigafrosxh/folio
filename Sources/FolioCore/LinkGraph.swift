@@ -297,8 +297,9 @@ public enum TemplateVariables {
                 return df.string(from: context.date)
             }
             switch name {
-            case "datum", "date": return (m.range, format.map(formatted) ?? context.date.formatted(Date.FormatStyle(date: .long, time: .omitted).locale(context.locale)), false)
-            case "uhrzeit", "time": return (m.range, format.map(formatted) ?? context.date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(context.locale)), false)
+            // Fixed formats, so a template gives the same text on every Mac.
+            case "datum", "date": return (m.range, formatted(format ?? "d. MMMM yyyy"), false)
+            case "uhrzeit", "time": return (m.range, formatted(format ?? "HH:mm"), false)
             case "wochentag", "weekday": return (m.range, formatted("EEEE"), false)
             case "titel", "title": return (m.range, context.title, false)
             case "cursor": return (m.range, "", true)
