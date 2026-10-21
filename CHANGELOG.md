@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- Die Regler in den Einstellungen sehen einheitlich aus und rasten in sinnvollen Schritten ein: Zeitlimit in 5 s, maximale Ausgabe in 50 KB, Editorbreite in 10 pt. Bisher zeichnete „Zeitlimit“ eine gestückelte Leiste und „Max. Ausgabe“ ließ sich kaum gezielt einstellen (#105).
+- Das Hilfe-Menü hat Inhalt: „Folio-Hilfe“ (⌘?) öffnet die Anleitung, dazu Tastenkürzel, Datenschutz, Änderungen und „Fehler melden“. Der englische Resteintrag „Toggle Sidebar“ ist weg (#106).
+
 ## [1.0.0-rc.3] – 2026-10-21
 
 ### Behoben

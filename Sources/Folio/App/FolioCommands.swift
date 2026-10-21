@@ -4,6 +4,10 @@ import FolioCore
 
 struct FolioCommands: Commands {
     @ObservedObject var store: NoteStore
+
+    static func docs(_ path: String) -> URL {
+        URL(string: "https://github.com/gigafrosxh/folio/blob/main/\(path)")!
+    }
     @Environment(\.openWindow) private var openWindow
     private var f: FormattingController { .shared }
 
@@ -51,6 +55,21 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("g")
             Button("Rückwärts suchen") { NotificationCenter.default.post(name: .folioFindNext, object: -1) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        // Help with content instead of macOS' „Hilfe ist nicht verfügbar“ (#106).
+        CommandGroup(replacing: .help) {
+            Button("Folio-Hilfe") { NSWorkspace.shared.open(Self.docs("README.md")) }
+                .keyboardShortcut("?", modifiers: .command)
+            Button("Tastenkürzel …") {
+                UserDefaults.standard.set("shortcuts", forKey: "folio.settingsTab")
+                // Through the app menu's „Einstellungen …“ item, which also works when no window is key.
+                if let appMenu = NSApp.mainMenu?.items.first?.submenu,
+                   let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," }) { appMenu.performActionForItem(at: i) }
+            }
+            Button("Datenschutz und Sicherheit") { NSWorkspace.shared.open(Self.docs("docs/PRIVACY.md")) }
+            Button("Änderungen in dieser Version") { NSWorkspace.shared.open(Self.docs("CHANGELOG.md")) }
+            Divider()
+            Button("Fehler melden oder Idee vorschlagen …") { NSWorkspace.shared.open(SettingsView.issuesURL) }
         }
         CommandGroup(after: .sidebar) {
             Button("Seitenleiste ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleSidebar, object: nil) }

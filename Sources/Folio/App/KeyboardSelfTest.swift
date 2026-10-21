@@ -141,6 +141,7 @@ enum KeyboardSelfTest {
         await focusChecks(store)
         await closeTabCheck(store)
         await trashMenuCheck(store)
+        await helpMenuCheck()
         print("KEY done"); fflush(stdout)
     }
 
@@ -166,6 +167,18 @@ enum KeyboardSelfTest {
         await wait(0.5)
         check(found != nil && store.notes.count == count - 1 && !store.notes.contains { $0.id == id },
               "Menü „Notiz in den Papierkorb legen“ legt die offene Notiz in den Papierkorb (#108)")
+    }
+
+    /// The Help menu has content and opens the shortcut settings (#106).
+    private static func helpMenuCheck() async {
+        guard let help = NSApp.mainMenu?.items.last?.submenu else { check(false, "Hilfe-Menü"); return }
+        let titles = help.items.map(\.title)
+        check(titles.contains("Folio-Hilfe") && !titles.contains("Toggle Sidebar"), "Hilfe-Menü ohne englischen Resteintrag (#106: \(titles.filter { !$0.isEmpty }))")
+        if let i = help.items.firstIndex(where: { $0.title == "Tastenkürzel …" }) { help.performActionForItem(at: i) }
+        await wait(1.5)
+        let settings = NSApp.windows.first { $0.isVisible && $0.identifier?.rawValue.contains("Settings") == true }
+        check(settings?.title == "Tastenkürzel", "„Hilfe → Tastenkürzel …“ öffnet die Einstellungen beim Reiter Tastenkürzel (\(settings?.title ?? "-"))")
+        settings?.close()
     }
 
     /// Plain typing posted right away, like a fast typist after a shortcut.
