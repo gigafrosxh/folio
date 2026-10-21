@@ -145,6 +145,11 @@ struct SettingsView: View {
 
     private var editor: some View {
         Form {
+            Section {
+                Toggle("Nach dem Titel mit einer Überschrift weiterschreiben", isOn: $theme.settings.headingAfterTitle)
+            } header: { Text("Absätze") } footer: {
+                Text("↩ nach dem Titel beginnt eine Überschrift, ↩ nach einer Überschrift normalen Text – wie in Apple Notizen. Listen setzen sich mit ↩ fort, ⇥ rückt ein.")
+            }
             Section("Schrift") {
                 Picker("Schriftfamilie", selection: $theme.settings.editorFont) {
                     Text("System").tag("System")

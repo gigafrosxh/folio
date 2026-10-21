@@ -157,6 +157,8 @@ struct ThemeSettings: Codable, Equatable {
     /// Daily notes (#117): folder below the library and template id ("" = none).
     var dailyFolder = "Tagesnotizen"
     var dailyTemplate = ""
+    /// After the title, Return starts a heading line, then body text (#125).
+    var headingAfterTitle = true
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -209,6 +211,7 @@ struct ThemeSettings: Codable, Equatable {
         widgetChecklist = v(.widgetChecklist, d.widgetChecklist)
         dailyFolder = v(.dailyFolder, d.dailyFolder)
         dailyTemplate = v(.dailyTemplate, d.dailyTemplate)
+        headingAfterTitle = v(.headingAfterTitle, d.headingAfterTitle)
     }
 }
 

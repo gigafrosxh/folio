@@ -64,6 +64,9 @@ final class FolioTextView: NSTextView {
     var onPasteImage: ((Data) -> Void)?
     var onPasteURL: ((URL) -> Bool)?
     var bodyAttributes: () -> [NSAttributedString.Key: Any] = { [:] }
+    /// Attributes of a paragraph style, and whether a heading follows the title (#125).
+    var styleAttributes: (TextStyle) -> [NSAttributedString.Key: Any] = { _ in [:] }
+    var headingAfterTitle: () -> Bool = { false }
     var predictionsEnabled: () -> Bool = { false }
     private var lastWidth: CGFloat = 0
 
@@ -202,8 +205,55 @@ final class FolioTextView: NSTextView {
 
     override func didChangeText() {
         super.didChangeText()
+        indentListParagraph()
         reportHeight()
         invalidateIntrinsicContentSize()
+    }
+
+    // MARK: Lists (#125)
+
+    /// „- “, „* “ and „[] “ at the start of a line become a bullet or checkbox, like in Apple Notes.
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        super.insertText(string, replacementRange: replacementRange)
+        guard (string as? String) == " " || (string as? NSAttributedString)?.string == " " else { return }
+        let ns = self.string as NSString
+        let sel = selectedRange()
+        guard sel.length == 0, !(isFirstBlock && ns.lineRange(for: NSRange(location: sel.location, length: 0)).location == 0) else { return }
+        let lineStart = ns.lineRange(for: NSRange(location: sel.location, length: 0)).location
+        let typed = ns.substring(with: NSRange(location: lineStart, length: sel.location - lineStart))
+        let indent = String(typed.prefix { $0 == "\t" })
+        let marker = String(typed.dropFirst(indent.count))
+        let replacement: String
+        switch marker {
+        case "- ", "* ": replacement = ListKind.bullet.rawValue
+        case "[] ", "[ ] ": replacement = ListKind.checklist.rawValue
+        case "[x] ": replacement = ListKind.checked
+        default: return
+        }
+        let range = NSRange(location: lineStart + (indent as NSString).length, length: (marker as NSString).length)
+        guard shouldChangeText(in: range, replacementString: replacement) else { return }
+        textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: replacement, attributes: typingAttributes))
+        didChangeText()
+        setSelectedRange(NSRange(location: range.location + (replacement as NSString).length, length: 0))
+    }
+
+    /// Wrapped lines of a list item start under its text, not under the bullet (hanging indent).
+    func indentListParagraph() {
+        guard let storage = textStorage, storage.length > 0 else { return }
+        let ns = storage.string as NSString
+        let para = ns.paragraphRange(for: NSRange(location: min(selectedRange().location, ns.length), length: 0))
+        guard para.length > 0 else { return }
+        let line = ns.substring(with: para).trimmingCharacters(in: .newlines)
+        let current = storage.attribute(.paragraphStyle, at: para.location, effectiveRange: nil) as? NSParagraphStyle ?? .default
+        var head: CGFloat = 0
+        if let list = ListKind.detect(line) {
+            let attrs = storage.attributes(at: para.location, effectiveRange: nil)
+            head = NSAttributedString(string: list.indent + list.marker, attributes: attrs).size().width
+        }
+        guard abs(current.headIndent - head) > 0.5 else { return }
+        let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+        style.headIndent = head
+        storage.addAttribute(.paragraphStyle, value: style, range: para)
     }
 
     override func becomeFirstResponder() -> Bool {
@@ -250,9 +300,18 @@ final class FolioTextView: NSTextView {
             return
         }
 
+        // Like Apple Notes: Return after the title starts a heading (or body text), Return after a heading
+        // starts body text, so nobody has to change the paragraph style by hand (#125).
         let wasTitle = isFirstBlock && para.location == 0
+        let font = para.length > 0 ? textStorage?.attribute(.font, at: para.location, effectiveRange: nil) as? NSFont : typingAttributes[.font] as? NSFont
+        let headingFonts = [TextStyle.heading, .subheading].compactMap { styleAttributes($0)[.font] as? NSFont }
+        let wasHeading = !wasTitle && font != nil && headingFonts.contains { $0.pointSize == font!.pointSize && $0.fontName == font!.fontName }
         super.insertNewline(sender)
-        if wasTitle { typingAttributes = bodyAttributes() }
+        if wasTitle {
+            typingAttributes = headingAfterTitle() && !line.isEmpty ? styleAttributes(.heading) : bodyAttributes()
+        } else if wasHeading {
+            typingAttributes = bodyAttributes()
+        }
     }
 
     override func deleteBackward(_ sender: Any?) {
@@ -589,7 +648,9 @@ struct RichTextView: NSViewRepresentable {
             tv.allowedWritingToolsResultOptions = [.plainText, .richText, .list, .table]
         }
         if #available(macOS 14.0, *) { tv.inlinePredictionType = theme.settings.systemPredictions ? .yes : .no }
-        tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
+        // The underline in the accent color too; without it AppKit draws it system blue (#126).
+        tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue,
+                                 .underlineColor: theme.accentNSColor.withAlphaComponent(0.6), .cursor: NSCursor.pointingHand]
         tv.delegate = context.coordinator
         configureCallbacks(tv, context: context)
         tv.typingAttributes = initialTypingAttributes()
@@ -619,6 +680,8 @@ struct RichTextView: NSViewRepresentable {
         tv.onPasteImage = onPasteImage
         tv.onPasteURL = onPasteURL
         tv.bodyAttributes = { [theme] in theme.bodyAttributes }
+        tv.styleAttributes = { [theme] style in style.attributes(theme: theme) }
+        tv.headingAfterTitle = { [theme] in theme.settings.headingAfterTitle }
         tv.predictionsEnabled = { [theme] in theme.settings.aiPredictions }
         if #available(macOS 14.0, *) {
             // Our own completion replaces the system's single-word prediction to avoid two ghost texts.
@@ -631,6 +694,7 @@ struct RichTextView: NSViewRepresentable {
         context.coordinator.parent = self
         configureCallbacks(tv, context: context)
         tv.linkTextAttributes?[.foregroundColor] = theme.accentNSColor
+        tv.linkTextAttributes?[.underlineColor] = theme.accentNSColor.withAlphaComponent(0.6)
         if tv.string.isEmpty { tv.typingAttributes = initialTypingAttributes() }
         context.coordinator.highlightTags(in: tv)
         context.coordinator.linkifyWikiLinks(in: tv)
