@@ -15,8 +15,9 @@ struct FormatToolbar: View {
     ]
 
     /// How much room the bar has (#103): `full` shows every tool, `compact` folds the insert tools into
-    /// an „Einfügen“ menu, `minimal` also folds alignment, link and Writing Tools into „Mehr“.
-    enum Layout { case full, compact, minimal }
+    /// an „Einfügen“ menu, `minimal` also folds alignment, link and Writing Tools into „Mehr“, `tiny`
+    /// keeps only style, bold, italic, „Mehr“ (with everything else) and „Einfügen“.
+    enum Layout { case full, compact, minimal, tiny }
     var layout: Layout = .full
 
     var body: some View {
@@ -25,13 +26,15 @@ struct FormatToolbar: View {
             sep
             toggle("bold", f.isBold, "Fett (⌘B)") { f.toggleBold() }
             toggle("italic", f.isItalic, "Kursiv (⌘I)") { f.toggleItalic() }
-            toggle("underline", f.isUnderlined, "Unterstrichen (⌘U)") { f.toggleUnderline() }
-            toggle("strikethrough", f.isStruck, "Durchgestrichen") { f.toggleStrikethrough() }
-            colorMenu
-            sep
-            listMenu
-            plain("checklist", "Checkliste") { f.toggleList(.checklist) }
-            if layout == .minimal {
+            if layout != .tiny {
+                toggle("underline", f.isUnderlined, "Unterstrichen (⌘U)") { f.toggleUnderline() }
+                toggle("strikethrough", f.isStruck, "Durchgestrichen") { f.toggleStrikethrough() }
+                colorMenu
+                sep
+                listMenu
+                plain("checklist", "Checkliste") { f.toggleList(.checklist) }
+            }
+            if layout == .minimal || layout == .tiny {
                 moreMenu
             } else {
                 alignmentMenu
@@ -120,6 +123,16 @@ struct FormatToolbar: View {
 
     private var moreMenu: some View {
         Menu {
+            if layout == .tiny {
+                Button { f.toggleUnderline() } label: { Label("Unterstrichen", systemImage: "underline") }
+                Button { f.toggleStrikethrough() } label: { Label("Durchgestrichen", systemImage: "strikethrough") }
+                Section("Listen") {
+                    ForEach(ListKind.allCases, id: \.self) { kind in
+                        Button { f.toggleList(kind) } label: { Label(kind.label, systemImage: kind.icon) }
+                    }
+                }
+                Button("Formatierung entfernen") { f.clearFormatting() }
+            }
             Section("Ausrichtung") { alignmentItems }
             Divider()
             Button { actions.addLink() } label: { Label("Link hinzufügen (⌘K)", systemImage: "link") }
@@ -127,7 +140,7 @@ struct FormatToolbar: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
-        .helpLabel("Mehr: Ausrichtung, Link, Writing Tools")
+        .helpLabel(layout == .tiny ? "Mehr: Formatierung, Listen, Ausrichtung, Link, Writing Tools" : "Mehr: Ausrichtung, Link, Writing Tools")
         .frame(width: 34)
     }
 

@@ -35,11 +35,21 @@ struct NoteEditorView: View {
     @State private var headerHover = false
     @Environment(\.undoManager) private var undoManager
     @State private var chatPopped = false
+    /// Width of the editor area, so the chat never squeezes the note to nothing (#109).
+    @State private var areaWidth: CGFloat = 1000
+    /// The header has two rows in narrow windows; the chat starts below it.
+    @State private var headerHeight: CGFloat = 52
+
+    /// The chat is 360 pt wide when there is room; in narrower windows it shrinks to 280 pt and, if the
+    /// note would still get less than 320 pt, floats over the text instead of pushing it aside.
+    private var chatWidth: CGFloat { min(360, max(280, areaWidth - 36 - 24 - 320)) }
+    private var chatPushesText: Bool { areaWidth - chatWidth - 24 - 36 >= 320 }
 
     var body: some View {
         VStack(spacing: 0) {
             if !focusMode || headerHover {
                 header
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .onHover { if focusMode { headerHover = $0 } }
             } else {
@@ -91,7 +101,7 @@ struct NoteEditorView: View {
                 .animation(Motion.standard, value: doc.blocks.map(\.id))
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
-                .padding(.trailing, showChat ? 36 + 372 : 36)
+                .padding(.trailing, showChat && chatPushesText ? 36 + chatWidth + 12 : 36)
                 .animation(Motion.standard, value: showChat)
                 .padding(.top, 18)
                 .frame(maxWidth: .infinity)
@@ -117,16 +127,18 @@ struct NoteEditorView: View {
         .overlay(alignment: .bottomTrailing) {
             if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { areaWidth = $0 }
         .overlay(alignment: .topTrailing) {
             if showChat {
                 AIChatView(chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
                            onInsert: insertChatAnswer, onClose: { setChat(false) })
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-                    .frame(width: 360)
+                    .frame(width: chatWidth)
+                    .shadow(color: .black.opacity(chatPushesText ? 0 : 0.25), radius: 16, y: 6)
                     // The popup grows out of the ✨ button (top right) and shrinks back into it.
                     .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
                     .opacity(chatPopped ? 1 : 0)
-                    .padding(.top, 62)
+                    .padding(.top, headerHeight + 10)
                     .padding([.trailing, .bottom], 12)
             }
         }
@@ -340,7 +352,10 @@ struct NoteEditorView: View {
             bars(.full)
             bars(.compact)
             bars(.minimal)
-            ScrollView(.horizontal) { bars(.minimal).padding(.horizontal, 2) }.scrollIndicators(.automatic)
+            // Still too narrow (e.g. chat open in a small window): two rows, then the smallest bar.
+            stackedBars(.minimal)
+            stackedBars(.tiny)
+            ScrollView(.horizontal) { stackedBars(.tiny).padding(.horizontal, 2) }.scrollIndicators(.automatic)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -351,6 +366,14 @@ struct NoteEditorView: View {
         }
         .shadow(color: .black.opacity(scrolled ? 0.10 : 0), radius: 6, y: 3)
         .zIndex(1)
+    }
+
+    private func stackedBars(_ layout: FormatToolbar.Layout) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            FormatToolbar(actions: actions, layout: layout)
+            NoteActionsBar(doc: doc)
+        }
+        .fixedSize()
     }
 
     private func bars(_ layout: FormatToolbar.Layout) -> some View {
