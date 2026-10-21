@@ -19,11 +19,12 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
    `.folio/damaged` verschoben.
 7. **Jedes Issue hat eine Priorität** als Label `P0`–`P3` (P0 kritisch: Datenverlust, Absturz, Eingabe am falschen Ort;
    P1 hoch; P2 mittel; P3 niedrig). Neue Issues werden beim Anlegen priorisiert.
-8. **Release-Ablauf** (Vorgabe des Nutzers, Stand 21.10.2026):
-   - **Hauptversionen** (1.0, 2.0, …) mit Release Candidates: `X.0.0-rc.1` → testen → P0 fixen → `rc.2` → … → P3 → Abschlusstests → `X.0.0`.
-   - **Alle anderen Versionen ohne RC:** `1.1.0` veröffentlichen → testen → P0 fixen → `1.1.1` → testen → P1 fixen → `1.1.2`
-     → P2 → `1.1.3` → P3 → `1.1.4` (leere Prioritätsstufen werden übersprungen). Nach **jedem** Release wird getestet und neue
-     Issues werden priorisiert angelegt; neue P0-Issues haben sofort Vorrang.
+8. **Release-Ablauf** (Vorgabe des Nutzers, Stand 21.10.2026): `Fixen → Release → Testen → Issues anlegen → Prioritäten prüfen`.
+   - Nach **jedem** Release (stabil oder nicht): P0 → `x.y.1`, P1 → `x.y.2`, P2 → `x.y.3`, P3 → `x.y.4`; leere Stufen entfallen.
+     Ein neu gefundenes P0 kommt immer ins nächste Release, alles andere rückt nach. Erst wenn kein P0 offen ist, P1, dann P2, P3.
+     Beispiel: `1.1.0 → 1.1.1 (P0) → Test → neues P0 → 1.1.2 (P0) → 1.1.3 (P1) → 1.1.4 (P2) → 1.1.5 (P3)`.
+   - **Release Candidates nur vor einer Hauptversion** (`2.0.0-rc.1 …` → `2.0.0`), nie danach: Nach SemVer ist `2.0.0-rc.1`
+     älter als `2.0.0`, der Update-Knopf würde es nie anbieten (vom Nutzer so bestätigt).
 9. **Übergabe bei knappem Kontingent:** Bevor Claudes Kontingent ausgeht, bekommt Codex im Terminal den Auftrag, genau
    dort weiterzumachen (Version, offene Issues, letzter Commit). Geht Codex' Kontingent aus, schreibt Codex in den
    Projekt-Thread, wo Claude weitermachen soll. Der Auftrag wird auch dann geschickt, wenn der andere gerade kein
