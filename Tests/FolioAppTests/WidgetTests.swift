@@ -3,6 +3,7 @@ import SwiftUI
 import XCTest
 import FolioWidgetData
 import FolioWidgetUI
+import FolioCore
 
 /// Widget data and views (#78–#84) without WidgetKit.
 final class WidgetTests: XCTestCase {
@@ -16,6 +17,18 @@ final class WidgetTests: XCTestCase {
 
     private func note(_ title: String, preview: String? = "Geheimer Inhalt", pinned: Bool = false, ago: TimeInterval = 0) -> WidgetSnapshot.Note {
         .init(id: UUID(), title: title, folder: "Notizen", modified: Date().addingTimeInterval(-ago), pinned: pinned, preview: preview)
+    }
+
+    /// Every click target in a widget is a link Folio understands (#78–#82).
+    func testWidgetLinksOpenFolio() {
+        let n = note("A")
+        guard case .success(.openNote(let id, _)) = FolioURL.parse(n.link) else { return XCTFail("note link") }
+        XCTAssertEqual(id, n.id)
+        let c = WidgetSnapshot.Checklist(noteID: UUID(), title: "L", done: 0, total: 1)
+        guard case .success(.openNote(let cid, _)) = FolioURL.parse(c.link) else { return XCTFail("checklist link") }
+        XCTAssertEqual(cid, c.noteID)
+        guard case .success(.capture(nil, nil)) = FolioURL.parse(QuickCaptureWidgetView.captureURL) else { return XCTFail("capture link") }
+        guard case .success(.newNote(nil, nil)) = FolioURL.parse(QuickCaptureWidgetView.newNoteURL) else { return XCTFail("new link") }
     }
 
     func testChecklistParser() {
