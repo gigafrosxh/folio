@@ -19,14 +19,19 @@ struct NoteListView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 5) {
-                        ForEach(groups(notes), id: \.title) { group in
-                            Text(group.title)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.top, 10)
-                                .padding(.bottom, 4)
-                            ForEach(group.notes) { note in
+                        // One flat list of headers and notes: a note that moves to another group (e.g. „Heute“
+                        // after an edit) keeps its identity instead of being removed and inserted, which left a
+                        // second, stale selected card behind (#128).
+                        ForEach(rows(notes)) { row in
+                            switch row {
+                            case .header(let title):
+                                Text(title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.top, 10)
+                                    .padding(.bottom, 4)
+                            case .note(let note):
                                 NoteCard(note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected)
                                     .id(note.id)
                                     .onTapGesture {
@@ -44,7 +49,6 @@ struct NoteListView: View {
                                     .accessibilityAction(named: "Rechts daneben öffnen") { store.openInSplit(note.id) }
                                     .draggable(note.id.uuidString)
                                     .contextMenu { menu(for: note) }
-                                    .transition(Motion.blockTransition)
                             }
                         }
                     }
@@ -155,6 +159,25 @@ struct NoteListView: View {
     }
 
     private struct Group { var title: String; var notes: [NoteRef] }
+
+    enum Row: Identifiable {
+        case header(String)
+        case note(NoteRef)
+        var id: String {
+            switch self {
+            case .header(let t): return "header-" + t
+            case .note(let n): return n.id.uuidString
+            }
+        }
+    }
+
+    private func rows(_ notes: [NoteRef]) -> [Row] {
+        var seen = Set<UUID>()
+        return groups(notes).flatMap { g in
+            // A note is listed once, even if two files share an id.
+            [Row.header(g.title)] + g.notes.filter { seen.insert($0.id).inserted }.map(Row.note)
+        }
+    }
 
     private func groups(_ notes: [NoteRef]) -> [Group] {
         let cal = Calendar.current

@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- In der Notizliste konnten zwei Notizen gleichzeitig ausgewählt aussehen, wenn eine Notiz durch eine Änderung in eine andere Gruppe rutschte (z. B. nach „Heute“): Die Liste ließ eine veraltete Kopie stehen. Notizen behalten jetzt ihre Identität, wenn sie die Gruppe wechseln (#128).
+
 ## [1.2.0] – 2026-10-21
 
 ### Neu – Graph und Links
