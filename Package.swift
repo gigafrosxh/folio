@@ -34,7 +34,9 @@ let package = Package(
             dependencies: ["FolioWidgetData", "FolioWidgetUI"],
             path: "Sources/FolioWidgets",
             swiftSettings: [.unsafeFlags(["-application-extension"])],
-            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension"])]
+            // Like Xcode for app extensions: start in NSExtensionMain, which then runs the @main WidgetBundle.
+            // With Swift's own entry point the extension crashed at launch (#123).
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
         // Command-line inspector for .folio files.
         .executableTarget(

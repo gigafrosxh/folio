@@ -49,6 +49,8 @@ done
 APPEX="$APP/Contents/PlugIns/FolioWidgets.appex"
 mkdir -p "$APPEX/Contents/MacOS"
 cp "$BIN_DIR/FolioWidgets" "$APPEX/Contents/MacOS/FolioWidgets"
+# Extensions must start in NSExtensionMain; with Swift's own main WidgetKit kills them at launch (#123).
+nm -u "$APPEX/Contents/MacOS/FolioWidgets" | grep -q _NSExtensionMain || { echo "FolioWidgets ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
 sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Widgets/Info.plist >"$APPEX/Contents/Info.plist"
