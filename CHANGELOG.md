@@ -7,6 +7,23 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu – Graph und Links
+- **Graph** (Darstellung › Graph, ⌃⌘G): alle Notizen als Punkte, Links als Linien. Ziehen verschiebt, zwei Finger zoomen, ein Klick öffnet die Notiz (#110).
+- **Lokaler Graph** unter jeder Notiz: die Notiz und ihre Nachbarn, 1–3 Schritte weit (#111).
+- **Filter**: nach Tag, Ordner und Abstand zur offenen Notiz, Farben nach Ordner oder Tag; die Einstellungen bleiben erhalten (#113).
+- **Suche im Graph**, Nachbarn beim Darüberfahren, ⌥-Klick auf zwei Notizen zeigt den kürzesten Weg, verwaiste Notizen sind gestrichelt und lassen sich ausblenden (#114).
+- **Link-Index**: Verknüpfungen werden pro geänderter, umbenannter oder gelöschter Notiz nachgeführt, ohne die Bibliothek neu zu lesen (#119).
+- **Backlinks und unverlinkte Erwähnungen**: Unter jeder Notiz stehen die Notizen, die auf sie verweisen; „Unverlinkte Erwähnungen suchen“ findet Notizen, die den Titel nur nennen, und „Verlinken“ macht daraus einen Link (#112).
+- **[[Wiki-Links]]**: `[[Titel]]` und `[[Titel|Text]]` verlinken Notizen über den Titel. Links auf noch nicht vorhandene Notizen sind blasser; ein Klick legt die Notiz an. Im Link-Dialog (`[[`) gibt es „… als neue Notiz verlinken“ (#115).
+- **Linkvorschau**: Wer mit dem Zeiger auf einem Notizlink verweilt, sieht Titel und Textauszug (#116).
+- **Tagesnotizen**: Ablage › Tagesnotiz (⌃⌘D) öffnet die Notiz von heute („2026-10-21“) im Ordner „Tagesnotizen“; Ordner und Vorlage in den Einstellungen (#117).
+- **Vorlagen mit Variablen**: zusätzlich `{{titel}}`, `{{cursor}}` und Datumsformate wie `{{datum:yyyy-MM-dd}}`; der Cursor steht nach dem Anlegen an `{{cursor}}` (#118).
+- **Eingebettete Notizen**: Einfügen › Notiz einbetten … oder eine Zeile `![[Titel]]` mit Return zeigt eine andere Notiz schreibgeschützt an, immer auf dem aktuellen Stand; Einbettungen in der eingebetteten Notiz werden nur verlinkt, Kreise sind so ausgeschlossen (#120).
+- **Eigenschaften**: Status, Datum, Zahl, Ja/Nein und Text pro Notiz; die Suche findet sie mit `name:wert`, z. B. `status:offen` oder `fällig:*` (#121).
+
+### Hinweis
+- Notizen mit eingebetteten Notizen lassen sich erst ab Folio 1.2.0 öffnen. Alle anderen Notizen bleiben mit älteren Versionen kompatibel.
+
 ## [1.1.1] – 2026-10-21
 
 ### Behoben

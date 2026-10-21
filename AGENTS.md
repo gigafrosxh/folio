@@ -87,7 +87,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.0.0** (stabil; nächste Version laut Roadmap 1.1.0) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.2.0** (Graph und Links) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -111,14 +111,24 @@ Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als
 | --- | --- | --- |
 | 1.0.0 | erledigt: rc.2 (#99–#104, #107), rc.3 (#108, #109), rc.4 (#105, #106), stabil am 21.10.2026 | #63 offen bis Developer ID vorliegt |
 | 1.1.0 | Desktop-Widgets (WidgetKit, Datenschutz) – vom Nutzer vorgezogen | #78–#84 |
-| 1.2.0 | Organisation und Notizverwaltung | #13, #14, #15, #19 |
-| 1.3.0 | Codeblöcke und Entwicklerfunktionen | #26, #28, #29, #31 |
-| 1.4.0 | Medien, PDFs und Anhänge | #43–#46, #49 |
-| 1.5.0 | KI-Erweiterungen und Ollama | #36, #37, #40, #42 |
-| 1.6.0 | macOS-Integration und Quick Access | #50, #70, #90–#92 |
-| 1.7.0 | Obsidian-Import und Projektqualität | #61, #66, #67, #71 |
+| 1.2.0 | Graph und Links (vom Nutzer festgelegt) | #110–#121 |
+| danach | Vorschlag aus dem Thread „Roadmap bis alle Issues erledigt“, vom Nutzer noch nicht bestätigt: 1.3 Organisation (#13–#15, #19), 1.4 Medien, 1.5 KI/Ollama, 1.6 Code, 1.7 macOS-Integration, 1.8 Obsidian/Qualität, 2.0 Signierung (#63) | |
 
 Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
+
+### Graph und Links ab 1.2
+
+- Kern in `Sources/FolioCore/LinkGraph.swift`: `WikiLink` (`[[Titel]]`, `[[Titel|Text]]`, `![[Titel]]`, URLs `folio://wiki/<Titel>`),
+  `LinkIndex` (Knoten, Kanten aus `meta.links` und `meta.wikiLinks`, Auflösung über den Titel, Backlinks, Nachbarschaft,
+  verwaiste, kürzester Weg), `Mentions`, `GraphLayout` (deterministisch, kraftbasiert), `TemplateVariables`, `DailyNote`.
+- `NoteMetadata.wikiLinks` und `.properties` sind optional (ältere Notizen: nil, Links dann aus `searchText`).
+  `BlockKind.embed` (Titel in `code`) ist neu – solche Notizen öffnen erst ab 1.2.
+- App: `NoteStore.linkIndex` wird in `notes.didSet` pro geänderter Notiz nachgeführt (`NoteStore+Links.swift`), `GraphView`
+  (Fenster „graph“, ⌃⌘G, und lokal in `BacklinksView`), `EmbedBlockView`, `PropertiesView`, `LinkPreviewController`.
+- **Nie `NoteDocument.makeFile()` in Ansichten aufrufen** – es ändert `meta` (@Published) und erzeugt eine Endlosschleife.
+  Für Lesezugriffe `makeFilePreview()` nehmen.
+- Selbsttest `FOLIO_LINK_TEST=1` (Teil von `scripts/dev-regression.py`), `FOLIO_GRAPH_SNAPSHOT=<png>` zeichnet Graph und
+  lokalen Graph mit `ImageRenderer`.
 
 ### Widgets ab 1.1
 
