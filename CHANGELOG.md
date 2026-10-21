@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.1.0] – 2026-10-21
+
 ### Neu – Widgets für den Schreibtisch
 - **Angepinnte Notizen** und **Letzte Notizen** (klein, mittel, groß): Ein Klick öffnet die Notiz in Folio (#78, #79).
 - **Schnellnotiz**: Knöpfe für die Schnellerfassung und eine neue Notiz (#80).
