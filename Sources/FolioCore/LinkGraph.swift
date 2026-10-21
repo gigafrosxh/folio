@@ -252,8 +252,8 @@ public enum GraphLayout {
             }
             for i in 0..<n {
                 // Gentle pull to the center keeps unconnected parts on screen.
-                disp[i].dx -= pos[i].x * 0.02
-                disp[i].dy -= pos[i].y * 0.02
+                disp[i].dx -= pos[i].x * 0.06
+                disp[i].dy -= pos[i].y * 0.06
                 let len = max(sqrt(disp[i].dx * disp[i].dx + disp[i].dy * disp[i].dy), 0.0001)
                 let step = min(len, temperature)
                 pos[i].x += disp[i].dx / len * step

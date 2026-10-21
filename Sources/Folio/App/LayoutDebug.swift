@@ -148,6 +148,9 @@ enum LayoutDebug {
         if env["FOLIO_AI_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await AISelfTest.run() }
         }
+        if env["FOLIO_LINK_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
+            Task { @MainActor in await LinkSelfTest.run() }
+        }
         if env["FOLIO_KEY_TEST"] != nil, env["FOLIO_LIBRARY"] != nil {
             Task { @MainActor in await KeyboardSelfTest.run() }
         }

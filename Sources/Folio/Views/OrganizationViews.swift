@@ -282,7 +282,8 @@ struct BacklinksView: View {
                     .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                 FlowLayout(spacing: 6) {
                     ForEach(unresolved, id: \.self) { key in
-                        let title = store.document(for: noteID)?.makeFile().meta.wikiLinks?.first { WikiLink.key($0) == key } ?? key
+                        // The title as written (the index keeps only the folded key).
+                        let title = store.notes.first { $0.id == noteID }.flatMap { WikiLink.targets(in: $0.meta.searchText).first { WikiLink.key($0) == key } } ?? key
                         Button { store.openOrCreate(title: title) } label: {
                             Label(title, systemImage: "plus").font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 10).padding(.vertical, 5)

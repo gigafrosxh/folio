@@ -56,7 +56,7 @@ struct EmbedBlockView: View {
         guard target.id != doc.id else { problem = "Eine Notiz kann sich nicht selbst einbetten."; content = nil; return }
         // The open (possibly unsaved) version of the source wins over the file.
         let file: NoteFile?
-        if let open = store.document(for: target.id) { file = open.makeFile() } else { file = try? NoteFile.read(from: target.url) }
+        if let open = store.document(for: target.id) { file = open.makeFilePreview() } else { file = try? NoteFile.read(from: target.url) }
         guard let file else { problem = "„\(title)“ konnte nicht gelesen werden."; content = nil; return }
         content = Self.render(file)
     }

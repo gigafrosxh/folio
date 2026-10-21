@@ -674,10 +674,19 @@ struct RichTextView: NSViewRepresentable {
             }
             let links = WikiLink.find(in: storage.string).filter { !$0.isEmbed }
             guard !stale.isEmpty || !links.isEmpty else { return }
-            storage.beginEditing()
-            for r in stale { storage.removeAttribute(.link, range: r) }
-            for l in links { storage.addAttribute(.link, value: WikiLink.url(for: l.target), range: l.range) }
-            storage.endEditing()
+            // Only touch the storage when something changed; this also runs on every view update.
+            let wanted = links.map { "\($0.range.location),\($0.range.length),\($0.target)" }
+            let have = stale.map { r -> String in
+                let url = storage.attribute(.link, at: r.location, effectiveRange: nil)
+                let target = ((url as? URL) ?? (url as? String).flatMap(URL.init(string:))).flatMap(WikiLink.target(from:)) ?? ""
+                return "\(r.location),\(r.length),\(target)"
+            }
+            if wanted != have {
+                storage.beginEditing()
+                for r in stale { storage.removeAttribute(.link, range: r) }
+                for l in links { storage.addAttribute(.link, value: WikiLink.url(for: l.target), range: l.range) }
+                storage.endEditing()
+            }
             guard let lm = tv.layoutManager else { return }
             let index = NoteStore.shared.linkIndex
             for l in links where index.resolve(l.target) == nil {

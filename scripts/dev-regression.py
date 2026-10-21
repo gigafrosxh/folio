@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
 print(f"Test libraries and logs: {RUN}", flush=True)
 failed = False
-for flag, prefix in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("A11Y", "A11Y")]:
+for flag, prefix in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("LINK", "LINK"), ("A11Y", "A11Y")]:
     library = RUN / flag
     library.mkdir()
     log = RUN / f"{flag}.log"

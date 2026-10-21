@@ -27,6 +27,8 @@ struct GraphView: View {
     @State private var hovered: UUID?
     @State private var pathEnds: [UUID] = []
     @State private var layoutKey = ""
+    /// Positions to start with (tests and pictures render without waiting for the layout task).
+    var initialPositions: [UUID: CGPoint]? = nil
 
     struct Model {
         var nodes: [LinkIndex.Node]
@@ -65,6 +67,7 @@ struct GraphView: View {
                     }
                 }
                 .task(id: key(m)) { await relayout(m) }
+                .onAppear { if let initialPositions, positions.isEmpty { positions = initialPositions } }
             }
             if !compact { legend(m) }
         }
@@ -85,6 +88,13 @@ struct GraphView: View {
     }
 
     // MARK: Drawing
+
+    /// The local graph keeps its note in the middle.
+    private var shownPositions: [UUID: CGPoint] {
+        let all = positions.isEmpty ? (initialPositions ?? [:]) : positions
+        guard let focus, let c = all[focus] else { return all }
+        return all.mapValues { CGPoint(x: $0.x - c.x, y: $0.y - c.y) }
+    }
 
     private func screen(_ p: CGPoint, _ size: CGSize) -> CGPoint {
         CGPoint(x: size.width / 2 + pan.width + p.x * zoom, y: size.height / 2 + pan.height + p.y * zoom)
@@ -120,16 +130,16 @@ struct GraphView: View {
         let current = store.currentDocument?.id
         return Canvas { ctx, _ in
             for (a, b) in m.edges {
-                guard let pa = positions[a], let pb = positions[b] else { continue }
+                guard let pa = shownPositions[a], let pb = shownPositions[b] else { continue }
                 var line = Path()
                 line.move(to: screen(pa, size))
                 line.addLine(to: screen(pb, size))
                 let onPath = pathEdges.contains([a.uuidString, b.uuidString].sorted().joined())
                 let lit = onPath || (hovered != nil && (a == hovered || b == hovered))
-                ctx.stroke(line, with: .color(lit ? theme.accent : Color.primary.opacity(dim ? 0.08 : 0.2)), lineWidth: lit ? 2 : 1)
+                ctx.stroke(line, with: .color(lit ? theme.accent : Color.primary.opacity(dim ? 0.1 : 0.32)), lineWidth: lit ? 2 : 1.2)
             }
             for node in m.nodes {
-                guard let p = positions[node.id] else { continue }
+                guard let p = shownPositions[node.id] else { continue }
                 let degree = index.outgoing(node.id).count + index.backlinks(node.id).count
                 let r = min(4 + sqrt(Double(degree)) * 2.2, 14) * max(min(zoom, 1.6), 0.7)
                 let c = screen(p, size)
@@ -193,7 +203,7 @@ struct GraphView: View {
     private func node(at point: CGPoint, _ m: Model, _ size: CGSize) -> UUID? {
         var best: (UUID, CGFloat)?
         for n in m.nodes {
-            guard let p = positions[n.id] else { continue }
+            guard let p = shownPositions[n.id] else { continue }
             let c = screen(p, size)
             let d = hypot(c.x - point.x, c.y - point.y)
             if d < 16, d < (best?.1 ?? .infinity) { best = (n.id, d) }
