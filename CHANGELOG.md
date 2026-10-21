@@ -7,6 +7,16 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+Erste stabile Version. Gegenüber 1.0.0-rc.4 keine Änderungen am Programm; alle in den Release Candidates gefundenen Fehler (#98–#109) sind behoben.
+
+### Geprüft
+- 167 Unit-Tests und alle App-Selbsttests (Entwicklerfunktionen, Datensicherheit, Organisation, Editor, Tastatur, Schnellzugriff, VoiceOver) unter Hardened Runtime.
+- Kopie einer echten Bibliothek mit 137 Notizen: Öffnen, Speichern, Titel, Tags, Markdown, PDF-Export, Duplikat und Diagnose ohne Fehler.
+- Installer: DMG und PKG vollständig, Signatur intakt, Erststart mit leerem Benutzerprofil legt Bibliothek und Vorlagen an.
+
+### Bekannt
+- Folio ist weiterhin nur ad hoc signiert und nicht notarisiert, bis ein „Developer ID“-Zertifikat vorliegt (#63, Einrichtung in `docs/SIGNING.md`).
+
 ## [1.0.0-rc.4] – 2026-10-21
 
 ### Behoben

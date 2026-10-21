@@ -86,7 +86,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.0.0-rc.1** (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.0.0** (stabil; nächste Version laut Roadmap 1.1.0) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -108,9 +108,7 @@ Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als
 
 | Version | Schwerpunkt | Issues |
 | --- | --- | --- |
-| 1.0.0-rc.2 | Kritische Editor- und Navigationsfehler | #100, #101, #102, #107 (dazu schon fertig: #99, #103, #104) |
-| 1.0.0-rc.3 | Weitere UI- und Fokusprobleme | #105, #106, #108 (#105 liegt als `git stash` „rc3 #105 Regler“ bereit) |
-| 1.0.0 | Stabil: Regressionstests, Signieren prüfen | #63 |
+| 1.0.0 | erledigt: rc.2 (#99–#104, #107), rc.3 (#108, #109), rc.4 (#105, #106), stabil am 21.10.2026 | #63 offen bis Developer ID vorliegt |
 | 1.1.0 | Organisation und Notizverwaltung | #13, #14, #15, #19 |
 | 1.2.0 | Codeblöcke und Entwicklerfunktionen | #26, #28, #29, #31 |
 | 1.3.0 | Medien, PDFs und Anhänge | #43–#46, #49 |
