@@ -29,7 +29,9 @@ NAME="Folio-$VERSION-arm64"
 CONFIG=release ARCH=arm64 scripts/build-app.sh >/dev/null
 APP="$ROOT/build/Folio.app"
 if [[ "$IDENTITY" != "-" ]]; then
-    # Hardened runtime, secure timestamp and only the entitlements Folio needs.
+    # Hardened runtime, secure timestamp and only the entitlements Folio needs; the widget extension first.
+    codesign --force --options runtime --timestamp --entitlements "$ROOT/Resources/Widgets/FolioWidgets.entitlements" \
+        --sign "$IDENTITY" "$APP/Contents/PlugIns/FolioWidgets.appex"
     codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP"
     codesign --verify --strict --deep "$APP"
 fi

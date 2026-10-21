@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             BackupManager.shared.start()
             CaptureService.shared.start()
+            WidgetFeed.shared.start()
             QuickAccessSettings.apply()
         }
         // Load the on-device model in the background so the first suggestion comes quickly.

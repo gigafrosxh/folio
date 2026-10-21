@@ -233,6 +233,18 @@ struct NoteListView: View {
             }
         }
         Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
+        // Which note the „Notiz des Tages“ and „Checkliste“ widgets show (#81, #82).
+        Menu("Im Widget zeigen") {
+            let theme = ThemeManager.shared
+            Button(theme.settings.widgetNote == note.id.uuidString ? "✓ Als Notiz des Tages" : "Als Notiz des Tages") {
+                theme.settings.widgetNote = theme.settings.widgetNote == note.id.uuidString ? "" : note.id.uuidString
+            }
+            if note.meta.searchText.contains("☐") || note.meta.searchText.contains("☑") {
+                Button(theme.settings.widgetChecklist == note.id.uuidString ? "✓ Als Checkliste" : "Als Checkliste") {
+                    theme.settings.widgetChecklist = theme.settings.widgetChecklist == note.id.uuidString ? "" : note.id.uuidString
+                }
+            }
+        }
         Divider()
         Button("In den Papierkorb legen", role: .destructive) { store.delete(note.id) }
     }

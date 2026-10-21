@@ -1,6 +1,6 @@
 # Datenschutz und Sicherheit (#72)
 
-Stand: Folio 1.0.0-rc.1. Kurzfassung: **Folio hat kein Konto, keinen Server und keine Telemetrie.** Deine Notizen
+Stand: Folio 1.1.0. Kurzfassung: **Folio hat kein Konto, keinen Server und keine Telemetrie.** Deine Notizen
 bleiben als Dateien auf deinem Mac. Ins Netz geht Folio nur für die Update-Prüfung und für Inhalte, die du selbst in
 eine Notiz einbettest.
 
@@ -11,6 +11,7 @@ eine Notiz einbettest.
 | Notizen | Bibliotheksordner, Standard `~/Documents/Folio` | Eine `.folio`-Datei pro Notiz (LZFSE-komprimiert, **nicht verschlüsselt**). Ordner und Dateien kannst du im Finder sehen, sichern und synchronisieren. |
 | Versionen, Papierkorb, Vorlagen, KI-Chats, beschädigte Notizen | `<Bibliothek>/.folio/` (`history`, `trash`, `templates`, `chats`, `damaged`) | Versteckter Ordner, wandert mit der Bibliothek. Versionen und Papierkorb enthalten auch Inhalte, die du in der Notiz schon gelöscht hast. |
 | Backups | `~/Library/Application Support/Folio/Backups` oder der in den Einstellungen gewählte Ordner | ZIP-Archive der ganzen Bibliothek, unverschlüsselt. Wählst du einen Cloud-Ordner, landen die Backups beim jeweiligen Anbieter. |
+| Widget-Daten | `~/Library/Application Support/Folio/Widgets/snapshot.json` | Titel, Ordner, Datum, Anpinn-Status und Checklisten-Fortschritt der Notizen, damit die Widgets sie anzeigen können. Vorschauen und Checklisten-Punkte nur, wenn „Notizinhalte in Widgets zeigen“ eingeschaltet ist (Standard: aus). Die Widgets dürfen nur diese Datei lesen und keine Notizen ändern. |
 | Wartende Schnellerfassungen | `~/Library/Application Support/Folio/Wartende Erfassungen` | Nur solange die Bibliothek nicht beschreibbar ist; danach werden sie in die Notiz geschrieben und gelöscht. |
 | Einstellungen, Entwurf der Schnellerfassung, zuletzt geöffnete Notizen | macOS-Benutzereinstellungen (`de.daniel.folio`) | Der Entwurf enthält den getippten Text, bis du ihn sicherst oder verwirfst. |
 | Passwörter von Datenbankverbindungen | macOS-Schlüsselbund | Nie in Notizen oder Einstellungen. Eine Notiz enthält nur Host, Port, Datenbank und Benutzername. |

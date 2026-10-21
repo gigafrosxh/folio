@@ -19,10 +19,11 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
    `.folio/damaged` verschoben.
 7. **Jedes Issue hat eine Priorität** als Label `P0`–`P3` (P0 kritisch: Datenverlust, Absturz, Eingabe am falschen Ort;
    P1 hoch; P2 mittel; P3 niedrig). Neue Issues werden beim Anlegen priorisiert.
-8. **Release-Ablauf pro Version** (ab 1.0, Vorgabe des Nutzers), z. B. für 1.1.0:
-   `1.1.0-rc.1` → testen → P0 fixen → `rc.2` → testen → P0 fixen (falls vorhanden) → `rc.3` → P1 fixen → `rc.4` →
-   P2 fixen → `rc.5` → P3 fixen → `rc.6` → Abschlusstests → `1.1.0` (stabil). Nach **jedem** RC wird getestet und neue
-   Issues werden priorisiert angelegt; neue P0-Issues haben sofort Vorrang. Jede Version durchläuft denselben Ablauf.
+8. **Release-Ablauf** (Vorgabe des Nutzers, Stand 21.10.2026):
+   - **Hauptversionen** (1.0, 2.0, …) mit Release Candidates: `X.0.0-rc.1` → testen → P0 fixen → `rc.2` → … → P3 → Abschlusstests → `X.0.0`.
+   - **Alle anderen Versionen ohne RC:** `1.1.0` veröffentlichen → testen → P0 fixen → `1.1.1` → testen → P1 fixen → `1.1.2`
+     → P2 → `1.1.3` → P3 → `1.1.4` (leere Prioritätsstufen werden übersprungen). Nach **jedem** Release wird getestet und neue
+     Issues werden priorisiert angelegt; neue P0-Issues haben sofort Vorrang.
 9. **Übergabe bei knappem Kontingent:** Bevor Claudes Kontingent ausgeht, bekommt Codex im Terminal den Auftrag, genau
    dort weiterzumachen (Version, offene Issues, letzter Commit). Geht Codex' Kontingent aus, schreibt Codex in den
    Projekt-Thread, wo Claude weitermachen soll. Der Auftrag wird auch dann geschickt, wenn der andere gerade kein
@@ -109,15 +110,30 @@ Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als
 | Version | Schwerpunkt | Issues |
 | --- | --- | --- |
 | 1.0.0 | erledigt: rc.2 (#99–#104, #107), rc.3 (#108, #109), rc.4 (#105, #106), stabil am 21.10.2026 | #63 offen bis Developer ID vorliegt |
-| 1.1.0 | Organisation und Notizverwaltung | #13, #14, #15, #19 |
-| 1.2.0 | Codeblöcke und Entwicklerfunktionen | #26, #28, #29, #31 |
-| 1.3.0 | Medien, PDFs und Anhänge | #43–#46, #49 |
-| 1.4.0 | KI-Erweiterungen und Ollama | #36, #37, #40, #42 |
-| 1.5.0 | macOS-Integration und Quick Access | #50, #70, #90–#92 |
-| 1.6.0 | Desktop-Widgets | #78–#84 |
+| 1.1.0 | Desktop-Widgets (WidgetKit, Datenschutz) – vom Nutzer vorgezogen | #78–#84 |
+| 1.2.0 | Organisation und Notizverwaltung | #13, #14, #15, #19 |
+| 1.3.0 | Codeblöcke und Entwicklerfunktionen | #26, #28, #29, #31 |
+| 1.4.0 | Medien, PDFs und Anhänge | #43–#46, #49 |
+| 1.5.0 | KI-Erweiterungen und Ollama | #36, #37, #40, #42 |
+| 1.6.0 | macOS-Integration und Quick Access | #50, #70, #90–#92 |
 | 1.7.0 | Obsidian-Import und Projektqualität | #61, #66, #67, #71 |
 
-Jede Version folgt Regel 8 (rc.1 … rc.6, dann stabil).
+Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
+
+### Widgets ab 1.1
+
+- Drei Ziele: `FolioWidgetData` (Snapshot-Modell, `ChecklistParser`, `WidgetSnapshotStore`), `FolioWidgetUI` (reine
+  SwiftUI-Ansichten, testbar mit `ImageRenderer`; `WidgetLink` lässt sich per `.environment(\.widgetLinks, false)`
+  abschalten) und `FolioWidgets` (WidgetKit-Erweiterung). `scripts/build-app.sh` packt sie als
+  `Folio.app/Contents/PlugIns/FolioWidgets.appex` (`Resources/Widgets/Info.plist`, Sandbox-Entitlements) und signiert sie vor der App.
+- Datenfluss (#84): `WidgetFeed` (App) schreibt `~/Library/Application Support/Folio/Widgets/snapshot.json` aus der
+  Notizliste im Speicher; die Erweiterung liest nur diese Datei (Sandbox-Ausnahme read-only für genau diesen Ordner).
+  Bei `FOLIO_LIBRARY` landet der Snapshot in `<Bibliothek>/.folio/widgets`, `FOLIO_WIDGET_FOLDER` lenkt ihn um.
+- Datenschutz (#83): Inhalte (Vorschau, Checklisten-Punkte) nur mit „Notizinhalte in Widgets zeigen“ (Einstellungen ›
+  Schnellzugriff › Widgets, Standard aus); `WidgetSnapshotStore.read` entfernt sie zusätzlich, `.privacySensitive()` im Sperrzustand.
+- Konfiguration ohne App-Intents (deren Metadaten braucht Xcode): Notiz und Checkliste wählt man in Folio
+  (Kontextmenü „Im Widget zeigen“). Klicks öffnen `folio://`-Links.
+- `FOLIO_WIDGET_RENDER=<ordner> swift test --filter WidgetTests` speichert alle Widgets als PNG zur Sichtprüfung.
 
 ### Themen der offenen Issues
 

@@ -149,6 +149,11 @@ struct ThemeSettings: Codable, Equatable {
     var backupIntervalHours: Double = 24
     /// Folder for backups; empty = ~/Library/Application Support/Folio/Backups.
     var backupFolder = ""
+    /// Widgets (#83): show previews and checklist items. Off by default – widgets show only titles.
+    var widgetShowContent = false
+    /// Note and checklist chosen for the widgets („Im Widget zeigen“); "" = automatic (#81, #82).
+    var widgetNote = ""
+    var widgetChecklist = ""
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -196,6 +201,9 @@ struct ThemeSettings: Codable, Equatable {
         backupsEnabled = v(.backupsEnabled, d.backupsEnabled)
         backupIntervalHours = v(.backupIntervalHours, d.backupIntervalHours)
         backupFolder = v(.backupFolder, d.backupFolder)
+        widgetShowContent = v(.widgetShowContent, d.widgetShowContent)
+        widgetNote = v(.widgetNote, d.widgetNote)
+        widgetChecklist = v(.widgetChecklist, d.widgetChecklist)
     }
 }
 

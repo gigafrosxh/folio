@@ -18,6 +18,8 @@ struct QuickAccessSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } header: { Text("Menüleiste") }
 
+            WidgetSettingsSection()
+
             Section {
                 LabeledContent("Schnellerfassung aus jeder App") {
                     HStack {
@@ -110,5 +112,35 @@ struct QuickAccessSettingsView: View {
         monitor = nil
         recording = false
         ShortcutCenter.shared.isRecording = false
+    }
+}
+
+/// Settings › Schnellzugriff › Widgets (#83).
+struct WidgetSettingsSection: View {
+    @EnvironmentObject var theme: ThemeManager
+    @EnvironmentObject var store: NoteStore
+
+    var body: some View {
+        Section {
+            Toggle("Notizinhalte in Widgets zeigen", isOn: $theme.settings.widgetShowContent)
+            Text(theme.settings.widgetShowContent
+                 ? "Widgets zeigen Vorschauen und Checklisten-Punkte auf dem Schreibtisch. Bei gesperrtem Mac blendet macOS sie aus."
+                 : "Widgets zeigen nur Titel, Ordner, Datum und Fortschritt – keine Notizinhalte.")
+                .font(.caption).foregroundStyle(.secondary)
+            choice("Notiz des Tages", id: theme.settings.widgetNote, automatic: "Jeden Tag eine andere") { theme.settings.widgetNote = "" }
+            choice("Checkliste", id: theme.settings.widgetChecklist, automatic: "Zuletzt bearbeitete mit offenen Punkten") { theme.settings.widgetChecklist = "" }
+        } header: { Text("Widgets") } footer: {
+            Text("Rechtsklick auf eine Notiz › „Im Widget zeigen“ wählt sie aus. Widgets fügst du über „Widgets bearbeiten“ im Kontextmenü des Schreibtischs hinzu.")
+        }
+    }
+
+    private func choice(_ title: String, id: String, automatic: String, reset: @escaping () -> Void) -> some View {
+        LabeledContent(title) {
+            HStack {
+                Text(store.notes.first { $0.id.uuidString == id }.map { $0.meta.title.isEmpty ? "Ohne Titel" : $0.meta.title } ?? automatic)
+                    .foregroundStyle(.secondary).lineLimit(1)
+                if !id.isEmpty { Button("Automatisch") { reset() } }
+            }
+        }
     }
 }

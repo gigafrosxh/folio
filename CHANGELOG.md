@@ -7,6 +7,17 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu – Widgets für den Schreibtisch
+- **Angepinnte Notizen** und **Letzte Notizen** (klein, mittel, groß): Ein Klick öffnet die Notiz in Folio (#78, #79).
+- **Schnellnotiz**: Knöpfe für die Schnellerfassung und eine neue Notiz (#80).
+- **Checkliste**: Fortschritt einer Checkliste, standardmäßig die zuletzt bearbeitete mit offenen Punkten; per Rechtsklick auf eine Notiz › „Im Widget zeigen“ wählbar (#81).
+- **Notiz des Tages**: jeden Tag eine andere Notiz oder die gewählte (#82).
+- **Datenschutz**: Widgets zeigen standardmäßig nur Titel, Ordner, Datum und Fortschritt, keine Notizinhalte. „Einstellungen › Schnellzugriff › Widgets › Notizinhalte in Widgets zeigen“ erlaubt Vorschauen; bei gesperrtem Mac blendet macOS sie aus (#83).
+- **Datenversorgung**: Folio schreibt nach Änderungen einen kleinen Snapshot; die Widgets lesen nur diesen, in einer Sandbox ohne Zugriff auf die Bibliothek, und zeigen verständliche Hinweise, wenn Folio noch nie lief oder die Bibliothek fehlt (#84).
+
+### Geändert
+- Release Candidates gibt es nur noch für Hauptversionen; Fehlerbehebungen erscheinen als Patch-Versionen (1.1.1, 1.1.2 …).
+
 ## [1.0.0] – 2026-10-21
 
 Erste stabile Version. Gegenüber 1.0.0-rc.4 keine Änderungen am Programm; alle in den Release Candidates gefundenen Fehler (#98–#109) sind behoben.

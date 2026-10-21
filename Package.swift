@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS("15.2")],
     products: [
         .executable(name: "Folio", targets: ["Folio"]),
+        .executable(name: "FolioWidgets", targets: ["FolioWidgets"]),
         .library(name: "FolioCore", targets: ["FolioCore"]),
     ],
     targets: [
@@ -20,9 +21,20 @@ let package = Package(
         // The SwiftUI/AppKit app.
         .executableTarget(
             name: "Folio",
-            dependencies: ["FolioCore"],
+            dependencies: ["FolioCore", "FolioWidgetData"],
             path: "Sources/Folio",
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        // Widgets (#78–#84): the snapshot model shared with the app, the views, and the extension
+        // executable that scripts/build-app.sh packs into Folio.app/Contents/PlugIns/FolioWidgets.appex.
+        .target(name: "FolioWidgetData", path: "Sources/FolioWidgetData"),
+        .target(name: "FolioWidgetUI", dependencies: ["FolioWidgetData"], path: "Sources/FolioWidgetUI"),
+        .executableTarget(
+            name: "FolioWidgets",
+            dependencies: ["FolioWidgetData", "FolioWidgetUI"],
+            path: "Sources/FolioWidgets",
+            swiftSettings: [.unsafeFlags(["-application-extension"])],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension"])]
         ),
         // Command-line inspector for .folio files.
         .executableTarget(
@@ -41,7 +53,7 @@ let package = Package(
         // Editor model tests (block operations, undo); runs the app module without its UI.
         .testTarget(
             name: "FolioAppTests",
-            dependencies: ["Folio"],
+            dependencies: ["Folio", "FolioWidgetData", "FolioWidgetUI"],
             path: "Tests/FolioAppTests",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

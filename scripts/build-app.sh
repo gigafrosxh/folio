@@ -24,6 +24,7 @@ cd "$ROOT"
 ARCH_ARGS=()
 if [[ -n "${ARCH:-}" ]]; then ARCH_ARGS=(--arch "$ARCH"); fi
 swift build -c "$CONFIG" --product Folio ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
+swift build -c "$CONFIG" --product FolioWidgets ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
 BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"} --show-bin-path)"
 if [[ ! -f Resources/AppIcon.icns ]]; then
     swift scripts/make-icon.swift Resources
@@ -44,7 +45,16 @@ shopt -s nullglob
 for bundle in "$BIN_DIR"/*.bundle; do
     /usr/bin/ditto "$bundle" "$APP/Contents/Resources/$(basename "$bundle")"
 done
-codesign --force --deep --sign - "$APP"
+# Desktop widgets (#78–#84) as a WidgetKit extension; sandboxed, signed before the app.
+APPEX="$APP/Contents/PlugIns/FolioWidgets.appex"
+mkdir -p "$APPEX/Contents/MacOS"
+cp "$BIN_DIR/FolioWidgets" "$APPEX/Contents/MacOS/FolioWidgets"
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
+BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
+sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Widgets/Info.plist >"$APPEX/Contents/Info.plist"
+/usr/bin/plutil -lint "$APPEX/Contents/Info.plist" >/dev/null
+codesign --force --sign - --entitlements Resources/Widgets/FolioWidgets.entitlements "$APPEX"
+codesign --force --sign - "$APP"
 
 if "$INSTALL"; then
     mkdir -p "$HOME/Applications"

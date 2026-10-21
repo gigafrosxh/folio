@@ -1,5 +1,6 @@
 import AppKit
 import FolioCore
+import FolioWidgetData
 
 /// End-to-end check of quick capture, the waiting queue, deep links, the global shortcut and the AI
 /// chat's saved conversations (FOLIO_QUICK_TEST=1 with throwaway FOLIO_LIBRARY and FOLIO_CAPTURE_QUEUE).
@@ -11,6 +12,28 @@ enum QuickAccessSelfTest {
     }
 
     private static func wait(_ s: Double) async { try? await Task.sleep(for: .seconds(s)) }
+
+    /// The widget snapshot (#83, #84) from the test library: written outside the notes, no content by default.
+    private static func widgetChecks(_ store: NoteStore) async {
+        let theme = ThemeManager.shared
+        _ = CaptureService.shared.save(CaptureItem(text: "☐ Milch\n☑ Brot\n☐ Äpfel"))
+        theme.settings.widgetShowContent = false
+        WidgetFeed.shared.update()
+        let folder = WidgetFeed.shared.folder
+        check(folder.path.hasPrefix(store.rootURL.path), "Widget-Snapshot der Testbibliothek bleibt in ihr (\(folder.lastPathComponent))")
+        guard case .success(let s) = WidgetSnapshotStore.read(from: folder) else { check(false, "Widget-Snapshot lesbar"); return }
+        check(s.pinned.contains { $0.title == "Inbox" } && !s.recent.isEmpty, "Widget kennt angepinnte und letzte Notizen")
+        check(s.notes.allSatisfy { $0.preview == nil } && s.checklists.allSatisfy(\.items.isEmpty), "Ohne Erlaubnis keine Notizinhalte im Widget (#83)")
+        let inbox = s.checklists.first { $0.title == "Inbox" }
+        check(inbox?.done == 1 && inbox?.total == 3, "Checklisten-Fortschritt im Widget (\(inbox?.done ?? -1)/\(inbox?.total ?? -1))")
+        theme.settings.widgetShowContent = true
+        WidgetFeed.shared.update()
+        if case .success(let shown) = WidgetSnapshotStore.read(from: folder) {
+            check(shown.checklists.first { $0.title == "Inbox" }?.items.first?.text == "Milch", "Mit Erlaubnis zeigt das Widget Checklisten-Punkte")
+        }
+        theme.settings.widgetShowContent = false
+        WidgetFeed.shared.update()
+    }
 
     static func run() async {
         let store = NoteStore.shared
@@ -108,6 +131,7 @@ enum QuickAccessSelfTest {
         again.removeNote(target.id)
         check(!FileManager.default.fileExists(atPath: LibraryData.folder(store.rootURL, "chats").appendingPathComponent(other.id.uuidString + ".json").path),
               "Leerer Chat hinterlässt keine Datei")
+        await widgetChecks(store)
         print("QUICK done"); fflush(stdout)
     }
 }
