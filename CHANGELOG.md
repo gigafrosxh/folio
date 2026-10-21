@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] – 2026-10-21
+
 ### Behoben
 - Notizen lassen sich jetzt auch aus dem Editor löschen: „Ablage → Notiz in den Papierkorb legen“. Das Kontextmenü der Notizliste heißt wie bei Ordnern „In den Papierkorb legen“ statt „Löschen“ (#108).
 - Bei schmalem Fenster mit offenem KI-Chat wurde der Editor auf einen Buchstaben Breite zusammengedrückt. Der Chat wird jetzt schmaler und legt sich, wenn es nicht reicht, über die Notiz; die Formatleiste bekommt bei Bedarf eine zweite Zeile und eine kleinste Variante, sodass alle Werkzeuge erreichbar bleiben (#109).
