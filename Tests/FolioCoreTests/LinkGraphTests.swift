@@ -117,4 +117,19 @@ final class LinkGraphTests: XCTestCase {
         let broken = try JSONDecoder().decode(NoteMetadata.self, from: Data(#"{"id":"8B69FAD9-5077-43A0-AD9C-DAE5020C5F7C","properties":"kaputt"}"#.utf8))
         XCTAssertNil(broken.properties, "a broken field never makes the note unreadable")
     }
+
+    func testPropertySearch() {
+        var m = meta("Aufgabe")
+        m.properties = [NoteProperty(name: "Status", kind: .status, value: "In Arbeit", options: ["Offen", "In Arbeit"]),
+                        NoteProperty(name: "Fällig", kind: .date, value: "2026-10-30")]
+        let f = SearchFilter.parse("status:arbeit bericht")
+        XCTAssertEqual(f.properties, ["status": "arbeit"])
+        XCTAssertEqual(f.text, "bericht")
+        XCTAssertTrue(SearchFilter.parse("status:arbeit").matches(m, folderPath: ""))
+        XCTAssertFalse(SearchFilter.parse("status:offen").matches(m, folderPath: ""))
+        XCTAssertTrue(SearchFilter.parse("fällig:*").matches(m, folderPath: ""))
+        XCTAssertFalse(SearchFilter.parse("priorität:*").matches(m, folderPath: ""))
+        XCTAssertTrue(SearchFilter.parse("https://example.com").properties.isEmpty, "links stay text")
+        XCTAssertTrue(SearchFilter.parse("arbeit").matches(m, folderPath: ""), "property values are searchable text")
+    }
 }

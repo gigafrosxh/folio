@@ -294,7 +294,41 @@ final class FolioTextView: NSTextView {
 
     // MARK: Checklist clicks
 
+    // MARK: Link preview on hover (#116)
+
+    private var hoverArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        guard let lm = layoutManager, let tc = textContainer, let storage = textStorage, storage.length > 0 else { return }
+        let local = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        let glyph = lm.glyphIndex(for: local, in: tc)
+        let glyphRect = lm.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: tc)
+        let index = lm.characterIndexForGlyph(at: glyph)
+        var range = NSRange()
+        let value = glyphRect.contains(local) && index < storage.length ? storage.attribute(.link, at: index, effectiveRange: &range) : nil
+        let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+        let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil), in: tc)
+            .offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+        LinkPreviewController.shared.hover(url, range: range, rect: rect, in: self)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        LinkPreviewController.shared.hover(nil, range: NSRange(), rect: .zero, in: self)
+    }
+
     override func mouseDown(with event: NSEvent) {
+        LinkPreviewController.shared.close()
         if let idx = checkboxIndex(at: convert(event.locationInWindow, from: nil)) {
             let ns = string as NSString
             let current = ns.substring(with: NSRange(location: idx, length: 1))

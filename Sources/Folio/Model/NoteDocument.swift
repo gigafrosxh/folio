@@ -243,6 +243,17 @@ final class NoteDocument: ObservableObject, Identifiable {
         markDirty()
     }
 
+    /// Structured properties (#121); an empty list is stored as nil so older versions see nothing new.
+    func setProperties(_ properties: [NoteProperty]) {
+        let value = properties.isEmpty ? nil : properties
+        guard value != meta.properties else { return }
+        let old = meta.properties ?? []
+        meta.properties = value
+        undoManager?.registerUndo(withTarget: self) { $0.setProperties(old) }
+        undoManager?.setActionName("Eigenschaften ändern")
+        markDirty()
+    }
+
     // MARK: Editing blocks
 
     /// Inserts `block` after `anchor`. When `anchor` is a text block and `splitAt` is inside it,

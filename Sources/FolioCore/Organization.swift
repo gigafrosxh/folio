@@ -127,6 +127,8 @@ public struct SearchFilter: Equatable, Sendable {
     public var folder: String?
     public var period: Period = .any
     public var types: Set<String> = []
+    /// Property filters (#121): `status:offen` → name „status“ whose value contains „offen“; „*“ = has the property.
+    public var properties: [String: String] = [:]
 
     public init(text: String = "", tags: Set<String> = [], folder: String? = nil, period: Period = .any, types: Set<String> = []) {
         self.text = text
@@ -136,7 +138,7 @@ public struct SearchFilter: Equatable, Sendable {
         self.types = types
     }
 
-    public var hasFilters: Bool { !tags.isEmpty || folder != nil || period != .any || !types.isEmpty }
+    public var hasFilters: Bool { !tags.isEmpty || folder != nil || period != .any || !types.isEmpty || !properties.isEmpty }
     public var isEmpty: Bool { !hasFilters && text.trimmingCharacters(in: .whitespaces).isEmpty }
 
     /// Reads typed filters out of the search text: `tag:rezept`, `#rezept`, `ordner:Projekte`,
@@ -159,6 +161,11 @@ public struct SearchFilter: Equatable, Sendable {
                 case "jahr", "365": f.period = .year
                 default: words.append(word)
                 }
+            } else if let colon = word.firstIndex(of: ":"), colon != word.startIndex, word.index(after: colon) != word.endIndex,
+                      word[..<colon].allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" }),
+                      !["http", "https", "folio", "mailto", "file"].contains(lower[..<lower.firstIndex(of: ":")!].description) {
+                // Any other name:value is a property filter (#121).
+                f.properties[String(lower[..<lower.firstIndex(of: ":")!])] = String(lower[lower.index(after: lower.firstIndex(of: ":")!)...])
             } else { words.append(word) }
         }
         f.text = words.joined(separator: " ")
@@ -173,6 +180,7 @@ public struct SearchFilter: Equatable, Sendable {
         f.folder = other.folder ?? folder
         if other.period != .any { f.period = other.period }
         f.types.formUnion(other.types)
+        f.properties.merge(other.properties) { _, new in new }
         return f
     }
 
@@ -196,6 +204,10 @@ public struct SearchFilter: Equatable, Sendable {
                 if have.isDisjoint(with: def.kinds) { return false }
             }
         }
+        for (name, value) in properties {
+            guard let p = (meta.properties ?? []).first(where: { $0.name.lowercased() == name }) else { return false }
+            if value != "*", !p.displayValue.lowercased().contains(value), !p.value.lowercased().contains(value) { return false }
+        }
         // Every word must appear in title or text (in any order).
         let words = text.lowercased().split(separator: " ")
         guard !words.isEmpty else { return true }
@@ -206,7 +218,10 @@ public struct SearchFilter: Equatable, Sendable {
     }
 
     /// Title and text of a note, lowercased, for repeated searches.
-    public static func haystack(for meta: NoteMetadata) -> String { (meta.title + "\n" + meta.searchText).lowercased() }
+    public static func haystack(for meta: NoteMetadata) -> String {
+        let props = (meta.properties ?? []).map { "\($0.name): \($0.displayValue)" }.joined(separator: "\n")
+        return (meta.title + "\n" + meta.searchText + (props.isEmpty ? "" : "\n" + props)).lowercased()
+    }
 }
 
 // MARK: - Tags (#18)

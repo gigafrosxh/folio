@@ -70,6 +70,8 @@ struct NoteEditorView: View {
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 2)
+                    PropertiesView(doc: doc)
+                        .padding(.leading, BlockRow.gutter)
                     if !doc.meta.tags.isEmpty {
                         HStack(spacing: 6) {
                             ForEach(doc.meta.tags, id: \.self) { tag in
