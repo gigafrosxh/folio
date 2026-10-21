@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.2.0] – 2026-10-21
+
 ### Neu – Graph und Links
 - **Graph** (Darstellung › Graph, ⌃⌘G): alle Notizen als Punkte, Links als Linien. Ziehen verschiebt, zwei Finger zoomen, ein Klick öffnet die Notiz (#110).
 - **Lokaler Graph** unter jeder Notiz: die Notiz und ihre Nachbarn, 1–3 Schritte weit (#111).
