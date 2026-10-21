@@ -140,6 +140,7 @@ enum KeyboardSelfTest {
         }
         await focusChecks(store)
         await closeTabCheck(store)
+        await trashMenuCheck(store)
         print("KEY done"); fflush(stdout)
     }
 
@@ -151,6 +152,20 @@ enum KeyboardSelfTest {
         await press("w", .command)
         let window = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }
         check(tabs > 1 && store.tabs.count == tabs - 1 && window != nil, "⌘W schließt bei mehreren Tabs nur den Tab (#107: \(tabs) → \(store.tabs.count))")
+    }
+
+    /// „Ablage → Notiz in den Papierkorb legen“ works from the editor (#108).
+    private static func trashMenuCheck(_ store: NoteStore) async {
+        guard let id = store.currentDocument?.id else { return }
+        let count = store.notes.count
+        var found: (NSMenu, Int)?
+        for top in NSApp.mainMenu?.items ?? [] {
+            if let m = top.submenu, let i = m.items.firstIndex(where: { $0.title == "Notiz in den Papierkorb legen" }) { found = (m, i) }
+        }
+        found.map { $0.0.performActionForItem(at: $0.1) }
+        await wait(0.5)
+        check(found != nil && store.notes.count == count - 1 && !store.notes.contains { $0.id == id },
+              "Menü „Notiz in den Papierkorb legen“ legt die offene Notiz in den Papierkorb (#108)")
     }
 
     /// Plain typing posted right away, like a fast typist after a shortcut.

@@ -36,6 +36,8 @@ struct FolioCommands: Commands {
             Divider()
             Button("Notiz duplizieren") { if let id = store.currentDocument?.id { store.duplicate(id) } }
                 .keyboardShortcut("d")
+            // Also reachable from the editor, not only with ⌫ in the note list (#108). No ⌘⌫: in text it deletes the line.
+            Button("Notiz in den Papierkorb legen") { if let id = store.currentDocument?.id { store.delete(id) } }
             Divider()
             Button("Apple Notizen importieren…") { NotificationCenter.default.post(name: .folioShowImport, object: nil) }
         }

@@ -234,7 +234,7 @@ struct NoteListView: View {
         }
         Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
         Divider()
-        Button("Löschen", role: .destructive) { store.delete(note.id) }
+        Button("In den Papierkorb legen", role: .destructive) { store.delete(note.id) }
     }
 }
 
