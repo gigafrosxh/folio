@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.1.1] – 2026-10-21
+
 ### Behoben
 - Die Folio-Widgets erschienen nicht in der Widget-Galerie, weil die Widget-Erweiterung beim Start abstürzte. Sie startet jetzt wie eine von Xcode gebaute Erweiterung; das Build-Skript prüft das (#123).
 
