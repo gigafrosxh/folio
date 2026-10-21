@@ -26,18 +26,21 @@ struct SettingsView: View {
         return "Folio \(version)" + (build.map { " (\($0))" } ?? "")
     }
 
+    /// The open tab; the Help menu opens „Tastenkürzel“ directly (#106).
+    @AppStorage("folio.settingsTab") private var tab = "general"
+
     var body: some View {
         VStack(spacing: 0) {
-        TabView {
-            general.tabItem { Label("Allgemein", systemImage: "gearshape") }
-            editor.tabItem { Label("Editor", systemImage: "textformat") }
-            code.tabItem { Label("Code", systemImage: "chevron.left.forwardslash.chevron.right") }
-            execution.tabItem { Label("Ausführung", systemImage: "play.circle") }
-            appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }
-            SafetySettingsView().tabItem { Label("Sicherheit", systemImage: "lock.shield") }
-            QuickAccessSettingsView().tabItem { Label("Schnellzugriff", systemImage: "bolt") }
-            shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }
-            feedback.tabItem { Label("Feedback", systemImage: "bubble.left.and.exclamationmark.bubble.right") }
+        TabView(selection: $tab) {
+            general.tabItem { Label("Allgemein", systemImage: "gearshape") }.tag("general")
+            editor.tabItem { Label("Editor", systemImage: "textformat") }.tag("editor")
+            code.tabItem { Label("Code", systemImage: "chevron.left.forwardslash.chevron.right") }.tag("code")
+            execution.tabItem { Label("Ausführung", systemImage: "play.circle") }.tag("execution")
+            appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }.tag("appearance")
+            SafetySettingsView().tabItem { Label("Sicherheit", systemImage: "lock.shield") }.tag("safety")
+            QuickAccessSettingsView().tabItem { Label("Schnellzugriff", systemImage: "bolt") }.tag("quick")
+            shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }.tag("shortcuts")
+            feedback.tabItem { Label("Feedback", systemImage: "bubble.left.and.exclamationmark.bubble.right") }.tag("feedback")
         }
             Divider()
             Text(Self.versionString)
@@ -141,7 +144,7 @@ struct SettingsView: View {
             }
             Section("Layout") {
                 settingSlider("Zeilenabstand", value: $theme.settings.lineSpacing, range: 0...14, unit: "pt")
-                settingSlider("Maximale Breite", value: $theme.settings.editorWidth, range: 520...1200, unit: "pt")
+                settingSlider("Maximale Breite", value: $theme.settings.editorWidth, range: 520...1200, unit: "pt", step: 10)
             }
             Section {
                 Toggle("Textvorhersage mit Apple Intelligence", isOn: $theme.settings.aiPredictions)
@@ -249,8 +252,8 @@ struct SettingsView: View {
     private var execution: some View {
         Form {
             Section {
-                settingSlider("Zeitlimit", value: $theme.settings.runTimeout, range: 5...300, unit: "s")
-                settingSlider("Max. Ausgabe", value: $theme.settings.maxOutputKB, range: 50...10_000, unit: "KB")
+                settingSlider("Zeitlimit", value: $theme.settings.runTimeout, range: 5...300, unit: "s", step: 5)
+                settingSlider("Max. Ausgabe", value: $theme.settings.maxOutputKB, range: 50...10_000, unit: "KB", step: 50)
                 Picker("Arbeitsspeicher-Limit", selection: $theme.settings.maxMemoryMB) {
                     Text("Keins").tag(0.0)
                     Text("256 MB").tag(256.0)
@@ -324,11 +327,19 @@ struct SettingsView: View {
         }.formStyle(.grouped)
     }
 
-    private func settingSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String) -> some View {
-        LabeledContent(title) {
-            Slider(value: value, in: range, step: 1).accessibilityLabel(title)
-            Text("\(Int(value.wrappedValue)) \(unit)").monospacedDigit()
-                .frame(width: 62, alignment: .trailing).foregroundStyle(.secondary)
+    /// All sliders look the same: no tick marks (with `step:` AppKit draws them once there are few enough
+    /// steps), and the value snaps to `step` instead (#105).
+    private func settingSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, step: Double = 1) -> some View {
+        let snapped = Binding<Double>(
+            get: { value.wrappedValue },
+            set: { v in
+                let s = min(max((v / step).rounded() * step, range.lowerBound), range.upperBound)
+                if s != value.wrappedValue { value.wrappedValue = s }
+            })
+        return LabeledContent(title) {
+            Slider(value: snapped, in: range).accessibilityLabel(title)
+            Text("\(Int(value.wrappedValue).formatted()) \(unit)").monospacedDigit()
+                .frame(width: 72, alignment: .trailing).foregroundStyle(.secondary)
         }
     }
 
