@@ -264,6 +264,30 @@ final class FolioTextView: NSTextView {
         super.deleteBackward(sender)
     }
 
+    /// ⌥⌫: the word before the cursor, never past the start of the line (#129). AppKit's version deleted
+    /// back over empty or blank lines into the previous text.
+    override func deleteWordBackward(_ sender: Any?) {
+        let sel = selectedRange()
+        guard sel.length == 0, sel.location > 0 else { super.deleteWordBackward(sender); return }
+        let ns = string as NSString
+        let lineStart = ns.lineRange(for: NSRange(location: sel.location, length: 0)).location
+        if lineStart == sel.location { deleteBackward(sender); return }   // at the line start: join with the line above
+        var start = sel.location
+        func char(_ i: Int) -> Character { Character(ns.substring(with: ns.rangeOfComposedCharacterSequence(at: i))) }
+        // Spaces before the cursor, then one word (or one run of punctuation).
+        while start > lineStart, char(start - 1).isWhitespace { start -= 1 }
+        if start > lineStart {
+            let isWord = { (c: Character) in c.isLetter || c.isNumber || c == "_" }
+            let wordRun = isWord(char(start - 1))
+            while start > lineStart, !char(start - 1).isWhitespace, isWord(char(start - 1)) == wordRun { start -= 1 }
+        }
+        let range = NSRange(location: start, length: sel.location - start)
+        guard range.length > 0, shouldChangeText(in: range, replacementString: "") else { return }
+        textStorage?.replaceCharacters(in: range, with: "")
+        didChangeText()
+        setSelectedRange(NSRange(location: start, length: 0))
+    }
+
     override func insertTab(_ sender: Any?) {
         if acceptSuggestion() { return }
         let ns = string as NSString

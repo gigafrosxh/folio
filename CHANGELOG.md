@@ -9,6 +9,7 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ### Behoben
 - In der Notizliste konnten zwei Notizen gleichzeitig ausgewählt aussehen, wenn eine Notiz durch eine Änderung in eine andere Gruppe rutschte (z. B. nach „Heute“): Die Liste ließ eine veraltete Kopie stehen. Notizen behalten jetzt ihre Identität, wenn sie die Gruppe wechseln (#128).
+- ⌥⌫ löscht nur noch das Wort vor dem Cursor in der aktuellen Zeile. Auf einer leeren oder nur mit Leerzeichen gefüllten Zeile löschte es bisher bis in den Text darüber (#129).
 
 ## [1.2.0] – 2026-10-21
 
