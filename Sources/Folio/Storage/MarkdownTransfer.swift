@@ -95,6 +95,8 @@ enum MarkdownTransfer {
                 let s = RichTextCodec.attributedString(from: b.rtf)
                 let md = markdown(from: s)
                 if !md.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { parts.append(md) }
+            case .embed:
+                parts.append("![[\(b.code ?? "")]]")
             case .code:
                 parts.append("```\(b.language ?? "")\n\(b.code ?? "")\n```")
                 if let out = b.output, !out.isEmpty { parts.append("```text\n\(out)\n```") }

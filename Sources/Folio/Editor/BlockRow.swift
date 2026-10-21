@@ -92,6 +92,8 @@ struct BlockRow: View {
             RenderedBlockView(block: block, doc: doc, kind: .diagram)
         case .audio:
             AudioBlockView(block: block, doc: doc)
+        case .embed:
+            EmbedBlockView(block: block, doc: doc)
         }
     }
 

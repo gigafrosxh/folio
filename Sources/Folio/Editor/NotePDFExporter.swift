@@ -162,6 +162,15 @@ enum NotePDFExporter {
                 guard block.storage.length > 0 else { continue }
                 newline()
                 out.append(printable(block.storage))
+            case .embed:
+                // The embedded note's text, as it reads in the editor (#120).
+                let title = block.storage.string
+                appendLabel("Eingebettet: \(title)", icon: "↳")
+                if let id = NoteStore.shared.linkIndex.resolve(title), id != doc.id,
+                   let ref = NoteStore.shared.notes.first(where: { $0.id == id }), let file = try? NoteFile.read(from: ref.url) {
+                    let text = file.body.blocks.filter { $0.kind == .text }.map { RichTextCodec.attributedString(from: $0.rtf) }
+                    for t in text where t.length > 0 { newline(); out.append(printable(t)) }
+                }
             case .code:
                 let spec = Languages.spec(for: block.language)
                 appendLabel(spec.name, icon: "⌘")

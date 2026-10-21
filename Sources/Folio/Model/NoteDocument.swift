@@ -51,7 +51,7 @@ final class BlockModel: ObservableObject, Identifiable {
         switch r.kind {
         case .text:
             storage.setAttributedString(RichTextCodec.attributedString(from: r.rtf))
-        case .code, .database, .math, .diagram:
+        case .code, .database, .math, .diagram, .embed:
             storage.setAttributedString(NSAttributedString(string: r.code ?? ""))
         default: break
         }
@@ -113,7 +113,7 @@ final class BlockModel: ObservableObject, Identifiable {
             r.code = storage.string
             r.language = "sql"
             r.connection = connection
-        case .math, .diagram:
+        case .math, .diagram, .embed:
             r.code = storage.string
         case .audio:
             r.output = output
@@ -137,6 +137,7 @@ final class BlockModel: ObservableObject, Identifiable {
         case .text, .code, .database, .math, .diagram: return storage.string
         case .web: return url
         case .audio: return [caption, output ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
+        case .embed: return "![[\(storage.string)]]"
         default: return caption
         }
     }
@@ -214,6 +215,7 @@ final class NoteDocument: ObservableObject, Identifiable {
         meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
         meta.tags = TagParser.tags(in: fullText)
         meta.searchText = blocks.map(\.plainText).joined(separator: "\n")
+        meta.wikiLinks = WikiLink.targets(in: meta.searchText)
         meta.kinds = Array(Set(blocks.filter { $0.kind != .text || $0.storage.length > 0 }.map(\.kind.rawValue))).sorted()
         var links: [UUID] = []
         for b in textBlocks {

@@ -18,6 +18,10 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
     public var kinds: [String]?
     /// How this note's code runs (interpreters, working directory, variables, time limit); nil = app settings.
     public var environment: RunEnvironment?
+    /// `[[Titel]]` link targets in the text (#115, #119); nil in notes saved before 1.2 (then taken from searchText).
+    public var wikiLinks: [String]?
+    /// Structured properties such as Status or Fällig (#121); nil = none.
+    public var properties: [NoteProperty]?
 
     public init(id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
                 created: Date = Date(), modified: Date = Date(), pinned: Bool = false, searchText: String = "") {
@@ -44,6 +48,60 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
         links = try c.decodeIfPresent([UUID].self, forKey: .links) ?? []
         kinds = try c.decodeIfPresent([String].self, forKey: .kinds)
         environment = try? c.decodeIfPresent(RunEnvironment.self, forKey: .environment)
+        wikiLinks = try? c.decodeIfPresent([String].self, forKey: .wikiLinks)
+        properties = try? c.decodeIfPresent([NoteProperty].self, forKey: .properties)
+    }
+}
+
+/// A named value on a note (#121). Values are stored as text so every version can read them.
+public struct NoteProperty: Codable, Hashable, Sendable, Identifiable {
+    public enum Kind: String, Codable, Sendable, CaseIterable {
+        case text, number, date, status, checkbox
+        public var label: String {
+            switch self {
+            case .text: return "Text"
+            case .number: return "Zahl"
+            case .date: return "Datum"
+            case .status: return "Auswahl"
+            case .checkbox: return "Ja/Nein"
+            }
+        }
+    }
+    public var id: UUID
+    public var name: String
+    public var kind: Kind
+    /// Text; numbers with "." decimal; dates as yyyy-MM-dd; checkboxes "true"/"false".
+    public var value: String
+    /// Choices for `.status`.
+    public var options: [String]?
+
+    public init(id: UUID = UUID(), name: String, kind: Kind = .text, value: String = "", options: [String]? = nil) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.value = value
+        self.options = options
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        kind = (try? c.decodeIfPresent(Kind.self, forKey: .kind)) ?? .text
+        value = try c.decodeIfPresent(String.self, forKey: .value) ?? ""
+        options = try c.decodeIfPresent([String].self, forKey: .options)
+    }
+
+    /// For display and search: dates in the user's format, checkboxes as Ja/Nein.
+    public var displayValue: String {
+        switch kind {
+        case .checkbox: return value == "true" ? "Ja" : "Nein"
+        case .date:
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.date(from: value).map { $0.formatted(date: .abbreviated, time: .omitted) } ?? value
+        default: return value
+        }
     }
 }
 
@@ -70,6 +128,8 @@ public enum BlockKind: String, Codable, Sendable, CaseIterable {
     case diagram
     /// An audio recording or file (attachment); `output` holds its transcript.
     case audio
+    /// Another note shown read-only (`![[Titel]]`, #120); the title is in `code`. Needs Folio 1.2+.
+    case embed
 }
 
 /// One block of a note's body. Fields not used by a block's kind stay nil.

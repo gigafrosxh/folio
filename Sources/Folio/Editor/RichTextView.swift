@@ -524,6 +524,7 @@ struct RichTextView: NSViewRepresentable {
         tv.typingAttributes = initialTypingAttributes()
         FormattingController.shared.register(tv, for: block.id)
         context.coordinator.highlightTags(in: tv)
+        context.coordinator.linkifyWikiLinks(in: tv)
         DispatchQueue.main.async { tv.reportHeight() }
         return tv
     }
@@ -561,6 +562,7 @@ struct RichTextView: NSViewRepresentable {
         tv.linkTextAttributes?[.foregroundColor] = theme.accentNSColor
         if tv.string.isEmpty { tv.typingAttributes = initialTypingAttributes() }
         context.coordinator.highlightTags(in: tv)
+        context.coordinator.linkifyWikiLinks(in: tv)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: FolioTextView, context: Context) -> CGSize? {
@@ -582,6 +584,7 @@ struct RichTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? FolioTextView else { return }
             highlightTags(in: tv)
+            linkifyWikiLinks(in: tv)
             parent.onChange()
             tv.schedulePrediction()
             // "[[" starts a link to another note: the two brackets go away and the note picker opens.
@@ -597,11 +600,42 @@ struct RichTextView: NSViewRepresentable {
         }
 
         /// Links to other notes (folio://note/…) open inside Folio; others go to the browser.
+        /// `[[Titel]]` opens that note or creates it when it does not exist yet (#115).
         func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
             let url = (link as? URL) ?? (link as? String).flatMap(URL.init(string:))
-            guard let url, let id = NoteLink.id(from: url) else { return false }
-            NoteStore.shared.open(noteID: id)
-            return true
+            guard let url else { return false }
+            if let id = NoteLink.id(from: url) {
+                NoteStore.shared.open(noteID: id)
+                return true
+            }
+            if let title = WikiLink.target(from: url) {
+                NoteStore.shared.openOrCreate(title: title)
+                return true
+            }
+            return false
+        }
+
+        /// `[[Titel]]` becomes a clickable link; links to notes that do not exist yet look fainter (#115).
+        /// The link is part of the stored text, so it also works after a restart and in other versions.
+        func linkifyWikiLinks(in tv: NSTextView) {
+            guard let storage = tv.textStorage else { return }
+            let full = NSRange(location: 0, length: storage.length)
+            var stale: [NSRange] = []
+            storage.enumerateAttribute(.link, in: full) { value, range, _ in
+                let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+                if let url, WikiLink.target(from: url) != nil { stale.append(range) }
+            }
+            let links = WikiLink.find(in: storage.string).filter { !$0.isEmbed }
+            guard !stale.isEmpty || !links.isEmpty else { return }
+            storage.beginEditing()
+            for r in stale { storage.removeAttribute(.link, range: r) }
+            for l in links { storage.addAttribute(.link, value: WikiLink.url(for: l.target), range: l.range) }
+            storage.endEditing()
+            guard let lm = tv.layoutManager else { return }
+            let index = NoteStore.shared.linkIndex
+            for l in links where index.resolve(l.target) == nil {
+                lm.addTemporaryAttributes([.foregroundColor: NSColor.secondaryLabelColor], forCharacterRange: l.range)
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

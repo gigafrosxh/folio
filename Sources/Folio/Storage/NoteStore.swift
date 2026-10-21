@@ -12,7 +12,7 @@ final class NoteStore: ObservableObject {
 
     @Published internal(set) var rootURL: URL
     @Published internal(set) var folders: [FolderNode] = []
-    @Published internal(set) var notes: [NoteRef] = [] { didSet { notesVersion += 1 } }
+    @Published internal(set) var notes: [NoteRef] = [] { didSet { notesVersion += 1; refreshLinkIndex() } }
     @Published var sidebarSelection: SidebarItem? = .all {
         didSet { if oldValue != sidebarSelection, let id = selectedNoteID, !filteredNotes.contains(where: { $0.id == id }) { selectedNoteID = filteredNotes.first?.id } }
     }
@@ -82,6 +82,10 @@ final class NoteStore: ObservableObject {
     /// Last result of `filteredNotes` and what it was computed from (it is read on every redraw) (#62).
     var filterMemo: (key: String, notes: [NoteRef])?
     var notesVersion = 0
+    /// Links between notes (#119), updated per changed note when `notes` changes.
+    internal(set) var linkIndex = LinkIndex()
+    /// What each note looked like when it went into `linkIndex`.
+    var linkIndexStamps: [UUID: String] = [:]
     /// Block kinds of notes saved before 0.15 (read once, when a type filter needs them).
     var kindsCache: [URL: [String]] = [:]
     @Published var lastError: String?

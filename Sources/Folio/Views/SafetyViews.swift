@@ -18,6 +18,7 @@ enum NoteText {
                 return "[\(kindName(r.kind))\(name.map { ": \($0)" } ?? "")]" + (r.output.map { "\n\($0)" } ?? "")
             case .web: return "[Webseite: \(r.url ?? "")]"
             case .database: return "```sql\n\(b.storage.string)\n```"
+            case .embed: return "![[\(b.storage.string)]]"
             }
         }.filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
