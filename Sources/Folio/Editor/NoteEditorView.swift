@@ -401,6 +401,13 @@ struct NoteEditorView: View {
     }
 
     private func handleInsert(_ kind: String) {
+        if kind.hasPrefix("embed:") {
+            // Another note, read-only (#120).
+            let block = BlockModel(kind: .embed)
+            block.storage.setAttributedString(NSAttributedString(string: String(kind.dropFirst(6))))
+            insertBlock(block)
+            return
+        }
         switch kind {
         case "code": insertCode(language: "python")
         case "file": pickFiles()

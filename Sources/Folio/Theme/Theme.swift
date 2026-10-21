@@ -154,6 +154,9 @@ struct ThemeSettings: Codable, Equatable {
     /// Note and checklist chosen for the widgets („Im Widget zeigen“); "" = automatic (#81, #82).
     var widgetNote = ""
     var widgetChecklist = ""
+    /// Daily notes (#117): folder below the library and template id ("" = none).
+    var dailyFolder = "Tagesnotizen"
+    var dailyTemplate = ""
 
     static var defaultLibraryPath: String {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Folio").path
@@ -204,6 +207,8 @@ struct ThemeSettings: Codable, Equatable {
         widgetShowContent = v(.widgetShowContent, d.widgetShowContent)
         widgetNote = v(.widgetNote, d.widgetNote)
         widgetChecklist = v(.widgetChecklist, d.widgetChecklist)
+        dailyFolder = v(.dailyFolder, d.dailyFolder)
+        dailyTemplate = v(.dailyTemplate, d.dailyTemplate)
     }
 }
 

@@ -116,6 +116,21 @@ final class FormattingController: ObservableObject {
     }
 
     /// Focuses a block's text view and puts the cursor at its end (or start).
+    /// Focuses a block at a given offset (e.g. a template's {{cursor}}, #118).
+    func focus(blockID: UUID, at offset: Int, attempts: Int = 20) {
+        DispatchQueue.main.async {
+            guard let tv = self.registry[blockID]?.view, tv.window != nil else {
+                if attempts > 0 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.focus(blockID: blockID, at: offset, attempts: attempts - 1) }
+                }
+                return
+            }
+            tv.window?.makeFirstResponder(tv)
+            tv.setSelectedRange(NSRange(location: min(offset, (tv.string as NSString).length), length: 0))
+            tv.scrollRangeToVisible(tv.selectedRange())
+        }
+    }
+
     func focus(blockID: UUID, atEnd: Bool = true, attempts: Int = 10) {
         DispatchQueue.main.async {
             // A new note's text view may appear a moment later.

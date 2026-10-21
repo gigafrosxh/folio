@@ -21,6 +21,8 @@ struct FolioCommands: Commands {
             Button("Neuer Ordner…") { NotificationCenter.default.post(name: .folioNewFolder, object: nil) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("Schnellerfassung …") { QuickCaptureController.shared.show() }
+            Button("Tagesnotiz") { store.openDailyNote() }
+                .keyboardShortcut("d", modifiers: [.command, .control])
             Button("Neuer Tab") { store.createNoteInNewTab() }
                 .keyboardShortcut("t")
             Divider()
@@ -78,6 +80,8 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("f", modifiers: [.command, .option])
             Button("Fokusmodus") { NotificationCenter.default.post(name: .folioToggleFocus, object: nil) }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
+            Button("Graph") { openWindow(id: "graph") }
+                .keyboardShortcut("g", modifiers: [.command, .control])
             Button("Terminal ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleTerminal, object: nil) }
                 .keyboardShortcut("`", modifiers: [.control])
             Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
@@ -160,6 +164,7 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("m", modifiers: [.command, .option])
             Button("Diagramm (Mermaid)") { NotificationCenter.default.post(name: .folioInsert, object: "diagram") }
                 .keyboardShortcut("g", modifiers: [.command, .option])
+            Button("Notiz einbetten …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.embed) }
             Button("Audioaufnahme") { NotificationCenter.default.post(name: .folioInsert, object: "audio") }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Zeichnung") { NotificationCenter.default.post(name: .folioInsert, object: "drawing") }

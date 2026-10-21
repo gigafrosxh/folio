@@ -267,8 +267,9 @@ public enum GraphLayout {
 
 // MARK: - Template variables (#118)
 
-/// `{{datum}}`, `{{uhrzeit}}`, `{{wochentag}}`, `{{titel}}`, `{{cursor}}` (and English `date`, `time`,
-/// `weekday`, `title`); `{{datum:yyyy-MM-dd}}` takes a date format.
+/// The placeholders of `TemplateText` (`{{datum}}`, `{{uhrzeit}}`, `{{wochentag}}`, `{{kw}}`, `{{jahr}}`,
+/// `{{monat}}`) plus `{{titel}}` and `{{cursor}}`, English names (`date`, `time`, `weekday`, `title`) and
+/// a date format after a colon: `{{datum:yyyy-MM-dd}}`.
 public enum TemplateVariables {
     public struct Context: Sendable {
         public var date: Date
@@ -298,9 +299,12 @@ public enum TemplateVariables {
             }
             switch name {
             // Fixed formats, so a template gives the same text on every Mac.
-            case "datum", "date": return (m.range, formatted(format ?? "d. MMMM yyyy"), false)
+            case "datum", "date": return (m.range, formatted(format ?? "dd.MM.yyyy"), false)
             case "uhrzeit", "time": return (m.range, formatted(format ?? "HH:mm"), false)
             case "wochentag", "weekday": return (m.range, formatted("EEEE"), false)
+            case "kw", "week": return (m.range, "\(Calendar(identifier: .iso8601).component(.weekOfYear, from: context.date))", false)
+            case "jahr", "year": return (m.range, formatted("yyyy"), false)
+            case "monat", "month": return (m.range, formatted("MMMM"), false)
             case "titel", "title": return (m.range, context.title, false)
             case "cursor": return (m.range, "", true)
             default: return nil   // unknown names stay as written
@@ -310,14 +314,21 @@ public enum TemplateVariables {
 
     /// Plain text with variables filled in, and where the cursor goes (UTF-16 offset).
     public static func apply(_ text: String, context: Context) -> (text: String, cursor: Int?) {
-        let m = NSMutableString(string: text)
+        let m = NSMutableAttributedString(string: text)
+        let cursor = apply(to: m, context: context)
+        return (m.string, cursor)
+    }
+
+    /// Fills in variables in rich text, keeping each placeholder's formatting; returns the cursor offset.
+    @discardableResult
+    public static func apply(to text: NSMutableAttributedString, context: Context) -> Int? {
         var cursor: Int?
-        for r in replacements(in: text, context: context).reversed() {
-            m.replaceCharacters(in: r.range, with: r.value)
+        for r in replacements(in: text.string, context: context).reversed() {
+            text.replaceCharacters(in: r.range, with: r.value)
             if r.isCursor { cursor = r.range.location }
             else if let c = cursor, r.range.location < c { cursor = c - r.range.length + (r.value as NSString).length }
         }
-        return (m as String, cursor)
+        return cursor
     }
 }
 

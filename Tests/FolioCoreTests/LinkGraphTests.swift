@@ -97,6 +97,7 @@ final class LinkGraphTests: XCTestCase {
         let date = DateComponents(calendar: .init(identifier: .gregorian), timeZone: .current, year: 2026, month: 10, day: 21, hour: 9, minute: 5).date!
         let ctx = TemplateVariables.Context(date: date, title: "Besprechung")
         let r = TemplateVariables.apply("# {{titel}}\nAm {{datum:yyyy-MM-dd}} ({{wochentag}}), {{uhrzeit}}\n{{cursor}}\n{{unbekannt}}", context: ctx)
+        XCTAssertEqual(TemplateVariables.apply("{{Datum}} KW {{kw}} {{monat}} {{jahr}}", context: ctx).text, "21.10.2026 KW 43 Oktober 2026", "the placeholders older templates use")
         XCTAssertEqual(r.text, "# Besprechung\nAm 2026-10-21 (Mittwoch), 09:05\n\n{{unbekannt}}")
         XCTAssertEqual(r.cursor, ("# Besprechung\nAm 2026-10-21 (Mittwoch), 09:05\n" as NSString).length)
         XCTAssertNil(TemplateVariables.apply("ohne", context: ctx).cursor)

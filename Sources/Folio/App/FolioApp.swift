@@ -90,6 +90,16 @@ struct FolioApp: App {
         }
         .defaultSize(width: 760, height: 820)
 
+        // All notes and their links (#110).
+        Window("Graph", id: "graph") {
+            GraphWindow()
+                .environmentObject(store)
+                .environmentObject(theme)
+                .preferredColorScheme(theme.settings.appearance.colorScheme)
+                .tint(theme.accent)
+        }
+        .defaultSize(width: 1000, height: 720)
+
         // Menu bar icon (#85), optional in Settings › Schnellzugriff.
         MenuBarExtra("Folio", systemImage: "note.text", isInserted: Binding(
             get: { theme.settings.menuBarIcon }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })) {

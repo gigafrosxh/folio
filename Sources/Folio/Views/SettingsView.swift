@@ -101,6 +101,16 @@ struct SettingsView: View {
                 UpdateView()
                 Toggle("Bei jedem Start nach Updates suchen und fragen", isOn: $theme.settings.askForUpdatesOnLaunch)
             }
+            // Daily notes (#117).
+            Section {
+                TextField("Ordner", text: $theme.settings.dailyFolder, prompt: Text("Tagesnotizen"))
+                Picker("Vorlage", selection: $theme.settings.dailyTemplate) {
+                    Text("Keine").tag("")
+                    ForEach(store.templates, id: \.id) { t in Text(t.meta.title.isEmpty ? "Ohne Titel" : t.meta.title).tag(t.id.uuidString) }
+                }
+            } header: { Text("Tagesnotizen") } footer: {
+                Text("„Ablage › Tagesnotiz“ (⌃⌘D) öffnet die Notiz von heute, z. B. „\(DailyNote.title(for: Date()))“, und legt sie bei Bedarf an. In Vorlagen setzen {{datum}}, {{wochentag}}, {{titel}} und {{cursor}} Werte ein.")
+            }
             Section {
                 Picker("Erscheinungsbild", selection: $theme.settings.appearance) {
                     ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }

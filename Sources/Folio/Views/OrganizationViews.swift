@@ -12,6 +12,8 @@ enum QuickOpenMode: Equatable {
     case link
     /// Add the chosen note to the open note's AI chat, for comparing (#34).
     case addToChat
+    /// Embed the chosen note read-only (#120).
+    case embed
 }
 
 /// Floating panel with fuzzy search over all notes; the recently opened ones come first.
@@ -55,19 +57,30 @@ struct QuickOpenView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: mode == .link ? "link" : mode == .addToChat ? "sparkles" : "magnifyingglass").foregroundStyle(.secondary)
-                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : "Notiz, Ordner (/) oder Tag (#) öffnen …", text: $query)
+                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : mode == .embed ? "Notiz zum Einbetten suchen …" : "Notiz, Ordner (/) oder Tag (#) öffnen …", text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .focused($focused)
-                    .onSubmit { choose(items) }
+                    .onSubmit { items.isEmpty ? linkNewNote() : choose(items) }
                     .onKeyPress(.downArrow) { index = min(index + 1, max(items.count - 1, 0)); return .handled }
                     .onKeyPress(.upArrow) { index = max(index - 1, 0); return .handled }
                     .onKeyPress(.escape) { onClose(); return .handled }
                     .accessibilityLabel("Suche")
-                Text(mode == .link ? "↩ verlinken" : mode == .addToChat ? "↩ hinzufügen" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
+                Text(mode == .link ? "↩ verlinken" : mode == .addToChat ? "↩ hinzufügen" : mode == .embed ? "↩ einbetten" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
             }
             .padding(14)
             Divider()
+            if mode == .link, !query.trimmingCharacters(in: .whitespaces).isEmpty,
+               store.linkIndex.resolve(query) == nil {
+                // [[Titel]] to a note that does not exist yet; clicking it later creates the note (#115).
+                Button { linkNewNote() } label: {
+                    Label("„\(query.trimmingCharacters(in: .whitespaces))“ als neue Notiz verlinken", systemImage: "link.badge.plus")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .helpLabel(items.isEmpty ? "↩" : "Fügt [[\(query)]] ein; ein Klick darauf legt die Notiz an")
+            }
             if items.isEmpty {
                 Text(store.notes.isEmpty ? "Noch keine Notizen." : "Nichts passt zu „\(query)“.")
                     .foregroundStyle(.secondary).padding(20)
@@ -160,6 +173,24 @@ struct QuickOpenView: View {
             NoteLinkInserter.insert(ref)
         case .addToChat:
             if let current = store.currentDocument?.id { AIChatModel.forNote(current).addNote(ref.id) }
+        case .embed:
+            NotificationCenter.default.post(name: .folioInsert, object: "embed:" + ref.meta.title)
+        }
+    }
+
+    /// Inserts `[[query]]` at the cursor, as text that becomes a link (#115).
+    private func linkNewNote() {
+        let title = query.trimmingCharacters(in: .whitespaces)
+        guard mode == .link, !title.isEmpty else { return }
+        onClose()
+        guard let tv = FormattingController.shared.activeTextView, tv.window != nil else { return }
+        let text = "[[\(title)]] "
+        let range = tv.selectedRange()
+        tv.window?.makeFirstResponder(tv)
+        if tv.shouldChangeText(in: range, replacementString: text) {
+            tv.textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: tv.typingAttributes))
+            tv.didChangeText()
+            tv.setSelectedRange(NSRange(location: range.location + (text as NSString).length, length: 0))
         }
     }
 }
@@ -223,36 +254,106 @@ extension NoteLinkInserter {
 // MARK: - Backlinks (#7)
 
 /// "Verweise auf diese Notiz": notes that link here, at the end of the editor.
+/// Below the note: notes linking here, notes mentioning this title without a link (#112), and the
+/// local graph (#111).
 struct BacklinksView: View {
     var noteID: UUID
     @EnvironmentObject var store: NoteStore
     @EnvironmentObject var theme: ThemeManager
+    @AppStorage("folio.showLocalGraph") private var showGraph = false
+    @AppStorage("folio.localGraphDepth") private var depth = 1
+    @State private var showMentions = false
 
     var body: some View {
-        let links = NoteLink.backlinks(to: noteID, in: store.notes.map(\.meta))
-        if !links.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("\(links.count) Verweis\(links.count == 1 ? "" : "e") auf diese Notiz", systemImage: "arrow.uturn.backward")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+        let backlinks = store.linkIndex.backlinks(noteID).compactMap { id in store.notes.first { $0.id == id } }
+            .sorted { $0.meta.modified > $1.meta.modified }
+        let mentions = showMentions ? store.unlinkedMentions(of: noteID) : []
+        let unresolved = store.linkIndex.unresolved(noteID)
+        VStack(alignment: .leading, spacing: 10) {
+            if !backlinks.isEmpty {
+                Label("\(backlinks.count) Verweis\(backlinks.count == 1 ? "" : "e") auf diese Notiz", systemImage: "arrow.uturn.backward")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                 FlowLayout(spacing: 6) {
-                    ForEach(links, id: \.id) { meta in
-                        Button { store.open(noteID: meta.id) } label: {
-                            Label(meta.title.isEmpty ? "Ohne Titel" : meta.title, systemImage: "note.text")
-                                .font(.system(size: 12, weight: .medium))
+                    ForEach(backlinks, id: \.id) { ref in chip(ref) }
+                }
+            }
+            if !unresolved.isEmpty {
+                Label("Verlinkt, aber noch nicht angelegt", systemImage: "link.badge.plus")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                FlowLayout(spacing: 6) {
+                    ForEach(unresolved, id: \.self) { key in
+                        let title = store.document(for: noteID)?.makeFile().meta.wikiLinks?.first { WikiLink.key($0) == key } ?? key
+                        Button { store.openOrCreate(title: title) } label: {
+                            Label(title, systemImage: "plus").font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(theme.accent.opacity(0.14), in: Capsule())
+                                .overlay(Capsule().strokeBorder(theme.accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
                         }
                         .buttonStyle(.plain)
-                        .help("Öffnen")
+                        .helpLabel("Notiz „\(title)“ anlegen")
                     }
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
-            .padding(.leading, BlockRow.gutter)
+            HStack(spacing: 14) {
+                Button(showMentions ? "Erwähnungen ausblenden" : "Unverlinkte Erwähnungen suchen") { showMentions.toggle() }
+                Button(showGraph ? "Lokalen Graph ausblenden" : "Lokalen Graph zeigen") { withAnimation(Motion.quick) { showGraph.toggle() } }
+                if showGraph {
+                    Picker("Tiefe", selection: $depth) {
+                        Text("1 Schritt").tag(1)
+                        Text("2 Schritte").tag(2)
+                        Text("3 Schritte").tag(3)
+                    }
+                    .pickerStyle(.segmented).fixedSize().labelsHidden()
+                    .helpLabel("Wie viele Verknüpfungen weit der lokale Graph reicht")
+                }
+                Spacer()
+            }
+            .buttonStyle(.borderless)
+            .font(.system(size: 12))
+            if showMentions {
+                if mentions.isEmpty {
+                    Text("Keine Notiz erwähnt diesen Titel ohne Link.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(mentions, id: \.id) { ref in
+                        HStack {
+                            chip(ref)
+                            Text(snippet(ref)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            Spacer()
+                            Button("Verlinken") { store.linkMention(in: ref.id, to: noteID) }
+                                .buttonStyle(.borderless)
+                                .helpLabel("Erwähnung in „\(ref.meta.title)“ in einen [[Link]] umwandeln")
+                        }
+                    }
+                }
+            }
+            if showGraph {
+                GraphView(focus: noteID, depth: depth, compact: true)
+                    .frame(height: 260)
+                    .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 10))
+            }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.leading, BlockRow.gutter)
+    }
+
+    private func chip(_ ref: NoteRef) -> some View {
+        Button { store.open(noteID: ref.id) } label: {
+            Label(ref.meta.title.isEmpty ? "Ohne Titel" : ref.meta.title, systemImage: "note.text")
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(theme.accent.opacity(0.14), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .helpLabel("Öffnen")
+    }
+
+    private func snippet(_ ref: NoteRef) -> String {
+        guard let title = store.notes.first(where: { $0.id == noteID })?.meta.title,
+              let r = Mentions.ranges(of: title, in: ref.meta.searchText).first else { return "" }
+        let ns = ref.meta.searchText as NSString
+        let start = max(0, r.location - 30)
+        return "…" + ns.substring(with: NSRange(location: start, length: min(ns.length - start, r.length + 60))).replacingOccurrences(of: "\n", with: " ") + "…"
     }
 }
 

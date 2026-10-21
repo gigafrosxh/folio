@@ -35,30 +35,29 @@ extension NoteStore {
         return url
     }
 
-    /// A new note from a template: placeholders like {{datum}} filled in, new id, in the target folder.
+    /// A new note from a template: placeholders like {{datum}}, {{titel}} and {{cursor}} filled in (#118),
+    /// new id, in the target folder. The cursor goes where {{cursor}} was.
     @discardableResult
-    func createNote(from template: NoteRef, in folder: URL? = nil) -> NoteRef? {
+    func createNote(from template: NoteRef, in folder: URL? = nil, title: String? = nil, date: Date = Date()) -> NoteRef? {
         guard var file = try? NoteFile.read(from: template.url) else {
             lastError = "Die Vorlage „\(template.meta.title)“ ist nicht lesbar."
             return nil
         }
-        let values = TemplateText.values()
+        let context = TemplateVariables.Context(date: date, title: title ?? TemplateText.fill(template.meta.title, now: date))
+        var cursor: (block: UUID, offset: Int)?
         for i in file.body.blocks.indices {
             let b = file.body.blocks[i]
+            file.body.blocks[i].id = UUID()
             if b.kind == .text, let rtf = b.rtf {
                 let s = RichTextCodec.attributedString(from: rtf)
-                for (key, value) in values {
-                    s.mutableString.replaceOccurrences(of: "{{\(key)}}", with: value, options: .caseInsensitive,
-                                                       range: NSRange(location: 0, length: s.length))
-                }
+                if let c = TemplateVariables.apply(to: s, context: context), cursor == nil { cursor = (file.body.blocks[i].id, c) }
                 file.body.blocks[i].rtf = RichTextCodec.rtfData(from: s)
             } else if let code = b.code {
-                file.body.blocks[i].code = TemplateText.fill(code)
+                file.body.blocks[i].code = TemplateVariables.apply(code, context: context).text
             }
-            file.body.blocks[i].id = UUID()
         }
         file.meta.id = UUID()
-        file.meta.title = TemplateText.fill(file.meta.title)
+        file.meta.title = title ?? TemplateVariables.apply(file.meta.title, context: context).text
         file.meta.created = Date()
         file.meta.modified = Date()
         file.meta.pinned = false
@@ -75,6 +74,7 @@ extension NoteStore {
             sidebarSelection = .all
         }
         selectedNoteID = ref.id
+        if let cursor { FormattingController.shared.focus(blockID: cursor.block, at: cursor.offset) }
         return ref
     }
 

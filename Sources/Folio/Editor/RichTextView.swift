@@ -237,6 +237,19 @@ final class FolioTextView: NSTextView {
             return
         }
 
+        // A line that is just ![[Titel]] becomes an embedded note (#120).
+        if !(isFirstBlock && para.location == 0), let embed = WikiLink.find(in: line).first, embed.isEmbed,
+           embed.range.location == 0, embed.range.length == (line as NSString).length {
+            let r = NSRange(location: para.location, length: (ns.substring(with: para) as NSString).length)
+            if shouldChangeText(in: r, replacementString: "") {
+                textStorage?.replaceCharacters(in: r, with: "")
+                didChangeText()
+                setSelectedRange(NSRange(location: para.location, length: 0))
+            }
+            NotificationCenter.default.post(name: .folioInsert, object: "embed:" + embed.target)
+            return
+        }
+
         let wasTitle = isFirstBlock && para.location == 0
         super.insertNewline(sender)
         if wasTitle { typingAttributes = bodyAttributes() }

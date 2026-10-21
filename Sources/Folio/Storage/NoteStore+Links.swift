@@ -70,4 +70,27 @@ extension NoteStore {
         }
         return false
     }
+
+    // MARK: Daily notes (#117)
+
+    /// Opens today's note (or another day's), creating it from the chosen template when it is missing.
+    @discardableResult
+    func openDailyNote(for date: Date = Date()) -> NoteRef? {
+        let settings = ThemeManager.shared.settings
+        let title = DailyNote.title(for: date)
+        let name = settings.dailyFolder.trimmingCharacters(in: .whitespacesAndNewlines)
+        let folder = name.isEmpty ? rootURL : rootURL.appendingPathComponent(Self.sanitize(name), isDirectory: true)
+        if let existing = notes.first(where: { $0.meta.title == title && $0.folderURL.standardizedFileURL == folder.standardizedFileURL }) {
+            open(noteID: existing.id)
+            return existing
+        }
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        if let template = templates.first(where: { $0.id.uuidString == settings.dailyTemplate }),
+           let ref = createNote(from: template, in: folder, title: title, date: date) {
+            return ref
+        }
+        let ref = createNote(titled: title, in: folder)
+        if let ref { open(noteID: ref.id) }
+        return ref
+    }
 }
