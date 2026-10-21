@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.0.0] – 2026-10-21
+
 Erste stabile Version. Gegenüber 1.0.0-rc.4 keine Änderungen am Programm; alle in den Release Candidates gefundenen Fehler (#98–#109) sind behoben.
 
 ### Geprüft
