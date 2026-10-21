@@ -41,6 +41,8 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         row(icon: "tray.full", title: "Alle Notizen", count: store.notes.count, item: .all)
                         row(icon: "pin", title: "Angepinnt", count: store.notes.filter(\.meta.pinned).count, item: .pinned)
+                        // The graph as its own section, one click away (#127).
+                        row(icon: "point.3.connected.trianglepath.dotted", title: "Graph", count: store.linkIndex.edges().count, item: .graph)
                         row(icon: "doc.on.doc", title: "Vorlagen", count: store.templates.count, item: .templates)
                             .simultaneousGesture(TapGesture().onEnded { store.ensureStarterTemplates() })
                         row(icon: "trash", title: "Papierkorb", count: store.trashItems.count, item: .trash)

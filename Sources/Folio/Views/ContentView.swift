@@ -27,6 +27,11 @@ struct ContentView: View {
                 TrashView(sidebarVisible: $sidebarVisible)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            } else if store.sidebarSelection == .graph {
+                // Opening a note from the graph goes back to the notes with that note selected.
+                GraphView(onOpen: { id in store.sidebarSelection = .all; store.open(noteID: id) })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
             } else if store.sidebarSelection == .damaged {
                 DamagedListView(sidebarVisible: $sidebarVisible)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

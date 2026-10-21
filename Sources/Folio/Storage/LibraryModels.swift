@@ -38,6 +38,8 @@ enum SidebarItem: Hashable {
     case damaged
     /// Note templates (kept in the library's hidden `.folio/templates`).
     case templates
+    /// The graph of all notes (#127).
+    case graph
 }
 
 /// A note file that cannot be opened, with what the diagnosis found and could rescue.

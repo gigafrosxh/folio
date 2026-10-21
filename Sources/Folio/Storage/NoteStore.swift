@@ -187,7 +187,7 @@ final class NoteStore: ObservableObject {
             case .pinned: list = list.filter(\.meta.pinned)
             case .folder(let url): list = list.filter { isInFolder($0.folderURL, url) }
             case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
-            case .trash, .damaged, .templates: list = []
+            case .trash, .damaged, .templates, .graph: list = []
             }
         }
         if !search.isEmpty {

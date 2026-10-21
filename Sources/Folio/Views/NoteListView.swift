@@ -217,6 +217,7 @@ struct NoteListView: View {
         case .trash: return "Papierkorb"
         case .damaged: return "Beschädigte Notizen"
         case .templates: return "Vorlagen"
+        case .graph: return "Graph"
         }
     }
 

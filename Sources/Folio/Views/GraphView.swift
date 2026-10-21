@@ -9,6 +9,8 @@ struct GraphView: View {
     var focus: UUID? = nil
     var depth: Int = 1
     var compact = false
+    /// What a click on a note does; default: open it.
+    var onOpen: ((UUID) -> Void)? = nil
 
     @EnvironmentObject var store: NoteStore
     @EnvironmentObject var theme: ThemeManager
@@ -175,7 +177,7 @@ struct GraphView: View {
         )
         .simultaneousGesture(
             SpatialTapGesture().onEnded { v in
-                if let id = node(at: v.location, m, size), !NSEvent.modifierFlags.contains(.option) { store.open(noteID: id) }
+                if let id = node(at: v.location, m, size), !NSEvent.modifierFlags.contains(.option) { open(id) }
             }
         )
         .simultaneousGesture(
@@ -195,9 +197,13 @@ struct GraphView: View {
         .accessibilityValue("\(m.nodes.count) Notizen, \(m.edges.count) Verknüpfungen")
         .accessibilityActions {
             ForEach(m.nodes.prefix(30), id: \.id) { node in
-                Button("„\(node.title)“ öffnen") { store.open(noteID: node.id) }
+                Button("„\(node.title)“ öffnen") { open(node.id) }
             }
         }
+    }
+
+    private func open(_ id: UUID) {
+        if let onOpen { onOpen(id) } else { store.open(noteID: id) }
     }
 
     private func node(at point: CGPoint, _ m: Model, _ size: CGSize) -> UUID? {
@@ -229,7 +235,7 @@ struct GraphView: View {
                     .textFieldStyle(.plain)
                     .onSubmit {
                         if let id = matches.compactMap({ id in store.linkIndex.nodes[id] }).sorted(by: { $0.modified > $1.modified }).first?.id {
-                            store.open(noteID: id)
+                            open(id)
                         }
                     }
             }
