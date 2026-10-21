@@ -25,6 +25,8 @@ final class AIChatModel: ObservableObject, Identifiable {
         var omitted = 0
         /// Answer made without the model (search results only).
         var isFallback = false
+        /// What the assistant changed in the notes for this answer (#124).
+        var actions: [NoteAgent.Action] = []
     }
 
     /// Ready-made prompts shown as chips.
@@ -216,10 +218,14 @@ final class AIChatModel: ObservableObject, Identifiable {
     }
 
     private static let instructions = """
-    Du bist der Assistent der Notizen-App Folio und läufst komplett auf dem Mac. Antworte in der Sprache der Frage, \
-    knapp und klar, mit Markdown (Listen, **fett**) wo es hilft. Stütze dich nur auf die nummerierten Quellen aus den \
-    Notizen des Nutzers und gib nach jeder Aussage die Quelle in eckigen Klammern an, z. B. [1] oder [2, 3]. \
-    Wenn die Quellen die Frage nicht beantworten, sag das ehrlich statt etwas zu erfinden.
+    Du bist der Assistent der Notizen-App Folio und läufst komplett auf dem Mac. Antworte in der Sprache des Nutzers, \
+    knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
+    Aufträge führst du sofort mit einem Werkzeug aus: Notiz anlegen (notizAnlegen), Text ergänzen (textAnfuegen), \
+    verknüpfen (notizenVerknuepfen), taggen (tagHinzufuegen), umbenennen (notizUmbenennen), verschieben (notizVerschieben). \
+    Kündige nie nur an, was du tun wirst – ruf das Werkzeug auf und sag danach in einem Satz, was erledigt ist. \
+    Kennst du den genauen Titel einer Notiz nicht, nutze zuerst notizenSuchen.
+    Bei Fragen zum Inhalt stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in \
+    eckigen Klammern, z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich.
     """
 
     private func respond(_ question: String, plan: ContextPlan, history: String, selection: String?) async {
@@ -238,14 +244,23 @@ final class AIChatModel: ObservableObject, Identifiable {
         if #available(macOS 26.0, *) {
             // A fresh session per question: recent turns travel in the prompt, so conversations survive
             // restarts and never overflow the small context window.
-            let session = LanguageModelSession(instructions: Self.instructions)
+            // With tools the assistant carries out tasks on the notes instead of only talking about them (#124).
+            let session = LanguageModelSession(tools: NoteAgentTools.all, instructions: Self.instructions)
+            NoteAgent.log = []
             do {
                 for try await partial in session.streamResponse(to: prompt) {
                     if Task.isCancelled { break }
-                    if let i = messages.lastIndex(where: { $0.isStreaming }) { messages[i].text = partial.content }
+                    if let i = messages.lastIndex(where: { $0.isStreaming }) {
+                        messages[i].text = partial.content
+                        messages[i].actions = NoteAgent.log
+                    }
                 }
             } catch {
                 if !Task.isCancelled { errorText = Self.describe(error) }
+            }
+            if let i = messages.lastIndex(where: { $0.isStreaming }) {
+                messages[i].actions = NoteAgent.log
+                if messages[i].text.isEmpty, !NoteAgent.log.isEmpty { messages[i].text = "Erledigt." }
             }
             finishStreaming()
             return

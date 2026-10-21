@@ -61,6 +61,21 @@ enum AISelfTest {
         let l = await ask(lib, "Welches Hotel in Madrid?")
         check(l?.sources.contains { $0.noteID == b } == true, "Bibliotheksfrage findet die richtige Notiz")
         print("AI library:", (l?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200)); fflush(stdout)
+
+        // The assistant carries out tasks (#124).
+        if availability.isAvailable {
+            let agent = AIChatModel.forLibrary()
+            agent.reset()
+            let r = await ask(agent, "Verknüpfe die Notiz Urlaub Portugal mit der Notiz Urlaub Spanien.")
+            print("AI agent:", (r?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), r?.actions.map(\.summary) ?? []); fflush(stdout)
+            await wait(0.5)
+            check(store.linkIndex.outgoing(a).contains(b) || store.linkIndex.outgoing(b).contains(a),
+                  "Auftrag „verknüpfen“ wird ausgeführt, nicht nur beschrieben")
+            let n = await ask(agent, "Lege eine neue Notiz mit dem Titel Packliste an.")
+            print("AI agent:", (n?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), n?.actions.map(\.summary) ?? []); fflush(stdout)
+            await wait(0.5)
+            check(store.notes.contains { $0.meta.title == "Packliste" }, "Auftrag „Notiz anlegen“ wird ausgeführt")
+        }
         print("AI done"); fflush(stdout)
     }
 }

@@ -313,6 +313,24 @@ struct AIChatView: View {
                     isUser ? theme.accent.opacity(0.16) : Color(nsColor: .controlBackgroundColor),
                     in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                 )
+                if !message.actions.isEmpty {
+                    // What the assistant changed (#124); each line opens the note.
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(message.actions.enumerated()), id: \.offset) { _, action in
+                            Button {
+                                if let id = action.noteID { NoteStore.shared.open(noteID: id) }
+                            } label: {
+                                Label(action.summary, systemImage: "checkmark.circle.fill")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(theme.accent)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .helpLabel("Notiz öffnen")
+                        }
+                    }
+                    .padding(.horizontal, 3)
+                }
                 if !isUser && !message.isStreaming && !message.text.isEmpty {
                     citedSources(message)
                     HStack(spacing: 12) {

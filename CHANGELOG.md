@@ -14,6 +14,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 ### Geändert
 - Absatzstile folgen beim Schreiben von selbst: ↩ nach dem Titel beginnt eine Überschrift, ↩ nach einer Überschrift normalen Text (abschaltbar unter Einstellungen › Editor › Absätze). „- “ oder „* “ am Zeilenanfang wird ein Aufzählungspunkt, „[] “ eine Checkbox; umbrochene Zeilen eines Listenpunkts beginnen unter dem Text statt unter dem Punkt (#125).
 - Links werden in der Akzentfarbe unterstrichen statt blau (#126).
+- Der Graph ist ein eigener Bereich in der Seitenleiste; ein Klick auf eine Notiz kehrt zur Notizliste zurück (#127).
+- Der Apple-Intelligence-Assistent erledigt Aufträge jetzt selbst, statt sie zusammenzufassen: Notizen anlegen, Text ergänzen, verknüpfen, taggen, umbenennen und verschieben. Unter der Antwort steht, was er geändert hat, ein Klick öffnet die Notiz. Er löscht nie etwas; jede Änderung landet im Versionsverlauf. Antworten kommen in ganzen Sätzen statt als Stichpunktliste (#124).
 
 ## [1.2.0] – 2026-10-21
 

@@ -130,6 +130,22 @@ enum LinkSelfTest {
                 }
             }
         }
+        // The assistant's note operations, without the model (#124).
+        NoteAgent.log = []
+        NoteAgent.createNote(title: "Agent Ziel", text: "Inhalt")
+        NoteAgent.link(from: "Delta", to: "agent ziel")
+        NoteAgent.addTag("projekt x", to: "Delta")
+        NoteAgent.rename("Agent Ziel", to: "Agent Ziel 2")
+        NoteAgent.move("Delta", toFolder: "Archiv/2026")
+        await wait(0.5)
+        let delta = ref("Delta")
+        let target = ref("Agent Ziel 2")
+        check(delta != nil && target != nil && store.linkIndex.outgoing(delta!.id).contains(target!.id) == false,
+              "Nach dem Umbenennen zeigt der alte [[Agent Ziel]]-Link ins Leere (erwartet)")
+        check(delta?.meta.tags.contains("projekt-x") == true, "Assistent setzt #projekt-x")
+        check(delta?.folderURL.path.hasSuffix("Archiv/2026") == true, "Assistent verschiebt nach Archiv/2026 (\(delta?.folderURL.path ?? "-"))")
+        check(NoteAgent.log.count == 5, "Fünf Aktionen protokolliert (\(NoteAgent.log.map(\.summary)))")
+        check(NoteAgent.append(to: "gibt es nicht xyz", text: "x").hasPrefix("Fehler"), "Unbekannte Notiz wird gemeldet, nichts wird geändert")
         print("LINK done"); fflush(stdout)
     }
 }
