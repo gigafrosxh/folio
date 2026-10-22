@@ -133,3 +133,31 @@ final class LinkGraphTests: XCTestCase {
         XCTAssertTrue(SearchFilter.parse("arbeit").matches(m, folderPath: ""), "property values are searchable text")
     }
 }
+
+final class Graph3DAndFolderTests: XCTestCase {
+    func testFolderNodesLinkNotesAndParents() {
+        let a = UUID(), b = UUID(), c = UUID()
+        let r = FolderGraph.augment(notes: [(a, "Schule/GGP"), (b, "Schule/GGP"), (c, "Schule")])
+        XCTAssertEqual(Set(r.folders.values), ["Schule/GGP", "Schule"])
+        let ggp = FolderGraph.id(for: "Schule/GGP"), schule = FolderGraph.id(for: "Schule")
+        let edges = Set(r.edges.map { "\($0.0)-\($0.1)" })
+        XCTAssertEqual(edges, ["\(a)-\(ggp)", "\(b)-\(ggp)", "\(c)-\(schule)", "\(ggp)-\(schule)"])
+        XCTAssertEqual(FolderGraph.id(for: "Schule"), schule, "stable ids")
+        XCTAssertNotEqual(FolderGraph.id(for: "Schule"), FolderGraph.id(for: "schule2"))
+        XCTAssertTrue(FolderGraph.augment(notes: [(a, "")]).edges.isEmpty, "notes in the library root need no folder node")
+    }
+
+    func testLayout3DAndProjection() {
+        let ids = (0..<30).map { _ in UUID() }
+        let edges = (1..<30).map { (ids[0], ids[$0]) }
+        let one = GraphLayout.compute3D(nodes: ids, edges: edges)
+        XCTAssertEqual(one, GraphLayout.compute3D(nodes: ids, edges: edges), "deterministic")
+        XCTAssertTrue(one.values.allSatisfy { $0.x.isFinite && $0.y.isFinite && $0.z.isFinite })
+        XCTAssertGreaterThan(Set(one.values.map { Int($0.z) }).count, 3, "uses the third dimension")
+        let near = GraphLayout.project(SIMD3(0, 0, 100), yaw: 0, pitch: 0)
+        let far = GraphLayout.project(SIMD3(0, 0, -100), yaw: 0, pitch: 0)
+        XCTAssertGreaterThan(near.scale, far.scale, "closer points are larger")
+        let turned = GraphLayout.project(SIMD3(100, 0, 0), yaw: .pi / 2, pitch: 0)
+        XCTAssertEqual(turned.x, 0, accuracy: 0.001, "a quarter turn moves a point from the side to the front")
+    }
+}

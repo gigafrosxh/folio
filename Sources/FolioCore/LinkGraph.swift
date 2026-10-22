@@ -64,6 +64,14 @@ public struct LinkIndex: Sendable {
         public var folder: String
         public var tags: [String]
         public var modified: Date
+
+        public init(id: UUID, title: String, folder: String, tags: [String], modified: Date) {
+            self.id = id
+            self.title = title
+            self.folder = folder
+            self.tags = tags
+            self.modified = modified
+        }
     }
 
     public private(set) var nodes: [UUID: Node] = [:]
@@ -339,5 +347,107 @@ public enum DailyNote {
     public static func title(for date: Date, calendar: Calendar = .current) -> String {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+}
+
+// MARK: - 3D graph and folders (#132, #133)
+
+public extension GraphLayout {
+    /// The same forces in three dimensions; starts on a Fibonacci sphere, deterministic.
+    static func compute3D(nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
+                          previous: [UUID: SIMD3<Double>] = [:]) -> [UUID: SIMD3<Double>] {
+        let n = nodes.count
+        guard n > 0 else { return [:] }
+        let index = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, $0) })
+        var pos = [SIMD3<Double>](repeating: .zero, count: n)
+        for (i, id) in nodes.enumerated() {
+            if let p = previous[id] { pos[i] = p; continue }
+            let y = n == 1 ? 0 : 1 - 2 * (Double(i) + 0.5) / Double(n)
+            let r = (1 - y * y).squareRoot()
+            let a = Double(i) * 2.399963
+            let radius = 40 * Double(n).squareRoot()
+            pos[i] = SIMD3(cos(a) * r, y, sin(a) * r) * radius
+        }
+        let links = edges.compactMap { e -> (Int, Int)? in
+            guard let a = index[e.0], let b = index[e.1], a != b else { return nil }
+            return (a, b)
+        }
+        let ideal = 60.0
+        var temperature = 40.0
+        let rounds = n > 800 ? min(iterations, 80) : n > 300 ? min(iterations, 150) : iterations
+        for _ in 0..<rounds {
+            var disp = [SIMD3<Double>](repeating: .zero, count: n)
+            for i in 0..<n {
+                for j in (i + 1)..<n {
+                    var d = pos[i] - pos[j]
+                    var d2 = (d * d).sum()
+                    if d2 < 0.01 { d = SIMD3(0.1 * Double(i - j), 0.1, 0.05); d2 = (d * d).sum() }
+                    if d2 > 250_000 { continue }
+                    let f = d * (ideal * ideal / d2)
+                    disp[i] += f
+                    disp[j] -= f
+                }
+            }
+            for (a, b) in links {
+                let d = pos[a] - pos[b]
+                let len = max((d * d).sum().squareRoot(), 0.01)
+                let f = d * (len / ideal)
+                disp[a] -= f
+                disp[b] += f
+            }
+            for i in 0..<n {
+                disp[i] -= pos[i] * 0.06
+                let len = max((disp[i] * disp[i]).sum().squareRoot(), 0.0001)
+                pos[i] += disp[i] / len * min(len, temperature)
+            }
+            temperature = max(temperature * 0.97, 1)
+        }
+        return Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, pos[$0]) })
+    }
+
+    /// A point after turning the graph (yaw around the vertical, pitch around the horizontal axis),
+    /// with perspective: `scale` < 1 is farther away, `depth` sorts drawing back to front.
+    static func project(_ p: SIMD3<Double>, yaw: Double, pitch: Double, camera: Double = 900) -> (x: Double, y: Double, scale: Double, depth: Double) {
+        let x1 = p.x * cos(yaw) + p.z * sin(yaw)
+        let z1 = -p.x * sin(yaw) + p.z * cos(yaw)
+        let y2 = p.y * cos(pitch) - z1 * sin(pitch)
+        let z2 = p.y * sin(pitch) + z1 * cos(pitch)
+        let scale = camera / max(camera - z2, 50)
+        return (x1 * scale, y2 * scale, scale, z2)
+    }
+}
+
+/// Folders as graph nodes (#132): every note is linked to its folder, every folder to its parent.
+public enum FolderGraph {
+    /// A stable id per folder path, so folder nodes keep their place between layouts.
+    public static func id(for path: String) -> UUID {
+        var h1: UInt64 = 0xcbf29ce484222325, h2: UInt64 = 0x84222325cbf29ce4
+        for b in ("folder:" + path).utf8 {
+            h1 = (h1 ^ UInt64(b)) &* 0x100000001b3
+            h2 = (h2 &+ UInt64(b)) &* 0x9E3779B97F4A7C15
+        }
+        let bytes = withUnsafeBytes(of: h1.bigEndian) { Array($0) } + withUnsafeBytes(of: h2.bigEndian) { Array($0) }
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
+
+    /// Folder nodes (id → path) and the edges note→folder and folder→parent for the given notes.
+    public static func augment(notes: [(id: UUID, folder: String)]) -> (folders: [UUID: String], edges: [(UUID, UUID)]) {
+        var folders: [UUID: String] = [:]
+        var edges: [(UUID, UUID)] = []
+        var linkedFolders = Set<String>()
+        for note in notes where !note.folder.isEmpty {
+            edges.append((note.id, id(for: note.folder)))
+            var path = note.folder
+            while !path.isEmpty {
+                folders[id(for: path)] = path
+                guard linkedFolders.insert(path).inserted else { break }
+                guard let slash = path.lastIndex(of: "/") else { break }
+                let parent = String(path[..<slash])
+                edges.append((id(for: path), id(for: parent)))
+                path = parent
+            }
+        }
+        return (folders, edges)
     }
 }

@@ -115,8 +115,21 @@ enum LinkSelfTest {
         check(NSApp.windows.contains { $0.title == "Graph" && $0.isVisible }, "Graph-Fenster öffnet (⌃⌘G)")
         if let path = ProcessInfo.processInfo.environment["FOLIO_GRAPH_SNAPSHOT"] {
             let index = store.linkIndex
-            let ids = index.nodes.keys.sorted { $0.uuidString < $1.uuidString }
-            let layout = GraphLayout.compute(nodes: ids, edges: index.edges())
+            let folders = FolderGraph.augment(notes: index.nodes.values.map { ($0.id, $0.folder) })
+            let ids = (Array(index.nodes.keys) + Array(folders.folders.keys)).sorted { $0.uuidString < $1.uuidString }
+            let layout = GraphLayout.compute(nodes: ids, edges: index.edges() + folders.edges)
+            let layout3D = GraphLayout.compute3D(nodes: ids, edges: index.edges() + folders.edges)
+            UserDefaults.standard.set(true, forKey: "folio.graph.folders")
+            UserDefaults.standard.set(true, forKey: "folio.graph.3d")
+            let view3D = GraphView(initialPositions3D: layout3D).environmentObject(store).environmentObject(ThemeManager.shared)
+                .frame(width: 900, height: 560).background(Color(nsColor: .windowBackgroundColor))
+            let r3 = ImageRenderer(content: view3D)
+            r3.scale = 2
+            if let tiff = r3.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: path.replacingOccurrences(of: ".png", with: "-3d.png")))
+                check(true, "3D-Graph gezeichnet")
+            }
+            UserDefaults.standard.set(false, forKey: "folio.graph.3d")
             for (focus, suffix) in [(nil as UUID?, ""), (alpha.id, "-lokal")] {
                 let view = GraphView(focus: focus, depth: 2, compact: focus != nil, initialPositions: layout)
                     .environmentObject(store).environmentObject(ThemeManager.shared)
