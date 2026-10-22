@@ -102,10 +102,24 @@ struct NoteStatusPill: View {
 extension View {
     /// Opaque rounded bar for the editor header (readable over any content, light or dark).
     func solidBar() -> some View {
+        // The toolbars use the same surface as every other floating element (Liquid Glass on macOS 26),
+        // so the window has one look instead of opaque boxes next to glass (#131).
+        modifier(BarSurface())
+    }
+}
+
+/// Surface for the editor's toolbars: the app's floating style, without the deep shadow of panels.
+struct BarSurface: ViewModifier {
+    @EnvironmentObject var theme: ThemeManager
+
+    func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        return self
-            .background(Color(nsColor: .controlBackgroundColor), in: shape)
-            .overlay(shape.strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
-            .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
+        switch theme.settings.floatingStyle {
+        case .glass, .material:
+            // Frosted rather than Liquid Glass: on light backgrounds glass let the tool icons fade out.
+            content.background(.regularMaterial, in: shape).overlay(shape.strokeBorder(Color.primary.opacity(0.08)))
+        case .solid:
+            content.background(Color(nsColor: .controlBackgroundColor), in: shape).overlay(shape.strokeBorder(Color.primary.opacity(0.08)))
+        }
     }
 }

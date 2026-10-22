@@ -295,6 +295,8 @@ struct BacklinksView: View {
                 }
             }
             HStack(spacing: 14) {
+                Button("Eigenschaft hinzufügen") { NotificationCenter.default.post(name: .folioAddProperty, object: noteID) }
+                    .helpLabel("Status, Datum, Zahl, Ja/Nein oder Text zu dieser Notiz (#121)")
                 Button(showMentions ? "Erwähnungen ausblenden" : "Unverlinkte Erwähnungen suchen") { showMentions.toggle() }
                 Button(showGraph ? "Lokalen Graph ausblenden" : "Lokalen Graph zeigen") { withAnimation(Motion.quick) { showGraph.toggle() } }
                 if showGraph {

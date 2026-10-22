@@ -34,12 +34,10 @@ struct PropertiesView: View {
                 }
                 .font(.system(size: 12))
             }
-            Button { adding = true } label: { Label("Eigenschaft", systemImage: "plus") }
-                .buttonStyle(.borderless)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .opacity(adding ? 0 : 1)
-                .helpLabel("Eigenschaft hinzufügen (Status, Datum, Zahl, Ja/Nein, Text)")
+        }
+        // „Eigenschaft hinzufügen“ sits with the other note tools below the text, not above the title (#131).
+        .onReceive(NotificationCenter.default.publisher(for: .folioAddProperty)) { note in
+            if (note.object as? UUID) == doc.id { adding = true }
         }
     }
 
@@ -105,4 +103,8 @@ struct PropertiesView: View {
                 .textFieldStyle(.roundedBorder).frame(maxWidth: 320).labelsHidden()
         }
     }
+}
+
+extension Notification.Name {
+    static let folioAddProperty = Notification.Name("folio.addProperty")
 }

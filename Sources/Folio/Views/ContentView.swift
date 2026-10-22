@@ -223,7 +223,8 @@ extension View {
         return self
             .background(fill ?? Color(nsColor: .windowBackgroundColor).opacity(0.92), in: shape)
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Color.primary.opacity(0.09), lineWidth: 1))
-            .shadow(color: .black.opacity(theme.settings.shadows ? 0.25 : 0), radius: 22, y: 10)
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 1))
+            // A soft shadow: panels float, but quietly (#131).
+            .shadow(color: .black.opacity(theme.settings.shadows ? 0.12 : 0), radius: 14, y: 6)
     }
 }

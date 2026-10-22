@@ -288,7 +288,7 @@ struct NoteCard: View {
                     Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(theme.accent)
                 }
                 Text(note.meta.title.isEmpty ? "Neue Notiz" : note.meta.title)
-                    .font(.system(size: 13.5, weight: selected ? .bold : .semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .lineLimit(1)
             }
             HStack(spacing: 0) {
@@ -315,17 +315,17 @@ struct NoteCard: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selected ? theme.accent.opacity(0.5) : .clear, lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        // Flat rows like in Apple Notes: only hover and selection get a background (#131).
+        .background(background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: selected)
         .animation(Motion.quick, value: hovering)
     }
 
     private var background: Color {
-        if selected { return theme.accent.opacity(0.22) }
-        return Color.primary.opacity(hovering ? 0.08 : 0.035)
+        if selected { return theme.accent.opacity(0.2) }
+        return Color.primary.opacity(hovering ? 0.06 : 0)
     }
 
     private var dateString: String {

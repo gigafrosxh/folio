@@ -10,6 +10,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 ### Neu
 - **PDF importieren** (Ablage › PDF importieren …): Jede PDF wird eine eigene Notiz. Titel und Text werden zu bearbeitbarem, durchsuchbarem Notiztext (umbrochene Zeilen und Silbentrennung werden zusammengefügt, mehrseitige PDFs bekommen Seitenüberschriften), die Original-PDF hängt darunter. Für Scans ohne Text gibt es einen Hinweis; passwortgeschützte PDFs werden gemeldet (#130).
 
+### Geändert
+- Ruhigeres, einheitlicheres Aussehen (#131): Die Formatleiste und die Notiz-Werkzeuge nutzen dieselbe Milchglas-Fläche wie die übrigen schwebenden Elemente, die Panels werfen weichere Schatten, der Fensterhintergrund hat nur noch einen dezenten Farbschimmer, und die Notizliste zeigt flache Zeilen wie Apple Notizen (nur Auswahl und Darüberfahren sind hinterlegt). „Eigenschaft hinzufügen“ steht jetzt bei den anderen Werkzeugen unter der Notiz statt über dem Titel.
+
 ## [1.2.1] – 2026-10-21
 
 ### Behoben

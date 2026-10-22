@@ -69,10 +69,9 @@ struct AmbientBackground: View {
     var body: some View {
         ZStack {
             (scheme == .dark ? Color(red: 0.07, green: 0.07, blue: 0.09) : Color(red: 0.91, green: 0.92, blue: 0.94))
-            RadialGradient(colors: [accent.opacity(scheme == .dark ? 0.22 : 0.20), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 700)
-            RadialGradient(colors: [Color.purple.opacity(scheme == .dark ? 0.16 : 0.10), .clear],
-                           center: .bottomTrailing, startRadius: 0, endRadius: 800)
+            // One quiet glow in the accent color; the second, purple one made the window look busy (#131).
+            RadialGradient(colors: [accent.opacity(scheme == .dark ? 0.14 : 0.12), .clear],
+                           center: .topLeading, startRadius: 0, endRadius: 760)
         }
         .ignoresSafeArea()
     }
