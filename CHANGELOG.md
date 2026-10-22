@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.2.3] – 2026-10-22
+
 ### Neu
 - **Ordner im Graph** (#132): Jeder Ordner ist eine Blase, die mit seinen Notizen und dem übergeordneten Ordner verbunden ist (gestrichelt, damit man sie von Notizlinks unterscheidet). Ein Klick auf die Blase zeigt den Ordner in der Notizliste. Abschaltbar mit „Ordner“ in der Graph-Leiste.
 - **3D-Graph** (#133): „3D“ in der Graph-Leiste ordnet Notizen und Ordner räumlich an. Ziehen dreht den Graph, ⇧-Ziehen verschiebt ihn, zwei Finger zoomen; entfernte Notizen werden kleiner und blasser.
