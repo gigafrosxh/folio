@@ -345,7 +345,7 @@ enum MarkdownTransfer {
         s.replacingOccurrences(of: #"\\([\\`*_{}\[\]()#+\-.!~])"#, with: "$1", options: .regularExpression)
     }
 
-    private static func uniqueURL(_ url: URL) -> URL {
+    static func uniqueURL(_ url: URL) -> URL {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else { return url }
         let base = url.deletingPathExtension().lastPathComponent, ext = url.pathExtension, dir = url.deletingLastPathComponent()

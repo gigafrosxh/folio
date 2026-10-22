@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **PDF importieren** (Ablage › PDF importieren …): Jede PDF wird eine eigene Notiz. Titel und Text werden zu bearbeitbarem, durchsuchbarem Notiztext (umbrochene Zeilen und Silbentrennung werden zusammengefügt, mehrseitige PDFs bekommen Seitenüberschriften), die Original-PDF hängt darunter. Für Scans ohne Text gibt es einen Hinweis; passwortgeschützte PDFs werden gemeldet (#130).
+
 ## [1.2.1] – 2026-10-21
 
 ### Behoben

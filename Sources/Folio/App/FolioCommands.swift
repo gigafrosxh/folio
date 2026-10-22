@@ -111,6 +111,7 @@ struct FolioCommands: Commands {
             }
             Divider()
             Button("Markdown importieren …") { MarkdownTransfer.importWithPanel() }
+            Button("PDF importieren …") { PDFImport.importWithPanel() }
             Button("Als Markdown exportieren …") {
                 if let doc = NoteStore.shared.currentDocument { MarkdownTransfer.exportWithPanel(doc) }
             }
