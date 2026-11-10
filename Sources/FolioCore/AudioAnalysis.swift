@@ -25,33 +25,38 @@ public enum AudioAnalysis {
         guard buckets > 0 else { return [] }
         let file: AVAudioFile
         do { file = try AVAudioFile(forReading: url) } catch { throw AudioError.unreadable(error.localizedDescription) }
-        let total = file.length
-        guard total > 0 else { return Array(repeating: 0, count: buckets) }
-        let format = file.processingFormat
-        let perBucket = max(AVAudioFrameCount(total / AVAudioFramePosition(buckets)), 1)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: perBucket) else { return [] }
+        guard file.length > 0 else { return Array(repeating: 0, count: buckets) }
+        let perBucket = max(AVAudioFrameCount(file.length / AVAudioFramePosition(buckets)), 1)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: perBucket) else { return [] }
+        let peaks = bucketPeaks(file, buffer: buffer, buckets: buckets, perBucket: perBucket)
+        return normalized(peaks + Array(repeating: 0, count: buckets - peaks.count))
+    }
+
+    /// The loudest sample of each slice, read slice by slice; stops at the end of the file.
+    private static func bucketPeaks(_ file: AVAudioFile, buffer: AVAudioPCMBuffer, buckets: Int, perBucket: AVAudioFrameCount) -> [Float] {
         var peaks: [Float] = []
         peaks.reserveCapacity(buckets)
         for _ in 0..<buckets {
             buffer.frameLength = 0
-            do { try file.read(into: buffer, frameCount: perBucket) } catch { break }
-            guard buffer.frameLength > 0, let channels = buffer.floatChannelData else { break }
-            var peak: Float = 0
-            for c in 0..<Int(format.channelCount) {
-                let samples = channels[c]
-                // Every 4th sample is plenty for a thumbnail and keeps long recordings fast.
-                var i = 0
-                while i < Int(buffer.frameLength) {
-                    peak = max(peak, abs(samples[i]))
-                    i += 4
-                }
-            }
+            guard (try? file.read(into: buffer, frameCount: perBucket)) != nil, let peak = peak(of: buffer) else { break }
             peaks.append(min(peak, 1))
         }
-        while peaks.count < buckets { peaks.append(0) }
-        // Normalize so quiet recordings still show a shape.
-        if let top = peaks.max(), top > 0.0001 { peaks = peaks.map { $0 / top } }
         return peaks
+    }
+
+    /// Every 4th sample of every channel is plenty for a thumbnail and keeps long recordings fast.
+    static func peak(of buffer: AVAudioPCMBuffer) -> Float? {
+        guard buffer.frameLength > 0, let channels = buffer.floatChannelData else { return nil }
+        let frames = Int(buffer.frameLength)
+        return (0..<Int(buffer.format.channelCount)).map { c in
+            stride(from: 0, to: frames, by: 4).reduce(Float(0)) { max($0, abs(channels[c][$1])) }
+        }.max() ?? 0
+    }
+
+    /// Scaled so quiet recordings still show a shape; silence stays flat.
+    static func normalized(_ peaks: [Float]) -> [Float] {
+        guard let top = peaks.max(), top > 0.0001 else { return peaks }
+        return peaks.map { $0 / top }
     }
 
     /// "1:05" or "1:02:03".

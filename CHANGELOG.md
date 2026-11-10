@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Intern
+- **Suche, Deep Links und Audio-Wellenform aufgeräumt** (#154, #155): Suchfilter, `folio://`-Links und die Wellenform sind in kleine, getestete Schritte zerlegt. Am Verhalten ändert sich nichts; Vergleichstests sichern Filterkombinationen, ungültige Links und Wellenformen ab. Die Komplexitäts-Baseline schrumpft auf 47 Einträge.
+
 ## [1.3.7] – 2026-11-10
 
 ### Behoben

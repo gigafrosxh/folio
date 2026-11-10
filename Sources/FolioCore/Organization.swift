@@ -145,31 +145,59 @@ public struct SearchFilter: Equatable, Sendable {
     /// `typ:code`, `seit:7` (days) or `seit:heute`. Everything else stays free text.
     public static func parse(_ input: String) -> SearchFilter {
         var f = SearchFilter()
-        var words: [String] = []
-        for word in input.split(separator: " ").map(String.init) {
-            let lower = word.lowercased()
-            if lower.hasPrefix("tag:"), lower.count > 4 { f.tags.insert(String(lower.dropFirst(4)).trimmingCharacters(in: CharacterSet(charactersIn: "#"))) }
-            else if lower.hasPrefix("#"), lower.count > 1, lower.dropFirst().first?.isLetter == true { f.tags.insert(String(lower.dropFirst())) }
-            else if lower.hasPrefix("ordner:"), word.count > 7 { f.folder = String(word.dropFirst(7)) }
-            else if lower.hasPrefix("typ:"), let t = contentTypes.first(where: { $0.id == lower.dropFirst(4) || $0.label.lowercased() == lower.dropFirst(4) }) { f.types.insert(t.id) }
-            else if lower.hasPrefix("seit:") {
-                let v = lower.dropFirst(5)
-                switch v {
-                case "heute": f.period = .today
-                case "woche", "7": f.period = .week
-                case "monat", "30": f.period = .month
-                case "jahr", "365": f.period = .year
-                default: words.append(word)
-                }
-            } else if let colon = word.firstIndex(of: ":"), colon != word.startIndex, word.index(after: colon) != word.endIndex,
-                      word[..<colon].allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" }),
-                      !["http", "https", "folio", "mailto", "file"].contains(lower[..<lower.firstIndex(of: ":")!].description) {
-                // Any other name:value is a property filter (#121).
-                f.properties[String(lower[..<lower.firstIndex(of: ":")!])] = String(lower[lower.index(after: lower.firstIndex(of: ":")!)...])
-            } else { words.append(word) }
-        }
+        let words = input.split(separator: " ").map(String.init).filter { !f.apply($0) }
         f.text = words.joined(separator: " ")
         return f
+    }
+
+    /// Takes one word as a filter; false leaves it as free text.
+    private mutating func apply(_ word: String) -> Bool {
+        let lower = word.lowercased()
+        if let tag = Self.tagFilter(lower) { tags.insert(tag); return true }
+        if lower.hasPrefix("ordner:"), word.count > 7 { folder = String(word.dropFirst(7)); return true }
+        if let type = Self.typeFilter(lower) { types.insert(type); return true }
+        if lower.hasPrefix("seit:") {
+            guard let p = Self.periodFilter(lower.dropFirst(5)) else { return false }
+            period = p
+            return true
+        }
+        guard let (name, value) = Self.propertyFilter(word) else { return false }
+        properties[name] = value
+        return true
+    }
+
+    /// `tag:rezept` or `#rezept`; a hash must be followed by a letter.
+    private static func tagFilter(_ lower: String) -> String? {
+        if lower.hasPrefix("tag:"), lower.count > 4 { return String(lower.dropFirst(4)).trimmingCharacters(in: CharacterSet(charactersIn: "#")) }
+        guard lower.hasPrefix("#"), lower.count > 1, lower.dropFirst().first?.isLetter == true else { return nil }
+        return String(lower.dropFirst())
+    }
+
+    private static func typeFilter(_ lower: String) -> String? {
+        guard lower.hasPrefix("typ:") else { return nil }
+        let name = lower.dropFirst(4)
+        return contentTypes.first { $0.id == name || $0.label.lowercased() == name }?.id
+    }
+
+    private static func periodFilter(_ value: Substring) -> Period? {
+        switch value {
+        case "heute": return .today
+        case "woche", "7": return .week
+        case "monat", "30": return .month
+        case "jahr", "365": return .year
+        default: return nil
+        }
+    }
+
+    /// Any other `name:value` is a property filter (#121); links are not.
+    private static func propertyFilter(_ word: String) -> (String, String)? {
+        guard let colon = word.firstIndex(of: ":"), colon != word.startIndex, word.index(after: colon) != word.endIndex,
+              word[..<colon].allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" }) else { return nil }
+        let lower = word.lowercased()
+        let split = lower.firstIndex(of: ":")!
+        let name = String(lower[..<split])
+        guard !["http", "https", "folio", "mailto", "file"].contains(name) else { return nil }
+        return (name, String(lower[lower.index(after: split)...]))
     }
 
     /// Combines typed filters with the ones chosen in the filter menu.
@@ -187,34 +215,48 @@ public struct SearchFilter: Equatable, Sendable {
     /// Whether a note matches. `folderPath` is its folder relative to the library; `kinds` its block
     /// kinds when the metadata does not have them.
     public func matches(_ meta: NoteMetadata, folderPath: String, kinds: [String]? = nil, now: Date = Date(), haystack: String? = nil) -> Bool {
-        if !tags.isEmpty {
-            // A tag filter also matches nested tags: "projekt" finds "projekt/alpha".
-            let noteTags = meta.tags.map { $0.lowercased() }
-            for tag in tags where !noteTags.contains(where: { $0 == tag || $0.hasPrefix(tag + "/") }) { return false }
-        }
-        if let folder, !folder.isEmpty {
-            let f = folder.lowercased(), p = folderPath.lowercased()
-            if p != f && !p.hasPrefix(f + "/") { return false }
-        }
-        if let start = period.start(now: now), meta.modified < start { return false }
-        if !types.isEmpty {
-            let have = Set(kinds ?? meta.kinds ?? [])
-            for t in types {
-                guard let def = Self.contentTypes.first(where: { $0.id == t }) else { continue }
-                if have.isDisjoint(with: def.kinds) { return false }
-            }
-        }
-        for (name, value) in properties {
+        matchesTags(meta) && matchesFolder(folderPath) && matchesPeriod(meta, now: now) && matchesTypes(kinds ?? meta.kinds ?? [])
+            && matchesProperties(meta) && matchesText(meta, haystack: haystack)
+    }
+
+    /// A tag filter also matches nested tags: "projekt" finds "projekt/alpha".
+    private func matchesTags(_ meta: NoteMetadata) -> Bool {
+        let noteTags = meta.tags.map { $0.lowercased() }
+        return tags.allSatisfy { tag in noteTags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
+    }
+
+    private func matchesFolder(_ folderPath: String) -> Bool {
+        guard let folder, !folder.isEmpty else { return true }
+        let f = folder.lowercased(), p = folderPath.lowercased()
+        return p == f || p.hasPrefix(f + "/")
+    }
+
+    private func matchesPeriod(_ meta: NoteMetadata, now: Date) -> Bool {
+        guard let start = period.start(now: now) else { return true }
+        return meta.modified >= start
+    }
+
+    /// Unknown types are ignored; every known one needs one of its block kinds.
+    private func matchesTypes(_ kinds: [String]) -> Bool {
+        let have = Set(kinds)
+        return types.compactMap { t in Self.contentTypes.first { $0.id == t } }.allSatisfy { !have.isDisjoint(with: $0.kinds) }
+    }
+
+    /// `*` asks only that the property exists.
+    private func matchesProperties(_ meta: NoteMetadata) -> Bool {
+        properties.allSatisfy { name, value in
             guard let p = (meta.properties ?? []).first(where: { $0.name.lowercased() == name }) else { return false }
-            if value != "*", !p.displayValue.lowercased().contains(value), !p.value.lowercased().contains(value) { return false }
+            return value == "*" || p.displayValue.lowercased().contains(value) || p.value.lowercased().contains(value)
         }
-        // Every word must appear in title or text (in any order).
+    }
+
+    /// Every word must appear in title or text (in any order). Lowercasing a long note for every search is the slow
+    /// part; callers can pass the haystack once (#62).
+    private func matchesText(_ meta: NoteMetadata, haystack: String?) -> Bool {
         let words = text.lowercased().split(separator: " ")
         guard !words.isEmpty else { return true }
-        // Lowercasing a long note for every search is the slow part; callers can pass it once (#62).
         let hay = haystack ?? Self.haystack(for: meta)
-        for word in words where !hay.contains(word) { return false }
-        return true
+        return words.allSatisfy { hay.contains($0) }
     }
 
     /// Title and text of a note, lowercased, for repeated searches.

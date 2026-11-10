@@ -39,35 +39,45 @@ public enum FolioURL {
 
     public static func parse(_ url: URL) -> Result<FolioAction, FolioURLError> {
         guard url.scheme?.lowercased() == NoteLink.scheme else { return .failure(.notFolio) }
-        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        var query: [String: String] = [:]
-        for item in comps?.queryItems ?? [] { query[item.name.lowercased()] = item.value ?? "" }
+        let query = parameters(of: url)
         if let long = query.first(where: { $0.value.count > maxText }) { return .failure(.tooLong(long.key)) }
         let action = (url.host() ?? "").lowercased()
         switch action {
-        case "note":
-            let raw = url.pathComponents.dropFirst().first ?? ""
-            guard !raw.isEmpty else { return .failure(.missingParameter("Notiz-ID")) }
-            guard let id = UUID(uuidString: raw) else { return .failure(.invalidNoteID(raw)) }
-            return .success(.openNote(id, passage: query["p"].flatMap(Int.init)))
-        case "capture":
-            var target: CaptureTarget?
-            if let t = query["target"], !t.isEmpty {
-                if t.lowercased() == "inbox" { target = .inbox }
-                else if let id = UUID(uuidString: t) { target = .note(id) }
-                else { return .failure(.invalidNoteID(t)) }
-            }
-            return .success(.capture(text: query["text"].flatMap { $0.isEmpty ? nil : $0 }, target: target))
-        case "search":
-            guard let q = query["q"], !q.trimmingCharacters(in: .whitespaces).isEmpty else { return .failure(.missingParameter("q")) }
-            return .success(.search(q))
-        case "new":
-            return .success(.newNote(title: query["title"].flatMap { $0.isEmpty ? nil : $0 }, text: query["text"].flatMap { $0.isEmpty ? nil : $0 }))
-        case "open", "":
-            return .success(.open)
-        default:
-            return .failure(.unknownAction(action))
+        case "note": return note(url, query)
+        case "capture": return capture(query)
+        case "search": return search(query)
+        case "new": return .success(.newNote(title: nonEmpty(query["title"]), text: nonEmpty(query["text"])))
+        case "open", "": return .success(.open)
+        default: return .failure(.unknownAction(action))
         }
+    }
+
+    /// Query items by lowercased name; the last one wins.
+    private static func parameters(of url: URL) -> [String: String] {
+        var query: [String: String] = [:]
+        for item in URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] { query[item.name.lowercased()] = item.value ?? "" }
+        return query
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? { value.flatMap { $0.isEmpty ? nil : $0 } }
+
+    private static func note(_ url: URL, _ query: [String: String]) -> Result<FolioAction, FolioURLError> {
+        let raw = url.pathComponents.dropFirst().first ?? ""
+        guard !raw.isEmpty else { return .failure(.missingParameter("Notiz-ID")) }
+        guard let id = UUID(uuidString: raw) else { return .failure(.invalidNoteID(raw)) }
+        return .success(.openNote(id, passage: query["p"].flatMap(Int.init)))
+    }
+
+    private static func capture(_ query: [String: String]) -> Result<FolioAction, FolioURLError> {
+        guard let t = nonEmpty(query["target"]) else { return .success(.capture(text: nonEmpty(query["text"]), target: nil)) }
+        if t.lowercased() == "inbox" { return .success(.capture(text: nonEmpty(query["text"]), target: .inbox)) }
+        guard let id = UUID(uuidString: t) else { return .failure(.invalidNoteID(t)) }
+        return .success(.capture(text: nonEmpty(query["text"]), target: .note(id)))
+    }
+
+    private static func search(_ query: [String: String]) -> Result<FolioAction, FolioURLError> {
+        guard let q = query["q"], !q.trimmingCharacters(in: .whitespaces).isEmpty else { return .failure(.missingParameter("q")) }
+        return .success(.search(q))
     }
 
     public static func capture(text: String? = nil, target: CaptureTarget? = nil) -> URL {

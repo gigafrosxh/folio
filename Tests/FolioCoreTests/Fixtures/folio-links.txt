@@ -1,0 +1,17 @@
+folio://note/00000000-0000-0000-0000-000000000001 → openNote(00000000-0000-0000-0000-000000000001, passage: nil)
+folio://note/00000000-0000-0000-0000-000000000001?p=3 → openNote(00000000-0000-0000-0000-000000000001, passage: Optional(3))
+folio://note/ → missingParameter("Notiz-ID")
+folio://note/kein-uuid → invalidNoteID("kein-uuid")
+folio://capture → capture(text: nil, target: nil)
+folio://capture?text=Hallo%20W%C3%B6rld&target=INBOX → capture(text: Optional("Hallo Wörld"), target: Optional(FolioCore.CaptureTarget.inbox))
+folio://capture?target=00000000-0000-0000-0000-000000000002 → capture(text: nil, target: Optional(FolioCore.CaptureTarget.note(00000000-0000-0000-0000-000000000002)))
+folio://capture?target=falsch → invalidNoteID("falsch")
+folio://search?q=%20 → missingParameter("q")
+folio://search?Q=Apfel → search("Apfel")
+folio://new?title=T&text= → newNote(title: Optional("T"), text: nil)
+folio://open → open
+folio: → open
+FOLIO://OPEN → open
+folio://nix → unknownAction("nix")
+https://e.example → notFolio
+folio://search?q=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx → tooLong("q")

@@ -19,48 +19,56 @@ enum DeepLinks {
     }
 
     static func perform(_ action: FolioAction) {
-        let store = NoteStore.shared
         switch action {
-        case .openNote(let id, let passage):
-            guard store.notes.contains(where: { $0.id == id }) else {
-                QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
-                store.lastError = "Die verlinkte Notiz gibt es in dieser Bibliothek nicht (mehr)."
-                return
-            }
-            QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
-            store.open(noteID: id)
-            if let passage, let ref = store.notes.first(where: { $0.id == id }) {
-                let parts = Passages.split(noteID: id, title: ref.meta.title, text: ref.meta.searchText)
-                if let p = parts.first(where: { $0.index == passage }) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        NotificationCenter.default.post(name: .folioRevealText, object: RevealRequest(noteID: id, text: p.text))
-                    }
-                }
-            }
-        case .capture(let text, let target):
-            if case .note(let id) = target, !store.notes.contains(where: { $0.id == id }) {
-                QuickCaptureController.shared.show(text: text, target: .inbox)
-                QuickCaptureController.shared.model.status = (false, "Die Zielnotiz aus dem Link gibt es nicht; die Erfassung geht in die Inbox.")
-                return
-            }
-            QuickCaptureController.shared.show(text: text, target: target)
-        case .search(let q):
-            QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
-            store.sidebarSelection = .all
-            store.searchText = q
-        case .newNote(let title, let text):
-            QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
-            guard store.createNote() != nil, let doc = store.currentDocument else { return }
-            let body = ThemeManager.shared.bodyAttributes
-            let s = NSMutableAttributedString()
-            if let title { s.append(NSAttributedString(string: title, attributes: TextStyle.title.attributes(theme: ThemeManager.shared))) }
-            if let text { s.append(NSAttributedString(string: (title == nil ? "" : "\n") + text, attributes: body)) }
-            if s.length > 0 {
-                doc.blocks[0].storage.setAttributedString(s)
-                doc.markDirty()
-            }
-        case .open:
-            QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
+        case .openNote(let id, let passage): openNote(id, passage: passage)
+        case .capture(let text, let target): capture(text, target: target)
+        case .search(let q): search(q)
+        case .newNote(let title, let text): newNote(title: title, text: text)
+        case .open: QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
         }
+    }
+
+    /// A note that is gone is reported; the passage, when given, is shown once the note is open.
+    private static func openNote(_ id: UUID, passage: Int?) {
+        let store = NoteStore.shared
+        QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
+        guard let ref = store.notes.first(where: { $0.id == id }) else {
+            store.lastError = "Die verlinkte Notiz gibt es in dieser Bibliothek nicht (mehr)."
+            return
+        }
+        store.open(noteID: id)
+        guard let passage, let p = Passages.split(noteID: id, title: ref.meta.title, text: ref.meta.searchText).first(where: { $0.index == passage }) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            NotificationCenter.default.post(name: .folioRevealText, object: RevealRequest(noteID: id, text: p.text))
+        }
+    }
+
+    /// An unknown target note falls back to the inbox, with a note in the window.
+    private static func capture(_ text: String?, target: CaptureTarget?) {
+        guard case .note(let id) = target, !NoteStore.shared.notes.contains(where: { $0.id == id }) else {
+            QuickCaptureController.shared.show(text: text, target: target)
+            return
+        }
+        QuickCaptureController.shared.show(text: text, target: .inbox)
+        QuickCaptureController.shared.model.status = (false, "Die Zielnotiz aus dem Link gibt es nicht; die Erfassung geht in die Inbox.")
+    }
+
+    private static func search(_ q: String) {
+        QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
+        NoteStore.shared.sidebarSelection = .all
+        NoteStore.shared.searchText = q
+    }
+
+    private static func newNote(title: String?, text: String?) {
+        let store = NoteStore.shared
+        QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
+        guard store.createNote() != nil, let doc = store.currentDocument else { return }
+        let theme = ThemeManager.shared
+        let s = NSMutableAttributedString()
+        if let title { s.append(NSAttributedString(string: title, attributes: TextStyle.title.attributes(theme: theme))) }
+        if let text { s.append(NSAttributedString(string: (title == nil ? "" : "\n") + text, attributes: theme.bodyAttributes)) }
+        guard s.length > 0 else { return }
+        doc.blocks[0].storage.setAttributedString(s)
+        doc.markDirty()
     }
 }
