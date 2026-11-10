@@ -26,6 +26,10 @@ final class BlockModel: ObservableObject, Identifiable {
     @Published var stdin: String?
     @Published var interactive = false
     @Published var outputCollapsed = false
+    /// Code blocks: expected output or exit code (#29).
+    @Published var test: BlockTest?
+    /// Result of the last check (not saved; cleared when the code or the test changes).
+    @Published var testOutcome: BlockTestOutcome?
     /// Lines the last run complained about (not saved; cleared when the code changes) (#30).
     @Published var diagnostics: [CodeDiagnostic] = []
     /// Ran without error in the note's shared session (not saved); used to rebuild the session after a delete.
@@ -59,6 +63,7 @@ final class BlockModel: ObservableObject, Identifiable {
         stdin = r.stdin
         interactive = r.interactive ?? false
         outputCollapsed = r.outputCollapsed ?? false
+        test = r.test
         language = r.language ?? language
         output = r.output
         outputIsError = r.outputIsError ?? false
@@ -86,6 +91,8 @@ final class BlockModel: ObservableObject, Identifiable {
         stdin = r.stdin
         interactive = r.interactive ?? false
         outputCollapsed = r.outputCollapsed ?? false
+        test = r.test
+        testOutcome = nil
         if let code = r.code, kind != .text, storage.string != code { storage.setAttributedString(NSAttributedString(string: code)) }
         revision += 1
     }
@@ -109,6 +116,7 @@ final class BlockModel: ObservableObject, Identifiable {
             if let stdin, !stdin.isEmpty { r.stdin = stdin }
             if interactive { r.interactive = true }
             if outputCollapsed { r.outputCollapsed = true }
+            r.test = test
         case .database:
             r.code = storage.string
             r.language = "sql"

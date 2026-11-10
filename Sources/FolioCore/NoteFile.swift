@@ -157,6 +157,8 @@ public struct BlockRecord: Codable, Sendable, Identifiable {
     public var interactive: Bool?
     /// Code blocks: output folded away.
     public var outputCollapsed: Bool?
+    /// Code blocks: what a run is expected to produce (#29).
+    public var test: BlockTest?
 
     public init(id: UUID = UUID(), kind: BlockKind) {
         self.id = id

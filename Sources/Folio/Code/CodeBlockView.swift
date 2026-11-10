@@ -28,6 +28,7 @@ struct CodeBlockView: View {
                                doc.markDirty()
                                // Error markers belong to the code as it was run.
                                if !block.diagnostics.isEmpty { block.diagnostics = [] }
+                               if block.testOutcome != nil { block.testOutcome = nil }
                            }, onRun: run,
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
                            onFormat: formatCode,
@@ -39,6 +40,10 @@ struct CodeBlockView: View {
                 .onAppear { markDiagnostics() }
             if showStdin || !(block.stdin ?? "").isEmpty {
                 stdinEditor
+                    .transition(Motion.slideUp)
+            }
+            if block.test != nil && !usesDatabase {
+                testPanel
                     .transition(Motion.slideUp)
             }
             serverBar
@@ -287,6 +292,94 @@ struct CodeBlockView: View {
         .background(Color.primary.opacity(0.04))
     }
 
+    private func updateTest(_ change: (inout BlockTest) -> Void) {
+        guard var test = block.test else { return }
+        change(&test)
+        block.test = test
+        block.testOutcome = nil
+        doc.markDirty()
+    }
+
+    /// Expected exit code and output of this block, and how the last run compared (#29).
+    private var testPanel: some View {
+        let test = block.test ?? BlockTest()
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Label("Test", systemImage: "checkmark.seal").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                testStatus
+                Spacer()
+                if runs.testingNotes.contains(doc.id) {
+                    ProgressView().controlSize(.mini)
+                } else if let summary = runs.testSummaries[doc.id] {
+                    Text("Notiz: \(summary.text)").font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            HStack(spacing: 10) {
+                Toggle("Exit-Code", isOn: Binding(
+                    get: { test.expectedExitCode != nil },
+                    set: { v in updateTest { $0.expectedExitCode = v ? 0 : nil } }))
+                if let code = test.expectedExitCode {
+                    TextField("Exit-Code", text: Binding(
+                        get: { String(code) },
+                        set: { text in
+                            guard let value = Int32(text.trimmingCharacters(in: .whitespaces)) else { return }
+                            updateTest { $0.expectedExitCode = value }
+                        }))
+                        .labelsHidden()
+                        .frame(width: 46)
+                }
+                Toggle("Ausgabe", isOn: Binding(
+                    get: { test.expectedOutput != nil },
+                    set: { v in updateTest { $0.expectedOutput = v ? "" : nil } }))
+                if test.expectedOutput != nil {
+                    Picker("Vergleich", selection: Binding(get: { test.match }, set: { v in updateTest { $0.match = v } })) {
+                        ForEach(BlockTest.Match.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                Spacer()
+                if let actual = block.testOutcome?.actualOutput, test.expectedOutput != nil, test.expectedOutput != actual {
+                    Button("Ausgabe übernehmen") { updateTest { $0.expectedOutput = actual; $0.match = .exact } }
+                        .buttonStyle(.borderless)
+                        .helpLabel("Die Ausgabe des letzten Laufs als Erwartung speichern")
+                }
+            }
+            .font(.system(size: 11))
+            .controlSize(.small)
+            if test.expectedOutput != nil {
+                TextEditor(text: Binding(get: { test.expectedOutput ?? "" }, set: { v in updateTest { $0.expectedOutput = v } }))
+                    .font(Font(theme.codeFont()))
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 44, maxHeight: 120)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Erwartete Ausgabe")
+            }
+            if let outcome = block.testOutcome, !outcome.messages.isEmpty {
+                ForEach(outcome.messages, id: \.self) { message in
+                    Text(message).font(.system(size: 11)).foregroundStyle(outcome.status == .failed ? Color.red : .secondary)
+                }
+            }
+            if isLinked && test.expectedExitCode.map({ $0 > 1 }) == true {
+                Text("In der gemeinsamen Sitzung ist der Exit-Code nur 0 (ok) oder 1 (Fehler).")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.04))
+    }
+
+    @ViewBuilder
+    private var testStatus: some View {
+        switch block.testOutcome?.status {
+        case .passed: Label("Bestanden", systemImage: "checkmark.circle.fill").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.green)
+        case .failed: Label("Fehlgeschlagen", systemImage: "xmark.octagon.fill").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.red)
+        case .notRun: Label("Nicht ausgeführt", systemImage: "minus.circle").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+        case nil: EmptyView()
+        }
+    }
+
     /// While an interactive run waits for input.
     private var interactiveInput: some View {
         HStack(spacing: 6) {
@@ -380,6 +473,21 @@ struct CodeBlockView: View {
                 Toggle("Während der Ausführung eingeben (interaktiv)", isOn: Binding(
                     get: { block.interactive },
                     set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
+            }
+            if spec.isRunnable && !usesDatabase {
+                Divider()
+                Toggle("Test für diesen Block", isOn: Binding(
+                    get: { block.test != nil },
+                    set: { v in
+                        doc.changeBlock(block, v ? "Test hinzufügen" : "Test entfernen") {
+                            block.test = v ? BlockTest() : nil
+                            block.testOutcome = nil
+                        }
+                    }))
+            }
+            if doc.blocks.contains(where: { $0.test != nil }) {
+                Button("Alle Blocktests der Notiz ausführen") { runs.runTests(doc: doc, theme: theme) }
+                    .disabled(runs.testingNotes.contains(doc.id))
             }
             Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
             if KernelManager.supportsSharing(block.language) {

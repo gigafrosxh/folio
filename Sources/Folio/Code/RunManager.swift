@@ -18,6 +18,9 @@ final class RunManager: ObservableObject {
 
     @Published private(set) var runs: [UUID: Run] = [:]
     @Published private(set) var info: [UUID: String] = [:]
+    /// Notes whose block tests are running, and the result of the last automatic run (#29).
+    @Published private(set) var testingNotes: Set<UUID> = []
+    @Published private(set) var testSummaries: [UUID: BlockTestSummary] = [:]
 
     func isRunning(_ id: UUID) -> Bool { runs[id] != nil }
     /// Whether the running block takes typed input (interactive runs as their own process).
@@ -54,6 +57,7 @@ final class RunManager: ObservableObject {
         block.outputIsError = false
         block.outputCollapsed = false
         block.diagnostics = []
+        block.testOutcome = nil
         let code = block.storage.string
         let noteOverride = env?.interpreters[lang.id].flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let override = noteOverride ?? theme.settings.interpreterOverrides[lang.id]
@@ -111,6 +115,7 @@ final class RunManager: ObservableObject {
                 if block.outputIsError || !r.stderr.isEmpty {
                     block.diagnostics = DiagnosticParser.parse(r.combinedOutput, fileName: r.fileName, lineCount: lineCount)
                 }
+                if let test = block.test { block.testOutcome = BlockTestEvaluator.evaluate(test, result: r) }
                 if kernel != nil {
                     block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
                     block.startedServer = r.serverURL != nil
@@ -122,6 +127,7 @@ final class RunManager: ObservableObject {
                 block.output = error.localizedDescription
                 block.outputIsError = true
                 info[id] = nil
+                if block.test != nil { block.testOutcome = .notRun(error.localizedDescription) }
             }
             runs[id] = nil
             doc.markDirty()
@@ -136,6 +142,40 @@ final class RunManager: ObservableObject {
                 await start(block: b, doc: doc, theme: theme)?.value
                 if b.outputIsError { break }
             }
+        }
+    }
+
+    /// Runs the note's block tests top to bottom and collects the results. Blocks without a test only run when a
+    /// later test shares their session; unlike `runAll`, a failed test does not end the run.
+    func runTests(doc: NoteDocument, theme: ThemeManager) {
+        guard !testingNotes.contains(doc.id) else { return }
+        let blocks = doc.blocks.filter { $0.kind == .code && !($0.language == "sql" && $0.connection != nil) }
+        let items = blocks.map { b in
+            BlockTestPlan.Item(id: b.id, hasTest: b.test != nil,
+                               session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
+                               interactive: b.interactive, startsServer: b.startedServer)
+        }
+        let steps = BlockTestPlan.steps(for: items)
+        testingNotes.insert(doc.id)
+        testSummaries[doc.id] = nil
+        Task {
+            for step in steps {
+                guard let block = blocks.first(where: { $0.id == step.id }) else { continue }
+                switch step.action {
+                case .skip(let reason):
+                    block.testOutcome = .notRun(reason)
+                case .setup:
+                    await start(block: block, doc: doc, theme: theme)?.value
+                case .test:
+                    if let run = start(block: block, doc: doc, theme: theme) {
+                        await run.value
+                    } else {
+                        block.testOutcome = .notRun(isRunning(block.id) ? "Der Block läuft bereits." : (block.output ?? "Der Block kann nicht ausgeführt werden."))
+                    }
+                }
+            }
+            testSummaries[doc.id] = BlockTestSummary(blocks.filter { $0.test != nil }.compactMap(\.testOutcome))
+            testingNotes.remove(doc.id)
         }
     }
 

@@ -66,6 +66,26 @@ enum DevSelfTest {
         check(runtime.diagnostics.first?.line == 2 && runtime.diagnostics.first?.message.contains("ZeroDivisionError") == true,
               "Laufzeitfehler in der Sitzung an Zeile 2")
 
+        // Block tests (#29)
+        let passing = code("print(6 * 7)")
+        passing.test = BlockTest(expectedOutput: "42")
+        doc.insert(passing, after: runtime.id)
+        let failing = code("import sys\nprint('nein')\nsys.exit(3)")
+        failing.test = BlockTest(expectedOutput: "ja")
+        doc.insert(failing, after: passing.id)
+        let linkedSetup = code("wert = 20", linked: true)
+        doc.insert(linkedSetup, after: failing.id)
+        let linkedTest = code("print(wert + 1)", linked: true)
+        linkedTest.test = BlockTest(expectedOutput: "21")
+        doc.insert(linkedTest, after: linkedSetup.id)
+        RunManager.shared.runTests(doc: doc, theme: theme)
+        for _ in 0..<400 where RunManager.shared.testingNotes.contains(doc.id) { await wait(0.05) }
+        check(passing.testOutcome?.status == .passed, "Blocktest bestanden")
+        check(failing.testOutcome?.status == .failed && failing.testOutcome?.messages.count == 2, "Blocktest fehlgeschlagen (Exit-Code und Ausgabe)")
+        check(linkedTest.testOutcome?.status == .passed, "Blocktest nutzt Variablen der Sitzung")
+        check(RunManager.shared.testSummaries[doc.id]?.failed == 1, "Zusammenfassung der Blocktests")
+        for b in [passing, failing, linkedSetup, linkedTest] { doc.remove(b.id) }
+
         // Environment (#25)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-env-\(UUID().uuidString.prefix(6))")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
