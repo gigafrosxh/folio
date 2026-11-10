@@ -35,51 +35,96 @@ final class RunManager: ObservableObject {
     func start(block: BlockModel, doc: NoteDocument, theme: ThemeManager) -> Task<Void, Never>? {
         guard runs[block.id] == nil else { return nil }
         let lang = Languages.spec(for: block.language)
-        let env = doc.meta.environment
-        let stdin = (block.stdin ?? "").isEmpty ? nil : block.stdin
-        // Typed input needs its own process; prepared input works in Python sessions too.
-        let needsOwnProcess = block.interactive || (stdin != nil && lang.id != "python")
-        let shared = block.mode != "isolated" && KernelManager.supportsSharing(lang.id) && !needsOwnProcess
+        let shared = runsInSession(block, language: lang.id)
         guard lang.isRunnable || shared else { return nil }
-        let id = block.id
-        let runner = CodeRun()
         var kernel: Kernel?
         if shared {
-            do { kernel = try KernelManager.shared.kernel(note: doc.id, language: lang.id, environment: env) } catch {
-                block.output = error.localizedDescription
-                block.outputIsError = true
-                return nil
-            }
+            kernel = openKernel(for: block, doc: doc, language: lang.id)
+            guard kernel != nil else { return nil }
         }
-        runs[id] = Run(runner: runner, kernel: kernel)
-        info[id] = "läuft…"
+        let runner = CodeRun()
+        begin(block, runner: runner, kernel: kernel)
+        let context = makeContext(block: block, doc: doc, theme: theme, language: lang, runner: runner, kernel: kernel)
+        if block.interactive { announceInputWhenReady(block.id, runner: runner) }
+        return Task { await self.execute(context) }
+    }
+
+    /// Everything a started run needs until it has finished.
+    private struct RunContext {
+        let block: BlockModel
+        let doc: NoteDocument
+        let language: LanguageSpec
+        let runner: CodeRun
+        let kernel: Kernel?
+        let code: String
+        let override: String?
+        let timeout: TimeInterval
+        let limits: ResourceLimits
+        let options: RunOptions
+        let onOutput: @Sendable (String) -> Void
+        let onServer: @Sendable (URL) -> Void
+    }
+
+    private func preparedInput(of block: BlockModel) -> String? {
+        (block.stdin ?? "").isEmpty ? nil : block.stdin
+    }
+
+    /// Typed input needs its own process; prepared input works in Python sessions too.
+    private func runsInSession(_ block: BlockModel, language: String) -> Bool {
+        let needsOwnProcess = block.interactive || (preparedInput(of: block) != nil && language != "python")
+        return block.mode != "isolated" && KernelManager.supportsSharing(language) && !needsOwnProcess
+    }
+
+    private func openKernel(for block: BlockModel, doc: NoteDocument, language: String) -> Kernel? {
+        do {
+            return try KernelManager.shared.kernel(note: doc.id, language: language, environment: doc.meta.environment)
+        } catch {
+            block.output = error.localizedDescription
+            block.outputIsError = true
+            return nil
+        }
+    }
+
+    private func begin(_ block: BlockModel, runner: CodeRun, kernel: Kernel?) {
+        runs[block.id] = Run(runner: runner, kernel: kernel)
+        info[block.id] = "läuft…"
         block.output = ""
         block.outputIsError = false
         block.outputCollapsed = false
         block.diagnostics = []
         block.testOutcome = nil
-        let code = block.storage.string
-        let noteOverride = env?.interpreters[lang.id].flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-        let override = noteOverride ?? theme.settings.interpreterOverrides[lang.id]
+    }
+
+    private func makeContext(block: BlockModel, doc: NoteDocument, theme: ThemeManager, language: LanguageSpec, runner: CodeRun, kernel: Kernel?) -> RunContext {
+        let env = doc.meta.environment
+        let noteOverride = env?.interpreters[language.id].flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let timeout = env?.timeout ?? theme.settings.runTimeout
         let limits = ResourceLimits(timeout: timeout, maxOutputBytes: Int(theme.settings.maxOutputKB * 1024),
                                     maxMemoryMB: Int(theme.settings.maxMemoryMB), killOrphans: theme.settings.killOrphans)
-        let options = RunOptions(stdin: stdin, interactive: block.interactive, workingDirectory: env?.workingDirectoryURL,
+        let options = RunOptions(stdin: preparedInput(of: block), interactive: block.interactive, workingDirectory: env?.workingDirectoryURL,
                                  environment: env?.variables ?? [:], limits: limits)
-        let lineCount = code.components(separatedBy: "\n").count
-        let output = OutputBuffer(limit: limits.maxOutputBytes)
-        let onOutput: @Sendable (String) -> Void = { chunk in
-            // Coalesce output so a chatty server doesn't redraw the note for every line.
-            if output.append(chunk) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    MainActor.assumeIsolated {
-                        guard self.runs[id]?.runner === runner else { return }
-                        block.output = output.flush()
-                    }
+        return RunContext(block: block, doc: doc, language: language, runner: runner, kernel: kernel, code: block.storage.string,
+                          override: noteOverride ?? theme.settings.interpreterOverrides[language.id], timeout: timeout, limits: limits, options: options,
+                          onOutput: outputHandler(for: block, runner: runner, limit: limits.maxOutputBytes), onServer: serverHandler(for: block.id))
+    }
+
+    /// Coalesces output so a chatty server doesn't redraw the note for every line.
+    private func outputHandler(for block: BlockModel, runner: CodeRun, limit: Int) -> @Sendable (String) -> Void {
+        let id = block.id
+        let output = OutputBuffer(limit: limit)
+        return { chunk in
+            guard output.append(chunk) else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                MainActor.assumeIsolated {
+                    guard self.runs[id]?.runner === runner else { return }
+                    block.output = output.flush()
                 }
             }
         }
-        let onServer: @Sendable (URL) -> Void = { url in
+    }
+
+    private func serverHandler(for id: UUID) -> @Sendable (URL) -> Void {
+        { url in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self.runs[id]?.server = url
@@ -87,54 +132,64 @@ final class RunManager: ObservableObject {
                 }
             }
         }
+    }
 
-        if block.interactive {
-            Task {
-                while self.runs[id]?.runner === runner {
-                    if runner.acceptsInput { self.objectWillChange.send(); break }
-                    try? await Task.sleep(for: .milliseconds(50))
-                }
+    private func announceInputWhenReady(_ id: UUID, runner: CodeRun) {
+        Task {
+            while self.runs[id]?.runner === runner {
+                if runner.acceptsInput { self.objectWillChange.send(); break }
+                try? await Task.sleep(for: .milliseconds(50))
             }
         }
-        return Task {
-            do {
-                let r: RunResult
-                if let kernel {
-                    r = await kernel.execute(code, timeout: timeout, stdin: stdin, limits: limits, onOutput: onOutput, onServer: onServer)
-                } else {
-                    r = try await runner.run(code: code, language: lang, override: override, options: options,
-                                             onOutput: onOutput, onServer: onServer)
-                }
-                let stopped = r.cancelled || runs[id]?.stopped == true
-                var text = r.combinedOutput
-                if r.timedOut { text += "\n⏱ Abgebrochen nach \(Int(timeout)) s (Zeitlimit)" }
-                if r.memoryExceeded { text += "\n⛔︎ Abgebrochen: mehr als \(limits.maxMemoryMB) MB Arbeitsspeicher (Limit in den Einstellungen)" }
-                if stopped { text += r.serverURL != nil ? "\n■ Server gestoppt" : "\n■ Gestoppt" }
-                block.output = text
-                block.outputIsError = !r.succeeded && !(stopped && r.serverURL != nil)
-                if block.outputIsError || !r.stderr.isEmpty {
-                    block.diagnostics = DiagnosticParser.parse(r.combinedOutput, fileName: r.fileName, lineCount: lineCount)
-                }
-                if let test = block.test {
-                    // A regular expression can take seconds; the interface has to keep running (#134).
-                    block.testOutcome = await Task.detached(priority: .userInitiated) { BlockTestEvaluator.evaluate(test, result: r) }.value
-                }
-                if kernel != nil {
-                    block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
-                    block.startedServer = r.serverURL != nil
-                }
-                info[id] = kernel != nil
-                    ? String(format: "%@ · %.2f s", r.succeeded ? "verknüpft" : "Fehler", r.duration)
-                    : String(format: "%@ · Exit %d · %.2f s", r.command, r.exitCode, r.duration)
-            } catch {
-                block.output = error.localizedDescription
-                block.outputIsError = true
-                info[id] = nil
-                if block.test != nil { block.testOutcome = .notRun(error.localizedDescription) }
-            }
-            runs[id] = nil
-            doc.markDirty()
+    }
+
+    private func execute(_ c: RunContext) async {
+        do {
+            await finish(c, with: try await perform(c))
+        } catch {
+            c.block.output = error.localizedDescription
+            c.block.outputIsError = true
+            info[c.block.id] = nil
+            if c.block.test != nil { c.block.testOutcome = .notRun(error.localizedDescription) }
         }
+        runs[c.block.id] = nil
+        c.doc.markDirty()
+    }
+
+    private func perform(_ c: RunContext) async throws -> RunResult {
+        if let kernel = c.kernel {
+            return await kernel.execute(c.code, timeout: c.timeout, stdin: preparedInput(of: c.block), limits: c.limits, onOutput: c.onOutput, onServer: c.onServer)
+        }
+        return try await c.runner.run(code: c.code, language: c.language, override: c.override, options: c.options, onOutput: c.onOutput, onServer: c.onServer)
+    }
+
+    private func finish(_ c: RunContext, with r: RunResult) async {
+        let block = c.block
+        let stopped = r.cancelled || runs[block.id]?.stopped == true
+        block.output = outputText(of: r, context: c, stopped: stopped)
+        block.outputIsError = !r.succeeded && !(stopped && r.serverURL != nil)
+        if block.outputIsError || !r.stderr.isEmpty {
+            block.diagnostics = DiagnosticParser.parse(r.combinedOutput, fileName: r.fileName, lineCount: c.code.components(separatedBy: "\n").count)
+        }
+        if let test = block.test {
+            // A regular expression can take seconds; the interface has to keep running (#134).
+            block.testOutcome = await Task.detached(priority: .userInitiated) { BlockTestEvaluator.evaluate(test, result: r) }.value
+        }
+        if c.kernel != nil {
+            block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
+            block.startedServer = r.serverURL != nil
+        }
+        info[block.id] = c.kernel != nil
+            ? String(format: "%@ · %.2f s", r.succeeded ? "verknüpft" : "Fehler", r.duration)
+            : String(format: "%@ · Exit %d · %.2f s", r.command, r.exitCode, r.duration)
+    }
+
+    private func outputText(of r: RunResult, context c: RunContext, stopped: Bool) -> String {
+        var text = r.combinedOutput
+        if r.timedOut { text += "\n⏱ Abgebrochen nach \(Int(c.timeout)) s (Zeitlimit)" }
+        if r.memoryExceeded { text += "\n⛔︎ Abgebrochen: mehr als \(c.limits.maxMemoryMB) MB Arbeitsspeicher (Limit in den Einstellungen)" }
+        if stopped { text += r.serverURL != nil ? "\n■ Server gestoppt" : "\n■ Gestoppt" }
+        return text
     }
 
     /// Runs every code block of the note from top to bottom, waiting for each.
@@ -153,32 +208,36 @@ final class RunManager: ObservableObject {
     func runTests(doc: NoteDocument, theme: ThemeManager) {
         guard !testingNotes.contains(doc.id) else { return }
         let blocks = doc.blocks.filter { $0.kind == .code && !($0.language == "sql" && $0.connection != nil) }
-        let items = blocks.map { b in
-            BlockTestPlan.Item(id: b.id, hasTest: b.test != nil,
-                               session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
-                               interactive: b.interactive, startsServer: b.startedServer)
-        }
-        let steps = BlockTestPlan.steps(for: items)
+        let steps = BlockTestPlan.steps(for: blocks.map(testPlanItem))
         testingNotes.insert(doc.id)
         testSummaries[doc.id] = nil
         Task {
             for step in steps {
-                guard let block = blocks.first(where: { $0.id == step.id }) else { continue }
-                switch step.action {
-                case .skip(let reason):
-                    block.testOutcome = .notRun(reason)
-                case .setup:
-                    await start(block: block, doc: doc, theme: theme)?.value
-                case .test:
-                    if let run = start(block: block, doc: doc, theme: theme) {
-                        await run.value
-                    } else {
-                        block.testOutcome = .notRun(isRunning(block.id) ? "Der Block läuft bereits." : (block.output ?? "Der Block kann nicht ausgeführt werden."))
-                    }
-                }
+                if let block = blocks.first(where: { $0.id == step.id }) { await perform(step.action, on: block, doc: doc, theme: theme) }
             }
             testSummaries[doc.id] = BlockTestSummary(blocks.filter { $0.test != nil }.compactMap(\.testOutcome))
             testingNotes.remove(doc.id)
+        }
+    }
+
+    private func testPlanItem(_ b: BlockModel) -> BlockTestPlan.Item {
+        BlockTestPlan.Item(id: b.id, hasTest: b.test != nil,
+                           session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
+                           interactive: b.interactive, startsServer: b.startedServer)
+    }
+
+    private func perform(_ action: BlockTestPlan.Action, on block: BlockModel, doc: NoteDocument, theme: ThemeManager) async {
+        switch action {
+        case .skip(let reason):
+            block.testOutcome = .notRun(reason)
+        case .setup:
+            await start(block: block, doc: doc, theme: theme)?.value
+        case .test:
+            if let run = start(block: block, doc: doc, theme: theme) {
+                await run.value
+            } else {
+                block.testOutcome = .notRun(isRunning(block.id) ? "Der Block läuft bereits." : (block.output ?? "Der Block kann nicht ausgeführt werden."))
+            }
         }
     }
 

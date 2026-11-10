@@ -38,17 +38,13 @@ public enum PDFText {
         var current = ""
         for line in lines {
             if line.isEmpty {
-                if !current.isEmpty { paragraphs.append(current); current = "" }
-                continue
-            }
-            if current.isEmpty { current = line; continue }
-            let last = current.last!
-            let startsLower = line.first?.isLowercase == true
-            if last == "-", current.count > 1, current.dropLast().last?.isLetter == true {
-                // „Bei-\nspiel“ → „Beispiel“; „Nord-\nSüd“ keeps its hyphen: „Nord-Süd“.
-                if startsLower { current.removeLast() }
-                current += line
-            } else if ".!?:;".contains(last) || isListItem(line) {
+                if !current.isEmpty { paragraphs.append(current) }
+                current = ""
+            } else if current.isEmpty {
+                current = line
+            } else if let joined = joiningHyphenated(current, line) {
+                current = joined
+            } else if endsParagraph(current, before: line) {
                 paragraphs.append(current)
                 current = line
             } else {
@@ -57,6 +53,16 @@ public enum PDFText {
         }
         if !current.isEmpty { paragraphs.append(current) }
         return paragraphs.joined(separator: "\n")
+    }
+
+    /// „Bei-\nspiel“ → „Beispiel“; „Nord-\nSüd“ keeps its hyphen: „Nord-Süd“.
+    private static func joiningHyphenated(_ current: String, _ line: String) -> String? {
+        guard current.last == "-", current.count > 1, current.dropLast().last?.isLetter == true else { return nil }
+        return (line.first?.isLowercase == true ? String(current.dropLast()) : current) + line
+    }
+
+    private static func endsParagraph(_ current: String, before line: String) -> Bool {
+        ".!?:;".contains(current.last!) || isListItem(line)
     }
 
     private static func isListItem(_ line: String) -> Bool {

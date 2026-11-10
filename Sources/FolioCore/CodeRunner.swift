@@ -277,109 +277,169 @@ public final class CodeRun: @unchecked Sendable {
         return true
     }
 
+    /// What one process of a run needs besides its arguments, directory and environment (#142).
+    fileprivate struct ProcessJob {
+        let timeout: TimeInterval
+        let stdin: String?
+        let interactive: Bool
+        let limits: ResourceLimits
+        let detectServer: Bool
+        let found: (URL) -> Void
+        let seen = LockedPIDs()
+        let timedOut = LockedFlag()
+    }
+
+    private typealias ProcessOutcome = (String, String, Int32, Bool)
+
     private func runProcess(_ args: [String], in dir: URL, environment: [String: String], timeout: TimeInterval,
                             stdin: String? = nil, interactive: Bool = false, limits: ResourceLimits = ResourceLimits(),
                             onOutput: (@Sendable (String) -> Void)?, onServer: (@Sendable (URL) -> Void)?,
-                            detectServer: Bool) async throws -> (String, String, Int32, Bool) {
+                            detectServer: Bool) async throws -> ProcessOutcome {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: args[0])
         p.arguments = Array(args.dropFirst())
         p.currentDirectoryURL = dir
         p.environment = environment
-        var inPipe: Pipe?
-        if stdin != nil || interactive {
-            let pipe = Pipe()
-            p.standardInput = pipe
-            inPipe = pipe
-        } else {
-            p.standardInput = FileHandle.nullDevice
+        let inPipe = attachInput(to: p, needsPipe: stdin != nil || interactive)
+        let capture = OutputCapture(process: p, limits: limits)
+        let job = ProcessJob(timeout: timeout, stdin: stdin, interactive: interactive, limits: limits, detectServer: detectServer,
+                             found: { [weak self] url in
+                                 guard let self, self.markServer(url) else { return }
+                                 onServer?(url)
+                             })
+        capture.startReading(onOutput: onOutput, serverFound: detectServer ? job.found : nil)
+        return try await withCheckedThrowingContinuation { cont in
+            p.terminationHandler = { [weak self] proc in self.finishProcess(proc, capture: capture, job: job, cont: cont) }
+            do {
+                try launch(p, inPipe: inPipe, job: job, cont: cont)
+            } catch {
+                p.terminationHandler = nil
+                cont.resume(throwing: error)
+            }
         }
-        let outPipe = Pipe(), errPipe = Pipe()
-        p.standardOutput = outPipe
-        p.standardError = errPipe
+    }
 
-        let outBuffer = LockedData(limit: limits.maxOutputBytes), errBuffer = LockedData(limit: limits.maxOutputBytes / 2)
-        let seen = LockedPIDs()
-        let found: (URL) -> Void = { [weak self] url in
-            guard let self, self.markServer(url) else { return }
-            onServer?(url)
+    private func attachInput(to p: Process, needsPipe: Bool) -> Pipe? {
+        guard needsPipe else {
+            p.standardInput = FileHandle.nullDevice
+            return nil
         }
+        let pipe = Pipe()
+        p.standardInput = pipe
+        return pipe
+    }
+
+    private func launch(_ p: Process, inPipe: Pipe?, job: ProcessJob, cont: CheckedContinuation<ProcessOutcome, Error>) throws {
+        lock.lock(); current = p; let cancelled = isCancelled; lock.unlock()
+        if cancelled { cont.resume(returning: ("", "", -1, false)); return }
+        try p.run()
+        if let inPipe { feedInput(inPipe.fileHandleForWriting, job: job) }
+        watchProcessTree(p, job: job)
+        if job.detectServer { watchForListeningPort(p, job: job) }
+        armTimeout(p, job: job)
+    }
+
+    /// A large input must not block the caller or delay installing the timeout.
+    private func feedInput(_ handle: FileHandle, job: ProcessJob) {
+        _ = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
+        if job.interactive { lock.lock(); input = handle; lock.unlock() }
+        DispatchQueue.global().async {
+            if let stdin = job.stdin, !stdin.isEmpty { try? handle.write(contentsOf: Data((stdin.hasSuffix("\n") ? stdin : stdin + "\n").utf8)) }
+            if !job.interactive { try? handle.close() }
+        }
+    }
+
+    /// Remembers child processes (to clean up orphans) and enforces the memory limit.
+    private func watchProcessTree(_ p: Process, job: ProcessJob) {
+        let pid = p.processIdentifier
+        DispatchQueue.global().async { [weak self] in
+            while p.isRunning {
+                let tree = ServerDetector.descendants(of: pid)
+                job.seen.add(tree)
+                if job.limits.maxMemoryMB > 0, ServerDetector.residentMemoryMB(of: [pid] + tree) > job.limits.maxMemoryMB {
+                    self?.lock.lock(); self?.memoryHit = true; self?.lock.unlock()
+                    ServerDetector.terminateTree(pid)
+                    break
+                }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+        }
+    }
+
+    /// Servers often print nothing; also look for listening sockets of the process tree.
+    private func watchForListeningPort(_ p: Process, job: ProcessJob) {
+        let pid = p.processIdentifier
+        DispatchQueue.global().async { [weak self] in
+            while p.isRunning, self?.serverURL == nil {
+                if let port = ServerDetector.listeningPort(ofProcessTree: pid) {
+                    job.found(URL(string: "http://localhost:\(port)")!)
+                    break
+                }
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+    }
+
+    private func armTimeout(_ p: Process, job: ProcessJob) {
+        let pid = p.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + job.timeout) { [weak self] in
+            // A recognized server keeps running until it is stopped.
+            guard p.isRunning, self?.serverURL == nil else { return }
+            job.timedOut.set()
+            ServerDetector.terminateTree(pid)
+        }
+    }
+}
+
+private extension Optional where Wrapped == CodeRun {
+    func finishProcess(_ proc: Process, capture: OutputCapture, job: CodeRun.ProcessJob, cont: CheckedContinuation<(String, String, Int32, Bool), Error>) {
+        capture.stopReading()
+        self?.closeInput()
+        // Background processes the program left behind would otherwise run on forever.
+        if job.limits.killOrphans, self?.serverURL == nil {
+            for pid in job.seen.all where kill(pid, 0) == 0 { kill(pid, SIGTERM) }
+        }
+        capture.drain()
+        cont.resume(returning: (capture.out.string, capture.err.string, proc.terminationStatus, job.timedOut.value))
+    }
+}
+
+/// Collects a process's stdout and stderr, streaming new output as it arrives.
+private final class OutputCapture: @unchecked Sendable {
+    let out: LockedData
+    let err: LockedData
+    private let outPipe = Pipe()
+    private let errPipe = Pipe()
+
+    init(process: Process, limits: ResourceLimits) {
+        out = LockedData(limit: limits.maxOutputBytes)
+        err = LockedData(limit: limits.maxOutputBytes / 2)
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+    }
+
+    func startReading(onOutput: (@Sendable (String) -> Void)?, serverFound: ((URL) -> Void)?) {
         let handle: (FileHandle, LockedData) -> Void = { h, buffer in
             let data = h.availableData
             guard !data.isEmpty else { return }
             buffer.append(data)
             let text = String(decoding: data, as: UTF8.self)
             onOutput?(text)
-            if detectServer, let url = ServerDetector.url(inOutput: text) { found(url) }
+            if let serverFound, let url = ServerDetector.url(inOutput: text) { serverFound(url) }
         }
-        outPipe.fileHandleForReading.readabilityHandler = { handle($0, outBuffer) }
-        errPipe.fileHandleForReading.readabilityHandler = { handle($0, errBuffer) }
+        let out = self.out, err = self.err
+        outPipe.fileHandleForReading.readabilityHandler = { handle($0, out) }
+        errPipe.fileHandleForReading.readabilityHandler = { handle($0, err) }
+    }
 
-        let timedOut = LockedFlag()
-        return try await withCheckedThrowingContinuation { cont in
-            p.terminationHandler = { [weak self] proc in
-                outPipe.fileHandleForReading.readabilityHandler = nil
-                errPipe.fileHandleForReading.readabilityHandler = nil
-                self?.closeInput()
-                // Background processes the program left behind would otherwise run on forever.
-                if limits.killOrphans, self?.serverURL == nil {
-                    for pid in seen.all where kill(pid, 0) == 0 { kill(pid, SIGTERM) }
-                }
-                outBuffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
-                errBuffer.append(errPipe.fileHandleForReading.readDataToEndOfFile())
-                cont.resume(returning: (outBuffer.string, errBuffer.string, proc.terminationStatus, timedOut.value))
-            }
-            do {
-                lock.lock(); current = p; let cancelled = isCancelled; lock.unlock()
-                if cancelled { cont.resume(returning: ("", "", -1, false)); return }
-                try p.run()
-                if let inPipe {
-                    let h = inPipe.fileHandleForWriting
-                    _ = fcntl(h.fileDescriptor, F_SETNOSIGPIPE, 1)
-                    if interactive { lock.lock(); input = h; lock.unlock() }
-                    // A large input must not block the caller or delay installing the timeout.
-                    DispatchQueue.global().async {
-                        if let stdin, !stdin.isEmpty { try? h.write(contentsOf: Data((stdin.hasSuffix("\n") ? stdin : stdin + "\n").utf8)) }
-                        if !interactive { try? h.close() }
-                    }
-                }
-                let pid = p.processIdentifier
-                // Watch the process tree: remember children (to clean up orphans) and enforce the memory limit.
-                DispatchQueue.global().async { [weak self] in
-                    while p.isRunning {
-                        let tree = ServerDetector.descendants(of: pid)
-                        seen.add(tree)
-                        if limits.maxMemoryMB > 0, ServerDetector.residentMemoryMB(of: [pid] + tree) > limits.maxMemoryMB {
-                            self?.lock.lock(); self?.memoryHit = true; self?.lock.unlock()
-                            ServerDetector.terminateTree(pid)
-                            break
-                        }
-                        Thread.sleep(forTimeInterval: 0.5)
-                    }
-                }
-                // Servers often print nothing; also look for listening sockets of the process tree.
-                if detectServer {
-                    DispatchQueue.global().async { [weak self] in
-                        while p.isRunning, self?.serverURL == nil {
-                            if let port = ServerDetector.listeningPort(ofProcessTree: pid) {
-                                found(URL(string: "http://localhost:\(port)")!)
-                                break
-                            }
-                            Thread.sleep(forTimeInterval: 1)
-                        }
-                    }
-                }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
-                    // A recognized server keeps running until it is stopped.
-                    guard p.isRunning, self?.serverURL == nil else { return }
-                    timedOut.set()
-                    ServerDetector.terminateTree(pid)
-                }
-            } catch {
-                p.terminationHandler = nil
-                cont.resume(throwing: error)
-            }
-        }
+    func stopReading() {
+        outPipe.fileHandleForReading.readabilityHandler = nil
+        errPipe.fileHandleForReading.readabilityHandler = nil
+    }
+
+    func drain() {
+        out.append(outPipe.fileHandleForReading.readDataToEndOfFile())
+        err.append(errPipe.fileHandleForReading.readDataToEndOfFile())
     }
 }
 

@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Intern
+- **Codeausführung, PDF-Export und Datenbank-Ausgabe aufgeräumt** (#142, #144, #148): In kleine, einzeln getestete Schritte zerlegt. Am Verhalten ändert sich nichts.
+
 ## [1.3.2] – 2026-11-10
 
 ### Behoben

@@ -105,153 +105,8 @@ enum NotePDFExporter {
 
     // MARK: Building the document
 
-    private static func buildContent(_ doc: NoteDocument, width: CGFloat, maxImageHeight: CGFloat, options: Options) async -> NSAttributedString {
-        let out = NSMutableAttributedString()
-        let theme = ThemeManager.shared
-        let body = bodyAttributes(theme)
-        let codeTheme = theme.codeTheme(dark: false)
-        let gap = paragraph(spacingBefore: 4, spacingAfter: 10)
-
-        func newline() {
-            if out.length > 0, !out.string.hasSuffix("\n") { out.append(NSAttributedString(string: "\n", attributes: body)) }
-        }
-        func appendImage(_ image: NSImage, fraction: CGFloat = 1) {
-            newline()
-            out.append(attachment(image, maxWidth: width * fraction, maxHeight: maxImageHeight, centered: true))
-            out.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: gap]))
-        }
-        func appendCaption(_ text: String) {
-            guard !text.isEmpty else { return }
-            let style = paragraph(spacingBefore: 0, spacingAfter: 10)
-            style.alignment = .center
-            out.append(NSAttributedString(string: text + "\n", attributes: [
-                .font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style]))
-        }
-        func appendLabel(_ text: String, icon: String) {
-            newline()
-            out.append(NSAttributedString(string: "\(icon)  \(text)\n", attributes: [
-                .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
-                .paragraphStyle: paragraph(spacingBefore: 8, spacingAfter: 3)]))
-        }
-        func appendBox(_ text: String, font: NSFont, background: NSColor, foreground: NSColor,
-                       tokens: [Token] = [], colors: CodeTheme? = nil) {
-            newline()
-            let block = NSTextBlock()
-            block.backgroundColor = background
-            block.setWidth(8, type: .absoluteValueType, for: .padding)
-            block.setWidth(0.5, type: .absoluteValueType, for: .border)
-            block.setBorderColor(NSColor.black.withAlphaComponent(0.08))
-            block.setValue(100, type: .percentageValueType, for: .width)
-            let style = NSMutableParagraphStyle()
-            style.textBlocks = [block]
-            style.lineBreakMode = .byCharWrapping
-            let text = text.isEmpty ? " " : text
-            let s = NSMutableAttributedString(string: text + "\n", attributes: [.font: font, .foregroundColor: foreground, .paragraphStyle: style])
-            if let colors {
-                for t in tokens where NSMaxRange(t.range) <= (text as NSString).length {
-                    s.addAttribute(.foregroundColor, value: colors.color(for: t.kind), range: t.range)
-                }
-            }
-            out.append(s)
-            out.append(NSAttributedString(string: "\n", attributes: [.font: NSFont.systemFont(ofSize: 4)]))
-        }
-
-        for block in doc.blocks {
-            switch block.kind {
-            case .text:
-                guard block.storage.length > 0 else { continue }
-                newline()
-                out.append(printable(block.storage))
-            case .embed:
-                // The embedded note's text, as it reads in the editor (#120).
-                let title = block.storage.string
-                appendLabel("Eingebettet: \(title)", icon: "↳")
-                if let id = NoteStore.shared.linkIndex.resolve(title), id != doc.id,
-                   let ref = NoteStore.shared.notes.first(where: { $0.id == id }), let file = try? NoteFile.read(from: ref.url) {
-                    let text = file.body.blocks.filter { $0.kind == .text }.map { RichTextCodec.attributedString(from: $0.rtf) }
-                    for t in text where t.length > 0 { newline(); out.append(printable(t)) }
-                }
-            case .code:
-                let spec = Languages.spec(for: block.language)
-                appendLabel(spec.name, icon: "⌘")
-                let code = block.storage.string
-                appendBox(code, font: NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular),
-                          background: codeTheme.backgroundColor.blended(withFraction: 0.5, of: NSColor(white: 0.96, alpha: 1)) ?? .white,
-                          foreground: codeTheme.foregroundColor,
-                          tokens: SyntaxHighlighter.tokens(in: code, language: spec), colors: codeTheme)
-                if options.includeOutputs, let output = block.output?.trimmingCharacters(in: .newlines), !output.isEmpty {
-                    appendLabel(block.outputIsError ? "Fehler" : "Ausgabe", icon: "▸")
-                    appendBox(String(output.prefix(20_000)), font: NSFont.monospacedSystemFont(ofSize: 9, weight: .regular),
-                              background: NSColor(white: 0.95, alpha: 1),
-                              foreground: block.outputIsError ? .systemRed : NSColor(white: 0.25, alpha: 1))
-                }
-            case .database:
-                appendLabel("SQL" + (block.connection.map { " · \($0.name)" } ?? ""), icon: "⛁")
-                let code = block.storage.string
-                appendBox(code, font: NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular),
-                          background: NSColor(white: 0.96, alpha: 1), foreground: codeTheme.foregroundColor,
-                          tokens: SyntaxHighlighter.tokens(in: code, language: Languages.spec(for: "sql")), colors: codeTheme)
-            case .image:
-                if let data = block.attachmentID.flatMap({ doc.attachments[$0]?.data }), let image = NSImage(data: data) {
-                    appendImage(image, fraction: CGFloat(block.width))
-                    appendCaption(block.caption)
-                }
-            case .drawing:
-                if let data = block.attachmentID.flatMap({ doc.attachments[$0]?.data }),
-                   let drawing = try? PKDrawing(data: data), !drawing.strokes.isEmpty {
-                    var image: NSImage?
-                    NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
-                        image = drawing.image(from: drawing.bounds.insetBy(dx: -10, dy: -10), scale: 2)
-                    }
-                    if let image { appendImage(image) }
-                }
-            case .pdf:
-                if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
-                    appendLabel(att.header.filename, icon: "📄")
-                    for page in pdfPages(att.data) { appendImage(page) }
-                }
-            case .file:
-                if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
-                    appendLabel(att.header.filename, icon: "📎")
-                    if let thumb = await thumbnail(att, noteID: doc.id, width: width) { appendImage(thumb) }
-                }
-            case .web:
-                guard !block.url.isEmpty else { continue }
-                newline()
-                var attrs = body
-                attrs[.link] = URL(string: block.url)
-                attrs[.foregroundColor] = NSColor.linkColor
-                out.append(NSAttributedString(string: "🔗 " + block.url + "\n", attributes: attrs))
-                appendCaption(block.caption)
-            case .math, .diagram:
-                let kind: RenderScript.Kind = block.kind == .math ? .math : .diagram
-                let source = block.storage.string
-                guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                if let rendered = try? await OffscreenRenderer.render(kind, source: source, width: width,
-                                                                       options: RenderScript.Options(dark: false, fontSize: kind == .math ? 16 : 13)),
-                   let image = OffscreenRenderer.image(from: rendered) {
-                    appendImage(image)
-                } else {
-                    appendBox(source, font: NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular),
-                              background: NSColor(white: 0.96, alpha: 1), foreground: .black)
-                }
-            case .audio:
-                let att = block.attachmentID.flatMap { doc.attachments[$0] }
-                var label = att?.header.filename ?? "Audioaufnahme"
-                if let att, let url = AttachmentSync.materialize(att, noteID: doc.id), let d = try? AudioAnalysis.duration(of: url) {
-                    label += " · " + AudioAnalysis.format(d)
-                }
-                appendLabel(label, icon: "🔊")
-                if let transcript = block.output, !transcript.isEmpty {
-                    out.append(NSAttributedString(string: transcript + "\n", attributes: body))
-                }
-            }
-        }
-        // Trailing line breaks would start an empty last page.
-        while out.length > 0, let last = out.string.last, last.isNewline || last == " " {
-            out.deleteCharacters(in: NSRange(location: out.length - 1, length: 1))
-        }
-        return out
+    static func buildContent(_ doc: NoteDocument, width: CGFloat, maxImageHeight: CGFloat, options: Options) async -> NSAttributedString {
+        await ContentBuilder(doc: doc, width: width, maxImageHeight: maxImageHeight, options: options).build()
     }
 
     private static func bodyAttributes(_ theme: ThemeManager) -> [NSAttributedString.Key: Any] {
@@ -328,5 +183,224 @@ final class PrintTextView: NSTextView {
         let p = NSMutableParagraphStyle()
         p.alignment = .center
         return NSAttributedString(string: "\(page)", attributes: [.font: NSFont.systemFont(ofSize: 8.5), .foregroundColor: NSColor.gray, .paragraphStyle: p])
+    }
+}
+
+// MARK: Content
+
+extension NotePDFExporter {
+    /// Turns the note's blocks, one kind at a time, into the attributed text that gets printed (#144).
+    @MainActor
+    private final class ContentBuilder {
+        private let out = NSMutableAttributedString()
+        private let doc: NoteDocument
+        private let width: CGFloat
+        private let maxImageHeight: CGFloat
+        private let options: Options
+        private let body: [NSAttributedString.Key: Any]
+        private let codeTheme: CodeTheme
+        private let gap = paragraph(spacingBefore: 4, spacingAfter: 10)
+        private let lightBox = NSColor(white: 0.96, alpha: 1)
+        private let codeFont = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular)
+
+        init(doc: NoteDocument, width: CGFloat, maxImageHeight: CGFloat, options: Options) {
+            self.doc = doc
+            self.width = width
+            self.maxImageHeight = maxImageHeight
+            self.options = options
+            let theme = ThemeManager.shared
+            body = bodyAttributes(theme)
+            codeTheme = theme.codeTheme(dark: false)
+        }
+
+        func build() async -> NSAttributedString {
+            for block in doc.blocks { await append(block) }
+            // Trailing line breaks would start an empty last page.
+            while out.length > 0, let last = out.string.last, last.isNewline || last == " " {
+                out.deleteCharacters(in: NSRange(location: out.length - 1, length: 1))
+            }
+            return out
+        }
+
+        private func append(_ block: BlockModel) async {
+            switch block.kind {
+            case .text: appendText(block)
+            case .embed: appendEmbed(block)
+            case .code: appendCode(block)
+            case .database: appendDatabase(block)
+            case .image: appendPicture(block)
+            case .drawing: appendDrawing(block)
+            case .pdf: appendPDF(block)
+            case .file: await appendFile(block)
+            case .web: appendWeb(block)
+            case .math, .diagram: await appendRendered(block)
+            case .audio: appendAudio(block)
+            }
+        }
+
+        private func attachment(of block: BlockModel) -> FolioArchive.Attachment? {
+            block.attachmentID.flatMap { doc.attachments[$0] }
+        }
+
+        // MARK: Blocks
+
+        private func appendText(_ block: BlockModel) {
+            guard block.storage.length > 0 else { return }
+            newline()
+            out.append(printable(block.storage))
+        }
+
+        /// The embedded note's text, as it reads in the editor (#120).
+        private func appendEmbed(_ block: BlockModel) {
+            let title = block.storage.string
+            appendLabel("Eingebettet: \(title)", icon: "↳")
+            let store = NoteStore.shared
+            guard let id = store.linkIndex.resolve(title), id != doc.id,
+                  let ref = store.notes.first(where: { $0.id == id }), let file = try? NoteFile.read(from: ref.url) else { return }
+            for text in file.body.blocks.filter({ $0.kind == .text }).map({ RichTextCodec.attributedString(from: $0.rtf) }) where text.length > 0 {
+                newline()
+                out.append(printable(text))
+            }
+        }
+
+        private func appendCode(_ block: BlockModel) {
+            let spec = Languages.spec(for: block.language)
+            appendLabel(spec.name, icon: "⌘")
+            let code = block.storage.string
+            let background = codeTheme.backgroundColor.blended(withFraction: 0.5, of: lightBox) ?? .white
+            appendBox(code, font: codeFont, background: background, foreground: codeTheme.foregroundColor,
+                      tokens: SyntaxHighlighter.tokens(in: code, language: spec), colors: codeTheme)
+            appendOutput(of: block)
+        }
+
+        private func appendOutput(of block: BlockModel) {
+            guard options.includeOutputs, let output = block.output?.trimmingCharacters(in: .newlines), !output.isEmpty else { return }
+            appendLabel(block.outputIsError ? "Fehler" : "Ausgabe", icon: "▸")
+            appendBox(String(output.prefix(20_000)), font: NSFont.monospacedSystemFont(ofSize: 9, weight: .regular),
+                      background: NSColor(white: 0.95, alpha: 1),
+                      foreground: block.outputIsError ? .systemRed : NSColor(white: 0.25, alpha: 1))
+        }
+
+        private func appendDatabase(_ block: BlockModel) {
+            appendLabel("SQL" + (block.connection.map { " · \($0.name)" } ?? ""), icon: "⛁")
+            let code = block.storage.string
+            appendBox(code, font: codeFont, background: lightBox, foreground: codeTheme.foregroundColor,
+                      tokens: SyntaxHighlighter.tokens(in: code, language: Languages.spec(for: "sql")), colors: codeTheme)
+        }
+
+        private func appendPicture(_ block: BlockModel) {
+            guard let data = attachment(of: block)?.data, let image = NSImage(data: data) else { return }
+            appendImage(image, fraction: CGFloat(block.width))
+            appendCaption(block.caption)
+        }
+
+        private func appendDrawing(_ block: BlockModel) {
+            guard let data = attachment(of: block)?.data, let drawing = try? PKDrawing(data: data), !drawing.strokes.isEmpty else { return }
+            var image: NSImage?
+            NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+                image = drawing.image(from: drawing.bounds.insetBy(dx: -10, dy: -10), scale: 2)
+            }
+            if let image { appendImage(image) }
+        }
+
+        private func appendPDF(_ block: BlockModel) {
+            guard let att = attachment(of: block) else { return }
+            appendLabel(att.header.filename, icon: "📄")
+            for page in pdfPages(att.data) { appendImage(page) }
+        }
+
+        private func appendFile(_ block: BlockModel) async {
+            guard let att = attachment(of: block) else { return }
+            appendLabel(att.header.filename, icon: "📎")
+            if let thumb = await thumbnail(att, noteID: doc.id, width: width) { appendImage(thumb) }
+        }
+
+        private func appendWeb(_ block: BlockModel) {
+            guard !block.url.isEmpty else { return }
+            newline()
+            var attrs = body
+            attrs[.link] = URL(string: block.url)
+            attrs[.foregroundColor] = NSColor.linkColor
+            out.append(NSAttributedString(string: "🔗 " + block.url + "\n", attributes: attrs))
+            appendCaption(block.caption)
+        }
+
+        private func appendRendered(_ block: BlockModel) async {
+            let kind: RenderScript.Kind = block.kind == .math ? .math : .diagram
+            let source = block.storage.string
+            guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            let options = RenderScript.Options(dark: false, fontSize: kind == .math ? 16 : 13)
+            if let rendered = try? await OffscreenRenderer.render(kind, source: source, width: width, options: options),
+               let image = OffscreenRenderer.image(from: rendered) {
+                appendImage(image)
+            } else {
+                appendBox(source, font: codeFont, background: lightBox, foreground: .black)
+            }
+        }
+
+        private func appendAudio(_ block: BlockModel) {
+            let att = attachment(of: block)
+            var label = att?.header.filename ?? "Audioaufnahme"
+            if let att, let url = AttachmentSync.materialize(att, noteID: doc.id), let d = try? AudioAnalysis.duration(of: url) {
+                label += " · " + AudioAnalysis.format(d)
+            }
+            appendLabel(label, icon: "🔊")
+            if let transcript = block.output, !transcript.isEmpty {
+                out.append(NSAttributedString(string: transcript + "\n", attributes: body))
+            }
+        }
+
+        // MARK: Pieces
+
+        private func newline() {
+            if out.length > 0, !out.string.hasSuffix("\n") { out.append(NSAttributedString(string: "\n", attributes: body)) }
+        }
+
+        private func appendImage(_ image: NSImage, fraction: CGFloat = 1) {
+            newline()
+            out.append(NotePDFExporter.attachment(image, maxWidth: width * fraction, maxHeight: maxImageHeight, centered: true))
+            out.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: gap]))
+        }
+
+        private func appendCaption(_ text: String) {
+            guard !text.isEmpty else { return }
+            let style = paragraph(spacingBefore: 0, spacingAfter: 10)
+            style.alignment = .center
+            out.append(NSAttributedString(string: text + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style]))
+        }
+
+        private func appendLabel(_ text: String, icon: String) {
+            newline()
+            out.append(NSAttributedString(string: "\(icon)  \(text)\n", attributes: [
+                .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraph(spacingBefore: 8, spacingAfter: 3)]))
+        }
+
+        private func appendBox(_ text: String, font: NSFont, background: NSColor, foreground: NSColor, tokens: [Token] = [], colors: CodeTheme? = nil) {
+            newline()
+            let text = text.isEmpty ? " " : text
+            let s = NSMutableAttributedString(string: text + "\n", attributes: [.font: font, .foregroundColor: foreground, .paragraphStyle: boxStyle(background)])
+            if let colors {
+                for token in tokens where NSMaxRange(token.range) <= (text as NSString).length {
+                    s.addAttribute(.foregroundColor, value: colors.color(for: token.kind), range: token.range)
+                }
+            }
+            out.append(s)
+            out.append(NSAttributedString(string: "\n", attributes: [.font: NSFont.systemFont(ofSize: 4)]))
+        }
+
+        private func boxStyle(_ background: NSColor) -> NSParagraphStyle {
+            let block = NSTextBlock()
+            block.backgroundColor = background
+            block.setWidth(8, type: .absoluteValueType, for: .padding)
+            block.setWidth(0.5, type: .absoluteValueType, for: .border)
+            block.setBorderColor(NSColor.black.withAlphaComponent(0.08))
+            block.setValue(100, type: .percentageValueType, for: .width)
+            let style = NSMutableParagraphStyle()
+            style.textBlocks = [block]
+            style.lineBreakMode = .byCharWrapping
+            return style
+        }
     }
 }

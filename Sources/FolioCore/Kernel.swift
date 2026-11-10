@@ -198,69 +198,101 @@ public final class Kernel: @unchecked Sendable {
         return names
     }
 
+    private typealias Reply = (String, String, String, Bool)
+    private typealias ReplyContinuation = CheckedContinuation<Reply, Never>
+
+    /// One request to the session process (#142).
+    private struct Job: @unchecked Sendable {
+        let id = UUID().uuidString
+        let message: [String: String]
+        let timeout: TimeInterval
+        let keepRunning: @Sendable () -> Bool
+        let limits: ResourceLimits
+        let memoryHit: LockedBool
+        let onOutput: (@Sendable (String) -> Void)?
+        let timedOut = LockedBool()
+    }
+
     private func send(_ message: [String: String], timeout: TimeInterval, keepRunning: @escaping @Sendable () -> Bool,
                       limits: ResourceLimits = ResourceLimits(), memoryHit: LockedBool = LockedBool(),
-                      onOutput: (@Sendable (String) -> Void)?) async -> (String, String, String, Bool) {
-        await withCheckedContinuation { cont in
-            let id = UUID().uuidString
-            let start: () -> Void = { [weak self] in
+                      onOutput: (@Sendable (String) -> Void)?) async -> Reply {
+        let job = Job(message: message, timeout: timeout, keepRunning: keepRunning, limits: limits, memoryHit: memoryHit, onOutput: onOutput)
+        return await withCheckedContinuation { cont in
+            enqueue { [weak self] in
                 guard let self, self.process.isRunning else {
                     self?.lock.lock(); self?.busy = false; self?.lock.unlock()
                     cont.resume(returning: ("", "Die Sitzung läuft nicht mehr.", "error", false))
                     return
                 }
-                let timedOut = LockedBool()
-                self.lock.lock()
-                self.current = (id, onOutput, false, false, OutputLimiter(limit: limits.maxOutputBytes), OutputLimiter(limit: limits.maxOutputBytes / 2), "ok", nil)
-                self.current?.finish = { [weak self] in
-                    guard let self else { return }
-                    self.lock.lock()
-                    guard self.current?.id == id else { self.lock.unlock(); return }
-                    let c = self.current
-                    self.current = nil
-                    self.busy = false
-                    let next = self.queue.isEmpty ? nil : self.queue.removeFirst()
-                    if next != nil { self.busy = true }
-                    self.lock.unlock()
-                    cont.resume(returning: (c?.stdout.text ?? "", c?.stderr.text ?? "", c?.status ?? "error", timedOut.value))
-                    if let next { DispatchQueue.global().async(execute: next) }
-                }
-                self.lock.unlock()
-                var msg: [String: String] = message
-                msg["id"] = id
-                guard let data = try? JSONSerialization.data(withJSONObject: msg) else { return }
-                try? self.input.write(contentsOf: data + Data("\n".utf8))
-                if limits.maxMemoryMB > 0 {
-                    DispatchQueue.global().async { [weak self] in
-                        while let self, self.process.isRunning {
-                            self.lock.lock(); let active = self.current?.id == id; self.lock.unlock()
-                            guard active else { return }
-                            let tree = [self.pid] + ServerDetector.descendants(of: self.pid)
-                            if ServerDetector.residentMemoryMB(of: tree) > limits.maxMemoryMB {
-                                memoryHit.set()
-                                self.shutdown()
-                                return
-                            }
-                            Thread.sleep(forTimeInterval: 0.5)
-                        }
-                    }
-                }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
-                    guard let self else { return }
-                    self.lock.lock(); let stillRunning = self.current?.id == id; self.lock.unlock()
-                    // A recognized server keeps running until it is stopped.
-                    if stillRunning, !keepRunning() { timedOut.set(); self.interrupt() }
-                }
+                self.begin(job, cont: cont)
             }
-            lock.lock()
-            if busy {
-                queue.append(start)
-                lock.unlock()
-            } else {
-                busy = true
-                lock.unlock()
-                start()
+        }
+    }
+
+    /// One request at a time; the others wait their turn.
+    private func enqueue(_ start: @escaping () -> Void) {
+        lock.lock()
+        if busy {
+            queue.append(start)
+            lock.unlock()
+        } else {
+            busy = true
+            lock.unlock()
+            start()
+        }
+    }
+
+    private func begin(_ job: Job, cont: ReplyContinuation) {
+        lock.lock()
+        current = (job.id, job.onOutput, false, false, OutputLimiter(limit: job.limits.maxOutputBytes), OutputLimiter(limit: job.limits.maxOutputBytes / 2), "ok", nil)
+        current?.finish = { [weak self] in self?.complete(job, cont: cont) }
+        lock.unlock()
+        var msg = job.message
+        msg["id"] = job.id
+        guard let data = try? JSONSerialization.data(withJSONObject: msg) else { return }
+        try? input.write(contentsOf: data + Data("\n".utf8))
+        if job.limits.maxMemoryMB > 0 { watchMemory(job) }
+        armTimeout(job)
+    }
+
+    private func complete(_ job: Job, cont: ReplyContinuation) {
+        lock.lock()
+        guard current?.id == job.id else { lock.unlock(); return }
+        let finished = current
+        current = nil
+        busy = false
+        let next = queue.isEmpty ? nil : queue.removeFirst()
+        if next != nil { busy = true }
+        lock.unlock()
+        cont.resume(returning: (finished?.stdout.text ?? "", finished?.stderr.text ?? "", finished?.status ?? "error", job.timedOut.value))
+        if let next { DispatchQueue.global().async(execute: next) }
+    }
+
+    private func isCurrent(_ job: Job) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return current?.id == job.id
+    }
+
+    private func watchMemory(_ job: Job) {
+        DispatchQueue.global().async { [weak self] in
+            while let self, self.process.isRunning, self.isCurrent(job) {
+                let tree = [self.pid] + ServerDetector.descendants(of: self.pid)
+                if ServerDetector.residentMemoryMB(of: tree) > job.limits.maxMemoryMB {
+                    job.memoryHit.set()
+                    self.shutdown()
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.5)
             }
+        }
+    }
+
+    /// A recognized server keeps running until it is stopped.
+    private func armTimeout(_ job: Job) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + job.timeout) { [weak self] in
+            guard let self, self.isCurrent(job), !job.keepRunning() else { return }
+            job.timedOut.set()
+            self.interrupt()
         }
     }
 
@@ -269,36 +301,31 @@ public final class Kernel: @unchecked Sendable {
         lock.lock()
         if isErr { errBuffer.append(data) } else { outBuffer.append(data) }
         var finish: (() -> Void)?
-        // Process complete lines; stream partial output as it comes.
-        let marker: UInt8 = 0x1E
-        while true {
-            let buffer = isErr ? errBuffer : outBuffer
-            guard !buffer.isEmpty else { break }
-            if let m = buffer.firstIndex(of: marker) {
-                let text = String(decoding: buffer[buffer.startIndex..<m], as: UTF8.self)
-                guard let nl = buffer[m...].firstIndex(of: 10) else {
-                    // Marker line not complete yet: emit text before it and wait.
-                    if !text.isEmpty { emit(text, isErr: isErr) }
-                    if isErr { errBuffer.removeSubrange(errBuffer.startIndex..<m) } else { outBuffer.removeSubrange(outBuffer.startIndex..<m) }
-                    break
-                }
-                if !text.isEmpty { emit(text, isErr: isErr) }
-                let markerLine = String(decoding: buffer[buffer.index(after: m)..<nl], as: UTF8.self)
-                if isErr { errBuffer.removeSubrange(errBuffer.startIndex...nl) } else { outBuffer.removeSubrange(outBuffer.startIndex...nl) }
-                let parts = markerLine.split(separator: ":", maxSplits: 1)
-                if parts.count == 2, parts[0] == current?.id ?? "" {
-                    if isErr { current?.errDone = true } else { current?.outDone = true; current?.status = String(parts[1]) }
-                    if current?.outDone == true && current?.errDone == true { finish = current?.finish }
-                }
-            } else {
-                let text = String(decoding: buffer, as: UTF8.self)
-                emit(text, isErr: isErr)
-                if isErr { errBuffer.removeAll() } else { outBuffer.removeAll() }
-                break
-            }
+        while let frame = KernelFrame.next(in: isErr ? errBuffer : outBuffer) {
+            if !frame.text.isEmpty { emit(frame.text, isErr: isErr) }
+            dropBytes(frame.consumed, isErr: isErr)
+            if let marker = frame.marker, applyMarker(marker, isErr: isErr) { finish = current?.finish }
+            if !frame.continues { break }
         }
         lock.unlock()
         finish?()
+    }
+
+    /// Called with `lock` held.
+    private func dropBytes(_ count: Int, isErr: Bool) {
+        if isErr { errBuffer.removeFirst(count) } else { outBuffer.removeFirst(count) }
+    }
+
+    /// Whether this marker ended the current request's last stream. Called with `lock` held.
+    private func applyMarker(_ marker: KernelFrame.Marker, isErr: Bool) -> Bool {
+        guard marker.id == current?.id ?? "" else { return false }
+        if isErr {
+            current?.errDone = true
+        } else {
+            current?.outDone = true
+            current?.status = marker.status
+        }
+        return current?.outDone == true && current?.errDone == true
     }
 
     /// Called with `lock` held.
@@ -325,4 +352,44 @@ private final class LockedBool: @unchecked Sendable {
     private var v = false
     func set() { lock.lock(); v = true; lock.unlock() }
     var value: Bool { lock.lock(); defer { lock.unlock() }; return v }
+}
+
+/// One step of reading the session's output stream. Each stream ends a request with a line of
+/// `0x1E <request id> : <status>`; text before it is program output (#142).
+struct KernelFrame: Equatable {
+    struct Marker: Equatable {
+        let id: String
+        let status: String
+    }
+
+    static let markerByte: UInt8 = 0x1E
+
+    /// Program output to pass on.
+    var text: String
+    /// How many bytes of the buffer this frame used.
+    var consumed: Int
+    /// The marker line, when it was complete and well formed.
+    var marker: Marker?
+    /// Whether more frames may follow in the buffer.
+    var continues: Bool
+
+    /// The next frame, or nil for an empty buffer. Partial text is passed on right away.
+    static func next(in buffer: Data) -> KernelFrame? {
+        guard !buffer.isEmpty else { return nil }
+        guard let m = buffer.firstIndex(of: markerByte) else {
+            return KernelFrame(text: String(decoding: buffer, as: UTF8.self), consumed: buffer.count, marker: nil, continues: false)
+        }
+        let text = String(decoding: buffer[buffer.startIndex..<m], as: UTF8.self)
+        let beforeMarker = m - buffer.startIndex
+        guard let newline = buffer[m...].firstIndex(of: 10) else {
+            return KernelFrame(text: text, consumed: beforeMarker, marker: nil, continues: false)
+        }
+        let line = String(decoding: buffer[buffer.index(after: m)..<newline], as: UTF8.self)
+        return KernelFrame(text: text, consumed: newline - buffer.startIndex + 1, marker: parseMarker(line), continues: true)
+    }
+
+    private static func parseMarker(_ line: String) -> Marker? {
+        let parts = line.split(separator: ":", maxSplits: 1)
+        return parts.count == 2 ? Marker(id: String(parts[0]), status: String(parts[1])) : nil
+    }
 }

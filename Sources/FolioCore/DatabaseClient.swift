@@ -178,52 +178,9 @@ public enum DatabaseClient {
         return tables
     }
 
-    // sqlcmd cannot distinguish SQL NULL from the string "NULL", or unescaped separators in values.
-    // Newlines are recoverable until the expected column count is reached; last-column newlines are ambiguous.
     static func parseSQLCMD(_ output: String) throws -> QueryResult {
-        let separator = "\u{001F}"
-        let lines = output.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
-        var current: QueryResult?, last: QueryResult?
-        var changes: String?
-        var pending: String?
-        func finish() {
-            guard let result = current else { return }
-            if result.columns == ["__folio_changes"] { changes = result.rows.first?.first ?? nil }
-            else if !result.rows.isEmpty { last = result }
-            current = nil
-        }
-        func isDashes(_ line: String) -> Bool {
-            let fields = line.components(separatedBy: separator)
-            return fields.allSatisfy { field in
-                let value = field.trimmingCharacters(in: .whitespaces)
-                return !value.isEmpty && value.allSatisfy { $0 == "-" }
-            }
-        }
-        var index = 0
-        while index < lines.count {
-            let line = lines[index]
-            if pending == nil && index + 1 < lines.count && isDashes(lines[index + 1]) {
-                finish()
-                current = QueryResult(columns: line.components(separatedBy: separator))
-                index += 2
-                continue
-            }
-            if let count = current?.columns.count {
-                if pending == nil && line.isEmpty { index += 1; continue }
-                let record = pending.map { $0 + "\n" + line } ?? line
-                let fields = record.components(separatedBy: separator)
-                if fields.count < count { pending = record }
-                else {
-                    guard fields.count == count else { throw DatabaseError.queryFailed("Ungültige SQL-Server-Ausgabe.") }
-                    current?.rows.append(fields.map { $0 == "NULL" ? nil : $0 })
-                    pending = nil
-                }
-            }
-            index += 1
-        }
-        guard pending == nil else { throw DatabaseError.queryFailed("Unvollständige SQL-Server-Ausgabe.") }
-        finish()
-        return last ?? QueryResult(message: changes.map { $0 == "1" ? "1 Zeile geändert" : "\($0) Zeilen geändert" } ?? "Ausgeführt.")
+        var parser = SQLCMDOutputParser(output)
+        return try parser.parse()
     }
 
     static func parseMySQLXML(_ output: String) throws -> QueryResult {
@@ -236,92 +193,10 @@ public enum DatabaseClient {
         return delegate.last ?? QueryResult(message: "Ausgeführt.")
     }
 
-    // psql CSV has no explicit set boundaries: equal-width consecutive sets remain ambiguous.
-    // A per-session NULL marker keeps single-column NULL rows distinct from blank separators.
     static func parseCSV(_ text: String, nullMarker: String? = nil) throws -> QueryResult {
-        var records: [[String?]] = [], row: [String?] = [], field = ""
-        var quoted = false, wasQuoted = false
-        let chars = Array(text); var i = 0
-        // With a NULL marker, an unquoted empty field is an empty string (psql writes '' unquoted).
-        func endField() { row.append(field.isEmpty && !wasQuoted && nullMarker == nil ? nil : field); field = ""; wasQuoted = false }
-        while i < chars.count {
-            let c = chars[i]
-            if c == "\"" {
-                if quoted && i + 1 < chars.count && chars[i + 1] == "\"" { field.append("\""); i += 1 }
-                else { quoted.toggle(); wasQuoted = true }
-            } else if c == "," && !quoted { endField() }
-            else if (c == "\n" || c == "\r\n" || c == "\r") && !quoted {
-                if row.isEmpty && field.isEmpty && !wasQuoted { records.append([nil]) }   // blank line: set separator
-                else { endField(); records.append(row) }
-                row = []
-            } else { field.append(c) }
-            i += 1
-        }
-        guard !quoted else { throw DatabaseError.queryFailed("Ungültige CSV-Ausgabe.") }
-        if !field.isEmpty || wasQuoted || !row.isEmpty { endField(); records.append(row) }
-        var current: QueryResult?, last: QueryResult?
-        for record in records {
-            if record.count == 1 && record[0] == nil {
-                if let value = current, !value.rows.isEmpty { last = value }; current = nil
-            } else if current == nil || record.count != current?.columns.count {
-                if let value = current, !value.rows.isEmpty { last = value }
-                current = QueryResult(columns: record.map { $0 ?? "" })
-            } else { current?.rows.append(record.map { value in value == nullMarker ? nil : value }) }
-        }
-        if let current, !current.rows.isEmpty { return current }
-        return last ?? current ?? QueryResult(message: "Ausgeführt.")
-    }
-}
-
-private struct OrderedJSON {
-    let bytes: [UInt8]
-    var index = 0
-    init(_ text: String) { bytes = Array(text.utf8) }
-    mutating func whitespace() { while index < bytes.count && [9, 10, 13, 32].contains(bytes[index]) { index += 1 } }
-    mutating func consume(_ byte: UInt8) throws {
-        whitespace()
-        guard index < bytes.count, bytes[index] == byte else { throw DatabaseError.queryFailed("Ungültige JSON-Ausgabe.") }
-        index += 1
-    }
-    mutating func scalar() throws -> String? {
-        whitespace(); let start = index
-        if index < bytes.count && bytes[index] == 34 {
-            index += 1
-            while index < bytes.count {
-                let b = bytes[index]; index += 1
-                if b == 92 { index += 1 } else if b == 34 { break }
-            }
-        } else {
-            while index < bytes.count && ![44, 125, 93, 10, 13, 32].contains(bytes[index]) { index += 1 }
-        }
-        guard index > start, index <= bytes.count else { throw DatabaseError.queryFailed("Ungültiger JSON-Wert.") }
-        let data = Data(bytes[start..<index])
-        let value = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
-        if value is NSNull { return nil }
-        if let string = value as? String { return string }
-        return String(decoding: data, as: UTF8.self)
-    }
-    mutating func results() throws -> [QueryResult] {
-        var results: [QueryResult] = []
-        whitespace()
-        while index < bytes.count {
-            try consume(91); whitespace()
-            var result = QueryResult()
-            while index < bytes.count && bytes[index] != 93 {
-                try consume(123); whitespace()
-                var keys: [String] = [], values: [String?] = []
-                while index < bytes.count && bytes[index] != 125 {
-                    keys.append(try scalar() ?? ""); try consume(58); values.append(try scalar()); whitespace()
-                    if index < bytes.count && bytes[index] == 44 { index += 1 } else { break }
-                }
-                try consume(125)
-                if result.rows.isEmpty { result.columns = keys }
-                result.rows.append(values); whitespace()
-                if index < bytes.count && bytes[index] == 44 { index += 1 } else { break }
-            }
-            try consume(93); results.append(result); whitespace()
-        }
-        return results
+        var reader = CSVRecordReader(nullMarker: nullMarker)
+        var sets = CSVResultSets(nullMarker: nullMarker)
+        return sets.assemble(try reader.read(text))
     }
 }
 
