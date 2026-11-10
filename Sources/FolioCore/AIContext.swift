@@ -29,35 +29,54 @@ public enum Passages {
     /// Splits note text into passages of roughly `target` characters, breaking at blank lines, headings
     /// and line ends; very long lines are cut at sentence ends.
     public static func split(noteID: UUID, title: String, text: String, target: Int = 700) -> [Passage] {
-        var out: [Passage] = []
+        var splitter = Splitter(noteID: noteID, title: title, target: target)
+        text.components(separatedBy: "\n").forEach { splitter.add($0) }
+        splitter.flush()
+        return splitter.passages
+    }
+
+    private struct Splitter {
+        let noteID: UUID
+        let title: String
+        let target: Int
+        var passages: [Passage] = []
         var current = ""
-        func flush() {
-            let t = current.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !t.isEmpty { out.append(Passage(noteID: noteID, noteTitle: title, index: out.count, text: t)) }
+
+        mutating func flush() {
+            let text = current.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { passages.append(Passage(noteID: noteID, noteTitle: title, index: passages.count, text: text)) }
             current = ""
         }
-        for rawLine in text.components(separatedBy: "\n") {
-            var line = rawLine
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let isHeading = trimmed.hasPrefix("#") || (trimmed.count < 60 && trimmed.hasSuffix(":"))
+
+        mutating func add(_ rawLine: String) {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
                 if current.count > target / 3 { flush() }
-                continue
+                return
             }
+            let isHeading = trimmed.hasPrefix("#") || (trimmed.count < 60 && trimmed.hasSuffix(":"))
             if isHeading, current.count > 80 { flush() }
+            let line = cuttingOverlongParts(of: rawLine)
+            if current.count + line.count > target { flush() }
+            append(line)
+        }
+
+        /// Cuts long lines at the last sentence end before the target and returns what is left.
+        private mutating func cuttingOverlongParts(of rawLine: String) -> String {
+            var line = rawLine
             while line.count > target {
-                // Cut long lines at the last sentence end before the target.
                 let head = String(line.prefix(target))
                 let cut = head.range(of: ". ", options: .backwards).map { head.distance(from: head.startIndex, to: $0.upperBound) } ?? target
-                current += (current.isEmpty ? "" : "\n") + String(line.prefix(cut))
+                append(String(line.prefix(cut)))
                 flush()
                 line = String(line.dropFirst(cut))
             }
-            if current.count + line.count > target { flush() }
-            current += (current.isEmpty ? "" : "\n") + line
+            return line
         }
-        flush()
-        return out
+
+        private mutating func append(_ text: String) {
+            current += (current.isEmpty ? "" : "\n") + text
+        }
     }
 }
 

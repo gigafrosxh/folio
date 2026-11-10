@@ -92,46 +92,55 @@ final class CodeTextView: NSTextView {
     /// Closes brackets and quotes, steps over closers that are already there, wraps a selection in a pair
     /// and pulls a closing bracket typed on an empty line back to the matching indentation.
     override func insertText(_ string: Any, replacementRange: NSRange) {
-        guard let s = (string as? String) ?? (string as? NSAttributedString)?.string, s.count == 1, let ch = s.first,
-              replacementRange.location == NSNotFound || replacementRange == selectedRange() else {
+        let sel = selectedRange()
+        guard let ch = singleTypedCharacter(string), replacementRange.location == NSNotFound || replacementRange == sel else {
             super.insertText(string, replacementRange: replacementRange)
             return
         }
-        let sel = selectedRange()
-        let next = char(at: sel.location)
-        let prev = char(at: sel.location - 1)
-
-        if sel.length == 0, next == ch, ")]}\"'`".contains(ch) {
-            setSelectedRange(NSRange(location: sel.location + 1, length: 0))
-            return
-        }
-        if let close = CodeStyle.pairs[ch] {
-            let isQuote = ch == close
-            let quoteAllowed = !isQuote || ((prev.map { !$0.isLetter && !$0.isNumber } ?? true)
-                && (ch != "'" || CodeStyle.autoClosesSingleQuote(language)))
-            if sel.length > 0, quoteAllowed {
-                let inner = ns.substring(with: sel)
-                super.insertText(String(ch) + inner + String(close), replacementRange: sel)
-                setSelectedRange(NSRange(location: sel.location + 1, length: (inner as NSString).length))
-                return
-            }
-            let nextAllowsPair = next.map { $0.isWhitespace || ")]},;:".contains($0) } ?? true
-            if quoteAllowed && nextAllowsPair {
-                super.insertText(String(ch) + String(close), replacementRange: replacementRange)
-                setSelectedRange(NSRange(location: selectedRange().location - 1, length: 0))
-                return
-            }
-        }
-        if "}])".contains(ch), sel.length == 0, textBeforeCaretOnLine.allSatisfy({ $0 == " " || $0 == "\t" }),
-           !textBeforeCaretOnLine.isEmpty {
-            // Dedent one level before the closer.
-            let loc = sel.location
-            let lineStart = loc - (textBeforeCaretOnLine as NSString).length
-            let newIndent = String(textBeforeCaretOnLine.dropLast(min(indentUnit.count, textBeforeCaretOnLine.count)))
-            super.insertText(newIndent + String(ch), replacementRange: NSRange(location: lineStart, length: loc - lineStart))
-            return
-        }
+        if stepOverCloser(ch, selection: sel) || insertPair(ch, selection: sel, replacementRange: replacementRange) || dedentCloser(ch, selection: sel) { return }
         super.insertText(string, replacementRange: replacementRange)
+    }
+
+    private func singleTypedCharacter(_ string: Any) -> Character? {
+        guard let s = (string as? String) ?? (string as? NSAttributedString)?.string, s.count == 1 else { return nil }
+        return s.first
+    }
+
+    private func stepOverCloser(_ ch: Character, selection sel: NSRange) -> Bool {
+        guard sel.length == 0, char(at: sel.location) == ch, ")]}\"'`".contains(ch) else { return false }
+        setSelectedRange(NSRange(location: sel.location + 1, length: 0))
+        return true
+    }
+
+    private func quoteMayOpen(_ ch: Character, close: Character, selection sel: NSRange) -> Bool {
+        guard ch == close else { return true }
+        let afterBoundary = char(at: sel.location - 1).map { !$0.isLetter && !$0.isNumber } ?? true
+        return afterBoundary && (ch != "'" || CodeStyle.autoClosesSingleQuote(language))
+    }
+
+    /// Wraps a selection in the pair, or inserts both halves when what follows allows it.
+    private func insertPair(_ ch: Character, selection sel: NSRange, replacementRange: NSRange) -> Bool {
+        guard let close = CodeStyle.pairs[ch], quoteMayOpen(ch, close: close, selection: sel) else { return false }
+        if sel.length > 0 {
+            let inner = ns.substring(with: sel)
+            super.insertText(String(ch) + inner + String(close), replacementRange: sel)
+            setSelectedRange(NSRange(location: sel.location + 1, length: (inner as NSString).length))
+            return true
+        }
+        guard char(at: sel.location).map({ $0.isWhitespace || ")]},;:".contains($0) }) ?? true else { return false }
+        super.insertText(String(ch) + String(close), replacementRange: replacementRange)
+        setSelectedRange(NSRange(location: selectedRange().location - 1, length: 0))
+        return true
+    }
+
+    /// A closing bracket typed on an empty line moves back one level.
+    private func dedentCloser(_ ch: Character, selection sel: NSRange) -> Bool {
+        let before = textBeforeCaretOnLine
+        guard "}])".contains(ch), sel.length == 0, !before.isEmpty, before.allSatisfy({ $0 == " " || $0 == "\t" }) else { return false }
+        let lineStart = sel.location - (before as NSString).length
+        let newIndent = String(before.dropLast(min(indentUnit.count, before.count)))
+        super.insertText(newIndent + String(ch), replacementRange: NSRange(location: lineStart, length: sel.location - lineStart))
+        return true
     }
 
     override func deleteBackward(_ sender: Any?) {
@@ -333,26 +342,22 @@ final class CodeTextView: NSTextView {
     func textChangedForCompletion() {
         guard completionEnabled() else { return }
         let ctx = CompletionContext(code: string, offset: selectedRange().location, language: language)
-        let typedTrigger = ctx.receiver != nil && ctx.prefix.isEmpty
-        if completion.isVisible {
-            // Narrow the visible list right away, so a fast Enter never takes an entry that no longer matches.
-            let caret = selectedRange().location
-            if caret >= completionAnchor, caret - completionAnchor <= ns.length {
-                let typed = ns.substring(with: NSRange(location: completionAnchor, length: caret - completionAnchor))
-                let narrowed = CompletionFilter.filter(completion.model.items, prefix: typed)
-                if narrowed.isEmpty || typed.contains(where: { !($0.isLetter || $0.isNumber || $0 == "_" || $0 == "$") }) {
-                    hideCompletion()
-                } else {
-                    completion.model.items = narrowed
-                    completion.model.prefix = typed
-                    completion.model.selection = 0
-                }
-            } else {
-                hideCompletion()
-            }
-        }
-        if completion.isVisible || typedTrigger || ctx.prefix.count >= 2 {
-            triggerCompletion(manual: false)
+        if completion.isVisible { narrowVisibleCompletion() }
+        if ctx.opensCompletionList(whileVisible: completion.isVisible) { triggerCompletion(manual: false) }
+    }
+
+    /// Narrows the visible list right away, so a fast Enter never takes an entry that no longer matches.
+    private func narrowVisibleCompletion() {
+        let caret = selectedRange().location
+        guard caret >= completionAnchor, caret - completionAnchor <= ns.length else { hideCompletion(); return }
+        let typed = ns.substring(with: NSRange(location: completionAnchor, length: caret - completionAnchor))
+        let narrowed = CompletionFilter.filter(completion.model.items, prefix: typed)
+        if narrowed.isEmpty || !CompletionContext.isIdentifierText(typed) {
+            hideCompletion()
+        } else {
+            completion.model.items = narrowed
+            completion.model.prefix = typed
+            completion.model.selection = 0
         }
     }
 

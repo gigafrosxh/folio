@@ -21,43 +21,9 @@ public enum SyntaxHighlighter {
         let late: [(NSRegularExpression, TokenKind)]
 
         init(_ spec: LanguageSpec) {
-            var base: [(NSRegularExpression, TokenKind, Int)] = []
-            func add(_ p: String, _ k: TokenKind, group: Int = 0, options: NSRegularExpression.Options = []) {
-                if let r = try? NSRegularExpression(pattern: p, options: options.union(.anchorsMatchLines)) { base.append((r, k, group)) }
-            }
-            if spec.id != "plain" && spec.id != "markdown" {
-                add(#"\b([A-Za-z_][A-Za-z0-9_]*)(?=\s*\()"#, .function, group: 1)
-                if spec.capitalizedAreTypes { add(#"\b[A-Z][A-Za-z0-9_]*\b"#, .type) }
-                if !spec.builtins.isEmpty {
-                    add(#"\b(?:"# + spec.builtins.map(NSRegularExpression.escapedPattern).joined(separator: "|") + #")\b"#, .type)
-                }
-                add(#"(?<![\w.])(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\b"#, .number)
-                if let prefix = spec.attributePrefix {
-                    add(NSRegularExpression.escapedPattern(for: prefix) + #"[A-Za-z_{][\w}]*"#, .attribute)
-                }
-                if !spec.keywords.isEmpty {
-                    let alternatives = spec.keywords.sorted { $0.count > $1.count }.map(NSRegularExpression.escapedPattern)
-                    add(#"(?<![\w$@])(?:"# + alternatives.joined(separator: "|") + #")(?![\w?])"#, .keyword,
-                        options: spec.caseInsensitive ? [.caseInsensitive] : [])
-                }
-            }
-            for rule in spec.extraRules where !rule.afterStrings { add(rule.pattern, rule.kind) }
-            self.base = base
-
-            var comments: [String] = []
-            for marker in spec.lineComments { comments.append(NSRegularExpression.escapedPattern(for: marker) + ".*$") }
-            if let bc = spec.blockComment, bc.count == 2 {
-                comments.append(NSRegularExpression.escapedPattern(for: bc[0]) + #"[\s\S]*?(?:"# + NSRegularExpression.escapedPattern(for: bc[1]) + "|$(?![\\s\\S]))")
-            }
-            var strings: [String] = []
-            for d in spec.stringDelimiters {
-                let e = NSRegularExpression.escapedPattern(for: d)
-                if d.count >= 3 || d == "`" {
-                    strings.append(e + #"[\s\S]*?(?:"# + e + "|$(?![\\s\\S]))")
-                } else {
-                    strings.append(e + #"(?:\\.|(?!"# + e + #")[^\\\n])*"# + e + "?")
-                }
-            }
+            base = Self.baseRules(spec)
+            let comments = Self.commentPatterns(spec)
+            let strings = Self.stringPatterns(spec)
             var parts: [String] = []
             if !comments.isEmpty { parts.append("(" + comments.joined(separator: "|") + ")") }
             if !strings.isEmpty { parts.append("(" + strings.joined(separator: "|") + ")") }
@@ -65,6 +31,50 @@ public enum SyntaxHighlighter {
             stringsAndComments = parts.isEmpty ? nil : try? NSRegularExpression(pattern: parts.joined(separator: "|"), options: [.anchorsMatchLines])
             late = spec.extraRules.filter(\.afterStrings).compactMap { r in
                 (try? NSRegularExpression(pattern: r.pattern, options: [.anchorsMatchLines])).map { ($0, r.kind) }
+            }
+        }
+
+        private typealias Rule = (pattern: String, kind: TokenKind, group: Int, options: NSRegularExpression.Options)
+
+        private static func baseRules(_ spec: LanguageSpec) -> [(NSRegularExpression, TokenKind, Int)] {
+            let languageRules = spec.id == "plain" || spec.id == "markdown" ? [] : codeRules(spec)
+            let extra: [Rule] = spec.extraRules.filter { !$0.afterStrings }.map { ($0.pattern, $0.kind, 0, []) }
+            return (languageRules + extra).compactMap { rule in
+                (try? NSRegularExpression(pattern: rule.pattern, options: rule.options.union(.anchorsMatchLines))).map { ($0, rule.kind, rule.group) }
+            }
+        }
+
+        /// The order matters: later rules win over earlier ones when ranges overlap.
+        private static func codeRules(_ spec: LanguageSpec) -> [Rule] {
+            var rules: [Rule] = [(#"\b([A-Za-z_][A-Za-z0-9_]*)(?=\s*\()"#, .function, 1, [])]
+            if spec.capitalizedAreTypes { rules.append((#"\b[A-Z][A-Za-z0-9_]*\b"#, .type, 0, [])) }
+            if !spec.builtins.isEmpty {
+                rules.append((#"\b(?:"# + spec.builtins.map(NSRegularExpression.escapedPattern).joined(separator: "|") + #")\b"#, .type, 0, []))
+            }
+            rules.append((#"(?<![\w.])(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\b"#, .number, 0, []))
+            if let prefix = spec.attributePrefix {
+                rules.append((NSRegularExpression.escapedPattern(for: prefix) + #"[A-Za-z_{][\w}]*"#, .attribute, 0, []))
+            }
+            if !spec.keywords.isEmpty {
+                let alternatives = spec.keywords.sorted { $0.count > $1.count }.map(NSRegularExpression.escapedPattern)
+                rules.append((#"(?<![\w$@])(?:"# + alternatives.joined(separator: "|") + #")(?![\w?])"#, .keyword, 0, spec.caseInsensitive ? [.caseInsensitive] : []))
+            }
+            return rules
+        }
+
+        private static func commentPatterns(_ spec: LanguageSpec) -> [String] {
+            var comments = spec.lineComments.map { NSRegularExpression.escapedPattern(for: $0) + ".*$" }
+            if let bc = spec.blockComment, bc.count == 2 {
+                comments.append(NSRegularExpression.escapedPattern(for: bc[0]) + #"[\s\S]*?(?:"# + NSRegularExpression.escapedPattern(for: bc[1]) + "|$(?![\\s\\S]))")
+            }
+            return comments
+        }
+
+        private static func stringPatterns(_ spec: LanguageSpec) -> [String] {
+            spec.stringDelimiters.map { d in
+                let e = NSRegularExpression.escapedPattern(for: d)
+                if d.count >= 3 || d == "`" { return e + #"[\s\S]*?(?:"# + e + "|$(?![\\s\\S]))" }
+                return e + #"(?:\\.|(?!"# + e + #")[^\\\n])*"# + e + "?"
             }
         }
     }
@@ -83,24 +93,20 @@ public enum SyntaxHighlighter {
     public static func tokens(in code: String, language: LanguageSpec) -> [Token] {
         let c = compiled(for: language)
         let full = NSRange(location: 0, length: (code as NSString).length)
-        var result: [Token] = []
-        for (regex, kind, group) in c.base {
-            for m in regex.matches(in: code, range: full) {
-                let r = m.range(at: group)
-                if r.location != NSNotFound && r.length > 0 { result.append(Token(range: r, kind: kind)) }
-            }
-        }
+        var result: [Token] = c.base.flatMap { tokens($0.0, kind: $0.1, group: $0.2, in: code, range: full) }
         if let sc = c.stringsAndComments {
-            for m in sc.matches(in: code, range: full) where m.range.length > 0 {
+            result += sc.matches(in: code, range: full).filter { $0.range.length > 0 }.map { m in
                 let isComment = c.commentGroupCount == 1 && m.range(at: 1).location != NSNotFound
-                result.append(Token(range: m.range, kind: isComment ? .comment : .string))
+                return Token(range: m.range, kind: isComment ? .comment : .string)
             }
         }
-        for (regex, kind) in c.late {
-            for m in regex.matches(in: code, range: full) where m.range.length > 0 {
-                result.append(Token(range: m.range, kind: kind))
-            }
+        return result + c.late.flatMap { tokens($0.0, kind: $0.1, group: 0, in: code, range: full) }
+    }
+
+    private static func tokens(_ regex: NSRegularExpression, kind: TokenKind, group: Int, in code: String, range: NSRange) -> [Token] {
+        regex.matches(in: code, range: range).compactMap { m in
+            let r = m.range(at: group)
+            return r.location != NSNotFound && r.length > 0 ? Token(range: r, kind: kind) : nil
         }
-        return result
     }
 }

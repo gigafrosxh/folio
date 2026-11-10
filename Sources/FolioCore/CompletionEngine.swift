@@ -41,3 +41,17 @@ public final class CompletionEngine: @unchecked Sendable {
         return "Schlüsselwörter und Wörter im Code"
     }
 }
+
+// MARK: When the list opens (#141)
+
+extension CompletionContext {
+    /// After `.`/`::`/`->`, once an identifier has two characters, and for as long as the list is open.
+    public func opensCompletionList(whileVisible visible: Bool) -> Bool {
+        visible || (receiver != nil && prefix.isEmpty) || prefix.count >= 2
+    }
+
+    /// Only identifier characters keep the list open while typing.
+    public static func isIdentifierText(_ typed: String) -> Bool {
+        typed.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "$" }
+    }
+}

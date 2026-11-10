@@ -234,39 +234,52 @@ final class AIChatModel: ObservableObject, Identifiable {
             answerWithoutModel(plan)
             return
         }
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *) {
+            await streamAnswer(to: Self.prompt(question: question, plan: plan, history: history, selection: selection))
+            return
+        }
+        #endif
+        answerWithoutModel(plan)
+    }
+
+    /// What the model is asked: recent turns, the sources, the marked text and the question.
+    static func prompt(question: String, plan: ContextPlan, history: String, selection: String?) -> String {
         var prompt = ""
         if !history.isEmpty { prompt += "Bisheriges Gespräch:\n\(history)\n\n" }
         if !plan.passages.isEmpty { prompt += "Quellen:\n\(ContextBuilder.sourceBlock(plan))\n\n" }
         else { prompt += "Es wurden keine passenden Stellen in den Notizen gefunden.\n\n" }
         if let selection, !selection.isEmpty { prompt += "Markierter Text:\n\"\"\"\n\(String(selection.prefix(2400)))\n\"\"\"\n\n" }
-        prompt += "Frage: \(question)"
-        #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            // A fresh session per question: recent turns travel in the prompt, so conversations survive
-            // restarts and never overflow the small context window.
-            // With tools the assistant carries out tasks on the notes instead of only talking about them (#124).
-            let session = LanguageModelSession(tools: NoteAgentTools.all, instructions: Self.instructions)
-            NoteAgent.log = []
-            do {
-                for try await partial in session.streamResponse(to: prompt) {
-                    if Task.isCancelled { break }
-                    if let i = messages.lastIndex(where: { $0.isStreaming }) {
-                        messages[i].text = partial.content
-                        messages[i].actions = NoteAgent.log
-                    }
-                }
-            } catch {
-                if !Task.isCancelled { errorText = Self.describe(error) }
+        return prompt + "Frage: \(question)"
+    }
+
+    #if canImport(FoundationModels)
+    /// A fresh session per question: recent turns travel in the prompt, so conversations survive restarts and
+    /// never overflow the small context window. With tools the assistant carries out tasks on the notes (#124).
+    @available(macOS 26.0, *)
+    private func streamAnswer(to prompt: String) async {
+        let session = LanguageModelSession(tools: NoteAgentTools.all, instructions: Self.instructions)
+        NoteAgent.log = []
+        do {
+            for try await partial in session.streamResponse(to: prompt) {
+                if Task.isCancelled { break }
+                updateStreamingMessage(text: partial.content)
             }
-            if let i = messages.lastIndex(where: { $0.isStreaming }) {
-                messages[i].actions = NoteAgent.log
-                if messages[i].text.isEmpty, !NoteAgent.log.isEmpty { messages[i].text = "Erledigt." }
-            }
-            finishStreaming()
-            return
+        } catch {
+            if !Task.isCancelled { errorText = Self.describe(error) }
         }
-        #endif
-        answerWithoutModel(plan)
+        if let i = messages.lastIndex(where: { $0.isStreaming }) {
+            messages[i].actions = NoteAgent.log
+            if messages[i].text.isEmpty, !NoteAgent.log.isEmpty { messages[i].text = "Erledigt." }
+        }
+        finishStreaming()
+    }
+    #endif
+
+    private func updateStreamingMessage(text: String) {
+        guard let i = messages.lastIndex(where: { $0.isStreaming }) else { return }
+        messages[i].text = text
+        messages[i].actions = NoteAgent.log
     }
 
     private func answerWithoutModel(_ plan: ContextPlan) {

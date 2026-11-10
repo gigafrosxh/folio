@@ -44,38 +44,53 @@ extension NoteStore {
             return nil
         }
         let context = TemplateVariables.Context(date: date, title: title ?? TemplateText.fill(template.meta.title, now: date))
+        let cursor = Self.fillTemplate(&file, title: title, context: context)
+        guard let url = writeNewNote(file, in: folder) else { return nil }
+        let ref = NoteRef(meta: file.meta, url: url)
+        notes.append(ref)
+        if [.templates, .trash, .damaged, .pinned].contains(sidebarSelection) { sidebarSelection = .all }
+        selectedNoteID = ref.id
+        if let cursor { FormattingController.shared.focus(blockID: cursor.block, at: cursor.offset) }
+        return ref
+    }
+
+    /// Fills in the placeholders and gives the note fresh ids. Returns where {{cursor}} was. Touches no file.
+    static func fillTemplate(_ file: inout NoteFile, title: String?, context: TemplateVariables.Context) -> (block: UUID, offset: Int)? {
         var cursor: (block: UUID, offset: Int)?
         for i in file.body.blocks.indices {
-            let b = file.body.blocks[i]
             file.body.blocks[i].id = UUID()
-            if b.kind == .text, let rtf = b.rtf {
-                let s = RichTextCodec.attributedString(from: rtf)
-                if let c = TemplateVariables.apply(to: s, context: context), cursor == nil { cursor = (file.body.blocks[i].id, c) }
-                file.body.blocks[i].rtf = RichTextCodec.rtfData(from: s)
-            } else if let code = b.code {
-                file.body.blocks[i].code = TemplateVariables.apply(code, context: context).text
-            }
+            if let found = fillBlock(&file.body.blocks[i], context: context), cursor == nil { cursor = (file.body.blocks[i].id, found) }
         }
         file.meta.id = UUID()
         file.meta.title = title ?? TemplateVariables.apply(file.meta.title, context: context).text
         file.meta.created = Date()
         file.meta.modified = Date()
         file.meta.pinned = false
+        return cursor
+    }
+
+    private static func fillBlock(_ block: inout BlockRecord, context: TemplateVariables.Context) -> Int? {
+        if block.kind == .text, let rtf = block.rtf {
+            let text = RichTextCodec.attributedString(from: rtf)
+            let cursor = TemplateVariables.apply(to: text, context: context)
+            block.rtf = RichTextCodec.rtfData(from: text)
+            return cursor
+        }
+        if let code = block.code { block.code = TemplateVariables.apply(code, context: context).text }
+        return nil
+    }
+
+    private func writeNewNote(_ file: NoteFile, in folder: URL?) -> URL? {
         let dir = folder ?? (sidebarSelection == .templates ? rootURL.appendingPathComponent(Self.defaultFolderName) : targetFolder)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = uniqueURL(in: dir, base: Self.sanitize(file.meta.title.isEmpty ? "Neue Notiz" : file.meta.title))
-        do { try file.write(to: url) } catch {
+        do {
+            try file.write(to: url)
+            return url
+        } catch {
             lastError = "Notiz konnte nicht angelegt werden: \(error.localizedDescription)"
             return nil
         }
-        let ref = NoteRef(meta: file.meta, url: url)
-        notes.append(ref)
-        if sidebarSelection == .templates || sidebarSelection == .trash || sidebarSelection == .damaged || sidebarSelection == .pinned {
-            sidebarSelection = .all
-        }
-        selectedNoteID = ref.id
-        if let cursor { FormattingController.shared.focus(blockID: cursor.block, at: cursor.offset) }
-        return ref
     }
 
     /// Saves a copy of a note as a new template.

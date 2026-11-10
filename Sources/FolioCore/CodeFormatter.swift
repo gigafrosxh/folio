@@ -129,42 +129,61 @@ extension CodeStyle {
     /// and tabs/spaces made consistent.
     public static func reindent(code: String, language: String) -> String {
         let unit = indentUnit(for: language)
-        let lines = code.components(separatedBy: "\n").map { line -> String in
-            var l = line
-            while let last = l.last, last == " " || last == "\t" { l.removeLast() }
-            return l
+        let lines = code.components(separatedBy: "\n").map(trimmingTrailingBlanks)
+        guard !indentationBasedLanguages.contains(language) else {
+            return lines.map { normalizingIndentation($0, unit: unit) }.joined(separator: "\n")
         }
-        if ["python", "yaml", "markdown", "plain", "fish", "ruby", "lua", "applescript", "sql"].contains(language) {
-            return lines.map { line in
-                let lead = line.prefix { $0 == " " || $0 == "\t" }
-                let width = lead.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
-                let normalized = unit == "\t" ? String(repeating: "\t", count: width / 4) : String(repeating: " ", count: width)
-                return normalized + line.dropFirst(lead.count)
-            }.joined(separator: "\n")
-        }
-        var depth = 0
-        var out: [String] = []
-        for line in lines {
+        var scanner = BracketDepthScanner()
+        return lines.map { line -> String in
             let body = line.drop { $0 == " " || $0 == "\t" }
-            if body.isEmpty { out.append(""); continue }
+            guard !body.isEmpty else { return "" }
             let leadingClosers = body.prefix { ")]}".contains($0) }.count
-            out.append(String(repeating: unit, count: max(depth - leadingClosers, 0)) + body)
-            var inString: Character?
-            var previous: Character = " "
-            for ch in body {
-                if let q = inString {
-                    if ch == q && previous != "\\" { inString = nil }
-                } else if ch == "\"" || ch == "'" || ch == "`" {
-                    inString = ch
-                } else if "([{".contains(ch) {
-                    depth += 1
-                } else if ")]}".contains(ch) {
-                    depth = max(depth - 1, 0)
-                }
-                previous = ch
-                if inString == nil, previous == "/", ch == "/" { break }
+            let indented = String(repeating: unit, count: max(scanner.depth - leadingClosers, 0)) + body
+            scanner.scan(body)
+            return indented
+        }.joined(separator: "\n")
+    }
+
+    private static let indentationBasedLanguages: Set<String> = ["python", "yaml", "markdown", "plain", "fish", "ruby", "lua", "applescript", "sql"]
+
+    private static func trimmingTrailingBlanks(_ line: String) -> String {
+        var l = line
+        while let last = l.last, last == " " || last == "\t" { l.removeLast() }
+        return l
+    }
+
+    private static func normalizingIndentation(_ line: String, unit: String) -> String {
+        let lead = line.prefix { $0 == " " || $0 == "\t" }
+        let width = lead.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+        let normalized = unit == "\t" ? String(repeating: "\t", count: width / 4) : String(repeating: " ", count: width)
+        return normalized + line.dropFirst(lead.count)
+    }
+}
+
+/// Follows bracket nesting line by line, ignoring strings and the rest of a // comment.
+private struct BracketDepthScanner {
+    private(set) var depth = 0
+
+    mutating func scan(_ line: Substring) {
+        var inString: Character?
+        var previous: Character = " "
+        for ch in line {
+            if let quote = inString {
+                if ch == quote && previous != "\\" { inString = nil }
+            } else if previous == "/" && ch == "/" {
+                return
+            } else {
+                inString = visit(ch)
             }
+            previous = ch
         }
-        return out.joined(separator: "\n")
+    }
+
+    /// Counts a bracket; returns the quote if a string starts here.
+    private mutating func visit(_ ch: Character) -> Character? {
+        if ch == "\"" || ch == "'" || ch == "`" { return ch }
+        if "([{".contains(ch) { depth += 1 }
+        if ")]}".contains(ch) { depth = max(depth - 1, 0) }
+        return nil
     }
 }

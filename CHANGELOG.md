@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Code formatieren** (#160): Klammern hinter einem Schrägstrich, etwa bei einer Division, werden jetzt mitgezählt, sodass die folgenden Zeilen richtig eingerückt werden.
+
+### Intern
+- **KI-Antwort, Code-Editor, Tags und Syntax-Hervorhebung** (#140, #141, #147, #149): In kleine, einzeln getestete Schritte zerlegt.
+
 ## [1.3.4] – 2026-11-10
 
 ### Behoben

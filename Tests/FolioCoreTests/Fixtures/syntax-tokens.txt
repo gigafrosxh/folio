@@ -1,0 +1,73 @@
+== python
+function 30 1
+function 84 3
+type 12 9
+type 62 9
+type 84 3
+type 115 3
+number 37 1
+number 93 4
+attribute 98 10
+keyword 0 6
+keyword 26 3
+keyword 77 6
+keyword 109 5
+keyword 120 4
+comment 10 15
+string 49 23
+string 125 16
+== javascript
+function 42 1
+type 23 9
+number 60 5
+keyword 0 5
+keyword 33 8
+keyword 49 6
+keyword 86 3
+string 10 8
+comment 20 12
+comment 69 16
+string 94 10
+== swift
+function 66 1
+type 7 10
+type 19 9
+type 36 1
+type 47 3
+type 73 6
+type 47 3
+type 73 6
+number 53 5
+attribute 18 10
+keyword 0 6
+keyword 29 6
+keyword 40 3
+keyword 61 4
+string 82 5
+comment 90 4
+== sql
+function 13 5
+keyword 0 6
+keyword 22 4
+keyword 42 5
+comment 29 12
+string 53 3
+string 56 3
+== bash
+number 38 1
+number 40 1
+attribute 18 5
+keyword 12 4
+keyword 29 3
+keyword 35 2
+keyword 43 2
+keyword 54 4
+comment 0 11
+string 17 7
+comment 25 3
+== plain
+
+== markdown
+keyword 0 7
+type 8 8
+string 17 6
