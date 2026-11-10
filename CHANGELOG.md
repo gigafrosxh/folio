@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.5] – 2026-11-10
+
 ### Behoben
 - **Code formatieren** (#160): Klammern hinter einem Schrägstrich, etwa bei einer Division, werden jetzt mitgezählt, sodass die folgenden Zeilen richtig eingerückt werden.
 
