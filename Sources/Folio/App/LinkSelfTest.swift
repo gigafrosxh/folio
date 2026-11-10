@@ -92,8 +92,15 @@ enum LinkSelfTest {
             let text = store.currentDocument?.blocks.first?.storage.string ?? ""
             check(note.meta.title == "Sitzung" && text.hasPrefix("Sitzung\nAm \(DailyNote.title(for: Date()))\n\nEnde"),
                   "Vorlage setzt Titel, Datum und Cursor ein (\(text.replacingOccurrences(of: "\n", with: "⏎")))")
+            // The cursor is set once the editor exists, which takes a varying time in a release build (#135).
+            let expected = ("Sitzung\nAm 0000-00-00\n" as NSString).length
+            var waited = 0.0
+            while FormattingController.shared.activeTextView?.selectedRange().location != expected, waited < 2 {
+                await wait(0.05)
+                waited += 0.05
+            }
             let cursor = FormattingController.shared.activeTextView?.selectedRange().location
-            check(cursor == ("Sitzung\nAm 0000-00-00\n" as NSString).length, "Cursor steht an {{cursor}} (\(cursor ?? -1))")
+            check(cursor == expected, "Cursor steht an {{cursor}} (\(cursor ?? -1))")
         } else { check(false, "Vorlage anwenden") }
 
         // Properties (#121): saved, searchable, removable.

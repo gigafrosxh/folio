@@ -179,7 +179,8 @@ final class FormattingController: ObservableObject {
         // itself, so its first text block gets the cursor at the start.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             guard let self, self.heldTyping != nil else { return }
-            if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, !tv.isFieldEditor || !forNote {
+            // Held keys for the quick switcher only ever go into a search field, never into the note (#135).
+            if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, tv.isFieldEditor != forNote {
                 self.releaseHeldTyping(into: tv)
             } else if forNote, let first = NoteStore.shared.currentDocument?.blocks.first(where: { $0.kind == .text }) {
                 self.focus(blockID: first.id, atEnd: false)

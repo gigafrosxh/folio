@@ -7,6 +7,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
+# FOLIO_BINARY tests another build, e.g. a copy from scripts/make-test-app.sh; a release identity refuses to start.
+BINARY = os.environ.get("FOLIO_BINARY", str(ROOT / ".build/debug/Folio"))
 RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
 print(f"Test libraries and logs: {RUN}", flush=True)
 failed = False
@@ -24,7 +26,7 @@ for flag, prefix in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDI
         # This harness needs a second note with an attachment; generate an image fixture.
         env["FOLIO_SAMPLE_MEDIA"] = str(RUN / "no-audio-needed.wav")
     with log.open("w") as output:
-        proc = subprocess.Popen([str(ROOT / ".build/debug/Folio")], env=env,
+        proc = subprocess.Popen([BINARY], env=env,
                                 stdout=output, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 60

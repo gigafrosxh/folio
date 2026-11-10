@@ -71,7 +71,11 @@ public enum BlockTestEvaluator {
             .trimmingCharacters(in: .newlines)
     }
 
-    public static func evaluate(_ test: BlockTest, result r: RunResult) -> BlockTestOutcome {
+    /// A regular expression that backtracks badly could otherwise run practically forever (#134).
+    public static let defaultRegexTimeout: TimeInterval = 2
+
+    /// Can take up to `regexTimeout`, so call it off the main actor when the test may use a regular expression.
+    public static func evaluate(_ test: BlockTest, result r: RunResult, regexTimeout: TimeInterval = defaultRegexTimeout) -> BlockTestOutcome {
         if r.cancelled { return .notRun("Der Lauf wurde gestoppt.") }
         if test.isEmpty { return .notRun("Für diesen Test ist nichts festgelegt.") }
         let actual = normalize(r.combinedOutput)
@@ -81,14 +85,14 @@ public enum BlockTestEvaluator {
         if !r.timedOut, !r.memoryExceeded, let code = test.expectedExitCode, code != r.exitCode {
             messages.append("Exit-Code \(r.exitCode), erwartet war \(code).")
         }
-        if let expected = test.expectedOutput, let problem = outputProblem(expected: expected, actual: actual, match: test.match) {
+        if let expected = test.expectedOutput, let problem = outputProblem(expected: expected, actual: actual, match: test.match, regexTimeout: regexTimeout) {
             messages.append(problem)
         }
         return BlockTestOutcome(status: messages.isEmpty ? .passed : .failed, messages: messages,
                                 actualOutput: actual, actualExitCode: r.exitCode)
     }
 
-    private static func outputProblem(expected: String, actual: String, match: BlockTest.Match) -> String? {
+    private static func outputProblem(expected: String, actual: String, match: BlockTest.Match, regexTimeout: TimeInterval) -> String? {
         switch match {
         case .exact:
             return normalize(expected) == actual ? nil : "Die Ausgabe weicht von der Erwartung ab."
@@ -98,9 +102,30 @@ public enum BlockTestEvaluator {
             guard let regex = try? NSRegularExpression(pattern: expected, options: [.anchorsMatchLines]) else {
                 return "Der reguläre Ausdruck ist ungültig."
             }
-            let range = NSRange(actual.startIndex..., in: actual)
-            return regex.firstMatch(in: actual, range: range) != nil ? nil : "Der reguläre Ausdruck passt nicht auf die Ausgabe."
+            switch firstMatch(of: regex, in: actual, timeout: regexTimeout) {
+            case true?: return nil
+            case false?: return "Der reguläre Ausdruck passt nicht auf die Ausgabe."
+            case nil: return "Der reguläre Ausdruck hat das Zeitlimit von \(Int(regexTimeout)) s überschritten."
+            }
         }
+    }
+
+    /// Whether the expression matches, or nil when it ran out of time. `reportProgress` makes the matcher call back
+    /// during backtracking too, so it can really be stopped and no thread keeps running.
+    private static func firstMatch(of regex: NSRegularExpression, in text: String, timeout: TimeInterval) -> Bool? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var found = false
+        var timedOut = false
+        regex.enumerateMatches(in: text, options: [.reportProgress], range: NSRange(text.startIndex..., in: text)) { match, _, stop in
+            if match != nil {
+                found = true
+                stop.pointee = true
+            } else if Date() >= deadline {
+                timedOut = true
+                stop.pointee = true
+            }
+        }
+        return timedOut ? nil : found
     }
 }
 

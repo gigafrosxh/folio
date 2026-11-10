@@ -115,7 +115,10 @@ final class RunManager: ObservableObject {
                 if block.outputIsError || !r.stderr.isEmpty {
                     block.diagnostics = DiagnosticParser.parse(r.combinedOutput, fileName: r.fileName, lineCount: lineCount)
                 }
-                if let test = block.test { block.testOutcome = BlockTestEvaluator.evaluate(test, result: r) }
+                if let test = block.test {
+                    // A regular expression can take seconds; the interface has to keep running (#134).
+                    block.testOutcome = await Task.detached(priority: .userInitiated) { BlockTestEvaluator.evaluate(test, result: r) }.value
+                }
                 if kernel != nil {
                     block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
                     block.startedServer = r.serverURL != nil

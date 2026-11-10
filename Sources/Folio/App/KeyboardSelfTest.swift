@@ -5,12 +5,29 @@ import FolioCore
 /// shortcuts) and the effect is checked: FOLIO_KEY_TEST=1 with a throwaway FOLIO_LIBRARY.
 @MainActor
 enum KeyboardSelfTest {
+    private static func hardwareKeyDowns() -> UInt32 { CGEventSource.counterForEventType(.hidSystemState, eventType: .keyDown) }
+    private static var keyDownsSeen = hardwareKeyDowns()
+    private static var lostActivation = false
+
+    /// Someone typing on the real keyboard or switching apps during a check says nothing about Folio (#135).
     private static func check(_ ok: Bool, _ label: String) {
-        print(ok ? "KEY ok" : "KEY FAIL", label)
+        let disturbed = lostActivation || hardwareKeyDowns() != keyDownsSeen
+        print(ok ? "KEY ok" : disturbed ? "KEY skip (gestört durch echte Eingabe oder App-Wechsel)" : "KEY FAIL", label)
         fflush(stdout)
+        keyDownsSeen = hardwareKeyDowns()
+        lostActivation = false
     }
 
     private static func wait(_ s: Double) async { try? await Task.sleep(for: .seconds(s)) }
+
+    /// Waits for an effect instead of guessing how long it takes; a release build has different timing (#135).
+    private static func waitUntil(_ seconds: Double = 2, _ condition: () -> Bool) async {
+        var left = seconds
+        while !condition(), left > 0 {
+            await wait(0.05)
+            left -= 0.05
+        }
+    }
 
     /// German keyboard layout key codes for the keys used below.
     private static let codes: [String: UInt16] = ["w": 13, "n": 45, "t": 17, "d": 2, "f": 3, "p": 35, "s": 1, "y": 6, "c": 8, "k": 40, "g": 5, "ä": 39, "ö": 41, "\u{1b}": 53]
@@ -66,6 +83,9 @@ enum KeyboardSelfTest {
     static func run() async {
         let store = NoteStore.shared
         await wait(2)
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { lostActivation = true }
+        }
         let seen = Seen()
         for name in [Notification.Name.folioFind, .folioQuickOpen, .folioShowHistory, .folioToggleFocus, .folioNewFolder] {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { n in seen.names.insert(n.name.rawValue) }
@@ -133,6 +153,7 @@ enum KeyboardSelfTest {
             FormattingController.shared.focus(blockID: doc.blocks[0].id)
             await wait(0.3)
             await press("c", .control)
+            await waitUntil { doc.blocks.contains { $0.kind == .code } && doc.blocks.count > blocks }
             check(doc.blocks.contains { $0.kind == .code } && doc.blocks.count > blocks, "⌃C fügt einen Code-Block ein")
         } else {
             // Tool shortcuts only act in the key window of the active app; a test started in the background skips this.
@@ -222,10 +243,34 @@ enum KeyboardSelfTest {
         await wait(0.3)
         await press("p", .command, settle: 0)
         typeNow("xyz")
-        await wait(0.6)
+        await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "xyz" }
         let responder = NSApp.keyWindow?.firstResponder as? NSTextView
         check(noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "xyz",
               "⌘P: Getipptes geht in den Schnellwechsel, nicht in die Notiz (#99: \"\(responder?.string ?? "-")\")")
         await press("\u{1b}", [])
+        await quickOpenTimingChecks(store)
+    }
+
+    /// #135: keys at any distance after ⌘P, also posted in the same event-loop turn, must never reach the note.
+    private static func quickOpenTimingChecks(_ store: NoteStore) async {
+        let rounds = Int(ProcessInfo.processInfo.environment["FOLIO_KEY_ROUNDS"] ?? "") ?? 1
+        for gap in [0, 0.001, 0.005, 0.02, 0.05, 0.12, 0.3] {
+            for round in 0..<rounds {
+                guard let first = store.currentDocument?.blocks.first else { continue }
+                FormattingController.shared.focus(blockID: first.id)
+                await wait(0.3)
+                let text = noteText(store)
+                await press("p", .command, settle: 0)
+                if gap > 0 { await wait(gap) }
+                typeNow("q")
+                if gap > 0 { await wait(gap) }
+                typeNow("rs")
+                await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "qrs" }
+                let responder = NSApp.keyWindow?.firstResponder as? NSTextView
+                check(noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "qrs",
+                      "⌘P, Abstand \(gap) s, Runde \(round): Feld „\(responder?.string ?? "-")“, Notiz \(noteText(store) == text ? "unverändert" : "GEÄNDERT: \(noteText(store).suffix(12))")")
+                await press("\u{1b}", [])
+            }
+        }
     }
 }

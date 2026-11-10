@@ -250,7 +250,12 @@ public struct CaptureQueue: Sendable {
     public init(directory: URL) { self.directory = directory }
 
     public static var standard: CaptureQueue {
-        if let env = ProcessInfo.processInfo.environment["FOLIO_CAPTURE_QUEUE"] { return CaptureQueue(directory: URL(fileURLWithPath: env)) }
+        let environment = ProcessInfo.processInfo.environment
+        if let env = environment["FOLIO_CAPTURE_QUEUE"] { return CaptureQueue(directory: URL(fileURLWithPath: env)) }
+        // A test library must never pick up the real waiting captures (#136).
+        if let library = environment["FOLIO_LIBRARY"] {
+            return CaptureQueue(directory: URL(fileURLWithPath: library).appendingPathComponent(".folio/capture-queue", isDirectory: true))
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return CaptureQueue(directory: base.appendingPathComponent("Folio/Wartende Erfassungen", isDirectory: true))
     }

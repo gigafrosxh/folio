@@ -86,6 +86,24 @@ enum DevSelfTest {
         check(RunManager.shared.testSummaries[doc.id]?.failed == 1, "Zusammenfassung der Blocktests")
         for b in [passing, failing, linkedSetup, linkedTest] { doc.remove(b.id) }
 
+        // A regular expression with catastrophic backtracking must not freeze the interface (#134).
+        let backtracking = code("print('a' * 32)")
+        backtracking.test = BlockTest(expectedOutput: "^(a+)+b$", match: .regex)
+        doc.insert(backtracking, after: runtime.id)
+        var ticks = 0
+        let heartbeat = Task { @MainActor in
+            while !Task.isCancelled {
+                ticks += 1
+                await wait(0.05)
+            }
+        }
+        await run(backtracking, doc)
+        heartbeat.cancel()
+        check(backtracking.testOutcome?.status == .failed && backtracking.testOutcome?.messages.contains { $0.contains("Zeitlimit") } == true,
+              "Regulärer Ausdruck läuft ins Zeitlimit und gilt als fehlgeschlagen")
+        check(ticks >= 20, "Oberfläche reagiert während der Prüfung des regulären Ausdrucks (\(ticks) Takte)")
+        doc.remove(backtracking.id)
+
         // Environment (#25)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-env-\(UUID().uuidString.prefix(6))")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -72,7 +72,7 @@ struct NoteStatusPill: View {
                 Text("\(doc.meta.tags.count) Tag\(doc.meta.tags.count == 1 ? "" : "s")")
                 dot
             }
-            Text("\(wordCount) Wörter")
+            Text(Self.wordLabel(wordCount))
             dot
             Text("\(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)) komprimiert")
         }
@@ -86,6 +86,8 @@ struct NoteStatusPill: View {
         .onAppear(perform: refresh)
         .onChange(of: doc.meta.modified) { refresh() }
     }
+
+    static func wordLabel(_ count: Int) -> String { count == 1 ? "1 Wort" : "\(count) Wörter" }
 
     private var dot: some View { Text("·").foregroundStyle(.tertiary) }
 

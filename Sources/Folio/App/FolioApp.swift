@@ -62,7 +62,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Entry point: the test-mode check has to run before anything touches UserDefaults (#136).
 @main
+enum FolioMain {
+    @MainActor static func main() {
+        if let refusal = TestIsolation.refusal(bundleID: Bundle.main.bundleIdentifier, environment: ProcessInfo.processInfo.environment) {
+            FileHandle.standardError.write(Data((refusal + "\n").utf8))
+            exit(78)
+        }
+        FolioApp.main()
+    }
+}
+
 struct FolioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = NoteStore.shared

@@ -68,11 +68,22 @@ Signieren/Notarisieren (#63) läuft automatisch, sobald „Developer ID“-Zerti
 `folio-notary` im Schlüsselbund sind (`docs/SIGNING.md`); bis dahin ad hoc. Der Updater prüft Signatur und Team-ID
 (`UpdateManager.verifySignature`).
 
+### Testkopie (Pflicht für Release-Builds und DMG, #136)
+
+macOS speichert Einstellungen und Fensterpositionen unter der Bundle-ID. Ein Build mit `de.daniel.folio` startet deshalb
+nicht mehr, sobald `FOLIO_LIBRARY` oder ein `FOLIO_*_TEST` gesetzt ist. Zum Testen eine Kopie mit eigener ID erzeugen:
+`BIN="$(scripts/make-test-app.sh <Folio.app> <neuer Ordner>)"`, dann `FOLIO_LIBRARY=<kopie> "$BIN"` oder
+`FOLIO_BINARY="$BIN" python3 scripts/dev-regression.py`. Die Kopie schreibt nach `de.daniel.folio.selftest`, hat keine Widgets
+und übernimmt keine `folio://`-Links. Der nackte Debug-Build schreibt nach `Folio.plist`. `make test` setzt selbst eine leere
+`FOLIO_LIBRARY`. Mit `FOLIO_LIBRARY` nutzt die Schnellerfassung `<Bibliothek>/.folio/capture-queue`.
+
 ### Ohne Bildschirmzugriff testen (Debug-Harness)
 
 Der Nutzer hat Claude keinen Bildschirmzugriff gegeben. Stattdessen Umgebungsvariablen für `.build/debug/Folio`:
 
 - `FOLIO_LIBRARY=<kopie>` – Pflicht bei jedem Test.
+- `FOLIO_KEY_ROUNDS=<n>` – Wiederholungen der ⌘P-Zeitprüfung im Tastaturtest. Echte Tastatureingaben oder ein App-Wechsel während
+  einer Prüfung ergeben `KEY skip` statt `KEY FAIL` (#135).
 - `FOLIO_OPEN=<notiz.folio>`, `FOLIO_LAYOUT_DUMP=1`, `FOLIO_DUMP_DELAY=<s>`, `FOLIO_SNAPSHOT=<datei.png>` – Notiz öffnen
   und das Fenster als Bild speichern (rendert über `cacheDisplay`; Webinhalte erscheinen nicht immer).
 - `FOLIO_MENU_DUMP=1` – Menüeinträge mit Kürzeln ausgeben (Konflikte finden).
@@ -88,7 +99,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.3.0** (Blocktests, Anhang-Angaben, Absturzberichte) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.3.1** (Fehlerbehebungen zu 1.3.0: #134–#137) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -205,9 +216,8 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
   `docs/PRIVACY.md` mitpflegen.
 - Hardened Runtime testen ohne Zertifikat: `codesign --force --options runtime --entitlements Resources/Folio.entitlements
   --sign - .build/debug/Folio`, dann `scripts/dev-regression.py`.
-- Erststart auf „frischem System“ ohne Systemänderung: App aus dem DMG in den Scratch-Ordner kopieren und mit
-  `CFFIXED_USER_HOME=<leer> HOME=<leer> FOLIO_LIBRARY=<leer>/Documents/Folio` starten – so bleiben die echten
-  Einstellungen (`de.daniel.folio`) unberührt. Ein echter neuer macOS-Benutzer oder eine VM braucht die Zustimmung des Nutzers.
+- Erststart auf „frischem System“ ohne Systemänderung: siehe „Testkopie“ oben; `CFFIXED_USER_HOME` schützt die echten
+  Einstellungen unter macOS 27 nicht (#136). Ein echter neuer macOS-Benutzer oder eine VM braucht die Zustimmung des Nutzers.
 - Notizen werden mit `.sortedKeys` kodiert (#98), gleicher Inhalt ergibt gleiche Bytes.
 - Auf dem Mac des Nutzers liegt in `/Applications` noch Folio 0.9.0 (ohne eingebauten Updater) – nicht anfassen.
 

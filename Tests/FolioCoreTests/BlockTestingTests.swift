@@ -27,6 +27,15 @@ final class BlockTestingTests: XCTestCase {
         XCTAssertEqual(invalid.messages, ["Der reguläre Ausdruck ist ungültig."])
     }
 
+    func testRegexWithCatastrophicBacktrackingRunsIntoTimeLimit() {
+        let start = Date()
+        let outcome = BlockTestEvaluator.evaluate(BlockTest(expectedOutput: "^(a+)+b$", match: .regex),
+                                                  result: result(String(repeating: "a", count: 32)), regexTimeout: 0.2)
+        XCTAssertEqual(outcome.status, .failed)
+        XCTAssertTrue(outcome.messages.contains { $0.contains("Zeitlimit") }, "\(outcome.messages)")
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
+
     func testStoppedTimedOutAndEmpty() {
         XCTAssertEqual(BlockTestEvaluator.evaluate(BlockTest(), result: result("", cancelled: true)).status, .notRun)
         XCTAssertEqual(BlockTestEvaluator.evaluate(BlockTest(), result: result("", timedOut: true)).status, .failed)

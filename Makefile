@@ -4,7 +4,7 @@ build:
 	swift build
 
 test:
-	swift test
+	FOLIO_LIBRARY="$$(mktemp -d)" swift test
 
 regression:
 	./scripts/ui-regression.sh

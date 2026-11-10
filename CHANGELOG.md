@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Blocktests mit regulärem Ausdruck** (#134): Ein Muster mit starkem Backtracking konnte Folio einfrieren. Die Prüfung läuft jetzt außerhalb der Oberfläche und bricht nach 2 Sekunden ab; der Test gilt dann als fehlgeschlagen.
+- **Schnell öffnen** (#135): Während das Suchfeld erscheint, gehen zurückgehaltene Tastenanschläge nur noch in ein Suchfeld und nie in die Notiz.
+- **Wortzähler** (#137): Bei genau einem Wort steht jetzt „1 Wort“.
+
+### Intern
+- **Testläufe** (#136): Tests mit Release-Builds laufen über eine Kopie mit eigener Bundle-ID (`scripts/make-test-app.sh`). Der echte Build verweigert den Testmodus, damit die Einstellungen unberührt bleiben. Tastatur- und Link-Selbsttests warten auf das Ergebnis, statt Zeiten zu raten (#135).
+
 ## [1.3.0] – 2026-11-10
 
 ### Neu
