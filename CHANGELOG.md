@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.4] – 2026-11-10
+
 ### Behoben
 - **Tippen direkt nach ⌘N oder ⌘P** (#158): Wenn das Ziel länger braucht, wartet der getippte Text jetzt bis zu fünf Sekunden darauf, statt nach einer Sekunde verloren zu gehen.
 
