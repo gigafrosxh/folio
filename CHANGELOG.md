@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.2] – 2026-11-10
+
 ### Behoben
 - **Markdown-Export** (#159): Verschachtelte Listen behalten ihre Einrückung.
 
