@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.7] – 2026-11-10
+
 ### Behoben
 - **Veröffentlichung von 1.3.6**: Dort fehlten die geänderten Dateien des Umbaus; nur neue Hilfsdateien waren enthalten, das Verhalten war unverändert. 1.3.7 enthält den vollständigen Umbau von Notizgraph, Bibliotheksscan und Diagnose (#150, #153).
 
