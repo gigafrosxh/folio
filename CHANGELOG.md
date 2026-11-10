@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.6] – 2026-11-10
+
 ### Intern
 - **Notizgraph, Bibliotheksscan und Diagnose aufgeräumt** (#150, #153): Die Kräfte für den 2D- und 3D-Graph laufen in einer gemeinsamen Simulation, das Zeichnen ist in Phasen zerlegt. Scan und Diagnose sind in einzelne Schritte geteilt. Das Layout bleibt bitgenau gleich, neue Vergleichstests sichern das ab.
 
