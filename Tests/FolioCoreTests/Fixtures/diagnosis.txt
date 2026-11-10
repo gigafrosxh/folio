@@ -1,0 +1,24 @@
+== gut: blocks 1 attachments 1 lost 0/0
+warning 1 Block/Blöcke verweisen auf fehlende Anhänge.
+== leer: blocks 0 attachments 0 lost 0/0
+error Die Datei ist leer (0 Byte). Wahrscheinlich wurde das Speichern unterbrochen.
+== fremd: blocks 0 attachments 0 lost 0/0
+error Das ist keine Folio-Notiz: Die Dateikennung „FOLI“ fehlt am Anfang.
+== nur kennung: blocks 0 attachments 0 lost 0/0
+error Die Datei endet direkt nach der Kennung.
+== neuer: blocks 0 attachments 0 lost 0/0
+error Die Datei stammt von einer neueren Folio-Version (Format 255). Aktualisiere Folio.
+== abgeschnitten kopf: blocks 0 attachments 0 lost 0/0
+warning Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.
+error Schon der Kopfbereich (Titel, Tags) ist beschädigt: Daten fehlen (abgeschnitten). Danach ist nichts mehr lesbar.
+== abgeschnitten mitte: blocks 0 attachments 0 lost 0/0
+warning Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.
+error Der Inhalt der Notiz ist beschädigt: Daten fehlen (abgeschnitten). Text und Blöcke lassen sich nicht retten.
+== abgeschnitten ende: blocks 1 attachments 0 lost 0/1
+warning Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.
+error 1 von 1 Anhängen (Bilder, PDFs, Aufnahmen …) sind beschädigt: Daten fehlen (abgeschnitten).
+== verfälscht: blocks 0 attachments 1 lost 0/0
+warning Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.
+error Der Inhalt der Notiz ist unlesbar (kein gültiges Format).
+== fehlender anhang: blocks 1 attachments 0 lost 0/0
+warning 1 Block/Blöcke verweisen auf fehlende Anhänge.
