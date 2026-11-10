@@ -8,6 +8,8 @@ struct SafetySettingsView: View {
     @EnvironmentObject var store: NoteStore
     @ObservedObject private var backups = BackupManager.shared
     @State private var confirmRestore: BackupInfo?
+    @State private var crashScan: CrashReports.Scan?
+    @State private var crashText: CrashReportText?
 
     var body: some View {
         Form {
@@ -83,9 +85,28 @@ struct SafetySettingsView: View {
                 Text("Versionen und Papierkorb liegen im versteckten Ordner „.folio“ der Bibliothek. Versionen werden ausgedünnt: alle der letzten 24 Stunden, stündlich für eine Woche, täglich für 3 Monate, wöchentlich für ein Jahr.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                LabeledContent("Gefundene Abstürze") {
+                    if let crashScan { Text("\(crashScan.reports.count)").foregroundStyle(.secondary) } else { ProgressView().controlSize(.small) }
+                }
+                Button("Bericht erstellen …") {
+                    if let crashScan { crashText = CrashReportText(text: CrashReports.render(crashScan.reports)) }
+                }
+                .disabled(crashScan?.reports.isEmpty != false)
+                if let unreadable = crashScan?.unreadable, unreadable > 0 {
+                    Text("\(unreadable) Bericht(e) waren unlesbar und fehlen.").font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Absturzberichte")
+            } footer: {
+                Text("Der Bericht enthält nur technische Angaben, keine Notizinhalte, Titel, Pfade oder Geräte-IDs. Folio sendet ihn nicht; du siehst ihn vorher und entscheidest, ob du ihn sicherst oder kopierst.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear { backups.refresh() }
+        .task { crashScan = await Task.detached { CrashReports.scan() }.value }
+        .sheet(item: $crashText) { CrashReportSheet(text: $0.text) }
         .confirmationDialog("Sicherung wiederherstellen?", isPresented: Binding(get: { confirmRestore != nil }, set: { if !$0 { confirmRestore = nil } })) {
             Button("Als Ordner wiederherstellen") { if let b = confirmRestore { backups.restore(b) } }
         } message: {
@@ -102,5 +123,48 @@ struct SafetySettingsView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         theme.settings.backupFolder = url.path
         backups.refresh()
+    }
+}
+
+struct CrashReportText: Identifiable {
+    let id = UUID()
+    var text: String
+}
+
+/// Shows the whole report before it can go anywhere (#61).
+struct CrashReportSheet: View {
+    var text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Absturzbericht").font(.headline)
+            ScrollView {
+                Text(text)
+                    .font(.system(size: 11, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 320)
+            HStack {
+                Button("Kopieren") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                }
+                Button("Sichern …", action: save)
+                Spacer()
+                Button("Schließen") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 620, height: 480)
+    }
+
+    private func save() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Folio-Absturzbericht.txt"
+        panel.allowedContentTypes = [.plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 }

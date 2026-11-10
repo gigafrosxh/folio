@@ -1,6 +1,6 @@
 # Datenschutz und Sicherheit (#72)
 
-Stand: Folio 1.1.0. Kurzfassung: **Folio hat kein Konto, keinen Server und keine Telemetrie.** Deine Notizen
+Stand: Folio 1.3.0. Kurzfassung: **Folio hat kein Konto, keinen Server und keine Telemetrie.** Deine Notizen
 bleiben als Dateien auf deinem Mac. Ins Netz geht Folio nur für die Update-Prüfung und für Inhalte, die du selbst in
 eine Notiz einbettest.
 
@@ -19,6 +19,14 @@ eine Notiz einbettest.
 
 Folio verschlüsselt Notizen nicht selbst. Für Schutz auf dem Gerät sorgt FileVault; wer die Bibliothek mit iCloud
 Drive, Dropbox o. Ä. synchronisiert, gibt die Dateien diesem Anbieter.
+
+## Absturzberichte
+
+macOS legt nach einem Absturz einen Bericht in `~/Library/Logs/DiagnosticReports` ab. Folio liest dort unter
+Einstellungen › Sicherheit nur Berichte über sich selbst und nimmt daraus App- und Systemversion, Architektur,
+Fehlerart und die Aufrufliste des abgestürzten Threads. Datum nur als Tag. Pfade, E-Mail-Adressen, Kennungen und der
+Benutzername werden entfernt, Bibliotheken außerhalb von macOS und Folio bleiben unbenannt. Der Text erscheint
+vollständig, bevor du ihn sicherst oder kopierst. Folio versendet ihn nie selbst.
 
 ## Netzwerkzugriffe
 

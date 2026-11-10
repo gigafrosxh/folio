@@ -7,6 +7,11 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Tests für Code-Blöcke** (#29): Im Menü eines Code-Blocks lässt sich „Test für diesen Block“ einschalten. Erwartet werden ein Exit-Code und/oder eine Ausgabe (genau gleich, enthält oder regulärer Ausdruck); nach jedem Lauf zeigt der Block „Bestanden“ oder „Fehlgeschlagen“ mit dem Grund. „Alle Blocktests der Notiz ausführen“ prüft die ganze Notiz und führt dafür auch die Blöcke aus, deren Variablen ein späterer Test braucht. Interaktive Blöcke und Server werden nicht automatisch gestartet.
+- **Angaben zu Anhängen** (#49): Datei-, PDF- und Audio-Blöcke zeigen unter der Vorschau Name, Typ und Größe, bei PDFs auch die Seitenzahl. Bilder zeigen dasselbe mit den Pixelmaßen beim Darüberfahren. Leere oder nicht darstellbare Dateien bekommen ein Symbol statt einer leeren Fläche.
+- **Absturzberichte** (#61): Einstellungen › Sicherheit erstellt aus den Abstürzen von Folio einen Bericht ohne Notizinhalte, Titel, Pfade und Geräte-IDs. Du siehst ihn vollständig, bevor du ihn sicherst oder kopierst; Folio sendet nichts.
+
 ## [1.2.3] – 2026-10-22
 
 ### Neu
