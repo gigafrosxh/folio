@@ -77,6 +77,12 @@ nicht mehr, sobald `FOLIO_LIBRARY` oder ein `FOLIO_*_TEST` gesetzt ist. Zum Test
 und übernimmt keine `folio://`-Links. Der nackte Debug-Build schreibt nach `Folio.plist`. `make test` setzt selbst eine leere
 `FOLIO_LIBRARY`. Mit `FOLIO_LIBRARY` nutzt die Schnellerfassung `<Bibliothek>/.folio/capture-queue`.
 
+### Komplexität (#156)
+
+`swift run -c release --package-path Tools/ComplexityCheck complexity-check --baseline Tools/ComplexityCheck/baseline.json Sources`
+misst jede Funktion per SwiftSyntax (Regeln in `docs/COMPLEXITY.md`). Mehr als 15 Punkte ist nur für Einträge der Baseline erlaubt; das
+CI schlägt bei neuen oder schlechteren Einheiten fehl. Nach einer Verbesserung die Baseline mit `--update-baseline` verkleinern.
+
 ### Ohne Bildschirmzugriff testen (Debug-Harness)
 
 Der Nutzer hat Claude keinen Bildschirmzugriff gegeben. Stattdessen Umgebungsvariablen für `.build/debug/Folio`:
@@ -101,7 +107,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.3.6** (Refactoring nach Komplexitätsprüfung) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.3.7** (Komplexitätsprüfung im CI) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).

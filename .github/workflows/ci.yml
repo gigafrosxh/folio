@@ -42,6 +42,28 @@ jobs:
       - name: App bundle
         run: ./scripts/build-app.sh
 
+      - name: Cache complexity check
+        uses: actions/cache@v4
+        with:
+          path: Tools/ComplexityCheck/.build
+          key: complexity-${{ runner.os }}-${{ hashFiles('Tools/ComplexityCheck/Package.swift', 'Tools/ComplexityCheck/Package.resolved') }}
+
+      - name: Complexity (#156)
+        # Fails when a function is new or worse above 15 points; see docs/COMPLEXITY.md.
+        run: |
+          swift run -c release --package-path Tools/ComplexityCheck complexity-check \
+            --baseline Tools/ComplexityCheck/baseline.json --report complexity.md --json complexity.json Sources
+
+      - name: Complexity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-report
+          path: |
+            complexity.md
+            complexity.json
+          if-no-files-found: ignore
+
       - name: Test log
         if: failure()
         uses: actions/upload-artifact@v4

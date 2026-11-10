@@ -68,3 +68,12 @@ final class StoreOperationTests: XCTestCase {
         XCTAssertTrue(prompt.hasSuffix("Frage: Was?"))
     }
 }
+
+/// Release notes in the update window (#151).
+final class MarkdownViewBlockTests: XCTestCase {
+    func testBlocks() {
+        let blocks = MarkdownView.blocks(of: "# Titel\nText eins\nzwei\n\n- a\n  - b\n2) c\n> Zitat\n---\n```\nx  y\n```\n```\noffen")
+        XCTAssertEqual(blocks, [.heading(1, "Titel"), .paragraph("Text eins zwei"), .bullet(0, "a"), .bullet(1, "b"), .numbered("2)", "c"),
+                                .quote("Zitat"), .rule, .code("x  y"), .code("offen")])
+    }
+}

@@ -1,0 +1,29 @@
+name: Funktion vorschlagen
+description: Eine Idee für Folio.
+title: "[Wunsch] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Wofür?
+      description: Was möchtest du erreichen, und was stört heute?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Vorschlag
+      description: Wie könnte es aussehen oder sich bedienen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Bisheriger Umweg
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Daten und Datenschutz
+      options:
+        - label: Der Vorschlag braucht kein Netzwerk und keine neuen Speicherorte, oder ich habe beschrieben, welche.

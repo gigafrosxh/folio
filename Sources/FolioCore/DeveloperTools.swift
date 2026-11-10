@@ -129,95 +129,124 @@ public struct CodeDiagnostic: Equatable, Sendable, Hashable {
 public enum DiagnosticParser {
     /// `fileName` is the block's file as it was run ("main.py"); shared Python sessions report "<block>".
     public static func parse(_ output: String, fileName: String, lineCount: Int = .max) -> [CodeDiagnostic] {
-        var found: [CodeDiagnostic] = []
-        let lines = output.components(separatedBy: "\n")
-        let file = NSRegularExpression.escapedPattern(for: fileName)
-        let block = NSRegularExpression.escapedPattern(for: "<block>")
-        let names = "(?:[^\\s\"'():]*/)?(?:\(file)|\(block))"
+        var scan = DiagnosticScan(output: output, fileName: fileName, lineCount: lineCount)
+        for (i, line) in scan.lines.enumerated() { scan.read(line, at: i) }
+        scan.applyPythonTraceback()
+        scan.applyFallbacks()
+        return scan.found.sorted { $0.line < $1.line }
+    }
+}
 
-        // clang/gcc/swiftc/go/rustc-style "file:line:col: error: message" and "file:line: error: msg" (javac)
-        let compiler = try! NSRegularExpression(pattern: "(?:^|\\s|\\./)\(names):(\\d+)(?::(\\d+))?:?\\s*(fatal error|error|warning)?:?\\s*(.*)$")
-        // Python tracebacks: File "…/main.py", line 3, in <module>
-        let python = try! NSRegularExpression(pattern: "File \"\(names)\", line (\\d+)")
-        // Rust: --> main.rs:3:5
-        let rust = try! NSRegularExpression(pattern: "-->\\s*\(names):(\\d+):(\\d+)")
-        // bash/zsh: main.sh: line 3: message  /  main.sh:3: message
-        let shell = try! NSRegularExpression(pattern: "\(names): line (\\d+): (.*)$")
-        // Ruby: main.rb:3:in `foo': message
-        let ruby = try! NSRegularExpression(pattern: "\(names):(\\d+):in [`'][^']*'?:?\\s*(.*)$")
-        // Node: at … (/path/main.js:3:5)
-        let node = try! NSRegularExpression(pattern: "\\(?\(names):(\\d+):(\\d+)\\)?$")
+/// One pass over a run's output; each tool's message format is one pattern (#152).
+private struct DiagnosticScan {
+    let output: String
+    let lines: [String]
+    private let lineCount: Int
+    /// The block's file name, also as a path, or the "<block>" of shared Python sessions.
+    private let names: String
+    private(set) var found: [CodeDiagnostic] = []
+    private var pythonLines: [Int] = []
 
-        func ns(_ s: String) -> NSString { s as NSString }
-        func group(_ m: NSTextCheckingResult, _ i: Int, _ s: String) -> String? {
-            guard i < m.numberOfRanges, m.range(at: i).location != NSNotFound else { return nil }
-            return ns(s).substring(with: m.range(at: i))
-        }
-        func add(_ line: Int?, _ col: Int?, _ msg: String, _ sev: CodeDiagnostic.Severity) {
-            guard let line, line >= 1, line <= lineCount else { return }
-            let message = msg.trimmingCharacters(in: .whitespaces)
-            if let i = found.firstIndex(where: { $0.line == line }) {
-                // Keep the most useful message for a line (Python puts the reason at the end).
-                if found[i].message.isEmpty, !message.isEmpty { found[i].message = message }
-                return
-            }
-            found.append(CodeDiagnostic(line: line, column: col, message: message, severity: sev))
-        }
+    // clang/gcc/swiftc/go/rustc-style "file:line:col: error: message" and "file:line: error: msg" (javac)
+    private let compiler: NSRegularExpression
+    // Python tracebacks: File "…/main.py", line 3, in <module>
+    private let python: NSRegularExpression
+    // Rust: --> main.rs:3:5
+    private let rust: NSRegularExpression
+    // bash/zsh: main.sh: line 3: message  /  main.sh:3: message
+    private let shell: NSRegularExpression
+    // Ruby: main.rb:3:in `foo': message
+    private let ruby: NSRegularExpression
+    // Node: at … (/path/main.js:3:5)
+    private let node: NSRegularExpression
 
-        var pythonLines: [Int] = []
-        for (i, raw) in lines.enumerated() {
-            let s = raw
-            let r = NSRange(location: 0, length: ns(s).length)
-            if let m = python.firstMatch(in: s, range: r) {
-                pythonLines.append(Int(group(m, 1, s) ?? "") ?? 0)
-                continue
-            }
-            if let m = rust.firstMatch(in: s, range: r) {
-                // The message is on the line before ("error[E0425]: cannot find value …").
-                let msg = i > 0 ? lines[i - 1].replacingOccurrences(of: #"^(error|warning)(\[\w+\])?:\s*"#, with: "", options: .regularExpression) : ""
-                add(Int(group(m, 1, s) ?? ""), Int(group(m, 2, s) ?? ""), msg, i > 0 && lines[i - 1].hasPrefix("warning") ? .warning : .error)
-                continue
-            }
-            if let m = shell.firstMatch(in: s, range: r) {
-                add(Int(group(m, 1, s) ?? ""), nil, group(m, 2, s) ?? "", .error)
-                continue
-            }
-            if let m = ruby.firstMatch(in: s, range: r) {
-                add(Int(group(m, 1, s) ?? ""), nil, group(m, 2, s) ?? "", .error)
-                continue
-            }
-            if let m = compiler.firstMatch(in: s, range: r) {
-                let kind = group(m, 3, s) ?? ""
-                let msg = group(m, 4, s) ?? ""
-                // Plain "main.c:3:" without a kind is only taken when a message follows.
-                if kind.isEmpty && msg.isEmpty { continue }
-                add(Int(group(m, 1, s) ?? ""), group(m, 2, s).flatMap { Int($0) }, msg, kind == "warning" ? .warning : .error)
-                continue
-            }
-            if let m = node.firstMatch(in: s, range: r) {
-                add(Int(group(m, 1, s) ?? ""), Int(group(m, 2, s) ?? ""), "", .error)
-            }
+    init(output: String, fileName: String, lineCount: Int) {
+        self.output = output
+        self.lineCount = lineCount
+        lines = output.components(separatedBy: "\n")
+        let names = "(?:[^\\s\"'():]*/)?(?:\(NSRegularExpression.escapedPattern(for: fileName))|\(NSRegularExpression.escapedPattern(for: "<block>")))"
+        self.names = names
+        compiler = try! NSRegularExpression(pattern: "(?:^|\\s|\\./)\(names):(\\d+)(?::(\\d+))?:?\\s*(fatal error|error|warning)?:?\\s*(.*)$")
+        python = try! NSRegularExpression(pattern: "File \"\(names)\", line (\\d+)")
+        rust = try! NSRegularExpression(pattern: "-->\\s*\(names):(\\d+):(\\d+)")
+        shell = try! NSRegularExpression(pattern: "\(names): line (\\d+): (.*)$")
+        ruby = try! NSRegularExpression(pattern: "\(names):(\\d+):in [`'][^']*'?:?\\s*(.*)$")
+        node = try! NSRegularExpression(pattern: "\\(?\(names):(\\d+):(\\d+)\\)?$")
+    }
+
+    private static func group(_ m: NSTextCheckingResult, _ i: Int, _ s: String) -> String? {
+        guard i < m.numberOfRanges, m.range(at: i).location != NSNotFound else { return nil }
+        return (s as NSString).substring(with: m.range(at: i))
+    }
+
+    private static func number(_ m: NSTextCheckingResult, _ i: Int, _ s: String) -> Int? { group(m, i, s).flatMap { Int($0) } }
+
+    /// Keeps the most useful message for a line (Python puts the reason at the end).
+    private mutating func add(_ line: Int?, _ col: Int?, _ msg: String, _ sev: CodeDiagnostic.Severity) {
+        guard let line, line >= 1, line <= lineCount else { return }
+        let message = msg.trimmingCharacters(in: .whitespaces)
+        if let i = found.firstIndex(where: { $0.line == line }) {
+            if found[i].message.isEmpty, !message.isEmpty { found[i].message = message }
+            return
         }
-        // Python: the innermost frame in the block is where it failed; the last output line says why.
-        if let line = pythonLines.last {
-            let reason = lines.reversed().first { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix(" ") } ?? ""
-            found.removeAll { $0.line == line }
-            add(line, nil, reason, .error)
+        found.append(CodeDiagnostic(line: line, column: col, message: message, severity: sev))
+    }
+
+    private func first(_ regex: NSRegularExpression, in s: String) -> NSTextCheckingResult? {
+        regex.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length))
+    }
+
+    /// The first format that matches a line wins.
+    mutating func read(_ s: String, at i: Int) {
+        if let m = first(python, in: s) {
+            pythonLines.append(Self.number(m, 1, s) ?? 0)
+        } else if let m = first(rust, in: s) {
+            addRust(m, s, at: i)
+        } else if let m = first(shell, in: s) ?? first(ruby, in: s) {
+            add(Self.number(m, 1, s), nil, Self.group(m, 2, s) ?? "", .error)
+        } else if let m = first(compiler, in: s) {
+            addCompiler(m, s)
+        } else if let m = first(node, in: s) {
+            add(Self.number(m, 1, s), Self.number(m, 2, s), "", .error)
         }
+    }
+
+    /// The message is on the line before ("error[E0425]: cannot find value …").
+    private mutating func addRust(_ m: NSTextCheckingResult, _ s: String, at i: Int) {
+        let previous = i > 0 ? lines[i - 1] : ""
+        let msg = previous.replacingOccurrences(of: #"^(error|warning)(\[\w+\])?:\s*"#, with: "", options: .regularExpression)
+        add(Self.number(m, 1, s), Self.number(m, 2, s), msg, previous.hasPrefix("warning") ? .warning : .error)
+    }
+
+    /// Plain "main.c:3:" without a kind is only taken when a message follows.
+    private mutating func addCompiler(_ m: NSTextCheckingResult, _ s: String) {
+        let kind = Self.group(m, 3, s) ?? ""
+        let msg = Self.group(m, 4, s) ?? ""
+        guard !(kind.isEmpty && msg.isEmpty) else { return }
+        add(Self.number(m, 1, s), Self.number(m, 2, s), msg, kind == "warning" ? .warning : .error)
+    }
+
+    /// Python: the innermost frame in the block is where it failed; the last output line says why.
+    mutating func applyPythonTraceback() {
+        guard let line = pythonLines.last else { return }
+        let reason = lines.reversed().first { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix(" ") } ?? ""
+        found.removeAll { $0.line == line }
+        add(line, nil, reason, .error)
+    }
+
+    mutating func applyFallbacks() {
         // A Python SyntaxError reports the line as well: "  File "main.py", line 2" handled above.
-        if found.isEmpty, let m = try? NSRegularExpression(pattern: #"line (\d+)"#).firstMatch(in: output, range: NSRange(location: 0, length: ns(output).length)),
-           output.contains("SyntaxError") {
-            add(Int(group(m, 1, output) ?? ""), nil, "SyntaxError", .error)
+        if found.isEmpty, output.contains("SyntaxError"), let m = first(try! NSRegularExpression(pattern: #"line (\d+)"#), in: output) {
+            add(Self.number(m, 1, output), nil, "SyntaxError", .error)
         }
+        let reason = lines.first { $0.range(of: #"^\w*Error:"#, options: .regularExpression) != nil }
         // Node also prints the failing line first ("/path/main.js:3"), followed by the source line.
         if found.isEmpty, let m = try? NSRegularExpression(pattern: "^\(names):(\\d+)$", options: .anchorsMatchLines)
-            .firstMatch(in: output, range: NSRange(location: 0, length: ns(output).length)) {
-            let reason = lines.first { $0.range(of: #"^\w*Error:"#, options: .regularExpression) != nil } ?? ""
-            add(Int(group(m, 1, output) ?? ""), nil, reason, .error)
-        } else if !found.isEmpty, let reason = lines.first(where: { $0.range(of: #"^\w*Error:"#, options: .regularExpression) != nil }) {
+            .firstMatch(in: output, range: NSRange(location: 0, length: (output as NSString).length)) {
+            add(Self.number(m, 1, output), nil, reason ?? "", .error)
+        } else if let reason {
             for i in found.indices where found[i].message.isEmpty { found[i].message = reason }
         }
-        return found.sorted { $0.line < $1.line }
     }
 }
 

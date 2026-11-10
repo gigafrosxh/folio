@@ -16,6 +16,12 @@ struct ContentView: View {
     @State private var hoverExit = false
 
     var body: some View {
+        withAlerts(withNotifications(decoratedRow))
+    }
+
+    // MARK: Layout
+
+    private var mainRow: some View {
         HStack(spacing: 0) {
             if sidebarVisible && !focusMode {
                 SidebarView()
@@ -23,92 +29,112 @@ struct ContentView: View {
                     .padding(.trailing, 12)
                     .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
             }
-            if store.sidebarSelection == .trash {
-                TrashView(sidebarVisible: $sidebarVisible)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
-            } else if store.sidebarSelection == .graph {
-                // Opening a note from the graph goes back to the notes with that note selected.
-                GraphView(onOpen: { id in store.sidebarSelection = .all; store.open(noteID: id) })
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
-            } else if store.sidebarSelection == .damaged {
-                DamagedListView(sidebarVisible: $sidebarVisible)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
-            } else {
-                if !focusMode {
-                    NoteListView(sidebarVisible: $sidebarVisible)
-                        .frame(width: CGFloat(listWidth))
-                        .frame(maxHeight: .infinity)
-                        .panel(theme: theme)
-                        .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
-                    ColumnResizer(width: $listWidth, range: 240...460)
-                }
-                editorArea
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+            mainArea
+        }
+    }
+
+    /// Trash, graph and damaged notes take the whole area; everything else shows the list and the editor.
+    @ViewBuilder private var mainArea: some View {
+        switch store.sidebarSelection {
+        case .trash:
+            TrashView(sidebarVisible: $sidebarVisible).fullPanel(theme: theme)
+        case .graph:
+            // Opening a note from the graph goes back to the notes with that note selected.
+            GraphView(onOpen: { id in store.sidebarSelection = .all; store.open(noteID: id) }).fullPanel(theme: theme)
+        case .damaged:
+            DamagedListView(sidebarVisible: $sidebarVisible).fullPanel(theme: theme)
+        default:
+            listAndEditor
+        }
+    }
+
+    @ViewBuilder private var listAndEditor: some View {
+        if !focusMode {
+            NoteListView(sidebarVisible: $sidebarVisible)
+                .frame(width: CGFloat(listWidth))
+                .frame(maxHeight: .infinity)
+                .panel(theme: theme)
+                .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
+            ColumnResizer(width: $listWidth, range: 240...460)
+        }
+        editorArea.fullPanel(theme: theme)
+    }
+
+    private var decoratedRow: some View {
+        mainRow
+            .padding(12)
+            .background(AmbientBackground(accent: theme.accent))
+            .background(WindowAccessor(window: $windowState.window))
+            .environmentObject(windowState)
+            .fontDesign(.rounded)
+            .ignoresSafeArea()
+            .animation(Motion.standard, value: sidebarVisible)
+            .animation(Motion.standard, value: focusMode)
+            .overlay(alignment: .topTrailing) { focusExitButton }
+    }
+
+    @ViewBuilder private var focusExitButton: some View {
+        if focusMode {
+            Button { focusMode = false } label: {
+                Label("Fokusmodus beenden", systemImage: "arrow.down.right.and.arrow.up.left")
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .floatingCapsule()
+            }
+            .buttonStyle(.plain)
+            .opacity(hoverExit ? 1 : 0.0001)
+            .onHover { hoverExit = $0 }
+            .padding(.top, 22).padding(.trailing, 26)
+            .help("Fokusmodus beenden (⇧⌘F oder Esc)")
+        }
+    }
+
+    @ViewBuilder private var quickOpenOverlay: some View {
+        if let mode = quickOpen {
+            ZStack(alignment: .top) {
+                Color.black.opacity(0.18).ignoresSafeArea().onTapGesture { quickOpen = nil }
+                QuickOpenView(mode: mode) { quickOpen = nil }
+                    .padding(.top, 90)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
             }
         }
-        .padding(12)
-        .background(AmbientBackground(accent: theme.accent))
-        .background(WindowAccessor(window: $windowState.window))
-        .environmentObject(windowState)
-        .fontDesign(.rounded)
-        .ignoresSafeArea()
-        .animation(Motion.standard, value: sidebarVisible)
-        .animation(Motion.standard, value: focusMode)
-        .overlay(alignment: .topTrailing) {
-            if focusMode {
-                Button { focusMode = false } label: {
-                    Label("Fokusmodus beenden", systemImage: "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 12).padding(.vertical, 7)
-                        .floatingCapsule()
-                }
-                .buttonStyle(.plain)
-                .opacity(hoverExit ? 1 : 0.0001)
-                .onHover { hoverExit = $0 }
-                .padding(.top, 22).padding(.trailing, 26)
-                .help("Fokusmodus beenden (⇧⌘F oder Esc)")
+    }
+
+    // MARK: Commands
+
+    private func withNotifications<V: View>(_ view: V) -> some View {
+        view
+            .onExitCommand { if focusMode { focusMode = false } }
+            .onAppear { focusMode = false; QuickAccessSettings.opener = openWindow }
+            .onReceive(NotificationCenter.default.publisher(for: .folioToggleFocus)) { _ in focusMode.toggle() }
+            .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
+            .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }
+            .onReceive(UpdateManager.shared.$state) { state in
+                // A background check that finds a new version brings up the update sheet.
+                if case .available = state, !showUpdates, ThemeManager.shared.settings.askForUpdatesOnLaunch { showUpdates = true }
             }
-        }
-        .onExitCommand { if focusMode { focusMode = false } }
-        .onAppear { focusMode = false; QuickAccessSettings.opener = openWindow }
-        .onReceive(NotificationCenter.default.publisher(for: .folioToggleFocus)) { _ in focusMode.toggle() }
-        .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
-        .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }
-        .onReceive(UpdateManager.shared.$state) { state in
-            // A background check that finds a new version brings up the update sheet.
-            if case .available = state, !showUpdates, ThemeManager.shared.settings.askForUpdatesOnLaunch { showUpdates = true }
-        }
-        .overlay(alignment: .top) {
-            if let mode = quickOpen {
-                ZStack(alignment: .top) {
-                    Color.black.opacity(0.18).ignoresSafeArea().onTapGesture { quickOpen = nil }
-                    QuickOpenView(mode: mode) { quickOpen = nil }
-                        .padding(.top, 90)
-                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
-                }
+            .overlay(alignment: .top) { quickOpenOverlay }
+            .animation(Motion.quick, value: quickOpen)
+            .onReceive(NotificationCenter.default.publisher(for: .folioQuickOpen)) { note in
+                if quickOpen == nil { FormattingController.shared.holdTypingForQuickOpen() }
+                quickOpen = (note.object as? QuickOpenMode) ?? .open
             }
-        }
-        .animation(Motion.quick, value: quickOpen)
-        .onReceive(NotificationCenter.default.publisher(for: .folioQuickOpen)) { note in
-            if quickOpen == nil { FormattingController.shared.holdTypingForQuickOpen() }
-            quickOpen = (note.object as? QuickOpenMode) ?? .open
-        }
-        .sheet(isPresented: $showUpdates) { UpdateSheet() }
-        .sheet(item: $store.conflict) { conflict in
-            ConflictSheet(conflict: conflict).environmentObject(store).environmentObject(theme)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            store.checkExternalChange()
-        }
-        .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {
-            Button("OK") {}
-        } message: {
-            Text(store.lastError ?? "")
-        }
+    }
+
+    private func withAlerts<V: View>(_ view: V) -> some View {
+        view
+            .sheet(isPresented: $showUpdates) { UpdateSheet() }
+            .sheet(item: $store.conflict) { conflict in
+                ConflictSheet(conflict: conflict).environmentObject(store).environmentObject(theme)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                store.checkExternalChange()
+            }
+            .alert("Fehler", isPresented: Binding(get: { store.lastError != nil }, set: { if !$0 { store.lastError = nil } })) {
+                Button("OK") {}
+            } message: {
+                Text(store.lastError ?? "")
+            }
     }
 
     /// Tabs, the main editor and (optionally) a second note on the right.
@@ -226,5 +252,12 @@ extension View {
             .overlay(shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 1))
             // A soft shadow: panels float, but quietly (#131).
             .shadow(color: .black.opacity(theme.settings.shadows ? 0.12 : 0), radius: 14, y: 6)
+    }
+}
+
+private extension View {
+    /// The trash, graph, damaged notes and the editor fill the remaining room in a panel.
+    func fullPanel(theme: ThemeManager) -> some View {
+        frame(maxWidth: .infinity, maxHeight: .infinity).panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
     }
 }

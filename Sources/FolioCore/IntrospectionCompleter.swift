@@ -29,9 +29,13 @@ public struct IntrospectionCompleter: CompletionProvider {
     }
 
     private static func run(_ tool: String, _ arguments: [String], input: Data = Data()) -> Data? {
-        guard let path = InterpreterLocator.shared.find(tool) else { return nil }
+        guard let path = InterpreterLocator.shared.find(tool), let (process, output) = launch(path, arguments, input: input),
+              let data = readOutput(of: process, from: output), process.terminationStatus == 0 else { return nil }
+        return data
+    }
+
+    private static func launch(_ path: String, _ arguments: [String], input: Data) -> (Process, Pipe)? {
         let process = Process(), output = Pipe(), stdin = Pipe()
-        let buffer = IntrospectionBuffer()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = arguments
         process.environment = InterpreterLocator.shared.environment
@@ -43,7 +47,12 @@ public struct IntrospectionCompleter: CompletionProvider {
             try? stdin.fileHandleForWriting.write(contentsOf: input)
             try? stdin.fileHandleForWriting.close()
         }
-        // Nonblocking reads keep inherited pipes and excessive output within the deadline.
+        return (process, output)
+    }
+
+    /// Nonblocking reads keep inherited pipes and excessive output within the deadline; nil after it.
+    private static func readOutput(of process: Process, from output: Pipe) -> Data? {
+        let buffer = IntrospectionBuffer()
         let fd = output.fileHandleForReading.fileDescriptor
         _ = fcntl(fd, F_SETFL, O_NONBLOCK)
         var bytes = [UInt8](repeating: 0, count: 8192)
@@ -52,20 +61,21 @@ public struct IntrospectionCompleter: CompletionProvider {
             let count = read(fd, &bytes, bytes.count)
             if count > 0 { buffer.append(Data(bytes.prefix(count))) }
             if DispatchTime.now() >= deadline {
-                if process.isRunning {
-                    process.terminate()
-                    Thread.sleep(forTimeInterval: 0.05)
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
+                stop(process)
                 return nil
             }
             if count <= 0 {
-                if !process.isRunning { break }
+                if !process.isRunning { return buffer.value }
                 Thread.sleep(forTimeInterval: 0.005)
             }
         }
-        guard process.terminationStatus == 0 else { return nil }
-        return buffer.value
+    }
+
+    private static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        Thread.sleep(forTimeInterval: 0.05)
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
     }
 
     private static func script(_ ctx: CompletionContext) -> [CompletionItem] {
@@ -101,7 +111,7 @@ public struct IntrospectionCompleter: CompletionProvider {
         struct Entry: Decodable { var label: String; var kind: String; var detail: String? }
     }
 
-    private struct JavaMember: Sendable {
+    struct JavaMember: Sendable, Equatable {
         var item: CompletionItem
         var type: String
         var isStatic: Bool
@@ -116,27 +126,31 @@ public struct IntrospectionCompleter: CompletionProvider {
     private static func javaMembers(_ name: String) -> [JavaMember]? {
         if let cached = cache.java(name) { return cached }
         guard let data = run("javap", ["-public", name]) else { return nil }
-        let text = String(decoding: data, as: UTF8.self)
-        var result: [JavaMember] = [], seen = Set<String>()
-        for line in text.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("public "), trimmed.hasSuffix(";"), !trimmed.contains(" class "), !trimmed.contains(" interface ") else { continue }
-            let signature = cleanGenerics(trimmed)
-            let parts = signature.split(separator: "(", maxSplits: 1).map(String.init)
-            let tokens = parts[0].replacingOccurrences(of: ";", with: "").split(separator: " ").map(String.init)
-            guard let memberName = tokens.last, tokens.count >= 3, !memberName.contains(".") else { continue }
-            let type = tokens[tokens.count - 2]
-            guard !["public", "static", "final"].contains(type), seen.insert(memberName).inserted else { continue }
-            let method = parts.count > 1
-            let params = method ? String(parts[1].prefix(while: { $0 != ")" })) : ""
-            let shortType = type.split(separator: ".").last.map(String.init) ?? type
-            let detail = method ? "\(shortType) \(memberName)(\(params))" : shortType
-            result.append(JavaMember(item: CompletionItem(label: memberName, kind: method ? .method : .field, detail: detail,
-                                                          insertText: method ? memberName + (params.isEmpty ? "()" : "(") : memberName),
-                                     type: type, isStatic: tokens.contains("static")))
-        }
+        let result = parseJavap(String(decoding: data, as: UTF8.self))
         cache.putJava(result, for: name)
         return result
+    }
+
+    /// The public members `javap -public` lists, each name once (the first overload wins).
+    static func parseJavap(_ text: String) -> [JavaMember] {
+        var seen = Set<String>()
+        return text.components(separatedBy: "\n").compactMap(javaMember(fromLine:)).filter { seen.insert($0.item.label).inserted }
+    }
+
+    private static func javaMember(fromLine line: String) -> JavaMember? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("public "), trimmed.hasSuffix(";"), !trimmed.contains(" class "), !trimmed.contains(" interface ") else { return nil }
+        let parts = cleanGenerics(trimmed).split(separator: "(", maxSplits: 1).map(String.init)
+        let tokens = parts[0].replacingOccurrences(of: ";", with: "").split(separator: " ").map(String.init)
+        guard let name = tokens.last, tokens.count >= 3, !name.contains(".") else { return nil }
+        let type = tokens[tokens.count - 2]
+        guard !["public", "static", "final"].contains(type) else { return nil }
+        let isMethod = parts.count > 1
+        let params = isMethod ? String(parts[1].prefix(while: { $0 != ")" })) : ""
+        let shortType = type.split(separator: ".").last.map(String.init) ?? type
+        let item = CompletionItem(label: name, kind: isMethod ? .method : .field, detail: isMethod ? "\(shortType) \(name)(\(params))" : shortType,
+                                  insertText: isMethod ? name + (params.isEmpty ? "()" : "(") : name)
+        return JavaMember(item: item, type: type, isStatic: tokens.contains("static"))
     }
 
     private static func cleanGenerics(_ value: String) -> String {
@@ -145,41 +159,50 @@ public struct IntrospectionCompleter: CompletionProvider {
         return value
     }
 
+    private static let javaLangTypes = ["String", "System", "Math", "Integer", "Long", "Double", "Float", "Boolean", "Character", "Byte", "Short", "Object", "Class", "Thread", "Throwable", "Exception", "RuntimeException", "StringBuilder", "StringBuffer", "Enum", "Iterable", "Comparable", "Number", "Runtime", "Process", "Void"]
+    private static let javaPackages = ["java.lang", "java.util", "java.io", "java.nio.file", "java.time", "java.util.stream", "java.util.function"]
+
     private static func java(_ ctx: CompletionContext) -> [CompletionItem] {
         let imports = matches(#"\bimport\s+(?!static\b)([\w.$]+(?:\.\*)?)\s*;"#, ctx.code).map { $0[1] }
         guard let receiver = ctx.receiver else {
-            let names = ["String", "System", "Math", "Integer", "Long", "Double", "Float", "Boolean", "Character", "Byte", "Short", "Object", "Class", "Thread", "Throwable", "Exception", "RuntimeException", "StringBuilder", "StringBuffer", "Enum", "Iterable", "Comparable", "Number", "Runtime", "Process", "Void"]
-            return (names + imports.filter { !$0.hasSuffix(".*") }.compactMap { $0.split(separator: ".").last.map(String.init) }).map { CompletionItem(label: $0, kind: .class) }
-        }
-        func resolve(_ raw: String) -> [JavaMember]? {
-            let type = cleanType(raw)
-            let candidates = (type.contains(".") ? [type] : [])
-                + imports.filter { $0.hasSuffix("." + type) }
-                + imports.filter { $0.hasSuffix(".*") }.map { String($0.dropLast()) + type }
-                + ["java.lang", "java.util", "java.io", "java.nio.file", "java.time", "java.util.stream", "java.util.function"].map { $0 + "." + type }
-            for candidate in candidates { if let members = javaMembers(candidate) { return members } }
-            return nil
+            return (javaLangTypes + imports.filter { !$0.hasSuffix(".*") }.compactMap { $0.split(separator: ".").last.map(String.init) }).map { CompletionItem(label: $0, kind: .class) }
         }
         let chain = receiver.components(separatedBy: ".")
-        guard let first = chain.first, !first.isEmpty else { return [] }
-        var isStatic = first.first?.isUppercase == true
-        var type = first
-        if !isStatic {
-            let escaped = NSRegularExpression.escapedPattern(for: first)
-            if let match = matches(#"\bvar\s+"# + escaped + #"\s*=\s*new\s+([\w.$]+)"#, ctx.code).last { type = match[1] }
-            else if let match = matches(#"\b([A-Za-z_$][\w.$]*(?:\s*<[^;=()]+>)?(?:\[\])*)\s+"# + escaped + #"\b\s*(?:=|[,;)])"#, ctx.code).last { type = match[1] }
-            else { return [] }
-        }
-        guard var members = resolve(type) else { return [] }
+        guard let first = chain.first, !first.isEmpty, let start = javaStart(first, in: ctx.code),
+              var members = resolveJava(start.type, imports: imports) else { return [] }
+        var isStatic = start.isStatic
         for segment in chain.dropFirst() {
-            let method = segment.contains("(")
-            let name = String(segment.prefix(while: { $0 != "(" }))
-            guard let member = members.first(where: { $0.item.label == name && $0.isStatic == isStatic && ($0.item.kind == .method) == method }),
-                  let next = resolve(member.type) else { return [] }
+            guard let next = javaMembers(after: segment, in: members, isStatic: isStatic, imports: imports) else { return [] }
             members = next
             isStatic = false
         }
         return members.filter { $0.isStatic == isStatic }.map(\.item)
+    }
+
+    /// A capitalized name is a class (static access); otherwise the variable's declared type is looked up.
+    private static func javaStart(_ first: String, in code: String) -> (type: String, isStatic: Bool)? {
+        if first.first?.isUppercase == true { return (first, true) }
+        let escaped = NSRegularExpression.escapedPattern(for: first)
+        if let match = matches(#"\bvar\s+"# + escaped + #"\s*=\s*new\s+([\w.$]+)"#, code).last { return (match[1], false) }
+        if let match = matches(#"\b([A-Za-z_$][\w.$]*(?:\s*<[^;=()]+>)?(?:\[\])*)\s+"# + escaped + #"\b\s*(?:=|[,;)])"#, code).last { return (match[1], false) }
+        return nil
+    }
+
+    private static func resolveJava(_ raw: String, imports: [String]) -> [JavaMember]? {
+        let type = cleanType(raw)
+        let candidates = (type.contains(".") ? [type] : [])
+            + imports.filter { $0.hasSuffix("." + type) }
+            + imports.filter { $0.hasSuffix(".*") }.map { String($0.dropLast()) + type }
+            + javaPackages.map { $0 + "." + type }
+        return candidates.lazy.compactMap(javaMembers).first
+    }
+
+    /// The members of what `segment` (a field, or a method call with parentheses) returns.
+    private static func javaMembers(after segment: String, in members: [JavaMember], isStatic: Bool, imports: [String]) -> [JavaMember]? {
+        let isMethod = segment.contains("(")
+        let name = String(segment.prefix(while: { $0 != "(" }))
+        guard let member = members.first(where: { $0.item.label == name && $0.isStatic == isStatic && ($0.item.kind == .method) == isMethod }) else { return nil }
+        return resolveJava(member.type, imports: imports)
     }
 
     private final class IntrospectionCache: @unchecked Sendable {

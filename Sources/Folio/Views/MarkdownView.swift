@@ -5,7 +5,7 @@ import SwiftUI
 struct MarkdownView: View {
     var markdown: String
 
-    private enum Block: Hashable {
+    enum Block: Hashable {
         case heading(Int, String)
         case bullet(Int, String)
         case numbered(String, String)
@@ -15,39 +15,62 @@ struct MarkdownView: View {
         case paragraph(String)
     }
 
-    private var blocks: [Block] {
-        var out: [Block] = []
-        var paragraph: [String] = []
-        var code: [String]? = nil
-        func flush() {
-            if !paragraph.isEmpty { out.append(.paragraph(paragraph.joined(separator: " "))); paragraph = [] }
+    private var blocks: [Block] { Self.blocks(of: markdown) }
+
+    static func blocks(of markdown: String) -> [Block] {
+        var parser = BlockParser()
+        markdown.components(separatedBy: "\n").forEach { parser.add($0) }
+        return parser.finish()
+    }
+
+    /// Collects paragraphs and code fences line by line (#151).
+    private struct BlockParser {
+        private var out: [Block] = []
+        private var paragraph: [String] = []
+        private var code: [String]?
+
+        private mutating func flush() {
+            if !paragraph.isEmpty { out.append(.paragraph(paragraph.joined(separator: " "))) }
+            paragraph = []
         }
-        for raw in markdown.components(separatedBy: "\n") {
+
+        mutating func add(_ raw: String) {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("```") {
-                if let c = code { out.append(.code(c.joined(separator: "\n"))); code = nil } else { flush(); code = [] }
-                continue
-            }
-            if code != nil { code!.append(raw); continue }
-            if line.isEmpty { flush(); continue }
-            let indent = raw.prefix { $0 == " " }.count / 2
-            if let m = line.range(of: #"^#{1,6} "#, options: .regularExpression) {
-                flush(); out.append(.heading(line[m].count - 1, String(line[m.upperBound...])))
-            } else if line == "---" || line == "***" {
-                flush(); out.append(.rule)
-            } else if let m = line.range(of: #"^[-*+] "#, options: .regularExpression) {
-                flush(); out.append(.bullet(indent, String(line[m.upperBound...])))
-            } else if let m = line.range(of: #"^\d+[.)] "#, options: .regularExpression) {
-                flush(); out.append(.numbered(String(line[m].dropLast()), String(line[m.upperBound...])))
-            } else if line.hasPrefix(">") {
-                flush(); out.append(.quote(String(line.dropFirst()).trimmingCharacters(in: .whitespaces)))
+            if line.hasPrefix("```") { toggleCode(); return }
+            if code != nil { code?.append(raw); return }
+            if line.isEmpty { flush(); return }
+            if let block = MarkdownView.block(for: line, indent: raw.prefix { $0 == " " }.count / 2) {
+                flush()
+                out.append(block)
             } else {
                 paragraph.append(line)
             }
         }
-        if let c = code { out.append(.code(c.joined(separator: "\n"))) }
-        flush()
-        return out
+
+        private mutating func toggleCode() {
+            if let c = code {
+                out.append(.code(c.joined(separator: "\n")))
+                code = nil
+            } else {
+                flush()
+                code = []
+            }
+        }
+
+        mutating func finish() -> [Block] {
+            if let c = code { out.append(.code(c.joined(separator: "\n"))) }
+            flush()
+            return out
+        }
+    }
+
+    /// A line that is a block of its own, or nil for paragraph text.
+    private static func block(for line: String, indent: Int) -> Block? {
+        if let m = line.range(of: #"^#{1,6} "#, options: .regularExpression) { return .heading(line[m].count - 1, String(line[m.upperBound...])) }
+        if line == "---" || line == "***" { return .rule }
+        if let m = line.range(of: #"^[-*+] "#, options: .regularExpression) { return .bullet(indent, String(line[m.upperBound...])) }
+        if let m = line.range(of: #"^\d+[.)] "#, options: .regularExpression) { return .numbered(String(line[m].dropLast()), String(line[m.upperBound...])) }
+        return line.hasPrefix(">") ? .quote(String(line.dropFirst()).trimmingCharacters(in: .whitespaces)) : nil
     }
 
     var body: some View {

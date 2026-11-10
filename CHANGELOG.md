@@ -7,6 +7,16 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Veröffentlichung von 1.3.6**: Dort fehlten die geänderten Dateien des Umbaus; nur neue Hilfsdateien waren enthalten, das Verhalten war unverändert. 1.3.7 enthält den vollständigen Umbau von Notizgraph, Bibliotheksscan und Diagnose (#150, #153).
+
+### Neu
+- **Komplexitätsprüfung im CI** (#156): `Tools/ComplexityCheck` misst die kognitive Komplexität jeder Swift-Funktion über den Syntaxbaum. Neue oder schlechtere Funktionen über 15 Punkten lassen das CI fehlschlagen; der Bericht liegt als Artefakt bei. Regeln und Baseline in `docs/COMPLEXITY.md`.
+- **Mitwirken** (#66, #67): `CONTRIBUTING.md` mit Einrichtung, Architektur und Regeln, dazu Vorlagen für Fehlermeldungen, Wünsche und Pull Requests.
+
+### Intern
+- **Ansichten, Completion und Compiler-Meldungen aufgeräumt** (#151, #152): Hauptfenster, Markdown-Anzeige, Tag-Dialog, Completion-Kontext, Java- und Skript-Completion sowie das Erkennen von Fehlerzeilen sind in kleine, getestete Schritte zerlegt.
+
 ## [1.3.6] – 2026-11-10
 
 ### Intern

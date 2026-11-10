@@ -1,0 +1,58 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke! Bitte keine privaten Notizinhalte einfügen. Absturzberichte ohne Inhalte erstellt Folio unter
+        **Einstellungen › Sicherheit › Absturzberichte**.
+  - type: input
+    id: version
+    attributes:
+      label: Folio-Version
+      description: Steht unter „Folio › Über Folio“.
+      placeholder: "1.3.7"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS-Version und Mac
+      placeholder: "macOS 27.2, MacBook Air M3"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Neue Notiz anlegen
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartet
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Tatsächlich
+      description: Fehlermeldungen wörtlich, Screenshots helfen.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Auswirkung
+      options:
+        - Daten verloren, Absturz oder Eingabe am falschen Ort (P0)
+        - Wichtige Funktion geht nicht (P1)
+        - Stört, aber es gibt einen Umweg (P2)
+        - Kleinigkeit (P3)
+    validations:
+      required: true

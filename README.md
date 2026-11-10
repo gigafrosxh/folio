@@ -83,6 +83,10 @@ Beim Import aus Apple Notizen und beim Erstellen von Numbers-Tabellen fragt macO
 
 Die Dateitypdeklaration registriert `.folio` als `de.daniel.folio.note` mit der Rolle „Editor“. Die App muss vom Finder übergebene Datei-URLs selbst entgegennehmen und die betreffende Notiz öffnen.
 
+## Mitwirken und Codequalität
+
+Einrichtung, Architektur und Regeln für Beiträge stehen in [CONTRIBUTING.md](CONTRIBUTING.md). Das CI misst die kognitive Komplexität jeder Swift-Funktion und lässt keine neue Funktion über 15 Punkte zu, siehe [docs/COMPLEXITY.md](docs/COMPLEXITY.md).
+
 ## Versionen und Releases
 
 Folio folgt [Semantic Versioning](https://semver.org/lang/de/). Die Version steht in `Resources/Info.plist` (`CFBundleShortVersionString`), jede veröffentlichte Version hat einen Git-Tag `vX.Y.Z` und einen Abschnitt in [CHANGELOG.md](CHANGELOG.md). Änderungen werden laufend unter **Unreleased** im Changelog notiert.

@@ -41,48 +41,61 @@ public struct CompletionContext: Sendable, Equatable {
         let ns = code as NSString
         let off = min(max(offset, 0), ns.length)
         self.offset = off
-        func isIdent(_ c: unichar) -> Bool {
-            guard let s = Unicode.Scalar(c) else { return false }
-            return CharacterSet.alphanumerics.contains(s) || c == 95 || c == 36 // _ $
-        }
-        var start = off
-        while start > 0, isIdent(ns.character(at: start - 1)) { start -= 1 }
+        let start = Self.identifierStart(in: ns, before: off)
         prefix = ns.substring(with: NSRange(location: start, length: off - start))
-
-        // Receiver: a dotted chain of identifiers, calls or indexes before a member access.
-        var r: String?
-        var i = start
-        var sepLength = 0
-        if i >= 1, ns.character(at: i - 1) == 46 { sepLength = 1 }                                   // .
-        else if i >= 2, ns.substring(with: NSRange(location: i - 2, length: 2)) == "::" { sepLength = 2 }
-        else if i >= 2, ns.substring(with: NSRange(location: i - 2, length: 2)) == "->" { sepLength = 2 }
-        if sepLength > 0 {
-            i -= sepLength
-            var j = i
-            var depth = 0
-            scan: while j > 0 {
-                let c = ns.character(at: j - 1)
-                switch c {
-                case 41, 93: depth += 1                         // ) ]
-                case 40, 91:                                    // ( [
-                    if depth == 0 { break scan }
-                    depth -= 1
-                case 46: break                                  // .
-                case 58 where j >= 2 && ns.character(at: j - 2) == 58: j -= 1   // ::
-                default:
-                    if depth == 0 && !isIdent(c) { break scan }
-                }
-                j -= 1
-            }
-            let expr = ns.substring(with: NSRange(location: j, length: i - j)).trimmingCharacters(in: .whitespaces)
-            if !expr.isEmpty { r = expr }
-        }
-        receiver = r
-
-        let before = ns.substring(to: off)
-        let lines = before.components(separatedBy: "\n")
+        receiver = Self.receiver(in: ns, before: start)
+        let lines = ns.substring(to: off).components(separatedBy: "\n")
         line = lines.count - 1
         column = ((lines.last ?? "") as NSString).length
+    }
+
+    private static func isIdentifier(_ c: unichar) -> Bool {
+        guard let s = Unicode.Scalar(c) else { return false }
+        return CharacterSet.alphanumerics.contains(s) || c == 95 || c == 36 // _ $
+    }
+
+    private static func identifierStart(in ns: NSString, before offset: Int) -> Int {
+        var start = offset
+        while start > 0, isIdentifier(ns.character(at: start - 1)) { start -= 1 }
+        return start
+    }
+
+    /// Length of the member access before `i`: `.` is 1, `::` and `->` are 2, anything else 0.
+    private static func separatorLength(in ns: NSString, before i: Int) -> Int {
+        if i >= 1, ns.character(at: i - 1) == 46 { return 1 }
+        guard i >= 2 else { return 0 }
+        return ["::", "->"].contains(ns.substring(with: NSRange(location: i - 2, length: 2))) ? 2 : 0
+    }
+
+    /// Receiver: a dotted chain of identifiers, calls or indexes before a member access.
+    private static func receiver(in ns: NSString, before start: Int) -> String? {
+        let separator = separatorLength(in: ns, before: start)
+        guard separator > 0 else { return nil }
+        let end = start - separator
+        let begin = chainStart(in: ns, before: end)
+        let expr = ns.substring(with: NSRange(location: begin, length: end - begin)).trimmingCharacters(in: .whitespaces)
+        return expr.isEmpty ? nil : expr
+    }
+
+    /// Walks back over identifiers, dots, `::` and balanced brackets.
+    private static func chainStart(in ns: NSString, before end: Int) -> Int {
+        var j = end
+        var depth = 0
+        while j > 0 {
+            let c = ns.character(at: j - 1)
+            if c == 41 || c == 93 {                         // ) ]
+                depth += 1
+            } else if c == 40 || c == 91 {                  // ( [
+                if depth == 0 { break }
+                depth -= 1
+            } else if c == 58, j >= 2, ns.character(at: j - 2) == 58 {
+                j -= 1                                      // ::
+            } else if c != 46, depth == 0, !isIdentifier(c) {
+                break
+            }
+            j -= 1
+        }
+        return j
     }
 }
 

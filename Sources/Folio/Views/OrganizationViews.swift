@@ -466,48 +466,10 @@ struct TagEditSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(heading).font(.title3.weight(.semibold))
-            let count = store.notes.filter { $0.meta.tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }.count
-            Text("Betrifft \(count) Notiz\(count == 1 ? "" : "en")\(store.tagCounts.contains { $0.tag.hasPrefix(tag + "/") } ? " (mit Untertags wie #\(tag)/…)" : ""). Vor jeder Änderung wird eine Version gesichert.")
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            if !started {
-                switch action {
-                case .rename:
-                    TextField("Neuer Name", text: $newName).textFieldStyle(.roundedBorder)
-                    if let n = TagEdit.normalized(newName), store.tagCounts.contains(where: { $0.tag == n }), n != tag {
-                        Label("#\(n) gibt es schon: Die Tags werden zusammengeführt.", systemImage: "arrow.triangle.merge").foregroundStyle(.orange)
-                    } else if !newName.isEmpty, TagEdit.normalized(newName) == nil {
-                        Label("Ein Tag beginnt mit einem Buchstaben und enthält keine Satzzeichen.", systemImage: "exclamationmark.triangle").foregroundStyle(.red)
-                    }
-                case .merge:
-                    Picker("Zusammenführen mit", selection: $target) {
-                        ForEach(store.tagCounts.filter { $0.tag != tag }, id: \.tag) { Text("#\($0.tag)").tag($0.tag) }
-                    }
-                case .remove:
-                    Text("Das Wort #\(tag) wird aus allen Notizen entfernt; der übrige Text bleibt.").foregroundStyle(.secondary)
-                }
-            }
-            if let p = store.tagEdit, started {
-                ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
-                    Text(p.finished ? "Fertig: \(p.changed) Notiz\(p.changed == 1 ? "" : "en") geändert." : "Ändere \(p.done) von \(p.total) …")
-                }
-                if !p.failures.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("\(p.failures.count) Notiz(en) konnten nicht geändert werden:", systemImage: "exclamationmark.triangle").foregroundStyle(.red)
-                        ForEach(p.failures, id: \.self) { Text($0).font(.caption).textSelection(.enabled) }
-                    }
-                }
-            }
-            HStack {
-                Spacer()
-                if store.tagEdit?.finished == true && started {
-                    Button("Fertig") { store.tagEdit = nil; dismiss() }.keyboardShortcut(.defaultAction)
-                } else {
-                    Button("Abbrechen") { dismiss() }.keyboardShortcut(.cancelAction).disabled(started)
-                    Button(buttonTitle, role: action == .remove ? .destructive : nil) { run() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(started || resultingTag == .invalid)
-                }
-            }
+            Text(summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if !started { actionInput }
+            if let p = store.tagEdit, started { progress(p) }
+            buttons
         }
         .padding(20)
         .frame(width: 440)
@@ -516,6 +478,60 @@ struct TagEditSheet: View {
             target = store.tagCounts.first { $0.tag != tag }?.tag ?? ""
         }
         .interactiveDismissDisabled(started && store.tagEdit?.finished != true)
+    }
+
+    private var summary: String {
+        let count = store.notes.filter { $0.meta.tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }.count
+        let children = store.tagCounts.contains { $0.tag.hasPrefix(tag + "/") } ? " (mit Untertags wie #\(tag)/…)" : ""
+        return "Betrifft \(count) Notiz\(count == 1 ? "" : "en")\(children). Vor jeder Änderung wird eine Version gesichert."
+    }
+
+    @ViewBuilder private var actionInput: some View {
+        switch action {
+        case .rename:
+            TextField("Neuer Name", text: $newName).textFieldStyle(.roundedBorder)
+            renameHint
+        case .merge:
+            Picker("Zusammenführen mit", selection: $target) {
+                ForEach(store.tagCounts.filter { $0.tag != tag }, id: \.tag) { Text("#\($0.tag)").tag($0.tag) }
+            }
+        case .remove:
+            Text("Das Wort #\(tag) wird aus allen Notizen entfernt; der übrige Text bleibt.").foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var renameHint: some View {
+        if let n = TagEdit.normalized(newName), store.tagCounts.contains(where: { $0.tag == n }), n != tag {
+            Label("#\(n) gibt es schon: Die Tags werden zusammengeführt.", systemImage: "arrow.triangle.merge").foregroundStyle(.orange)
+        } else if !newName.isEmpty, TagEdit.normalized(newName) == nil {
+            Label("Ein Tag beginnt mit einem Buchstaben und enthält keine Satzzeichen.", systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+        }
+    }
+
+    @ViewBuilder private func progress(_ p: NoteStore.TagEditProgress) -> some View {
+        ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
+            Text(p.finished ? "Fertig: \(p.changed) Notiz\(p.changed == 1 ? "" : "en") geändert." : "Ändere \(p.done) von \(p.total) …")
+        }
+        if !p.failures.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("\(p.failures.count) Notiz(en) konnten nicht geändert werden:", systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                ForEach(p.failures, id: \.self) { Text($0).font(.caption).textSelection(.enabled) }
+            }
+        }
+    }
+
+    private var buttons: some View {
+        HStack {
+            Spacer()
+            if store.tagEdit?.finished == true && started {
+                Button("Fertig") { store.tagEdit = nil; dismiss() }.keyboardShortcut(.defaultAction)
+            } else {
+                Button("Abbrechen") { dismiss() }.keyboardShortcut(.cancelAction).disabled(started)
+                Button(buttonTitle, role: action == .remove ? .destructive : nil) { run() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(started || resultingTag == .invalid)
+            }
+        }
     }
 
     private enum Resulting: Equatable { case invalid, tag(String?) }

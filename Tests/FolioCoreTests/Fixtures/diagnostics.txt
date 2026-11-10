@@ -1,0 +1,28 @@
+== leer
+
+== python
+3:- error ZeroDivisionError: division by zero
+== python sitzung
+2:- error SyntaxError: '(' was never closed
+== syntaxfehler ohne datei
+4:- error SyntaxError
+== gcc
+3:5 error use of undeclared identifier 'x'
+9:1 warning unused 'y' ä😀
+== javac
+5:- error ';' expected
+== rust
+2:9 warning unused variable
+3:13 error cannot find value `y` in this scope
+== shell
+4:- error foo: command not found
+== ruby
+6:- error undefined local variable (NameError)
+== node
+3:3 error ReferenceError: foo is not defined
+== node stack
+8:2 error TypeError: x is not a function
+== zeilen begrenzt
+
+== andere datei
+

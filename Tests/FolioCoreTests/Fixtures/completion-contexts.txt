@@ -1,0 +1,10 @@
+swift: receiver=text prefix=cou line=0 column=16
+python: receiver=os.path prefix=jo line=1 column=10
+kette: receiver=a.b(c).d[0] prefix= line=0 column=12
+cpp: receiver=std prefix=vec line=0 column=8
+zeiger: receiver=p prefix=na line=0 column=5
+leer: receiver=- prefix= line=0 column=0
+unicode: receiver=- prefix=grö line=1 column=3
+klammer: receiver=b prefix=c line=0 column=8
+ohne punkt: receiver=- prefix=y line=0 column=9
+dollar: receiver=$el prefix=$na line=0 column=7
