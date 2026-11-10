@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.1] – 2026-11-10
+
 ### Behoben
 - **Blocktests mit regulärem Ausdruck** (#134): Ein Muster mit starkem Backtracking konnte Folio einfrieren. Die Prüfung läuft jetzt außerhalb der Oberfläche und bricht nach 2 Sekunden ab; der Test gilt dann als fehlgeschlagen.
 - **Schnell öffnen** (#135): Während das Suchfeld erscheint, gehen zurückgehaltene Tastenanschläge nur noch in ein Suchfeld und nie in die Notiz.
