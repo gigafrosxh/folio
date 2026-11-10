@@ -16,7 +16,16 @@ enum SafetySelfTest {
         await wait(1)
         guard let ref = store.createNote(), let doc = store.currentDocument else { check(false, "Notiz anlegen"); return }
         let body = ThemeManager.shared.bodyAttributes
+        await versionChecks(store: store, ref: ref, doc: doc, body: body)
+        guard let current = store.currentDocument else { check(false, "Notiz offen"); return }
+        await conflictChecks(store: store, current: current, body: body)
+        await externalChangeCheck(store: store)
+        trashChecks(store: store, ref: ref)
+        await backupChecks(store: store)
+        print("SAFETY done"); fflush(stdout)
+    }
 
+    private static func versionChecks(store: NoteStore, ref: NoteRef, doc: NoteDocument, body: [NSAttributedString.Key: Any]) async {
         // Versions: the opened state plus one after editing (forced, since the 5-minute interval applies).
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nErster Stand", attributes: body))
         doc.markDirty(); doc.saveNow()
@@ -37,9 +46,9 @@ enum SafetySelfTest {
         } else {
             check(false, "erste Version gefunden")
         }
+    }
 
-        // Conflict: another app writes the file while there are unsaved edits.
-        guard let current = store.currentDocument else { check(false, "Notiz offen"); return }
+    private static func conflictChecks(store: NoteStore, current: NoteDocument, body: [NSAttributedString.Key: Any]) async {
         if var other = try? NoteFile.read(from: current.url) {
             var b = BlockRecord(kind: .code)
             b.code = "von außen geändert"
@@ -62,7 +71,9 @@ enum SafetySelfTest {
             let reopened = store.currentDocument.map { $0.blocks.map(\.storage.string).joined(separator: "\n") } ?? ""
             check(reopened.contains("von außen geändert"), "Notiz zeigt die externe Version")
         }
+    }
 
+    private static func externalChangeCheck(store: NoteStore) async {
         // External change without local edits is simply loaded.
         if let doc2 = store.currentDocument, var other = try? NoteFile.read(from: doc2.url) {
             other.body.blocks.append({ var b = BlockRecord(kind: .code); b.code = "zweite externe Änderung"; return b }())
@@ -71,7 +82,9 @@ enum SafetySelfTest {
             await wait(0.3)
             check(store.currentDocument?.blocks.contains { $0.storage.string == "zweite externe Änderung" } == true, "externe Änderung ohne Konflikt übernommen")
         }
+    }
 
+    private static func trashChecks(store: NoteStore, ref: NoteRef) {
         // Trash
         let id = ref.id
         store.delete(id)
@@ -85,7 +98,9 @@ enum SafetySelfTest {
             store.deleteFolder(folder)
             check(store.trashItems.contains { $0.isFolder && $0.noteCount == 1 }, "Ordner samt Notiz im Papierkorb")
         }
+    }
 
+    private static func backupChecks(store: NoteStore) async {
         // Backups
         BackupManager.shared.backupNow()
         for _ in 0..<60 where BackupManager.shared.isRunning { await wait(0.5) }
@@ -95,6 +110,5 @@ enum SafetySelfTest {
             BackupManager.shared.restore(b)
             check(store.allFolderURLs.contains { $0.lastPathComponent.hasPrefix("Wiederhergestellt") }, "Backup als Ordner wiederhergestellt")
         }
-        print("SAFETY done"); fflush(stdout)
     }
 }

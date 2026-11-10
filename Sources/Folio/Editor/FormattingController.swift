@@ -164,30 +164,53 @@ final class FormattingController: ObservableObject {
     private func holdTyping(forNote: Bool) {
         NSApp.keyWindow?.makeFirstResponder(nil)
         heldTyping = ""
-        if holdMonitor == nil {
-            holdMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, self.heldTyping != nil,
-                      event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
-                      let chars = event.characters, !chars.isEmpty else { return event }
-                if chars == "\r" { self.heldTyping! += "\n"; return nil }
-                guard chars.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) else { return event }
-                self.heldTyping! += chars
-                return nil
-            }
-        }
-        // Never hold keys for long. A new note that already has text (a tag, a template) does not focus
-        // itself, so its first text block gets the cursor at the start.
+        installHoldMonitor()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            guard let self, self.heldTyping != nil else { return }
-            // Held keys for the quick switcher only ever go into a search field, never into the note (#135).
-            if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, tv.isFieldEditor != forNote {
-                self.releaseHeldTyping(into: tv)
-            } else if forNote, let first = NoteStore.shared.currentDocument?.blocks.first(where: { $0.kind == .text }) {
-                self.focus(blockID: first.id, atEnd: false)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.releaseHeldTyping(into: nil) }
-            } else {
-                self.releaseHeldTyping(into: nil)
-            }
+            self?.settleHeldTyping(forNote: forNote, attemptsLeft: Self.holdRetries)
+        }
+    }
+
+    /// How often, a quarter second apart, held text keeps waiting for its target on a busy main thread (#158).
+    private static let holdRetries = 16
+
+    private func installHoldMonitor() {
+        guard holdMonitor == nil else { return }
+        holdMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.heldTyping != nil else { return event }
+            return self.holdKey(event) ? nil : event
+        }
+    }
+
+    /// Plain keys are kept; shortcuts, control keys and arrows go through.
+    private func holdKey(_ event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let chars = event.characters, !chars.isEmpty else { return false }
+        if chars == "\r" {
+            heldTyping! += "\n"
+            return true
+        }
+        guard chars.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) else { return false }
+        heldTyping! += chars
+        return true
+    }
+
+    /// Hands the held text over as soon as the target has the focus. Held keys for the quick switcher only ever
+    /// go into a search field, never into the note (#135). A new note that already has text (a tag, a template)
+    /// does not focus itself, so its first text block gets the cursor at the start.
+    private func settleHeldTyping(forNote: Bool, attemptsLeft: Int) {
+        guard heldTyping != nil else { return }
+        if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, tv.isFieldEditor != forNote {
+            releaseHeldTyping(into: tv)
+            return
+        }
+        if forNote, let first = NoteStore.shared.currentDocument?.blocks.first(where: { $0.kind == .text }) {
+            focus(blockID: first.id, atEnd: false)
+        }
+        guard attemptsLeft > 0 else {
+            releaseHeldTyping(into: nil)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.settleHeldTyping(forNote: forNote, attemptsLeft: attemptsLeft - 1)
         }
     }
 

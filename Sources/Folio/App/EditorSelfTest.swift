@@ -22,7 +22,21 @@ enum EditorSelfTest {
         let um = doc.undoManager ?? UndoManager()
         doc.undoManager = um
         check(doc.undoManager != nil, "Editor nutzt den Undo-Manager des Fensters")
+        undoChecks(doc: doc, um: um)
+        reloadChecks(store: store, doc: doc, um: um)
+        um.groupsByEvent = true
+        await wait(0.8)
+        guard let reopened = store.document(for: ref.id) else { check(false, "Notiz nach Neuladen"); return }
+        findChecks(doc: reopened, um: um)
+        noteLinkCheck(store: store, doc: reopened)
+        guard let other = store.notes.first(where: { $0.id != ref.id }) else { check(false, "zweite Notiz"); return }
+        tabChecks(store: store, ref: ref, other: other)
+        duplicateChecks(store: store)
+        await focusModeChecks()
+        print("EDIT done"); fflush(stdout)
+    }
 
+    private static func undoChecks(doc: NoteDocument, um: UndoManager) {
         // Undo/redo (#3): insert in the middle of a text block, remove, move.
         let before = doc.blocks.count
         let code = BlockModel(kind: .code)
@@ -49,6 +63,9 @@ enum EditorSelfTest {
         um.beginUndoGrouping(); doc.changeBlock(code, "Sprache ändern") { code.language = "ruby" }; um.endUndoGrouping()
         um.undo()
         check(code.language == "python", "Spracheinstellung rückgängig")
+    }
+
+    private static func reloadChecks(store: NoteStore, doc: NoteDocument, um: UndoManager) {
         // #77: after reloading the note, no undo step may point at the old document.
         um.beginUndoGrouping(); doc.insert(BlockModel(kind: .drawing), after: doc.blocks[0].id); um.endUndoGrouping()
         doc.saveNow()
@@ -61,10 +78,9 @@ enum EditorSelfTest {
             um.undo()
             check(reloaded.blocks.count < n, "Undo wirkt auf die neu geladene Notiz")
         }
-        um.groupsByEvent = true
-        await wait(0.8)
-        guard let doc = store.document(for: ref.id) else { check(false, "Notiz nach Neuladen"); return }
+    }
 
+    private static func findChecks(doc: NoteDocument, um: UndoManager) {
         // Find & replace (#9)
         let find = FindModel()
         find.attach(doc)
@@ -84,7 +100,9 @@ enum EditorSelfTest {
         check(restored.contains("Apfel"), "Ersetzen rückgängig")
         find.detach()
         doc.saveNow()
+    }
 
+    private static func noteLinkCheck(store: NoteStore, doc: NoteDocument) {
         // #76: a note link without a text cursor lands at the end of the note.
         if let target = store.notes.first(where: { $0.id != doc.id }) {
             FormattingController.shared.activeTextView = nil
@@ -92,9 +110,9 @@ enum EditorSelfTest {
             doc.saveNow()
             check(store.notes.first { $0.id == doc.id }?.meta.links.contains(target.id) == true, "Notizlink ohne Textcursor am Ende eingefügt")
         }
+    }
 
-        // Tabs and split view (#11, #12)
-        guard let other = store.notes.first(where: { $0.id != ref.id }) else { check(false, "zweite Notiz"); return }
+    private static func tabChecks(store: NoteStore, ref: NoteRef, other: NoteRef) {
         store.openInNewTab(other.id)
         check(store.tabs == [ref.id, other.id] && store.selectedNoteID == other.id, "Zweiter Tab geöffnet, erster bleibt offen")
         check(store.documents[ref.id] != nil, "Erste Notiz bleibt im Tab geladen")
@@ -116,7 +134,9 @@ enum EditorSelfTest {
         check(store.documents[other.id] != nil && store.currentDocument?.id == other.id, "Notiz im eigenen Fenster")
         store.windowClosed(other.id)
         check(store.documents[other.id] == nil, "Fenster geschlossen")
+    }
 
+    private static func duplicateChecks(store: NoteStore) {
         // Duplicates (#16)
         if let withAttachment = store.notes.first(where: { (try? NoteFile.read(from: $0.url))?.attachments.isEmpty == false }),
            let original = try? NoteFile.read(from: withAttachment.url), let copyRef = store.duplicate(withAttachment.id),
@@ -129,7 +149,9 @@ enum EditorSelfTest {
         } else {
             check(false, "Notiz mit Anhang duplizieren")
         }
+    }
 
+    private static func focusModeChecks() async {
         // Focus mode (#10)
         UserDefaults.standard.set(false, forKey: "folio.focusMode")
         NotificationCenter.default.post(name: .folioToggleFocus, object: nil)
@@ -138,6 +160,5 @@ enum EditorSelfTest {
         NotificationCenter.default.post(name: .folioToggleFocus, object: nil)
         await wait(0.3)
         check(!UserDefaults.standard.bool(forKey: "folio.focusMode"), "Fokusmodus aus")
-        print("EDIT done"); fflush(stdout)
     }
 }

@@ -32,8 +32,18 @@ enum DevSelfTest {
         await wait(1.5)
         print("DEV notes", store.notes.count); fflush(stdout)
         guard store.createNote() != nil, let doc = store.currentDocument else { check(false, "Notiz"); return }
+        let (input, interactive) = await inputChecks(doc: doc, theme: theme)
+        let runtime = await errorMarkerChecks(doc: doc, interactive: interactive)
+        await blockTestChecks(doc: doc, theme: theme, runtime: runtime)
+        await slowRegexCheck(doc: doc, runtime: runtime)
+        let slow = await environmentChecks(doc: doc, runtime: runtime)
+        let (chatty, hungry) = await limitChecks(doc: doc, theme: theme, saved: saved, slow: slow)
+        savedStateCheck(doc: doc, chatty: chatty, input: input)
+        await terminalChecks(doc: doc, hungry: hungry)
+        print("DEV done"); fflush(stdout)
+    }
 
-        // stdin (#24)
+    private static func inputChecks(doc: NoteDocument, theme: ThemeManager) async -> (BlockModel, BlockModel) {
         let input = code("name = input('Name? ')\nprint('Hallo', name)")
         input.stdin = "Ada"
         doc.insert(input, after: doc.blocks[0].id)
@@ -54,8 +64,10 @@ enum DevSelfTest {
         RunManager.shared.send("21\n", to: interactive.id)
         await task?.value
         check(interactive.output?.contains("doppelt 42") == true, "Eingabe während der Ausführung")
+        return (input, interactive)
+    }
 
-        // Error markers (#30)
+    private static func errorMarkerChecks(doc: NoteDocument, interactive: BlockModel) async -> BlockModel {
         let broken = code("x = 1\ny = x +\n")
         doc.insert(broken, after: interactive.id)
         await run(broken, doc)
@@ -65,8 +77,10 @@ enum DevSelfTest {
         await run(runtime, doc)
         check(runtime.diagnostics.first?.line == 2 && runtime.diagnostics.first?.message.contains("ZeroDivisionError") == true,
               "Laufzeitfehler in der Sitzung an Zeile 2")
+        return runtime
+    }
 
-        // Block tests (#29)
+    private static func blockTestChecks(doc: NoteDocument, theme: ThemeManager, runtime: BlockModel) async {
         let passing = code("print(6 * 7)")
         passing.test = BlockTest(expectedOutput: "42")
         doc.insert(passing, after: runtime.id)
@@ -85,7 +99,9 @@ enum DevSelfTest {
         check(linkedTest.testOutcome?.status == .passed, "Blocktest nutzt Variablen der Sitzung")
         check(RunManager.shared.testSummaries[doc.id]?.failed == 1, "Zusammenfassung der Blocktests")
         for b in [passing, failing, linkedSetup, linkedTest] { doc.remove(b.id) }
+    }
 
+    private static func slowRegexCheck(doc: NoteDocument, runtime: BlockModel) async {
         // A regular expression with catastrophic backtracking must not freeze the interface (#134).
         let backtracking = code("print('a' * 32)")
         backtracking.test = BlockTest(expectedOutput: "^(a+)+b$", match: .regex)
@@ -103,8 +119,9 @@ enum DevSelfTest {
               "Regulärer Ausdruck läuft ins Zeitlimit und gilt als fehlgeschlagen")
         check(ticks >= 20, "Oberfläche reagiert während der Prüfung des regulären Ausdrucks (\(ticks) Takte)")
         doc.remove(backtracking.id)
+    }
 
-        // Environment (#25)
+    private static func environmentChecks(doc: NoteDocument, runtime: BlockModel) async -> BlockModel {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-env-\(UUID().uuidString.prefix(6))")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         doc.setEnvironment(RunEnvironment(workingDirectory: dir.path, variables: ["FOLIO_ENV": "aus-der-notiz"], timeout: 2))
@@ -123,8 +140,10 @@ enum DevSelfTest {
         await run(slow, doc)
         check(slow.output?.contains("Zeitlimit") == true, "Zeitlimit der Notiz (2 s)")
         doc.setEnvironment(nil)
+        return slow
+    }
 
-        // Limits (#27, #32)
+    private static func limitChecks(doc: NoteDocument, theme: ThemeManager, saved: ThemeSettings, slow: BlockModel) async -> (BlockModel, BlockModel) {
         theme.settings.maxOutputKB = 50
         let chatty = code("for i in range(100000): print(i)")
         doc.insert(chatty, after: slow.id)
@@ -136,15 +155,19 @@ enum DevSelfTest {
         await run(hungry, doc)
         check(hungry.output?.contains("Arbeitsspeicher") == true, "Arbeitsspeicher-Limit")
         theme.settings = saved
+        return (chatty, hungry)
+    }
 
+    private static func savedStateCheck(doc: NoteDocument, chatty: BlockModel, input: BlockModel) {
         chatty.outputCollapsed = true
         doc.saveNow()
         if let file = try? NoteFile.read(from: doc.url) {
             check(file.body.blocks.first { $0.id == chatty.id }?.outputCollapsed == true
                   && file.body.blocks.first { $0.id == input.id }?.stdin == "Ada", "Eingeklappt und Eingabe gespeichert")
         }
+    }
 
-        // Terminal (#23)
+    private static func terminalChecks(doc: NoteDocument, hungry: BlockModel) async {
         let term = TerminalSession.session(for: doc.id)
         term.start()
         term.send("echo folio-\"42\"\n")
@@ -160,6 +183,5 @@ enum DevSelfTest {
         check(term.text.contains("aus dem Terminal Antwort"), "Code-Block interaktiv im Terminal")
         TerminalSession.close(note: doc.id)
         check(TerminalSession.existing(for: doc.id) == nil, "Terminal geschlossen")
-        print("DEV done"); fflush(stdout)
     }
 }

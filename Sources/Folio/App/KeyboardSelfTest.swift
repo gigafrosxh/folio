@@ -8,10 +8,13 @@ enum KeyboardSelfTest {
     private static func hardwareKeyDowns() -> UInt32 { CGEventSource.counterForEventType(.hidSystemState, eventType: .keyDown) }
     private static var keyDownsSeen = hardwareKeyDowns()
     private static var lostActivation = false
+    /// Checks that could not run; a run with any of them is incomplete, not passed (#157).
+    private static var skipped = 0
 
     /// Someone typing on the real keyboard or switching apps during a check says nothing about Folio (#135).
     private static func check(_ ok: Bool, _ label: String) {
         let disturbed = lostActivation || hardwareKeyDowns() != keyDownsSeen
+        if !ok && disturbed { skipped += 1 }
         print(ok ? "KEY ok" : disturbed ? "KEY skip (gestört durch echte Eingabe oder App-Wechsel)" : "KEY FAIL", label)
         fflush(stdout)
         keyDownsSeen = hardwareKeyDowns()
@@ -78,6 +81,23 @@ enum KeyboardSelfTest {
         return find(NSApp.mainMenu)
     }
 
+    /// Every menu shortcut with the items using it.
+    private static func menuShortcuts() -> [String: [String]] {
+        var combos: [String: [String]] = [:]
+        for top in NSApp.mainMenu?.items ?? [] {
+            func walk(_ menu: NSMenu?) {
+                for item in menu?.items ?? [] {
+                    if !item.keyEquivalent.isEmpty {
+                        combos["\(item.keyEquivalent.lowercased())|\(item.keyEquivalentModifierMask.rawValue)", default: []].append(item.title)
+                    }
+                    walk(item.submenu)
+                }
+            }
+            walk(top.submenu)
+        }
+        return combos
+    }
+
     private final class Seen: @unchecked Sendable { var names: Set<String> = [] }
 
     static func run() async {
@@ -91,19 +111,7 @@ enum KeyboardSelfTest {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { n in seen.names.insert(n.name.rawValue) }
         }
 
-        // Every menu shortcut is used once.
-        var combos: [String: [String]] = [:]
-        for top in NSApp.mainMenu?.items ?? [] {
-            func walk(_ menu: NSMenu?) {
-                for item in menu?.items ?? [] {
-                    if !item.keyEquivalent.isEmpty {
-                        combos["\(item.keyEquivalent.lowercased())|\(item.keyEquivalentModifierMask.rawValue)", default: []].append(item.title)
-                    }
-                    walk(item.submenu)
-                }
-            }
-            walk(top.submenu)
-        }
+        let combos = menuShortcuts()
         let dups = combos.filter { $0.value.count > 1 }
         check(dups.isEmpty, "Keine doppelt belegten Menükürzel \(dups.isEmpty ? "" : "\(dups.values)")")
 
@@ -157,12 +165,14 @@ enum KeyboardSelfTest {
             check(doc.blocks.contains { $0.kind == .code } && doc.blocks.count > blocks, "⌃C fügt einen Code-Block ein")
         } else {
             // Tool shortcuts only act in the key window of the active app; a test started in the background skips this.
+            skipped += 1
             print("KEY skip ⌃C (Folio ist nicht die aktive App)")
         }
         await focusChecks(store)
         await closeTabCheck(store)
         await trashMenuCheck(store)
         await helpMenuCheck()
+        if skipped > 0 { print("KEY FAIL Unvollständig: \(skipped) Prüfungen übersprungen") }
         print("KEY done"); fflush(stdout)
     }
 
@@ -220,7 +230,11 @@ enum KeyboardSelfTest {
 
     /// Focus after shortcuts: new note during a search (#100, #102) and the quick switcher (#99).
     private static func focusChecks(_ store: NoteStore) async {
-        guard NSApp.isActive else { print("KEY skip Fokusprüfung (Folio ist nicht die aktive App)"); return }
+        guard NSApp.isActive else {
+            skipped += 1
+            print("KEY skip Fokusprüfung (Folio ist nicht die aktive App)")
+            return
+        }
         store.searchText = "zzzzkeinTreffer"
         await wait(0.3)
         await press("n", .command)
@@ -255,22 +269,25 @@ enum KeyboardSelfTest {
     private static func quickOpenTimingChecks(_ store: NoteStore) async {
         let rounds = Int(ProcessInfo.processInfo.environment["FOLIO_KEY_ROUNDS"] ?? "") ?? 1
         for gap in [0, 0.001, 0.005, 0.02, 0.05, 0.12, 0.3] {
-            for round in 0..<rounds {
-                guard let first = store.currentDocument?.blocks.first else { continue }
-                FormattingController.shared.focus(blockID: first.id)
-                await wait(0.3)
-                let text = noteText(store)
-                await press("p", .command, settle: 0)
-                if gap > 0 { await wait(gap) }
-                typeNow("q")
-                if gap > 0 { await wait(gap) }
-                typeNow("rs")
-                await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "qrs" }
-                let responder = NSApp.keyWindow?.firstResponder as? NSTextView
-                check(noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "qrs",
-                      "⌘P, Abstand \(gap) s, Runde \(round): Feld „\(responder?.string ?? "-")“, Notiz \(noteText(store) == text ? "unverändert" : "GEÄNDERT: \(noteText(store).suffix(12))")")
-                await press("\u{1b}", [])
-            }
+            for round in 0..<rounds { await quickOpenRound(store, gap: gap, round: round) }
         }
+    }
+
+    private static func quickOpenRound(_ store: NoteStore, gap: Double, round: Int) async {
+        guard let first = store.currentDocument?.blocks.first else { return }
+        FormattingController.shared.focus(blockID: first.id)
+        await wait(0.3)
+        let text = noteText(store)
+        await press("p", .command, settle: 0)
+        if gap > 0 { await wait(gap) }
+        typeNow("q")
+        if gap > 0 { await wait(gap) }
+        typeNow("rs")
+        await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "qrs" }
+        let responder = NSApp.keyWindow?.firstResponder as? NSTextView
+        let unchanged = noteText(store) == text
+        check(unchanged && responder?.isFieldEditor == true && responder?.string == "qrs",
+              "⌘P, Abstand \(gap) s, Runde \(round): Feld „\(responder?.string ?? "-")“, Notiz \(unchanged ? "unverändert" : "GEÄNDERT: \(noteText(store).suffix(12))")")
+        await press("\u{1b}", [])
     }
 }

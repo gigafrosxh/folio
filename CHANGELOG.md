@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Tippen direkt nach ⌘N oder ⌘P** (#158): Wenn das Ziel länger braucht, wartet der getippte Text jetzt bis zu fünf Sekunden darauf, statt nach einer Sekunde verloren zu gehen.
+
+### Intern
+- **Debug-Harness und Selbsttests** (#138, #139, #157): In einzelne Szenarien zerlegt. Der Tastaturtest meldet übersprungene Prüfungen jetzt als Fehlschlag.
+
 ## [1.3.3] – 2026-11-10
 
 ### Intern

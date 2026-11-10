@@ -20,9 +20,19 @@ enum OrganizationSelfTest {
 
     static func run() async {
         let store = NoteStore.shared
-        let body = ThemeManager.shared.bodyAttributes
         await wait(1)
+        await templateChecks(store: store)
+        guard let (a, b) = await linkChecks(store: store, body: ThemeManager.shared.bodyAttributes) else { return }
+        filterChecks(store: store, a: a, b: b)
+        subfolderChecks(store: store)
+        await tagChecks(store: store, a: a)
+        await markdownChecks(store: store)
+        // Recents (#20)
+        check(store.recent.ids.first == store.currentDocument?.id && store.recent.ids.contains(a.id), "Zuletzt geöffnet")
+        print("ORG done"); fflush(stdout)
+    }
 
+    private static func templateChecks(store: NoteStore) async {
         // Templates (#6)
         store.ensureStarterTemplates()
         check(store.templates.count >= 3, "Startvorlagen angelegt (\(store.templates.count))")
@@ -33,11 +43,13 @@ enum OrganizationSelfTest {
             check(text.contains("Meeting \(today)") && !text.contains("{{"), "Notiz aus Vorlage mit ausgefülltem Datum")
             check(store.notes.contains { $0.id == ref.id } && !store.templates.contains { $0.id == ref.id }, "Vorlagennotiz liegt in der Bibliothek, nicht bei den Vorlagen")
         } else { check(false, "Meeting-Vorlage") }
+    }
 
+    private static func linkChecks(store: NoteStore, body: [NSAttributedString.Key: Any]) async -> (NoteRef, NoteRef)? {
         // Links and backlinks (#7)
-        guard let a = store.createNote(), let docA = store.currentDocument else { return }
+        guard let a = store.createNote(), let docA = store.currentDocument else { return nil }
         write(docA, NSAttributedString(string: "Ziel der Links\n#orgtest", attributes: body))
-        guard let b = store.createNote(), let docB = store.currentDocument else { return }
+        guard let b = store.createNote(), let docB = store.currentDocument else { return nil }
         let linked = NSMutableAttributedString(string: "Quelle verweist auf ", attributes: body)
         var linkAttrs = body
         linkAttrs[.link] = NoteLink.url(for: a.id)
@@ -52,7 +64,10 @@ enum OrganizationSelfTest {
         check(NoteLink.backlinks(to: a.id, in: store.notes.map(\.meta)).map(\.id) == [b.id], "Rückverweis in der Zielnotiz")
         store.open(noteID: a.id)
         check(store.currentDocument?.id == a.id, "Notizlink öffnet die Zielnotiz")
+        return (a, b)
+    }
 
+    private static func filterChecks(store: NoteStore, a: NoteRef, b: NoteRef) {
         // Search filters (#8)
         store.sidebarSelection = .all
         store.searchText = "tag:orgtest"
@@ -64,7 +79,9 @@ enum OrganizationSelfTest {
         let todayCount = store.filteredNotes.count
         check(todayCount >= 3 && todayCount < store.notes.count || store.notes.count <= 4, "Filter Zeitraum heute (\(todayCount) von \(store.notes.count))")
         store.searchFilter = SearchFilter()
+    }
 
+    private static func subfolderChecks(store: NoteStore) {
         // Subfolders (#17)
         if let parent = store.createFolder(named: "OrgParent"), let child = store.createFolder(named: "Kind", in: parent) {
             store.createNote(in: child)
@@ -77,7 +94,9 @@ enum OrganizationSelfTest {
             store.includeSubfolders = false
             store.sidebarSelection = .all
         }
+    }
 
+    private static func tagChecks(store: NoteStore, a: NoteRef) async {
         // Tags (#18)
         await store.editTag("orgtest", to: "umbenannt")
         check(store.notes.first { $0.id == a.id }?.meta.tags == ["umbenannt"] && store.tagEdit?.failures.isEmpty == true, "Tag umbenannt")
@@ -86,7 +105,9 @@ enum OrganizationSelfTest {
         await store.editTag("meeting", to: nil)
         check(!store.notes.contains { $0.meta.tags.contains("meeting") }, "Tag überall entfernt")
         store.tagEdit = nil
+    }
 
+    private static func markdownChecks(store: NoteStore) async {
         // Markdown (#4)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-md-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -121,9 +142,5 @@ enum OrganizationSelfTest {
                   "Markdown exportiert")
             if !exported.contains("**fett**") { print(exported) }
         } else { check(false, "Markdown-Import") }
-
-        // Recents (#20)
-        check(store.recent.ids.first == store.currentDocument?.id && store.recent.ids.contains(a.id), "Zuletzt geöffnet")
-        print("ORG done"); fflush(stdout)
     }
 }
