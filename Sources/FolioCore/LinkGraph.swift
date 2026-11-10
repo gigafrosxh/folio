@@ -219,57 +219,13 @@ public enum Mentions {
 public enum GraphLayout {
     public static func compute(nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
                                previous: [UUID: CGPoint] = [:]) -> [UUID: CGPoint] {
-        let n = nodes.count
-        guard n > 0 else { return [:] }
-        let index = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, $0) })
-        var pos = [CGPoint](repeating: .zero, count: n)
-        for (i, id) in nodes.enumerated() {
-            if let p = previous[id] { pos[i] = p; continue }
-            // Golden-angle spiral: a stable, even start without randomness.
-            let r = 30 * sqrt(Double(i) + 0.5)
-            let a = Double(i) * 2.399963
-            pos[i] = CGPoint(x: r * cos(a), y: r * sin(a))
+        guard !nodes.isEmpty else { return [:] }
+        let start = nodes.enumerated().map { i, id in previous[id].map { SIMD2($0.x, $0.y) } ?? spiralStart(i) }
+        var simulation = ForceSimulation(positions: start, links: ForceSimulation<SIMD2<Double>>.links(edges, in: nodes)) { i, j in
+            SIMD2(0.1 * Double(i - j), 0.1)
         }
-        let links = edges.compactMap { e -> (Int, Int)? in
-            guard let a = index[e.0], let b = index[e.1], a != b else { return nil }
-            return (a, b)
-        }
-        let ideal = 60.0
-        var temperature = 40.0
-        // Big libraries: fewer rounds keep opening the graph fast.
-        let rounds = n > 800 ? min(iterations, 80) : n > 300 ? min(iterations, 150) : iterations
-        for _ in 0..<rounds {
-            var disp = [CGVector](repeating: .zero, count: n)
-            for i in 0..<n {
-                for j in (i + 1)..<n {
-                    var dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y
-                    var d2 = dx * dx + dy * dy
-                    if d2 < 0.01 { dx = 0.1 * Double(i - j); dy = 0.1; d2 = dx * dx + dy * dy }
-                    if d2 > 250_000 { continue }   // far apart: no noticeable push
-                    let f = ideal * ideal / d2
-                    disp[i].dx += dx * f; disp[i].dy += dy * f
-                    disp[j].dx -= dx * f; disp[j].dy -= dy * f
-                }
-            }
-            for (a, b) in links {
-                let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y
-                let d = max(sqrt(dx * dx + dy * dy), 0.01)
-                let f = d / ideal
-                disp[a].dx -= dx * f; disp[a].dy -= dy * f
-                disp[b].dx += dx * f; disp[b].dy += dy * f
-            }
-            for i in 0..<n {
-                // Gentle pull to the center keeps unconnected parts on screen.
-                disp[i].dx -= pos[i].x * 0.06
-                disp[i].dy -= pos[i].y * 0.06
-                let len = max(sqrt(disp[i].dx * disp[i].dx + disp[i].dy * disp[i].dy), 0.0001)
-                let step = min(len, temperature)
-                pos[i].x += disp[i].dx / len * step
-                pos[i].y += disp[i].dy / len * step
-            }
-            temperature = max(temperature * 0.97, 1)
-        }
-        return Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, pos[$0]) })
+        simulation.run(rounds: ForceSimulation<SIMD2<Double>>.rounds(nodes: nodes.count, iterations: iterations))
+        return Dictionary(uniqueKeysWithValues: zip(nodes, simulation.positions.map { CGPoint(x: $0.x, y: $0.y) }))
     }
 }
 
@@ -356,53 +312,13 @@ public extension GraphLayout {
     /// The same forces in three dimensions; starts on a Fibonacci sphere, deterministic.
     static func compute3D(nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
                           previous: [UUID: SIMD3<Double>] = [:]) -> [UUID: SIMD3<Double>] {
-        let n = nodes.count
-        guard n > 0 else { return [:] }
-        let index = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, $0) })
-        var pos = [SIMD3<Double>](repeating: .zero, count: n)
-        for (i, id) in nodes.enumerated() {
-            if let p = previous[id] { pos[i] = p; continue }
-            let y = n == 1 ? 0 : 1 - 2 * (Double(i) + 0.5) / Double(n)
-            let r = (1 - y * y).squareRoot()
-            let a = Double(i) * 2.399963
-            let radius = 40 * Double(n).squareRoot()
-            pos[i] = SIMD3(cos(a) * r, y, sin(a) * r) * radius
+        guard !nodes.isEmpty else { return [:] }
+        let start = nodes.enumerated().map { i, id in previous[id] ?? sphereStart(i, of: nodes.count) }
+        var simulation = ForceSimulation(positions: start, links: ForceSimulation<SIMD3<Double>>.links(edges, in: nodes)) { i, j in
+            SIMD3(0.1 * Double(i - j), 0.1, 0.05)
         }
-        let links = edges.compactMap { e -> (Int, Int)? in
-            guard let a = index[e.0], let b = index[e.1], a != b else { return nil }
-            return (a, b)
-        }
-        let ideal = 60.0
-        var temperature = 40.0
-        let rounds = n > 800 ? min(iterations, 80) : n > 300 ? min(iterations, 150) : iterations
-        for _ in 0..<rounds {
-            var disp = [SIMD3<Double>](repeating: .zero, count: n)
-            for i in 0..<n {
-                for j in (i + 1)..<n {
-                    var d = pos[i] - pos[j]
-                    var d2 = (d * d).sum()
-                    if d2 < 0.01 { d = SIMD3(0.1 * Double(i - j), 0.1, 0.05); d2 = (d * d).sum() }
-                    if d2 > 250_000 { continue }
-                    let f = d * (ideal * ideal / d2)
-                    disp[i] += f
-                    disp[j] -= f
-                }
-            }
-            for (a, b) in links {
-                let d = pos[a] - pos[b]
-                let len = max((d * d).sum().squareRoot(), 0.01)
-                let f = d * (len / ideal)
-                disp[a] -= f
-                disp[b] += f
-            }
-            for i in 0..<n {
-                disp[i] -= pos[i] * 0.06
-                let len = max((disp[i] * disp[i]).sum().squareRoot(), 0.0001)
-                pos[i] += disp[i] / len * min(len, temperature)
-            }
-            temperature = max(temperature * 0.97, 1)
-        }
-        return Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1, pos[$0]) })
+        simulation.run(rounds: ForceSimulation<SIMD3<Double>>.rounds(nodes: nodes.count, iterations: iterations))
+        return Dictionary(uniqueKeysWithValues: zip(nodes, simulation.positions))
     }
 
     /// A point after turning the graph (yaw around the vertical, pitch around the horizontal axis),
@@ -433,21 +349,29 @@ public enum FolderGraph {
 
     /// Folder nodes (id → path) and the edges note→folder and folder→parent for the given notes.
     public static func augment(notes: [(id: UUID, folder: String)]) -> (folders: [UUID: String], edges: [(UUID, UUID)]) {
+        var tree = FolderTree()
+        for note in notes where !note.folder.isEmpty {
+            tree.edges.append((note.id, id(for: note.folder)))
+            tree.addChain(from: note.folder)
+        }
+        return (tree.folders, tree.edges)
+    }
+
+    private struct FolderTree {
         var folders: [UUID: String] = [:]
         var edges: [(UUID, UUID)] = []
-        var linkedFolders = Set<String>()
-        for note in notes where !note.folder.isEmpty {
-            edges.append((note.id, id(for: note.folder)))
-            var path = note.folder
+        private var linked = Set<String>()
+
+        /// The folder and its parents up to the first one already in the graph.
+        mutating func addChain(from folder: String) {
+            var path = folder
             while !path.isEmpty {
-                folders[id(for: path)] = path
-                guard linkedFolders.insert(path).inserted else { break }
-                guard let slash = path.lastIndex(of: "/") else { break }
+                folders[FolderGraph.id(for: path)] = path
+                guard linked.insert(path).inserted, let slash = path.lastIndex(of: "/") else { return }
                 let parent = String(path[..<slash])
-                edges.append((id(for: path), id(for: parent)))
+                edges.append((FolderGraph.id(for: path), FolderGraph.id(for: parent)))
                 path = parent
             }
         }
-        return (folders, edges)
     }
 }

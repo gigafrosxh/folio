@@ -64,112 +64,142 @@ public enum FolioDiagnostics {
     }
 
     public static func diagnose(_ data: Data) -> DiagnosticReport {
-        var report = DiagnosticReport(fileSize: data.count)
-        func add(_ s: DiagnosticReport.Severity, _ m: String) { report.problems.append(.init(severity: s, message: m)) }
-
-        if data.isEmpty {
-            add(.error, "Die Datei ist leer (0 Byte). Wahrscheinlich wurde das Speichern unterbrochen.")
-            return report
-        }
-        var r = ByteReader(data)
-        guard let magic = try? r.readBytes(4), magic == FolioArchive.magic else {
-            add(.error, "Das ist keine Folio-Notiz: Die Dateikennung „FOLI“ fehlt am Anfang.")
-            return report
-        }
-        guard let version: UInt16 = try? r.read(), let flags: UInt16 = try? r.read() else {
-            add(.error, "Die Datei endet direkt nach der Kennung.")
-            return report
-        }
-        if version > FolioArchive.currentVersion {
-            add(.error, "Die Datei stammt von einer neueren Folio-Version (Format \(version)). Aktualisiere Folio.")
-            return report
-        }
-        let compressed = flags & 1 == 1
-
-        // Checksum: tells whether anything changed, not what; the sections below say where.
-        if data.count >= 8 {
-            var tail = ByteReader(data.suffix(4))
-            if let stored: UInt32 = try? tail.read(), CRC32.checksum(data.prefix(data.count - 4)) != stored {
-                add(.warning, "Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.")
-            }
-        }
-
-        // Metadata
-        do {
-            let raw = try r.readSection(compressed: compressed)
-            do {
-                report.meta = try JSONDecoder().decode(NoteMetadata.self, from: raw)
-            } catch {
-                add(.warning, "Titel, Tags und Datum sind unlesbar; die Notiz bekommt neue Angaben.")
-            }
-        } catch {
-            add(.error, "Schon der Kopfbereich (Titel, Tags) ist beschädigt: \(reason(error)). Danach ist nichts mehr lesbar.")
-            return report
-        }
-
-        // Body
-        var bodyOK = false
-        do {
-            let raw = try r.readSection(compressed: compressed)
-            bodyOK = true
-            if let body = try? JSONDecoder().decode(NoteBody.self, from: raw) {
-                report.blocks = body.blocks
-            } else {
-                // Rescue block by block.
-                let list = ((try? JSONSerialization.jsonObject(with: raw)) as? [String: Any])?["blocks"] as? [Any] ?? []
-                for item in list {
-                    if let d = try? JSONSerialization.data(withJSONObject: item), let b = try? JSONDecoder().decode(BlockRecord.self, from: d) {
-                        report.blocks.append(b)
-                    } else {
-                        report.lostBlocks += 1
-                    }
-                }
-                if list.isEmpty {
-                    add(.error, "Der Inhalt der Notiz ist unlesbar (kein gültiges Format).")
-                } else {
-                    add(.error, "\(report.lostBlocks) von \(list.count) Blöcken sind unlesbar; die übrigen wurden gerettet.")
-                }
-            }
-        } catch {
-            add(.error, "Der Inhalt der Notiz ist beschädigt: \(reason(error)). Text und Blöcke lassen sich nicht retten.")
-        }
-
-        // Attachments
-        guard bodyOK else { return report }
-        guard let count: UInt32 = try? r.read() else {
-            add(.error, "Die Liste der Anhänge fehlt; die Datei wurde abgeschnitten.")
-            return report
-        }
-        if count > 100_000 {
-            add(.error, "Die Anzahl der Anhänge (\(count)) ist unplausibel; die Anhänge sind beschädigt.")
-            return report
-        }
-        for i in 0..<Int(count) {
-            do {
-                let headerLength: UInt32 = try r.read()
-                let header = try JSONDecoder().decode(FolioArchive.AttachmentHeader.self, from: Data(try r.readBytes(Int(headerLength))))
-                let content = try r.readSection(compressed: compressed)
-                report.attachments.append(FolioArchive.Attachment(header: header, data: content))
-            } catch {
-                report.lostAttachments = Int(count) - i
-                add(.error, "\(report.lostAttachments) von \(count) Anhängen (Bilder, PDFs, Aufnahmen …) sind beschädigt: \(reason(error)).")
-                break
-            }
-        }
-        let missing = Set(report.blocks.compactMap(\.attachmentID)).subtracting(report.attachments.map(\.id))
-        if !missing.isEmpty, report.lostAttachments == 0 {
-            add(.warning, "\(missing.count) Block/Blöcke verweisen auf fehlende Anhänge.")
-        }
-        if report.problems.isEmpty { add(.info, "Alle Bereiche sind lesbar und die Prüfsumme stimmt.") }
-        return report
+        var reader = DiagnosisReader(data)
+        reader.run()
+        return reader.report
     }
 
-    private static func reason(_ error: Error) -> String {
+    fileprivate static func reason(_ error: Error) -> String {
         switch error as? FolioFormatError {
         case .truncated: return "Daten fehlen (abgeschnitten)"
         case .compressionFailed: return "die komprimierten Daten sind verfälscht"
         default: return error.localizedDescription
         }
+    }
+}
+
+/// Reads a note file section by section and notes what is wrong, in the order a reader would meet it (#153).
+/// Only collects findings; it neither repairs nor writes anything.
+private struct DiagnosisReader {
+    private let data: Data
+    private var r: ByteReader
+    private var compressed = false
+    private(set) var report: DiagnosticReport
+
+    init(_ data: Data) {
+        self.data = data
+        r = ByteReader(data)
+        report = DiagnosticReport(fileSize: data.count)
+    }
+
+    private mutating func add(_ s: DiagnosticReport.Severity, _ m: String) { report.problems.append(.init(severity: s, message: m)) }
+
+    /// Each step returns false when nothing after it can be read.
+    mutating func run() {
+        guard readHeader() else { return }
+        checkChecksum()
+        guard readMetadata(), readBody(), readAttachments() else { return }
+        checkReferences()
+        if report.problems.isEmpty { add(.info, "Alle Bereiche sind lesbar und die Prüfsumme stimmt.") }
+    }
+
+    private mutating func readHeader() -> Bool {
+        if data.isEmpty {
+            add(.error, "Die Datei ist leer (0 Byte). Wahrscheinlich wurde das Speichern unterbrochen.")
+            return false
+        }
+        guard let magic = try? r.readBytes(4), magic == FolioArchive.magic else {
+            add(.error, "Das ist keine Folio-Notiz: Die Dateikennung „FOLI“ fehlt am Anfang.")
+            return false
+        }
+        guard let version: UInt16 = try? r.read(), let flags: UInt16 = try? r.read() else {
+            add(.error, "Die Datei endet direkt nach der Kennung.")
+            return false
+        }
+        guard version <= FolioArchive.currentVersion else {
+            add(.error, "Die Datei stammt von einer neueren Folio-Version (Format \(version)). Aktualisiere Folio.")
+            return false
+        }
+        compressed = flags & 1 == 1
+        return true
+    }
+
+    /// Tells whether anything changed, not what; the sections below say where.
+    private mutating func checkChecksum() {
+        guard data.count >= 8 else { return }
+        var tail = ByteReader(data.suffix(4))
+        if let stored: UInt32 = try? tail.read(), CRC32.checksum(data.prefix(data.count - 4)) != stored {
+            add(.warning, "Die Prüfsumme stimmt nicht: Der Inhalt wurde nach dem Speichern verändert oder ist unvollständig.")
+        }
+    }
+
+    private mutating func readMetadata() -> Bool {
+        do {
+            let raw = try r.readSection(compressed: compressed)
+            if let meta = try? JSONDecoder().decode(NoteMetadata.self, from: raw) { report.meta = meta }
+            else { add(.warning, "Titel, Tags und Datum sind unlesbar; die Notiz bekommt neue Angaben.") }
+            return true
+        } catch {
+            add(.error, "Schon der Kopfbereich (Titel, Tags) ist beschädigt: \(FolioDiagnostics.reason(error)). Danach ist nichts mehr lesbar.")
+            return false
+        }
+    }
+
+    private mutating func readBody() -> Bool {
+        do {
+            let raw = try r.readSection(compressed: compressed)
+            if let body = try? JSONDecoder().decode(NoteBody.self, from: raw) { report.blocks = body.blocks } else { rescueBlocks(raw) }
+            return true
+        } catch {
+            add(.error, "Der Inhalt der Notiz ist beschädigt: \(FolioDiagnostics.reason(error)). Text und Blöcke lassen sich nicht retten.")
+            return false
+        }
+    }
+
+    /// Rescue block by block.
+    private mutating func rescueBlocks(_ raw: Data) {
+        let list = ((try? JSONSerialization.jsonObject(with: raw)) as? [String: Any])?["blocks"] as? [Any] ?? []
+        for item in list {
+            if let d = try? JSONSerialization.data(withJSONObject: item), let b = try? JSONDecoder().decode(BlockRecord.self, from: d) {
+                report.blocks.append(b)
+            } else {
+                report.lostBlocks += 1
+            }
+        }
+        if list.isEmpty { add(.error, "Der Inhalt der Notiz ist unlesbar (kein gültiges Format).") }
+        else { add(.error, "\(report.lostBlocks) von \(list.count) Blöcken sind unlesbar; die übrigen wurden gerettet.") }
+    }
+
+    private mutating func readAttachments() -> Bool {
+        guard let count: UInt32 = try? r.read() else {
+            add(.error, "Die Liste der Anhänge fehlt; die Datei wurde abgeschnitten.")
+            return false
+        }
+        guard count <= 100_000 else {
+            add(.error, "Die Anzahl der Anhänge (\(count)) ist unplausibel; die Anhänge sind beschädigt.")
+            return false
+        }
+        for i in 0..<Int(count) {
+            do {
+                report.attachments.append(try readAttachment())
+            } catch {
+                report.lostAttachments = Int(count) - i
+                add(.error, "\(report.lostAttachments) von \(count) Anhängen (Bilder, PDFs, Aufnahmen …) sind beschädigt: \(FolioDiagnostics.reason(error)).")
+                break
+            }
+        }
+        return true
+    }
+
+    private mutating func readAttachment() throws -> FolioArchive.Attachment {
+        let headerLength: UInt32 = try r.read()
+        let header = try JSONDecoder().decode(FolioArchive.AttachmentHeader.self, from: Data(try r.readBytes(Int(headerLength))))
+        return FolioArchive.Attachment(header: header, data: try r.readSection(compressed: compressed))
+    }
+
+    private mutating func checkReferences() {
+        let missing = Set(report.blocks.compactMap(\.attachmentID)).subtracting(report.attachments.map(\.id))
+        if !missing.isEmpty, report.lostAttachments == 0 { add(.warning, "\(missing.count) Block/Blöcke verweisen auf fehlende Anhänge.") }
     }
 }
 
@@ -215,25 +245,29 @@ public enum TextDiff {
     public static func lines(_ old: String, _ new: String) -> [Line] {
         let a = Array(old.components(separatedBy: "\n").prefix(1500))
         let b = Array(new.components(separatedBy: "\n").prefix(1500))
-        let n = a.count, m = b.count
-        // Longest common subsequence table, filled from the end.
-        var lcs = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
-        if n > 0 && m > 0 {
-            for i in stride(from: n - 1, through: 0, by: -1) {
-                for j in stride(from: m - 1, through: 0, by: -1) {
-                    lcs[i][j] = a[i] == b[j] ? lcs[i + 1][j + 1] + 1 : max(lcs[i + 1][j], lcs[i][j + 1])
-                }
+        return walk(a, b, table: commonSubsequenceTable(a, b))
+    }
+
+    /// Longest common subsequence lengths, filled from the end.
+    private static func commonSubsequenceTable(_ a: [String], _ b: [String]) -> [[Int]] {
+        var lcs = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in stride(from: a.count - 1, through: 0, by: -1) {
+            for j in stride(from: b.count - 1, through: 0, by: -1) {
+                lcs[i][j] = a[i] == b[j] ? lcs[i + 1][j + 1] + 1 : max(lcs[i + 1][j], lcs[i][j + 1])
             }
         }
+        return lcs
+    }
+
+    private static func walk(_ a: [String], _ b: [String], table lcs: [[Int]]) -> [Line] {
         var out: [Line] = []
         var i = 0, j = 0
-        while i < n && j < m {
+        while i < a.count && j < b.count {
             if a[i] == b[j] { out.append(Line(kind: .same, text: a[i])); i += 1; j += 1 }
             else if lcs[i + 1][j] >= lcs[i][j + 1] { out.append(Line(kind: .removed, text: a[i])); i += 1 }
             else { out.append(Line(kind: .added, text: b[j])); j += 1 }
         }
-        while i < n { out.append(Line(kind: .removed, text: a[i])); i += 1 }
-        while j < m { out.append(Line(kind: .added, text: b[j])); j += 1 }
+        out += a[i...].map { Line(kind: .removed, text: $0) } + b[j...].map { Line(kind: .added, text: $0) }
         return out
     }
 }

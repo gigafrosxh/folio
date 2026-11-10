@@ -170,118 +170,66 @@ struct GraphView: View {
 
     private func canvas(_ m: Model, size: CGSize) -> some View {
         let index = store.linkIndex
-        let neighbors: Set<UUID> = hovered.map { h in index.neighborhood(of: h, depth: 1) } ?? []
-        let path: [UUID] = pathEnds.count == 2 ? (index.path(from: pathEnds[0], to: pathEnds[1]) ?? []) : []
-        let pathEdges = Set(zip(path, path.dropFirst()).map { [$0.0.uuidString, $0.1.uuidString].sorted().joined() })
-        let found = matches
-        let dim = hovered != nil || !found.isEmpty || !path.isEmpty
-        let current = store.currentDocument?.id
         let proj = projected(size)
-        // Far nodes first, so near ones are drawn on top (3D).
-        let ordered = m.nodes.sorted { (proj[$0.id]?.depth ?? 0) < (proj[$1.id]?.depth ?? 0) }
-        return Canvas { ctx, _ in
-            for (a, b) in m.edges {
-                guard let pa = proj[a], let pb = proj[b] else { continue }
-                var line = Path()
-                line.move(to: pa.point)
-                line.addLine(to: pb.point)
-                let onPath = pathEdges.contains([a.uuidString, b.uuidString].sorted().joined())
-                let lit = onPath || (hovered != nil && (a == hovered || b == hovered))
-                let toFolder = m.folders[a] != nil || m.folders[b] != nil
-                let fade = Double(min(pa.scale, pb.scale))
-                let base = Color.primary.opacity((dim ? 0.1 : (toFolder ? 0.18 : 0.32)) * min(fade, 1))
-                ctx.stroke(line, with: .color(lit ? theme.accent : base),
-                           style: StrokeStyle(lineWidth: lit ? 2 : 1.2, dash: toFolder && !lit ? [3, 3] : []))
+        let renderer = GraphCanvasRenderer(
+            model: m, projection: proj,
+            highlight: GraphHighlight(index: index, hovered: hovered, pathEnds: pathEnds, found: matches, focus: focus, current: store.currentDocument?.id),
+            index: index, accent: theme.accent, zoom: zoom, color: color(for:))
+        return Canvas { ctx, _ in renderer.draw(&ctx) }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                if case .active(let p) = phase { hovered = node(at: p, m, proj) } else { hovered = nil }
             }
-            for node in ordered {
-                guard let pr = proj[node.id] else { continue }
-                let isFolder = m.folders[node.id] != nil
-                let degree = isFolder ? m.edges.filter { $0.1 == node.id }.count : index.outgoing(node.id).count + index.backlinks(node.id).count
-                let r = (isFolder ? min(9 + sqrt(Double(degree)) * 2.5, 22) : min(4 + sqrt(Double(degree)) * 2.2, 14)) * max(min(zoom, 1.6), 0.7) * pr.scale
-                let c = pr.point
-                let lit = !dim || node.id == hovered || neighbors.contains(node.id) || found.contains(node.id) || path.contains(node.id)
-                let depthFade = min(max(Double(pr.scale), 0.35), 1)
-                if isFolder {
-                    // Folders are bubbles in a neutral color with a folder symbol (#132).
-                    let bubble = Path(roundedRect: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2), cornerRadius: r * 0.45)
-                    ctx.fill(bubble, with: .color(Color.gray.opacity((lit ? 0.35 : 0.12) * depthFade)))
-                    ctx.stroke(bubble, with: .color(Color.primary.opacity(0.35 * depthFade)), lineWidth: 1)
-                    ctx.draw(Image(systemName: "folder.fill"), in: CGRect(x: c.x - r * 0.5, y: c.y - r * 0.45, width: r, height: r * 0.9))
-                } else {
-                    let fill = node.id == focus || node.id == current ? theme.accent : color(for: node)
-                    let circle = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2))
-                    ctx.fill(circle, with: .color(fill.opacity((lit ? 1 : 0.2) * depthFade)))
-                    if m.orphans.contains(node.id) && m.folders.isEmpty {
-                        ctx.stroke(circle, with: .color(Color.primary.opacity(0.5)), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                    }
-                }
-                if found.contains(node.id) || path.contains(node.id) {
-                    ctx.stroke(Path(ellipseIn: CGRect(x: c.x - r - 3, y: c.y - r - 3, width: r * 2 + 6, height: r * 2 + 6)), with: .color(theme.accent), lineWidth: 2)
-                }
-                // Labels when zoomed in, for highlighted notes and folders, or in small graphs.
-                if lit && (isFolder || zoom > 0.9 || m.nodes.count < 40 || node.id == hovered || found.contains(node.id) || node.id == focus) {
-                    let label = Text(node.title.isEmpty ? "Ohne Titel" : node.title)
-                        .font(.system(size: isFolder ? 12 : 11, weight: isFolder || node.id == hovered || node.id == focus ? .semibold : .regular))
-                        .foregroundStyle(Color.primary.opacity((lit ? 0.85 : 0.3) * depthFade))
-                    ctx.draw(label, at: CGPoint(x: c.x, y: c.y + r + 9))
+            .gesture(SpatialTapGesture().modifiers(.option).onEnded { v in markPathEnd(at: v.location, m, proj) })
+            .simultaneousGesture(SpatialTapGesture().onEnded { v in openNode(at: v.location, m, proj) })
+            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged(drag).onEnded { _ in dragStart = nil; rotateStart = nil })
+            .simultaneousGesture(MagnifyGesture().onChanged { v in magnify(v.magnification) }.onEnded { _ in pinchStart = nil })
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(focus == nil ? "Graph aller Notizen" : "Lokaler Graph")
+            .accessibilityValue("\(m.noteCount) Notizen, \(m.folders.count) Ordner, \(m.edges.count) Verknüpfungen\(threeD ? ", 3D" : "")")
+            .accessibilityActions {
+                ForEach(m.nodes.filter { m.folders[$0.id] == nil }.prefix(30), id: \.id) { node in
+                    Button("„\(node.title)“ öffnen") { open(node.id) }
                 }
             }
+    }
+
+    /// ⌥-click two notes: the shortest path between them lights up (#114).
+    private func markPathEnd(at location: CGPoint, _ m: Model, _ proj: GraphProjection) {
+        guard let id = node(at: location, m, proj), m.folders[id] == nil else { pathEnds = []; return }
+        pathEnds = pathEnds.count == 1 ? [pathEnds[0], id] : [id]
+    }
+
+    /// A note opens; a folder bubble shows that folder's notes in the list.
+    private func openNode(at location: CGPoint, _ m: Model, _ proj: GraphProjection) {
+        guard let id = node(at: location, m, proj), !NSEvent.modifierFlags.contains(.option) else { return }
+        guard let path = m.folders[id] else { open(id); return }
+        store.searchText = ""
+        store.sidebarSelection = .folder(path.split(separator: "/").reduce(store.rootURL) { $0.appendingPathComponent(String($1), isDirectory: true) })
+    }
+
+    /// 3D: dragging turns the graph; ⇧-drag (and any drag in 2D) moves it.
+    private func drag(_ v: DragGesture.Value) {
+        if threeD && !compact && !NSEvent.modifierFlags.contains(.shift) {
+            if rotateStart == nil { rotateStart = (yaw, pitch) }
+            yaw = (rotateStart?.0 ?? 0) + v.translation.width / 180
+            pitch = min(max((rotateStart?.1 ?? 0) + v.translation.height / 180, -1.4), 1.4)
+            return
         }
-        .contentShape(Rectangle())
-        .onContinuousHover { phase in
-            if case .active(let p) = phase { hovered = node(at: p, m, proj) } else { hovered = nil }
-        }
-        .gesture(
-            SpatialTapGesture().modifiers(.option).onEnded { v in
-                // ⌥-click two notes: the shortest path between them lights up (#114).
-                guard let id = node(at: v.location, m, proj), m.folders[id] == nil else { pathEnds = []; return }
-                pathEnds = pathEnds.count == 1 ? [pathEnds[0], id] : [id]
-            }
-        )
-        .simultaneousGesture(
-            SpatialTapGesture().onEnded { v in
-                guard let id = node(at: v.location, m, proj), !NSEvent.modifierFlags.contains(.option) else { return }
-                if let path = m.folders[id] {
-                    // A folder bubble shows that folder's notes in the list.
-                    store.searchText = ""
-                    store.sidebarSelection = .folder(path.split(separator: "/").reduce(store.rootURL) { $0.appendingPathComponent(String($1), isDirectory: true) })
-                } else { open(id) }
-            }
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 3).onChanged { v in
-                if threeD && !compact && !NSEvent.modifierFlags.contains(.shift) {
-                    // 3D: dragging turns the graph; ⇧-drag moves it.
-                    if rotateStart == nil { rotateStart = (yaw, pitch) }
-                    yaw = (rotateStart?.0 ?? 0) + v.translation.width / 180
-                    pitch = min(max((rotateStart?.1 ?? 0) + v.translation.height / 180, -1.4), 1.4)
-                    return
-                }
-                if dragStart == nil { dragStart = pan }
-                pan = CGSize(width: (dragStart?.width ?? 0) + v.translation.width, height: (dragStart?.height ?? 0) + v.translation.height)
-            }.onEnded { _ in dragStart = nil; rotateStart = nil }
-        )
-        .simultaneousGesture(
-            MagnifyGesture().onChanged { v in
-                if pinchStart == nil { pinchStart = zoom }
-                zoom = min(max((pinchStart ?? 1) * v.magnification, 0.15), 4)
-            }.onEnded { _ in pinchStart = nil }
-        )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(focus == nil ? "Graph aller Notizen" : "Lokaler Graph")
-        .accessibilityValue("\(m.noteCount) Notizen, \(m.folders.count) Ordner, \(m.edges.count) Verknüpfungen\(threeD ? ", 3D" : "")")
-        .accessibilityActions {
-            ForEach(m.nodes.filter { m.folders[$0.id] == nil }.prefix(30), id: \.id) { node in
-                Button("„\(node.title)“ öffnen") { open(node.id) }
-            }
-        }
+        if dragStart == nil { dragStart = pan }
+        pan = CGSize(width: (dragStart?.width ?? 0) + v.translation.width, height: (dragStart?.height ?? 0) + v.translation.height)
+    }
+
+    private func magnify(_ magnification: CGFloat) {
+        if pinchStart == nil { pinchStart = zoom }
+        zoom = min(max((pinchStart ?? 1) * magnification, 0.15), 4)
     }
 
     private func open(_ id: UUID) {
         if let onOpen { onOpen(id) } else { store.open(noteID: id) }
     }
 
-    private func node(at point: CGPoint, _ m: Model, _ proj: [UUID: (point: CGPoint, scale: CGFloat, depth: Double)]) -> UUID? {
+    private func node(at point: CGPoint, _ m: Model, _ proj: GraphProjection) -> UUID? {
         var best: (UUID, CGFloat, Double)?
         for n in m.nodes {
             guard let p = proj[n.id] else { continue }
