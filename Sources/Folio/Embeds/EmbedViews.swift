@@ -3,6 +3,7 @@ import LinkPresentation
 import PDFKit
 import Quartz
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 import FolioCore
 
@@ -104,7 +105,10 @@ struct PDFBlockView: View {
                 .help("Im Standardprogramm öffnen")
         } content: {
             if let att {
-                PDFKitView(data: att.data, revision: block.revision)
+                VStack(spacing: 0) {
+                    PDFKitView(data: att.data, revision: block.revision)
+                    AttachmentInfoBar(attachment: att, revision: block.revision)
+                }
             } else {
                 Text("PDF fehlt").foregroundStyle(.secondary)
             }
@@ -170,12 +174,62 @@ struct FileBlockView: View {
             }
             .help("Änderungen aus der Datei übernehmen")
         } content: {
-            if let url {
-                QuickLookView(url: url, revision: block.revision)
+            if let att {
+                VStack(spacing: 0) {
+                    if let url, !att.data.isEmpty {
+                        QuickLookView(url: url, revision: block.revision)
+                    } else {
+                        AttachmentPlaceholder(attachment: att)
+                    }
+                    AttachmentInfoBar(attachment: att, revision: block.revision)
+                }
             } else {
                 Text("Datei fehlt").foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// Name, type and size of an attachment under its preview (#49). Reads the details off the main thread.
+struct AttachmentInfoBar: View {
+    var attachment: FolioArchive.Attachment
+    var revision: Int
+    var showsDivider = true
+    @State private var info: AttachmentInfo?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if showsDivider { Divider().opacity(0.5) }
+            HStack(spacing: 6) {
+                Text(info?.name ?? attachment.header.filename).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text(info?.summary ?? " ").foregroundStyle(.secondary).lineLimit(1)
+            }
+            .font(.system(size: 11))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+        }
+        .task(id: "\(attachment.id)-\(attachment.data.count)-\(revision)") {
+            let attachment = attachment
+            info = await Task.detached { AttachmentInfo(attachment) }.value
+        }
+    }
+}
+
+/// Shown instead of a preview when there is nothing Quick Look could display.
+struct AttachmentPlaceholder: View {
+    var attachment: FolioArchive.Attachment
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(nsImage: NSWorkspace.shared.icon(for: UTType(attachment.header.typeIdentifier) ?? .data))
+                .resizable()
+                .frame(width: 56, height: 56)
+                .accessibilityHidden(true)
+            Text(attachment.data.isEmpty ? "Die Datei ist leer" : "Keine Vorschau möglich").foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -209,6 +263,7 @@ struct ImageBlockView: View {
             } else {
                 Label("Bild fehlt", systemImage: "photo").foregroundStyle(.secondary).frame(height: 80)
             }
+            if hovering, let att { AttachmentInfoBar(attachment: att, revision: block.revision, showsDivider: false) }
             // The caption field only shows while hovering or once it has text.
             if hovering || !block.caption.isEmpty {
                 TextField("Bildunterschrift", text: $block.caption)

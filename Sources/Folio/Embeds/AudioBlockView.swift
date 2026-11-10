@@ -166,6 +166,7 @@ struct AudioBlockView: View {
         } content: {
             VStack(alignment: .leading, spacing: 10) {
                 if attachment == nil { recorderView } else { playerView }
+                if let attachment { AttachmentInfoBar(attachment: attachment, revision: block.revision) }
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.red).textSelection(.enabled)
