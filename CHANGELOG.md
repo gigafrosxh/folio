@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.3] – 2026-11-10
+
 ### Intern
 - **Codeausführung, PDF-Export und Datenbank-Ausgabe aufgeräumt** (#142, #144, #148): In kleine, einzeln getestete Schritte zerlegt. Am Verhalten ändert sich nichts.
 
