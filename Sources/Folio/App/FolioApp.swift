@@ -2,11 +2,39 @@ import AppKit
 import SwiftUI
 import FolioCore
 
+/// FOLIO_BACKGROUND=1 with a throwaway FOLIO_LIBRARY: self-tests that never show a window or take the focus.
+enum BackgroundRun {
+    static let isOn: Bool = {
+        let env = ProcessInfo.processInfo.environment
+        return env["FOLIO_BACKGROUND"] != nil && env["FOLIO_LIBRARY"] != nil
+    }()
+
+    /// Runs before Core Animation commits, so a new window is transparent from its first frame on.
+    @MainActor static func start() {
+        NSApp.setActivationPolicy(.accessory)
+        let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0) { _, _ in
+            MainActor.assumeIsolated {
+                for window in NSApp.windows where window.alphaValue != 0 {
+                    window.alphaValue = 0
+                    window.ignoresMouseEvents = true
+                }
+            }
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if BackgroundRun.isOn { MainActor.assumeIsolated { BackgroundRun.start() } }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Needed when started as a bare binary (`swift run`); harmless inside the .app bundle.
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        if !BackgroundRun.isOn {
+            // Needed when started as a bare binary (`swift run`); harmless inside the .app bundle.
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
         ShortcutCenter.shared.install()
         // Test runs against a throwaway library never ask for updates: the sheet would take the keyboard.
         if ThemeManager.shared.settings.askForUpdatesOnLaunch, ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] == nil {
@@ -18,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             BackupManager.shared.start()
             CaptureService.shared.start()
             WidgetFeed.shared.start()
-            QuickAccessSettings.apply()
+            if !BackgroundRun.isOn { QuickAccessSettings.apply() }
         }
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
@@ -113,7 +141,7 @@ struct FolioApp: App {
 
         // Menu bar icon (#85), optional in Settings › Schnellzugriff.
         MenuBarExtra("Folio", systemImage: "note.text", isInserted: Binding(
-            get: { theme.settings.menuBarIcon }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })) {
+            get: { theme.settings.menuBarIcon && !BackgroundRun.isOn }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })) {
             MenuBarPanel()
                 .environmentObject(store)
                 .environmentObject(theme)

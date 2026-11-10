@@ -46,60 +46,44 @@ struct NoteEditorView: View {
     private var chatPushesText: Bool { areaWidth - chatWidth - 24 - 36 >= 320 }
 
     var body: some View {
+        withDocumentHandlers(withPrompts(withWindowCommands(withEditorCommands(decoratedColumn))))
+    }
+
+    // MARK: Layout
+
+    private var editorColumn: some View {
         VStack(spacing: 0) {
-            if !focusMode || headerHover {
-                header
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .onHover { if focusMode { headerHover = $0 } }
-            } else {
-                Color.clear.frame(height: 14).contentShape(Rectangle())
-                    .onHover { if $0 { withAnimation(Motion.quick) { headerHover = true } } }
-            }
-            if showFind {
-                FindBar(model: find) { closeFind() }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("\(doc.meta.modified.formatted(date: .long, time: .shortened)) · \(doc.url.lastPathComponent)")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 2)
-                    PropertiesView(doc: doc)
-                        .padding(.leading, BlockRow.gutter)
-                    if !doc.meta.tags.isEmpty {
-                        HStack(spacing: 6) {
-                            ForEach(doc.meta.tags, id: \.self) { tag in
-                                Button { store.sidebarSelection = .tag(tag) } label: {
-                                    Text("#\(tag)")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(theme.accent)
-                                        .padding(.horizontal, 9)
-                                        .padding(.vertical, 3)
-                                        .background(theme.accent.opacity(0.14), in: Capsule())
-                                }
-                                .buttonStyle(.plain)
-                                .help("Alle Notizen mit #\(tag)")
-                            }
-                        }
-                        .padding(.leading, BlockRow.gutter)
-                    }
-                    ForEach(doc.blocks) { block in
-                        BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
-                            .transition(Motion.blockTransition)
-                    }
-                    BacklinksView(noteID: doc.id)
-                        .padding(.top, 8)
-                    Color.clear
-                        .frame(height: 220)
-                        .contentShape(Rectangle())
-                        .onTapGesture { focusEnd() }
-                }
+            headerArea
+            findArea
+            noteScrollArea
+            terminalArea
+        }
+    }
+
+    @ViewBuilder private var headerArea: some View {
+        if !focusMode || headerHover {
+            header
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onHover { if focusMode { headerHover = $0 } }
+        } else {
+            Color.clear.frame(height: 14).contentShape(Rectangle())
+                .onHover { if $0 { withAnimation(Motion.quick) { headerHover = true } } }
+        }
+    }
+
+    @ViewBuilder private var findArea: some View {
+        if showFind {
+            FindBar(model: find) { closeFind() }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    private var noteScrollArea: some View {
+        ScrollView {
+            noteContent
                 .animation(Motion.standard, value: doc.blocks.map(\.id))
                 .frame(maxWidth: CGFloat(theme.settings.editorWidth) + BlockRow.gutter)
                 .padding(.leading, 36 - BlockRow.gutter)
@@ -107,139 +91,202 @@ struct NoteEditorView: View {
                 .animation(Motion.standard, value: showChat)
                 .padding(.top, 18)
                 .frame(maxWidth: .infinity)
+        }
+        .scrollContentBackground(.hidden)
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y > 2 } action: { _, now in
+            withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
+        }
+        .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
             }
-            .scrollContentBackground(.hidden)
-            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y > 2 } action: { _, now in
-                withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
-            }
-            .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
-            .overlay {
-                if dropTargeted {
-                    RoundedRectangle(cornerRadius: 18).stroke(theme.accent, style: StrokeStyle(lineWidth: 2, dash: [8, 6])).padding(10)
-                }
-            }
-            if showTerminal {
-                Divider()
-                TerminalPanel(session: TerminalSession.session(for: doc.id)) { withAnimation(Motion.quick) { showTerminal = false } }
-                    .frame(height: 250)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+        }
+    }
 
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
-        }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { areaWidth = $0 }
-        .overlay(alignment: .topTrailing) {
-            if showChat {
-                AIChatView(chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
-                           onInsert: insertChatAnswer, onClose: { setChat(false) })
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-                    .frame(width: chatWidth)
-                    .shadow(color: .black.opacity(chatPushesText ? 0 : 0.25), radius: 16, y: 6)
-                    // The popup grows out of the ✨ button (top right) and shrinks back into it.
-                    .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
-                    .opacity(chatPopped ? 1 : 0)
-                    .padding(.top, headerHeight + 10)
-                    .padding([.trailing, .bottom], 12)
+    private var noteContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("\(doc.meta.modified.formatted(date: .long, time: .shortened)) · \(doc.url.lastPathComponent)")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 2)
+            PropertiesView(doc: doc)
+                .padding(.leading, BlockRow.gutter)
+            tagRow
+            ForEach(doc.blocks) { block in
+                BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
+                    .transition(Motion.blockTransition)
             }
+            BacklinksView(noteID: doc.id)
+                .padding(.top, 8)
+            Color.clear
+                .frame(height: 220)
+                .contentShape(Rectangle())
+                .onTapGesture { focusEnd() }
         }
-        .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
-        .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
-        .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in if isActive { showHistory = true } }
-        .onReceive(NotificationCenter.default.publisher(for: .folioRevealText)) { note in
-            if let req = note.object as? RevealRequest, req.noteID == doc.id { reveal(req.text) }
+    }
+
+    @ViewBuilder private var tagRow: some View {
+        if !doc.meta.tags.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(doc.meta.tags, id: \.self, content: tagButton)
+            }
+            .padding(.leading, BlockRow.gutter)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .folioOpenChat)) { _ in
-            guard isActive else { return }
-            chatLibrary = false
-            if !showChat { setChat(true) }
+    }
+
+    private func tagButton(_ tag: String) -> some View {
+        Button { store.sidebarSelection = .tag(tag) } label: {
+            Text("#\(tag)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.accent)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(theme.accent.opacity(0.14), in: Capsule())
         }
-        .onReceive(NotificationCenter.default.publisher(for: .folioAskLibrary)) { _ in
-            guard isActive else { return }
-            chatLibrary = true
-            if !showChat { setChat(true) }
+        .buttonStyle(.plain)
+        .help("Alle Notizen mit #\(tag)")
+    }
+
+    @ViewBuilder private var terminalArea: some View {
+        if showTerminal {
+            Divider()
+            TerminalPanel(session: TerminalSession.session(for: doc.id)) { withAnimation(Motion.quick) { showTerminal = false } }
+                .frame(height: 250)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
-        .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in
-            guard isActive else { return }
-            if let selected = formatting.selectedText, !selected.contains("\n"), !selected.isEmpty { find.query = selected }
-            find.showReplace = (note.object as? Bool) ?? find.showReplace
-            find.attach(doc)
-            withAnimation(Motion.quick) { showFind = true }
+    }
+
+    private var decoratedColumn: some View {
+        editorColumn
+            .overlay(alignment: .bottomTrailing) {
+                if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { areaWidth = $0 }
+            .overlay(alignment: .topTrailing) { chatPanel }
+            .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
+            .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
+    }
+
+    @ViewBuilder private var chatPanel: some View {
+        if showChat {
+            AIChatView(chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
+                       onInsert: insertChatAnswer, onClose: { setChat(false) })
+                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+                .frame(width: chatWidth)
+                .shadow(color: .black.opacity(chatPushesText ? 0 : 0.25), radius: 16, y: 6)
+                // The popup grows out of the ✨ button (top right) and shrinks back into it.
+                .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
+                .opacity(chatPopped ? 1 : 0)
+                .padding(.top, headerHeight + 10)
+                .padding([.trailing, .bottom], 12)
         }
-        .onDisappear { find.detach() }
-        .animation(Motion.quick, value: showFind)
-        .animation(Motion.quick, value: headerHover)
-        .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
-            if isActive { setChat(!showChat) }
-        }
-        // With tabs, split view and windows several editors exist: the one being typed in is "active".
-        .onReceive(formatting.$activeBlockID) { id in
-            if let id, doc.block(id) != nil, store.focusedNoteID != doc.id { store.focusedNoteID = doc.id }
-        }
-        .onAppear { if chatRemembered && store.splitNoteID == nil && store.selectedNoteID == doc.id { showChat = true; chatPopped = true } }
-        .background(Color(nsColor: .textBackgroundColor))
-        .imagePlaygroundSheet(isPresented: $showPlayground,
-                              concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]) { url in
-            insertImageFile(url)
-        }
-        .alert("Webseite einbetten", isPresented: $showWebPrompt) {
-            TextField("https://…", text: $promptText)
-            Button("Einbetten") { insertWeb(promptText) }
-            Button("Abbrechen", role: .cancel) {}
-        } message: {
-            Text("Die Seite wird direkt in der Notiz angezeigt.")
-        }
-        .alert("Link hinzufügen", isPresented: $showLinkPrompt) {
-            TextField("https://…", text: $promptText)
-            Button("Hinzufügen") { formatting.addLink(promptText) }
-            Button("Abbrechen", role: .cancel) {}
-        }
-        .alert("Hinweis", isPresented: Binding(get: { alertMessage != nil }, set: { if !$0 { alertMessage = nil } })) {
-            Button("OK") {}
-        } message: {
-            Text(alertMessage ?? "")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            AttachmentSync.syncExternalEdits(in: doc)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .folioPasteboard)) { note in
-            if isActive, let pb = note.object as? NSPasteboard { pasteWithoutTextFocus(pb) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .folioInsert)) { note in
-            if isActive, let kind = note.object as? String { handleInsert(kind) }
-        }
-        .onAppear { doc.undoManager = undoManager }
-        .onChange(of: undoManager) { doc.undoManager = undoManager }
-        .onAppear {
-            if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
-        }
+    }
+
+    // MARK: Commands
+
+    private func withEditorCommands<V: View>(_ view: V) -> some View {
+        view
+            .onReceive(NotificationCenter.default.publisher(for: .folioShowHistory)) { _ in if isActive { showHistory = true } }
+            .onReceive(NotificationCenter.default.publisher(for: .folioRevealText)) { note in
+                if let req = note.object as? RevealRequest, req.noteID == doc.id { reveal(req.text) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .folioOpenChat)) { _ in openChat(library: false) }
+            .onReceive(NotificationCenter.default.publisher(for: .folioAskLibrary)) { _ in openChat(library: true) }
+            .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in openFind(showReplace: note.object as? Bool) }
+            .onDisappear { find.detach() }
+            .animation(Motion.quick, value: showFind)
+            .animation(Motion.quick, value: headerHover)
+    }
+
+    private func withWindowCommands<V: View>(_ view: V) -> some View {
+        view
+            .onReceive(NotificationCenter.default.publisher(for: .folioToggleChat)) { _ in
+                if isActive { setChat(!showChat) }
+            }
+            // With tabs, split view and windows several editors exist: the one being typed in is "active".
+            .onReceive(formatting.$activeBlockID) { id in
+                if let id, doc.block(id) != nil, store.focusedNoteID != doc.id { store.focusedNoteID = doc.id }
+            }
+            .onAppear { if chatRemembered && store.splitNoteID == nil && store.selectedNoteID == doc.id { showChat = true; chatPopped = true } }
+            .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private func withPrompts<V: View>(_ view: V) -> some View {
+        view
+            .imagePlaygroundSheet(isPresented: $showPlayground,
+                                  concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]) { url in
+                insertImageFile(url)
+            }
+            .alert("Webseite einbetten", isPresented: $showWebPrompt) {
+                TextField("https://…", text: $promptText)
+                Button("Einbetten") { insertWeb(promptText) }
+                Button("Abbrechen", role: .cancel) {}
+            } message: {
+                Text("Die Seite wird direkt in der Notiz angezeigt.")
+            }
+            .alert("Link hinzufügen", isPresented: $showLinkPrompt) {
+                TextField("https://…", text: $promptText)
+                Button("Hinzufügen") { formatting.addLink(promptText) }
+                Button("Abbrechen", role: .cancel) {}
+            }
+            .alert("Hinweis", isPresented: Binding(get: { alertMessage != nil }, set: { if !$0 { alertMessage = nil } })) {
+                Button("OK") {}
+            } message: {
+                Text(alertMessage ?? "")
+            }
+    }
+
+    private func withDocumentHandlers<V: View>(_ view: V) -> some View {
+        view
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                AttachmentSync.syncExternalEdits(in: doc)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .folioPasteboard)) { note in
+                if isActive, let pb = note.object as? NSPasteboard { pasteWithoutTextFocus(pb) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .folioInsert)) { note in
+                if isActive, let kind = note.object as? String { handleInsert(kind) }
+            }
+            .onAppear { doc.undoManager = undoManager }
+            .onChange(of: undoManager) { doc.undoManager = undoManager }
+            .onAppear {
+                if doc.blocks.count == 1, doc.blocks[0].storage.length == 0 { formatting.focus(blockID: doc.blocks[0].id) }
+            }
+    }
+
+    private func openChat(library: Bool) {
+        guard isActive else { return }
+        chatLibrary = library
+        if !showChat { setChat(true) }
+    }
+
+    private func openFind(showReplace: Bool?) {
+        guard isActive else { return }
+        if let selected = formatting.selectedText, !selected.contains("\n"), !selected.isEmpty { find.query = selected }
+        find.showReplace = showReplace ?? find.showReplace
+        find.attach(doc)
+        withAnimation(Motion.quick) { showFind = true }
     }
 
     /// Selects and shows a cited passage (#35): its first line is looked up in the text and code blocks.
     private func reveal(_ passage: String) {
-        let lines = passage.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count >= 3 }
-        guard let first = lines.first else { return }
-        let probe = String(first.prefix(60))
+        let lines = PassageLocator.searchLines(of: passage)
         for b in doc.blocks where b.kind == .text || b.kind == .code || b.kind == .database {
-            let ns = b.storage.string as NSString
-            let r = ns.range(of: probe, options: [.caseInsensitive, .diacriticInsensitive])
-            guard r.location != NSNotFound else { continue }
-            let tv: NSTextView? = FormattingController.shared.textView(for: b.id) ?? FormattingController.shared.codeView(for: b.id)
-            guard let tv, tv.textStorage === b.storage else { continue }
-            // Select the whole passage as far as it is contiguous in this block.
-            var end = NSMaxRange(r)
-            if let last = lines.last, last != first {
-                let lr = ns.range(of: String(last.suffix(60)), options: [.caseInsensitive], range: NSRange(location: r.location, length: ns.length - r.location))
-                if lr.location != NSNotFound, NSMaxRange(lr) - r.location < 4000 { end = NSMaxRange(lr) }
-            }
-            let range = NSRange(location: r.location, length: end - r.location)
+            guard let match = PassageLocator.locate(lines, in: b.storage.string), let tv = textView(showing: b) else { continue }
             tv.window?.makeFirstResponder(tv)
-            tv.setSelectedRange(range)
-            tv.scrollRangeToVisible(range)
-            tv.showFindIndicator(for: NSRange(location: r.location, length: min(r.length, range.length)))
+            tv.setSelectedRange(match.range)
+            tv.scrollRangeToVisible(match.range)
+            tv.showFindIndicator(for: NSRange(location: match.range.location, length: min(match.firstLineLength, match.range.length)))
             return
         }
+    }
+
+    private func textView(showing block: BlockModel) -> NSTextView? {
+        let tv: NSTextView? = FormattingController.shared.textView(for: block.id) ?? FormattingController.shared.codeView(for: block.id)
+        return tv?.textStorage === block.storage ? tv : nil
     }
 
     private func closeFind() {
@@ -287,52 +334,7 @@ struct NoteEditorView: View {
 
     /// Inserts a chat answer at the cursor (or at the end of the note), turning Markdown lists and bold into note formatting.
     private func insertChatAnswer(_ markdown: String) {
-        let body = theme.bodyAttributes
-        let result = NSMutableAttributedString()
-        let codeFont = NSFont.monospacedSystemFont(ofSize: theme.bodyFont().pointSize * 0.92, weight: .regular)
-        for (i, rawLine) in markdown.components(separatedBy: "\n").enumerated() {
-            var line = rawLine
-            // Nested list items keep their level as tabs (two spaces of Markdown indentation per level).
-            let leading = line.prefix { $0 == " " || $0 == "\t" }
-            let level = leading.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) } / 2
-            if let r = line.range(of: #"^\s*[-*+] \[ \] "#, options: .regularExpression) {
-                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "☐ ")
-            } else if let r = line.range(of: #"^\s*[-*+] \[[xX]\] "#, options: .regularExpression) {
-                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "☑ ")
-            } else if let r = line.range(of: #"^\s*[-*+] "#, options: .regularExpression) {
-                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + "• ")
-            } else if let r = line.range(of: #"^\s*\d+\. "#, options: .regularExpression) {
-                line.replaceSubrange(r, with: String(repeating: "\t", count: level) + line[r].trimmingCharacters(in: .whitespaces) + " ")
-            }
-            var attrs = body
-            if let r = line.range(of: #"^#{1,6} "#, options: .regularExpression) {
-                line.removeSubrange(r)
-                attrs = TextStyle.subheading.attributes(theme: theme)
-            }
-            if i > 0 { result.append(NSAttributedString(string: "\n", attributes: body)) }
-            // **bold** and `code` spans become real formatting instead of literal Markdown.
-            let tokens = try! NSRegularExpression(pattern: #"\*\*(.+?)\*\*|`([^`]+)`"#)
-            let ns = line as NSString
-            var cursor = 0
-            for m in tokens.matches(in: line, range: NSRange(location: 0, length: ns.length)) {
-                if m.range.location > cursor {
-                    result.append(NSAttributedString(string: ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor)), attributes: attrs))
-                }
-                var a = attrs
-                if m.range(at: 1).location != NSNotFound {
-                    if let f = a[.font] as? NSFont { a[.font] = NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) }
-                    result.append(NSAttributedString(string: ns.substring(with: m.range(at: 1)), attributes: a))
-                } else {
-                    a[.font] = codeFont
-                    a[.backgroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.12)
-                    result.append(NSAttributedString(string: ns.substring(with: m.range(at: 2)), attributes: a))
-                }
-                cursor = NSMaxRange(m.range)
-            }
-            if cursor < ns.length {
-                result.append(NSAttributedString(string: ns.substring(from: cursor), attributes: attrs))
-            }
-        }
+        let result = ChatAnswerFormatter.attributed(fromMarkdown: markdown, theme: theme)
         if let tv = formatting.activeTextView, tv.window != nil, doc.block(tv.blockID ?? UUID()) != nil {
             let range = tv.selectedRange()
             if tv.shouldChangeText(in: range, replacementString: result.string) {
@@ -340,7 +342,7 @@ struct NoteEditorView: View {
                 tv.didChangeText()
             }
         } else if let last = doc.blocks.last(where: { $0.kind == .text }) {
-            if last.storage.length > 0 { last.storage.append(NSAttributedString(string: "\n", attributes: body)) }
+            if last.storage.length > 0 { last.storage.append(NSAttributedString(string: "\n", attributes: theme.bodyAttributes)) }
             last.storage.append(result)
             doc.markDirty()
         }
@@ -527,27 +529,34 @@ struct NoteEditorView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    guard let url else { return }
-                    DispatchQueue.main.async { insertFiles([url], after: doc.blocks.last?.id) }
-                }
-            } else if let type = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .image) == true }) {
-                _ = provider.loadDataRepresentation(forTypeIdentifier: type) { data, _ in
-                    guard let data else { return }
-                    DispatchQueue.main.async {
-                        insertBlock(AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc), after: doc.blocks.last?.id)
-                    }
-                }
-            } else if provider.canLoadObject(ofClass: URL.self) {
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    guard let url else { return }
-                    DispatchQueue.main.async { insertBlock(webBlock(url), after: doc.blocks.last?.id) }
-                }
+        providers.forEach(loadDrop)
+        return true
+    }
+
+    private func loadDrop(_ provider: NSItemProvider) {
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            loadDroppedURL(provider) { url in insertFiles([url], after: doc.blocks.last?.id) }
+        } else if let type = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .image) == true }) {
+            loadDroppedImage(provider, type: type)
+        } else if provider.canLoadObject(ofClass: URL.self) {
+            loadDroppedURL(provider) { url in insertBlock(webBlock(url), after: doc.blocks.last?.id) }
+        }
+    }
+
+    private func loadDroppedURL(_ provider: NSItemProvider, then insert: @escaping (URL) -> Void) {
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            guard let url else { return }
+            DispatchQueue.main.async { insert(url) }
+        }
+    }
+
+    private func loadDroppedImage(_ provider: NSItemProvider, type: String) {
+        _ = provider.loadDataRepresentation(forTypeIdentifier: type) { data, _ in
+            guard let data else { return }
+            DispatchQueue.main.async {
+                insertBlock(AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc), after: doc.blocks.last?.id)
             }
         }
-        return true
     }
 
     /// Pastes files or an image at the end of the note (or at the last cursor position in a text block).

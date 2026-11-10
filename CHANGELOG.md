@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Markdown-Export** (#159): Verschachtelte Listen behalten ihre Einrückung.
+
+### Intern
+- **Editor und Markdown aufgeräumt** (#143, #145, #146): Der Aufbau des Editors, das Einfügen aus der Zwischenablage, Listen und die Markdown-Umwandlung sind in kleine, einzeln getestete Schritte zerlegt. Am Verhalten ändert sich sonst nichts.
+- **Selbsttests im Hintergrund**: Mit `FOLIO_BACKGROUND=1` laufen die App-Selbsttests ohne sichtbares Fenster und ohne den Fokus zu nehmen.
+
 ## [1.3.1] – 2026-11-10
 
 ### Behoben

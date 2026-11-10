@@ -271,46 +271,57 @@ final class FolioTextView: NSTextView {
 
     override func insertNewline(_ sender: Any?) {
         let ns = string as NSString
-        let sel = selectedRange()
-        let para = ns.paragraphRange(for: NSRange(location: sel.location, length: 0))
+        let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
         let line = ns.substring(with: para).trimmingCharacters(in: .newlines)
+        if continueList(line: line, paragraph: para, sender: sender) || turnIntoEmbed(line: line, paragraph: para) { return }
+        insertNewlineSwitchingStyle(line: line, paragraph: para, sender: sender)
+    }
 
-        if let list = ListKind.detect(line) {
-            let prefixLength = (list.indent + list.marker as NSString).length
-            if (line as NSString).length == prefixLength {
-                // Empty list item ends the list.
-                replace(NSRange(location: para.location, length: prefixLength), with: "")
-                return
-            }
-            super.insertNewline(sender)
-            insertText(list.indent + ListKind.next(after: list.marker, kind: list.kind), replacementRange: selectedRange())
-            return
+    /// Return in a list item starts the next item; in an empty item it ends the list.
+    private func continueList(line: String, paragraph para: NSRange, sender: Any?) -> Bool {
+        guard let list = ListKind.detect(line) else { return false }
+        let prefixLength = (list.indent + list.marker as NSString).length
+        if (line as NSString).length == prefixLength {
+            replace(NSRange(location: para.location, length: prefixLength), with: "")
+            return true
         }
+        super.insertNewline(sender)
+        insertText(list.indent + ListKind.next(after: list.marker, kind: list.kind), replacementRange: selectedRange())
+        return true
+    }
 
-        // A line that is just ![[Titel]] becomes an embedded note (#120).
-        if !(isFirstBlock && para.location == 0), let embed = WikiLink.find(in: line).first, embed.isEmbed,
-           embed.range.location == 0, embed.range.length == (line as NSString).length {
-            let r = NSRange(location: para.location, length: (ns.substring(with: para) as NSString).length)
-            if shouldChangeText(in: r, replacementString: "") {
-                textStorage?.replaceCharacters(in: r, with: "")
-                didChangeText()
-                setSelectedRange(NSRange(location: para.location, length: 0))
-            }
-            NotificationCenter.default.post(name: .folioInsert, object: "embed:" + embed.target)
-            return
+    /// A line that is just ![[Titel]] becomes an embedded note (#120).
+    private func turnIntoEmbed(line: String, paragraph para: NSRange) -> Bool {
+        guard !(isFirstBlock && para.location == 0), let embed = WikiLink.find(in: line).first, embed.isEmbed,
+              embed.range.location == 0, embed.range.length == (line as NSString).length else { return false }
+        if shouldChangeText(in: para, replacementString: "") {
+            textStorage?.replaceCharacters(in: para, with: "")
+            didChangeText()
+            setSelectedRange(NSRange(location: para.location, length: 0))
         }
+        NotificationCenter.default.post(name: .folioInsert, object: "embed:" + embed.target)
+        return true
+    }
 
-        // Like Apple Notes: Return after the title starts a heading (or body text), Return after a heading
-        // starts body text, so nobody has to change the paragraph style by hand (#125).
+    /// Like Apple Notes: Return after the title starts a heading (or body text), Return after a heading
+    /// starts body text, so nobody has to change the paragraph style by hand (#125).
+    private func insertNewlineSwitchingStyle(line: String, paragraph para: NSRange, sender: Any?) {
         let wasTitle = isFirstBlock && para.location == 0
-        let font = para.length > 0 ? textStorage?.attribute(.font, at: para.location, effectiveRange: nil) as? NSFont : typingAttributes[.font] as? NSFont
-        let headingFonts = [TextStyle.heading, .subheading].compactMap { styleAttributes($0)[.font] as? NSFont }
-        let wasHeading = !wasTitle && font != nil && headingFonts.contains { $0.pointSize == font!.pointSize && $0.fontName == font!.fontName }
+        let wasHeading = !wasTitle && paragraphIsHeading(para)
         super.insertNewline(sender)
         if wasTitle {
             typingAttributes = headingAfterTitle() && !line.isEmpty ? styleAttributes(.heading) : bodyAttributes()
         } else if wasHeading {
             typingAttributes = bodyAttributes()
+        }
+    }
+
+    private func paragraphIsHeading(_ para: NSRange) -> Bool {
+        let attribute = para.length > 0 ? textStorage?.attribute(.font, at: para.location, effectiveRange: nil) : typingAttributes[.font]
+        guard let font = attribute as? NSFont else { return false }
+        return [TextStyle.heading, .subheading].contains { style in
+            guard let heading = styleAttributes(style)[.font] as? NSFont else { return false }
+            return heading.pointSize == font.pointSize && heading.fontName == font.fontName
         }
     }
 
@@ -555,48 +566,61 @@ final class FolioTextView: NSTextView {
     }
 
     func handlePasteboard(_ pb: NSPasteboard) -> Bool {
-        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           !urls.isEmpty, onPasteFiles?(urls) == true {
-            return true
-        }
-        let types = pb.types ?? []
-        // An image wins unless the pasteboard mainly carries text: browsers add the image URL or HTML as text.
-        if let data = Self.imageData(in: pb) {
-            let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let textIsJustALink = text.isEmpty || (!text.contains(" ") && !text.contains("\n"))
-            if !types.contains(.rtf) && textIsJustALink {
-                onPasteImage?(Self.normalizedImage(data))
-                return true
+        pasteFiles(from: pb) || pasteImage(from: pb) || pasteRichTextWithPictures(from: pb) || pasteLink(from: pb)
+    }
+
+    private func pasteFiles(from pb: NSPasteboard) -> Bool {
+        guard let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else { return false }
+        return onPasteFiles?(urls) == true
+    }
+
+    /// An image wins unless the pasteboard mainly carries text: browsers add the image URL or HTML as text.
+    private func pasteImage(from pb: NSPasteboard) -> Bool {
+        guard let data = Self.imageData(in: pb), !(pb.types ?? []).contains(.rtf) else { return false }
+        let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard text.isEmpty || !(text.contains(" ") || text.contains("\n")) else { return false }
+        onPasteImage?(Self.normalizedImage(data))
+        return true
+    }
+
+    /// Rich text with embedded pictures (Notes, TextEdit, Pages): paste the text, then the pictures as blocks.
+    private func pasteRichTextWithPictures(from pb: NSPasteboard) -> Bool {
+        guard (pb.types ?? []).contains(.rtfd), let rtfd = pb.data(forType: .rtfd),
+              let rich = NSAttributedString(rtfd: rtfd, documentAttributes: nil) else { return false }
+        let (text, images) = Self.separatingPictures(of: rich)
+        guard !images.isEmpty else { return false }
+        if text.length > 0 { insertText(text, replacementRange: selectedRange()) }
+        images.forEach { onPasteImage?($0) }
+        return true
+    }
+
+    private static func separatingPictures(of rich: NSAttributedString) -> (NSAttributedString, [Data]) {
+        var images: [Data] = []
+        let text = NSMutableAttributedString(attributedString: rich)
+        rich.enumerateAttribute(.attachment, in: NSRange(location: 0, length: rich.length), options: .reverse) { value, range, _ in
+            guard let attachment = value as? NSTextAttachment else { return }
+            if let data = attachment.fileWrapper?.regularFileContents ?? attachment.contents ?? attachment.image?.tiffRepresentation {
+                images.insert(normalizedImage(data), at: 0)
             }
+            text.deleteCharacters(in: range)
         }
-        // Rich text with embedded pictures (Notes, TextEdit, Pages): paste the text, then the pictures as blocks.
-        if types.contains(.rtfd), let rtfd = pb.data(forType: .rtfd),
-           let rich = NSAttributedString(rtfd: rtfd, documentAttributes: nil) {
-            var images: [Data] = []
-            let clean = NSMutableAttributedString(attributedString: rich)
-            rich.enumerateAttribute(.attachment, in: NSRange(location: 0, length: rich.length), options: .reverse) { value, range, _ in
-                guard let att = value as? NSTextAttachment else { return }
-                if let d = att.fileWrapper?.regularFileContents ?? att.contents ?? att.image?.tiffRepresentation {
-                    images.insert(Self.normalizedImage(d), at: 0)
-                }
-                clean.deleteCharacters(in: range)
-            }
-            if !images.isEmpty {
-                if clean.length > 0 { insertText(clean, replacementRange: selectedRange()) }
-                for d in images { onPasteImage?(d) }
-                return true
-            }
-        }
-        if var s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.contains(" "), !s.contains("\n") {
-            // "localhost:3000" or "192.168.1.5:8080" without a scheme still counts as a link (plain http).
-            if !s.contains("://"), NoteEditorView.isLocalAddress(s) { s = "http://" + s }
-            guard let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return false }
-            let ns = string as NSString
-            let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
-            let line = ns.substring(with: para).trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty, onPasteURL?(url) == true { return true }
-        }
-        return false
+        return (text, images)
+    }
+
+    /// A single link on an empty line becomes a web block.
+    private func pasteLink(from pb: NSPasteboard) -> Bool {
+        guard let url = pastedLink(in: pb) else { return false }
+        let ns = string as NSString
+        let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
+        return ns.substring(with: para).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && onPasteURL?(url) == true
+    }
+
+    private func pastedLink(in pb: NSPasteboard) -> URL? {
+        guard var s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.contains(" "), !s.contains("\n") else { return nil }
+        // "localhost:3000" or "192.168.1.5:8080" without a scheme still counts as a link (plain http).
+        if !s.contains("://"), NoteEditorView.isLocalAddress(s) { s = "http://" + s }
+        guard let url = URL(string: s), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return nil }
+        return url
     }
 }
 

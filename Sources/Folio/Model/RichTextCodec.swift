@@ -37,32 +37,46 @@ enum RichTextCodec {
     static func normalizeImported(_ s: NSMutableAttributedString, bodyFont: NSFont) {
         let full = NSRange(location: 0, length: s.length)
         s.enumerateAttribute(.foregroundColor, in: full) { value, range, _ in
-            if let c = (value as? NSColor)?.usingColorSpace(.sRGB) {
-                let brightness = (c.redComponent + c.greenComponent + c.blueComponent) / 3
-                let saturation = max(c.redComponent, c.greenComponent, c.blueComponent) - min(c.redComponent, c.greenComponent, c.blueComponent)
-                if saturation < 0.08 && (brightness < 0.2 || brightness > 0.9) { s.removeAttribute(.foregroundColor, range: range) }
-            }
+            if isNeutralTextColor(value as? NSColor) { s.removeAttribute(.foregroundColor, range: range) }
         }
         s.enumerateAttribute(.backgroundColor, in: full) { value, range, _ in
-            if let c = (value as? NSColor)?.usingColorSpace(.sRGB), c.redComponent > 0.95, c.greenComponent > 0.95, c.blueComponent > 0.95 {
-                s.removeAttribute(.backgroundColor, range: range)
-            }
+            if isWhite(value as? NSColor) { s.removeAttribute(.backgroundColor, range: range) }
         }
         s.enumerateAttribute(.font, in: full) { value, range, _ in
-            guard let f = value as? NSFont else { return }
-            let family = f.familyName ?? ""
-            if family.contains("Times") || family.contains("Helvetica") || family.hasPrefix(".") {
-                let traits = NSFontManager.shared.traits(of: f)
-                var nf = NSFont.systemFont(ofSize: max(f.pointSize, bodyFont.pointSize), weight: traits.contains(.boldFontMask) ? .bold : .regular)
-                if bodyFont.familyName != nf.familyName, !(bodyFont.familyName ?? "").hasPrefix(".") {
-                    nf = NSFontManager.shared.convert(bodyFont, toSize: max(f.pointSize, bodyFont.pointSize))
-                    if traits.contains(.boldFontMask) { nf = NSFontManager.shared.convert(nf, toHaveTrait: .boldFontMask) }
-                }
-                if traits.contains(.italicFontMask) { nf = NSFontManager.shared.convert(nf, toHaveTrait: .italicFontMask) }
-                s.addAttribute(.font, value: nf, range: range)
-            }
+            if let font = value as? NSFont, isHTMLDefaultFont(font) { s.addAttribute(.font, value: editorFont(replacing: font, bodyFont: bodyFont), range: range) }
         }
         applyDefaultColor(s)
+    }
+
+    private static func isNeutralTextColor(_ color: NSColor?) -> Bool {
+        guard let c = color?.usingColorSpace(.sRGB) else { return false }
+        let brightness = (c.redComponent + c.greenComponent + c.blueComponent) / 3
+        let saturation = max(c.redComponent, c.greenComponent, c.blueComponent) - min(c.redComponent, c.greenComponent, c.blueComponent)
+        return saturation < 0.08 && (brightness < 0.2 || brightness > 0.9)
+    }
+
+    private static func isWhite(_ color: NSColor?) -> Bool {
+        guard let c = color?.usingColorSpace(.sRGB) else { return false }
+        return min(c.redComponent, c.greenComponent, c.blueComponent) > 0.95
+    }
+
+    private static func isHTMLDefaultFont(_ font: NSFont) -> Bool {
+        let family = font.familyName ?? ""
+        return family.contains("Times") || family.contains("Helvetica") || family.hasPrefix(".")
+    }
+
+    /// The editor font with the size and traits of the imported one.
+    private static func editorFont(replacing font: NSFont, bodyFont: NSFont) -> NSFont {
+        let manager = NSFontManager.shared
+        let traits = manager.traits(of: font)
+        let isBold = traits.contains(.boldFontMask)
+        let size = max(font.pointSize, bodyFont.pointSize)
+        var result = NSFont.systemFont(ofSize: size, weight: isBold ? .bold : .regular)
+        if bodyFont.familyName != result.familyName, !(bodyFont.familyName ?? "").hasPrefix(".") {
+            result = manager.convert(bodyFont, toSize: size)
+            if isBold { result = manager.convert(result, toHaveTrait: .boldFontMask) }
+        }
+        return traits.contains(.italicFontMask) ? manager.convert(result, toHaveTrait: .italicFontMask) : result
     }
 
     private static func isDefaultTextColor(_ c: NSColor) -> Bool {

@@ -100,7 +100,11 @@ enum LinkSelfTest {
                 waited += 0.05
             }
             let cursor = FormattingController.shared.activeTextView?.selectedRange().location
-            check(cursor == expected, "Cursor steht an {{cursor}} (\(cursor ?? -1))")
+            if BackgroundRun.isOn {
+                print("LINK skip Cursor (ohne aktives Fenster nicht prüfbar)")
+            } else {
+                check(cursor == expected, "Cursor steht an {{cursor}} (\(cursor ?? -1))")
+            }
         } else { check(false, "Vorlage anwenden") }
 
         // Properties (#121): saved, searchable, removable.
