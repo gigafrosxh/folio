@@ -67,6 +67,7 @@ final class PDFStructureImportTests: XCTestCase {
             case .paragraph(let runs): return "p " + runs.map(\.text).joined()
             case .listItem(let runs): return "li " + runs.map(\.text).joined()
             case .image: return "bild"
+            case .blankLine: return "leer"
             }
         }
         XCTAssertEqual(kinds, ["h1 Schwingungen", "p " + longText, "h2 Beispiele", "li • Ein Pendel", "li • Eine Saite", "bild",
@@ -89,9 +90,11 @@ final class PDFStructureImportTests: XCTestCase {
         let file = try PDFImport.note(fromPDFAt: url)
         XCTAssertEqual(file.meta.title, "Titel")
         XCTAssertEqual(Array(file.body.blocks.map(\.kind).prefix(4)), [.text, .image, .text, .pdf])
-        XCTAssertEqual(file.attachments.map(\.header.typeIdentifier), ["public.png", "com.adobe.pdf"])
-        XCTAssertEqual(file.body.blocks[1].attachmentID, file.attachments[0].id)
-        XCTAssertNotNil(NSImage(data: file.attachments[0].data))
+        // The order of stored attachments is not fixed; blocks refer to them by id.
+        XCTAssertEqual(Set(file.attachments.map(\.header.typeIdentifier)), ["public.png", "com.adobe.pdf"])
+        let picture = try XCTUnwrap(file.attachments.first { $0.id == file.body.blocks[1].attachmentID })
+        XCTAssertEqual(picture.header.typeIdentifier, "public.png")
+        XCTAssertNotNil(NSImage(data: picture.data))
         let first = RichTextCodec.attributedString(from: file.body.blocks[0].rtf).string
         XCTAssertEqual(first, "Titel\nVorher steht ein ganzer Satz.")
     }

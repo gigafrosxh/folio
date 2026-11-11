@@ -24,6 +24,8 @@ public enum PDFStructure {
         case heading(level: Int, runs: [Run])
         case paragraph([Run])
         case listItem([Run])
+        /// An empty line, where the PDF leaves the space of one between two paragraphs.
+        case blankLine
         /// PNG data of a picture as it appears on the page.
         case image(Data, width: Int, height: Int)
     }
@@ -35,12 +37,17 @@ public enum PDFStructure {
         public var width: CGFloat
         /// Top edge in page coordinates (larger is higher on the page).
         public var top: CGFloat
+        /// Bottom and left edge, for gaps and indentation.
+        public var bottom: CGFloat
+        public var left: CGFloat
         public var text: String { runs.map(\.text).joined() }
-        public init(runs: [Run], size: CGFloat, width: CGFloat, top: CGFloat) {
+        public init(runs: [Run], size: CGFloat, width: CGFloat, top: CGFloat, bottom: CGFloat? = nil, left: CGFloat = 0) {
             self.runs = runs
             self.size = size
             self.width = width
             self.top = top
+            self.bottom = bottom ?? top - size
+            self.left = left
         }
     }
 
@@ -76,7 +83,7 @@ public enum PDFStructure {
         guard !attributed.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let bounds = page.selection(for: range)?.bounds(for: page) ?? .zero
         let (runs, size) = runs(of: attributed)
-        return runs.isEmpty ? nil : Line(runs: runs, size: size, width: bounds.width, top: bounds.maxY)
+        return runs.isEmpty ? nil : Line(runs: runs, size: size, width: bounds.width, top: bounds.maxY, bottom: bounds.minY, left: bounds.minX)
     }
 
     /// Runs with their bold and italic traits, and the largest font size of the line.
@@ -114,6 +121,8 @@ public enum PDFStructure {
     /// straight into a capital letter marks the break.
     static func startsNewLine(after previous: String, before next: String) -> Bool {
         guard let end = previous.last, let start = next.first else { return false }
+        // „…/400)“ + „f₀ = 2,23 Hz“, „3,6“ + „v = 40,14 km/h“: a formula after a number or bracket.
+        if (end.isNumber || end == ")") && start.isLetter { return true }
         return (end.isLetter || end.isNumber || end == ")") && start.isUppercase
     }
 
@@ -135,10 +144,46 @@ public enum PDFStructure {
         let body = bodySize(pages)
         let furniture = runningLines(pages, body: body)
         let content = pages.map { page in Page(lines: page.lines.filter { !furniture.contains(key($0)) || !isMargin($0, body: body) }, images: page.images) }
-        let wide = (content.flatMap(\.lines).filter { level(of: $0, body: body) == 0 }.map(\.width).max() ?? 0) * 0.75
-        var builder = ElementBuilder(body: body, wideLine: wide)
-        for page in content { builder.add(page) }
+        let bodyLines = content.flatMap(\.lines).filter { level(of: $0, body: body) == 0 }
+        var builder = ElementBuilder(rightMargin: bodyLines.map { $0.left + $0.width }.max() ?? 0, widest: bodyLines.map(\.width).max() ?? 0)
+        for page in content { builder.add(page, levels: levels(of: page.lines, body: body)) }
         return builder.finish()
+    }
+
+    /// Heading levels of a page's lines: against the body text of the whole document, and for sections set in their
+    /// own smaller sizes against the text that follows (#168).
+    static func levels(of lines: [Line], body: CGFloat) -> [Int] {
+        var levels: [Int] = []
+        for i in lines.indices {
+            // A piece on the same row as the line before (a formula PDFKit split) is part of that line.
+            if i > 0, sameRow(lines[i - 1], lines[i]) { levels.append(levels[i - 1]); continue }
+            levels.append(level(at: i, of: lines, body: body))
+        }
+        return levels
+    }
+
+    static func sameRow(_ a: Line, _ b: Line) -> Bool { abs(a.top - b.top) < b.size * 0.5 }
+
+    private static func level(at i: Int, of lines: [Line], body: CGFloat) -> Int {
+        let global = level(of: lines[i], body: body)
+        // Only in sections set smaller than the document's body text; elsewhere the global sizes decide.
+        guard global == 0, lines[i].size < body - 0.5, couldBeHeading(lines[i]), i + 1 == lines.count || !sameRow(lines[i], lines[i + 1]) else { return global }
+        let following = lines[(i + 1)...].prefix(8).filter { !couldBeHeading($0) }.map(\.size)
+        return following.min().map { localLevel(size: lines[i].size, body: $0) } ?? 0
+    }
+
+    /// Headings inside a section with its own sizes are at most second level; the document's title stays the largest.
+    static func localLevel(size: CGFloat, body: CGFloat) -> Int {
+        let ratio = size / max(body, 1)
+        if ratio >= 1.35 { return 2 }
+        return ratio >= 1.1 ? 3 : 0
+    }
+
+    /// A short line without a formula, list marker or sentence end.
+    static func couldBeHeading(_ line: Line) -> Bool {
+        let text = line.text.trimmingCharacters(in: .whitespaces)
+        guard let last = text.last, text.count <= 90, !text.contains("="), !isListItem(text) else { return false }
+        return !".:;,!?".contains(last)
     }
 
     /// The font size most of the text has.
@@ -186,58 +231,95 @@ public enum PDFStructure {
 
     static func isListItem(_ text: String) -> Bool {
         guard let first = text.first else { return false }
-        return "•–▪◦".contains(first) || (first == "-" && text.dropFirst().first == " ")
+        if "•–▪◦".contains(first) || (first == "-" && text.dropFirst().first == " ") { return true }
+        // „1. Feder“, „2) Auto“
+        let digits = text.prefix { $0.isNumber }
+        let rest = text.dropFirst(digits.count)
+        return (1...2).contains(digits.count) && (rest.hasPrefix(". ") || rest.hasPrefix(") "))
     }
 }
 
-/// Collects lines into paragraphs and places pictures between them.
+/// Collects lines into paragraphs and places pictures between them, keeping the PDF's line breaks and blank lines (#168).
 private struct ElementBuilder {
-    let body: CGFloat
-    let wideLine: CGFloat
+    /// Right edge of the widest body lines, and their width.
+    let rightMargin: CGFloat
+    let widest: CGFloat
     private var out: [PDFStructure.Element] = []
-    private var current: (level: Int, runs: [PDFStructure.Run], wide: Bool, list: Bool)?
+    private var current: (level: Int, runs: [PDFStructure.Run], list: Bool, left: CGFloat)?
+    /// The line before, on the same page.
+    private var previous: (line: PDFStructure.Line, level: Int)?
 
-    init(body: CGFloat, wideLine: CGFloat) {
-        self.body = body
-        self.wideLine = wideLine
+    init(rightMargin: CGFloat, widest: CGFloat) {
+        self.rightMargin = rightMargin
+        self.widest = widest
     }
 
     /// Lines and pictures from top to bottom.
-    mutating func add(_ page: PDFStructure.Page) {
+    mutating func add(_ page: PDFStructure.Page, levels: [Int]) {
+        previous = nil
         var images = page.images.sorted { $0.top > $1.top }[...]
-        for line in page.lines {
+        for (line, level) in zip(page.lines, levels) {
             while let image = images.first, image.top >= line.top {
                 addImage(image)
                 images = images.dropFirst()
             }
-            add(line)
+            add(line, level: level)
+            previous = (line, level)
         }
         images.forEach { addImage($0) }
     }
 
     private mutating func addImage(_ image: (png: Data, top: CGFloat, width: Int, height: Int)) {
         flush()
+        previous = nil
         out.append(.image(image.png, width: image.width, height: image.height))
     }
 
-    /// A full-width line of body text continues on the next line; short lines (formulas, labels) stand alone.
-    private mutating func add(_ line: PDFStructure.Line) {
-        let level = PDFStructure.level(of: line, body: body)
-        let list = level == 0 && PDFStructure.isListItem(line.text)
-        if var c = current, PDFStructure.startsWithSubscript(line.text) {
+    private mutating func add(_ line: PDFStructure.Line, level: Int) {
+        if continues(line, level: level) { return }
+        flush()
+        if blankLine(before: line, level: level) { out.append(.blankLine) }
+        current = (level, line.runs, level == 0 && PDFStructure.isListItem(line.text), line.left)
+    }
+
+    /// Whether the line belongs to the paragraph before: same row, an index, a soft wrap, or the indented rest of a list item.
+    private mutating func continues(_ line: PDFStructure.Line, level: Int) -> Bool {
+        guard var c = current, let (prev, prevLevel) = previous, prevLevel == level else { return false }
+        if PDFStructure.sameRow(prev, line) {
+            // Side by side on one row: a formula PDFKit split, or two short columns.
+            let gap = line.left - (prev.left + prev.width)
+            let separator = PDFStructure.startsWithSubscript(line.text) ? "" : gap > line.size * 2 ? "\t" : " "
+            c.runs = c.runs + [PDFStructure.Run(text: separator)] + line.runs
+        } else if PDFStructure.startsWithSubscript(line.text) {
             // „m“ + „ₐ = 80 kg“: an index the PDF set on its own line belongs to the word before.
             c.runs = c.runs + line.runs
-            current = c
-            return
-        }
-        if var c = current, c.level == level, level == 0, c.wide, !list {
+        } else if level == 0, c.list, line.left > c.left + 4, !PDFStructure.isListItem(line.text) {
+            // „2. Auto: …“ + indented „Gesucht: …“ stays with its item, on its own line.
+            c.runs = isSoftWrap(after: prev, line) ? join(c.runs, line.runs) : c.runs + [PDFStructure.Run(text: "\n\t")] + line.runs
+        } else if level == 0, !PDFStructure.isListItem(line.text), isSoftWrap(after: prev, line) {
             c.runs = join(c.runs, line.runs)
-            c.wide = line.width >= wideLine
-            current = c
-            return
+        } else {
+            return false
         }
-        flush()
-        current = (level, line.runs, level == 0 && line.width >= wideLine, list)
+        current = c
+        return true
+    }
+
+    /// The PDF broke the line only because the line was full: it reaches the right margin, or a long sentence goes on
+    /// in lower case. Short lines (formulas, labels) keep their own line.
+    private func isSoftWrap(after prev: PDFStructure.Line, _ line: PDFStructure.Line) -> Bool {
+        guard abs(line.left - prev.left) < 2, prev.top - line.top < prev.size * 1.6 else { return false }
+        // A line that ends a sentence keeps its break, as in the PDF.
+        guard !(prev.text.last.map { ".!?".contains($0) } ?? true) else { return false }
+        if prev.left + prev.width >= rightMargin * 0.88 { return true }
+        let ends = prev.text.last.map { ":;".contains($0) } ?? true
+        return !ends && prev.width >= widest * 0.5 && line.text.first?.isLowercase == true && !line.text.contains("=")
+    }
+
+    /// A gap of about a line between two text lines; headings bring their own space.
+    private func blankLine(before line: PDFStructure.Line, level: Int) -> Bool {
+        guard let (prev, prevLevel) = previous, level == 0, prevLevel == 0 else { return false }
+        return prev.bottom - line.top > line.size * 0.9
     }
 
     private func join(_ a: [PDFStructure.Run], _ b: [PDFStructure.Run]) -> [PDFStructure.Run] {

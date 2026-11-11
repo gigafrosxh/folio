@@ -73,8 +73,10 @@ enum PDFImport {
     }
 
     private static func isText(_ element: PDFStructure.Element) -> Bool {
-        if case .image = element { return false }
-        return true
+        switch element {
+        case .image, .blankLine: return false
+        default: return true
+        }
     }
 }
 
@@ -98,6 +100,7 @@ struct PDFNoteBuilder {
         case .paragraph(let runs): line(runs, style: nil)
         case .listItem(let runs): line(Self.folioListItem(runs), style: nil)
         case .image(let png, _, _): addPicture(png)
+        case .blankLine: line([], style: nil)
         }
     }
 

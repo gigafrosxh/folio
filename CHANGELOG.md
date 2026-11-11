@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **PDF-Import wie in der PDF** (#168): Abschnitte mit eigenen, kleineren Schriftgrößen bekommen ihre Überschriften. Zeilen auf derselben Höhe (eine Formel, zwei Spalten) bleiben zusammen, nummerierte Listen behalten ihre eingerückten Folgezeilen, Zeilenumbrüche und Leerzeilen werden wie in der PDF übernommen. Nur Zeilen, die die PDF wegen der Seitenbreite umbricht, werden wieder zu einem Absatz.
+- **CI**: Ein Test aus 1.3.11 erwartete eine feste Reihenfolge der Anhänge und schlug im CI fehl. Er prüft jetzt über die Kennung des Anhangs.
+
 ## [1.3.11] – 2026-11-11
 
 ### Behoben
