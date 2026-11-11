@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.9] – 2026-11-11
+
 ### Behoben
 - **⌘N im Graphen** (#162): Die neue Notiz öffnet sich jetzt im Editor mit der Einfügemarke darin, wie aus „Alle Notizen“. Das gilt auch aus Papierkorb und beschädigten Notizen.
 - **Graph mit Bedienungshilfen** (#163): Jede im Graphen sichtbare Notiz und jeder Ordner lässt sich über die Aktionen öffnen, nicht mehr nur die ersten 30 Notizen. Die Aktionen sind nach Namen sortiert.
