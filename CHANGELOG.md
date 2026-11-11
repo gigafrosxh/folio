@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.11] – 2026-11-11
+
 ### Behoben
 - **PDF-Import mit Aufbau** (#167): Eine importierte PDF sieht jetzt aus wie eine in Folio geschriebene Notiz. Titel und Überschriften kommen aus den Schriftgrößen, Fett und Kursiv bleiben erhalten, umbrochene Zeilen werden wieder zu Absätzen, Formelzeilen bleiben einzeln, Aufzählungen werden zu Listen. Bilder stehen als eigene Bildblöcke an ihrer Stelle im Text. Laufende Kopfzeilen, Seitenzahlen und „Seite N“ fallen weg, Ligaturen wie „ﬀ“ werden zu normalen Buchstaben. Die Original-PDF bleibt am Ende angehängt.
 - **Aufzählungen im Markdown** (#167): Aufzählungen im Stil von Apple Notizen (`•` mit Tabulator) werden beim Markdown-Export und -Import als Liste erkannt.
