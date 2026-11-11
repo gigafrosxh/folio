@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.10] – 2026-11-11
+
 ### Behoben
 - **Kopierte Notizdateien** (#166): Eine im Finder kopierte Notiz, eine Konfliktkopie von iCloud oder Dropbox oder eine Datei aus einem Backup erscheint jetzt als eigene Notiz. Bisher zeigte Folio bei gleicher interner Kennung nur eine der Dateien. Die Kopie bekommt beim Einlesen eine neue Kennung; Titel, Text und Anhänge bleiben gleich. Die Datei, die Folio schon kannte, behält ihre Kennung und ihren Versionsverlauf.
 
