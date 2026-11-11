@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.3.13] – 2026-11-11
+
 ### Sicherheit
 - **Sicherheitstests und Release-Sperre** (#161): `make release` führt jetzt die Unit-Tests und die Komplexitätsprüfung aus und bricht ab, wenn etwas rot ist. Neue Negativtests prüfen Notizdateien, Updates, Links, Importe und Geheimnisse; sie laufen auch im CI. Überblick in `SECURITY.md`.
 - **Notizdateien**: Eine Datei, die riesige Inhalte vorgibt (etwa ein „Entpack-Bombe“), wird abgelehnt, bevor Speicher belegt wird. Deine Notizen liegen weit unter den Grenzen.
