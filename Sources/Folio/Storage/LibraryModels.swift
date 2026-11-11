@@ -30,6 +30,10 @@ struct FolderNode: Identifiable, Hashable {
 enum SidebarItem: Hashable {
     case all
     case pinned
+    /// Favorite notes, in their own order (#15).
+    case favorites
+    /// A saved search (#14).
+    case smartView(UUID)
     case folder(URL)
     case tag(String)
     /// Folio's own trash (deleted notes and folders).

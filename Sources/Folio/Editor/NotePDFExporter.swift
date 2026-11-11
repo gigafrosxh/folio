@@ -65,6 +65,17 @@ enum NotePDFExporter {
         try write(content, title: doc.meta.title, to: url, options: options)
     }
 
+    /// The note as PDF data, for printing (#169). The print system can only write PDFs to a file, so it goes
+    /// through a private temporary folder that is removed again before this returns, also on errors.
+    static func pdfData(_ doc: NoteDocument, options: Options = Options()) async throws -> Data {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-print-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("Notiz.pdf")
+        try await export(doc, to: url, options: options)
+        return try Data(contentsOf: url)
+    }
+
     static func write(_ content: NSAttributedString, title: String, to url: URL, options: Options) throws {
         let info = NSPrintInfo()
         info.paperSize = options.paper

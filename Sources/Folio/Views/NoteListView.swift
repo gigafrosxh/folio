@@ -10,6 +10,8 @@ struct NoteListView: View {
     @EnvironmentObject var windowState: WindowState
     @FocusState private var focused: Bool
     @State private var showFilters = false
+    @State private var savingView = false
+    @State private var viewName = ""
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -32,7 +34,8 @@ struct NoteListView: View {
                                     .padding(.top, 10)
                                     .padding(.bottom, 4)
                             case .note(let note):
-                                NoteCard(note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected)
+                                NoteCard(note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected,
+                                         favorite: store.isFavorite(note.id))
                                     .id(note.id)
                                     .onTapGesture {
                                         // ⌘-click opens the note in a new tab, ⌥-click on the right.
@@ -48,6 +51,8 @@ struct NoteListView: View {
                                     .accessibilityAction(named: "In neuem Tab öffnen") { store.openInNewTab(note.id) }
                                     .accessibilityAction(named: "Rechts daneben öffnen") { store.openInSplit(note.id) }
                                     .draggable(note.id.uuidString)
+                                    // Dropping a note on another one puts it in front of it: the list keeps its own order (#13).
+                                    .dropDestination(for: String.self) { items, _ in drop(items, on: note, in: notes) }
                                     .contextMenu { menu(for: note) }
                             }
                         }
@@ -65,32 +70,49 @@ struct NoteListView: View {
                 .onDeleteCommand { if let id = store.selectedNoteID { store.delete(id) } }
             }
         }
-        .overlay {
-            if notes.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: store.searchText.isEmpty ? "note.text" : "magnifyingglass")
-                        .font(.system(size: 28, weight: .light))
-                        .foregroundStyle(.tertiary)
-                    Text(store.searchText.isEmpty ? "Keine Notizen" : "Keine Treffer").font(.headline)
-                    Text(store.searchText.isEmpty ? "Mit ⌘N legst du eine neue an." : "Für „\(store.searchText)“ wurde nichts gefunden.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding()
-            }
+        .overlay { if notes.isEmpty { emptyState } }
+    }
+
+    private var emptyState: some View {
+        let searching = !store.searchText.isEmpty
+        return VStack(spacing: 8) {
+            Image(systemName: searching ? "magnifyingglass" : emptyIcon)
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text(searching ? "Keine Treffer" : emptyTitle).font(.headline)
+            Text(searching ? "Für „\(store.searchText)“ wurde nichts gefunden." : emptyHint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
+        .padding()
+    }
+
+    /// A note dropped on another one goes in front of it.
+    private func drop(_ items: [String], on note: NoteRef, in notes: [NoteRef]) -> Bool {
+        guard store.canReorderNotes, let id = items.first.flatMap(UUID.init(uuidString:)),
+              id != note.id, notes.contains(where: { $0.id == id }) else { return false }
+        withAnimation(Motion.standard) { store.moveNote(id, before: note.id) }
+        return true
     }
 
     private func header(count: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if !sidebarVisible { WindowControls(window: windowState.window) }
             headerRow(count: count)
+            listTools
             FilterChips()
         }
         .padding(.horizontal, 14)
         .padding(.top, 16)
         .padding(.bottom, 8)
+        .alert("Intelligente Ansicht sichern", isPresented: $savingView) {
+            TextField("Name", text: $viewName)
+            Button("Sichern") { store.saveSearchAsSmartView(named: viewName) }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Die Ansicht erscheint in der Seitenleiste und zeigt immer die Notizen, die zu „\(SmartView(name: "", filter: store.activeSearch).summary)“ passen.")
+        }
     }
 
     private func headerRow(count: Int) -> some View {
@@ -106,9 +128,7 @@ struct NoteListView: View {
             if sidebarVisible {
                 iconButton("sidebar.left", help: "Seitenleiste ausblenden") { sidebarVisible = false }
             }
-            iconButton(store.searchFilter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
-                       help: "Suchfilter: Tag, Ordner, Zeitraum, Inhalt") { showFilters.toggle() }
-                .popover(isPresented: $showFilters, arrowEdge: .bottom) { SearchFilterPopover().environmentObject(store) }
+            filterButton
             if store.sidebarSelection == .templates {
                 iconButton("plus", help: "Neue Vorlage", prominent: true) { store.createTemplate() }
             } else {
@@ -134,6 +154,83 @@ struct NoteListView: View {
                 .helpLabel("Neue Notiz (⌘N) – gedrückt halten: aus Vorlage")
                 .onAppear { store.ensureStarterTemplates() }
             }
+        }
+    }
+
+    /// Search filters; sorting and saving the search sit in their own slim row below the title.
+    private var filterButton: some View {
+        iconButton(store.searchFilter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+                   help: "Suchfilter: Tag, Ordner, Zeitraum, Inhalt") { showFilters.toggle() }
+            .popover(isPresented: $showFilters, arrowEdge: .bottom) { SearchFilterPopover().environmentObject(store) }
+    }
+
+    /// Order of the list (#13) and „save this search as a view“ (#14).
+    @ViewBuilder private var listTools: some View {
+        if store.sidebarSelection != .templates {
+            HStack(spacing: 8) {
+                if store.sidebarSelection != .favorites { sortMenu }
+                Spacer(minLength: 4)
+                if store.isSearching {
+                    Button {
+                        viewName = store.activeSearch.text
+                        savingView = true
+                    } label: {
+                        Label("Als Ansicht sichern", systemImage: "plus.magnifyingglass")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(theme.accent)
+                    .helpLabel("Suche als intelligente Ansicht in der Seitenleiste sichern")
+                }
+            }
+            .font(.system(size: 11.5, weight: .medium))
+        }
+    }
+
+    /// Dragging a note also switches to the own order.
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sortieren nach", selection: Binding(get: { store.organization.sortMode },
+                                                        set: { store.organization.sortMode = $0 })) {
+                ForEach(NoteSortMode.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.inline)
+            if store.organization.sortMode == .manual {
+                Divider()
+                Text("Notizen in der Liste ziehen, um sie anzuordnen")
+            }
+        } label: {
+            Label(store.organization.sortMode.label, systemImage: "arrow.up.arrow.down")
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .helpLabel("Sortieren: \(store.organization.sortMode.label)")
+    }
+
+    private var emptyIcon: String {
+        switch store.sidebarSelection {
+        case .favorites: return "star"
+        case .smartView: return "sparkle.magnifyingglass"
+        default: return "note.text"
+        }
+    }
+
+    private var emptyTitle: String {
+        switch store.sidebarSelection {
+        case .favorites: return "Keine Favoriten"
+        case .smartView(let id): return store.smartView(id) == nil ? "Ansicht nicht gefunden" : "Keine passenden Notizen"
+        default: return "Keine Notizen"
+        }
+    }
+
+    private var emptyHint: String {
+        switch store.sidebarSelection {
+        case .favorites: return "Über das Kontextmenü einer Notiz oder den Stern in der Notiz fügst du Favoriten hinzu."
+        case .smartView(let id):
+            return store.smartView(id).map { "Sobald Notizen zu „\($0.summary)“ passen, erscheinen sie hier." } ?? "Diese Ansicht wurde gelöscht."
+        default: return "Mit ⌘N legst du eine neue an."
         }
     }
 
@@ -180,12 +277,18 @@ struct NoteListView: View {
     }
 
     private func groups(_ notes: [NoteRef]) -> [Group] {
+        if store.sidebarSelection == .favorites { return [Group(title: "Favoriten", notes: notes)] }
+        let mode = store.organization.sortMode
+        guard mode.groupsByDate else {
+            let pinned = notes.filter(\.meta.pinned), rest = notes.filter { !$0.meta.pinned }
+            return [Group(title: "Angepinnt", notes: pinned), Group(title: "Notizen", notes: rest)].filter { !$0.notes.isEmpty }
+        }
         let cal = Calendar.current
         let now = Date()
         var buckets: [(String, [NoteRef])] = [("Angepinnt", []), ("Heute", []), ("Gestern", []), ("Letzte 7 Tage", []),
                                               ("Letzte 30 Tage", []), ("Älter", [])]
         for n in notes {
-            let d = n.meta.modified
+            let d = mode == .created ? n.meta.created : n.meta.modified
             let idx: Int
             if n.meta.pinned { idx = 0 }
             else if cal.isDateInToday(d) { idx = 1 }
@@ -212,6 +315,8 @@ struct NoteListView: View {
         switch store.sidebarSelection ?? .all {
         case .all: return "Alle Notizen"
         case .pinned: return "Angepinnt"
+        case .favorites: return "Favoriten"
+        case .smartView(let id): return store.smartView(id)?.name ?? "Intelligente Ansicht"
         case .folder(let url): return url.lastPathComponent
         case .tag(let t): return "#\(t)"
         case .trash: return "Papierkorb"
@@ -224,6 +329,9 @@ struct NoteListView: View {
     private func subtitle(_ count: Int) -> String {
         if store.sidebarSelection == .templates { return "\(count) Vorlage\(count == 1 ? "" : "n") · {{datum}} wird beim Anlegen ersetzt" }
         var s = "\(count) Notiz\(count == 1 ? "" : "en")"
+        if case .smartView(let id) = store.sidebarSelection, let view = store.smartView(id), !store.isSearching {
+            return s + " · " + view.summary
+        }
         if store.isSearching {
             s += store.searchText.isEmpty ? " · gefiltert" : " · Suche „\(store.searchText)“"
             if store.searchEverywhere, store.sidebarSelection != .all { s += " in allen Notizen" }
@@ -233,9 +341,21 @@ struct NoteListView: View {
         return s
     }
 
+    /// Pin, favorite and place in the list (#13, #15).
+    @ViewBuilder
+    private func organizeMenu(for note: NoteRef) -> some View {
+        Button(note.meta.pinned ? "Loslösen" : "Anpinnen") { store.togglePin(note.id) }
+        Button(store.isFavorite(note.id) ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen") { store.toggleFavorite(note.id) }
+        if store.canReorderNotes {
+            Button("Nach oben") { withAnimation(Motion.standard) { store.stepNote(note.id, by: -1) } }
+            Button("Nach unten") { withAnimation(Motion.standard) { store.stepNote(note.id, by: 1) } }
+        }
+    }
+
     @ViewBuilder
     private func menu(for note: NoteRef) -> some View {
-        Button(note.meta.pinned ? "Loslösen" : "Anpinnen") { store.togglePin(note.id) }
+        organizeMenu(for: note)
+        Divider()
         Button("In neuem Tab öffnen") { store.openInNewTab(note.id) }
         Button("Rechts daneben öffnen") { store.openInSplit(note.id) }
         Button("In neuem Fenster öffnen") { openWindow(id: "note", value: note.id) }
@@ -278,19 +398,13 @@ struct NoteCard: View {
     var note: NoteRef
     var selected: Bool
     var showFolder: Bool
+    var favorite = false
     @EnvironmentObject var theme: ThemeManager
     @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 5) {
-                if note.meta.pinned {
-                    Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(theme.accent)
-                }
-                Text(note.meta.title.isEmpty ? "Neue Notiz" : note.meta.title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .lineLimit(1)
-            }
+            titleRow
             HStack(spacing: 0) {
                 Text(dateString).foregroundStyle(.primary.opacity(0.75))
                 Text(" · ").foregroundStyle(.secondary)
@@ -321,6 +435,21 @@ struct NoteCard: View {
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: selected)
         .animation(Motion.quick, value: hovering)
+    }
+
+    private var titleRow: some View {
+        HStack(spacing: 5) {
+            if note.meta.pinned {
+                Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(theme.accent)
+            }
+            if favorite {
+                Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.yellow)
+                    .accessibilityLabel("Favorit")
+            }
+            Text(note.meta.title.isEmpty ? "Neue Notiz" : note.meta.title)
+                .font(.system(size: 13.5, weight: .semibold))
+                .lineLimit(1)
+        }
     }
 
     private var background: Color {

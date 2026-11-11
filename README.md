@@ -5,6 +5,8 @@ Folio ist eine native Notizen-App für macOS ab Version 15, geschrieben in Swift
 ## Funktionen
 
 - Echte Ordner, Suche, angeheftete Notizen und `#tags`.
+- Sortieren nach Bearbeitung, Erstellung, Titel oder eigener Reihenfolge (Notizen und Ordner per Ziehen), Favoriten unabhängig vom Anheften und gesicherte Suchen als intelligente Ansichten in der Seitenleiste.
+- Informationen zur Notiz (Daten, Wörter, Zeichen, Codezeilen) und Drucken direkt über den Systemdialog.
 - Rich Text mit Formatierungen, gespeichert als RTF.
 - Codeblöcke mit Syntaxhervorhebung und Ausführung über lokal installierte Interpreter oder Compiler; Befehle und Zeitlimit sind anpassbar.
 - Eingebettete PDFs, Bilder und Dokumente sowie live dargestellte Webseiten.

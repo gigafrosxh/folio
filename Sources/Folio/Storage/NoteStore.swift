@@ -89,6 +89,18 @@ final class NoteStore: ObservableObject {
     /// Block kinds of notes saved before 0.15 (read once, when a type filter needs them).
     var kindsCache: [URL: [String]] = [:]
     @Published var lastError: String?
+    /// Order, favorites and smart views of this library (#13, #14, #15), saved in `.folio/organization.json`.
+    @Published var organization = LibraryOrganization() {
+        didSet {
+            guard organization != oldValue else { return }
+            organizationVersion += 1
+            if organization.folderOrder != oldValue.folderOrder { folders = orderedFolders(folders, parent: "") }
+            saveOrganization()
+        }
+    }
+    var organizationVersion = 0
+    /// Set while the library's organization is read, so reading does not write it back.
+    var loadingOrganization = false
     /// Items in Folio's trash.
     @Published internal(set) var trashItems: [TrashItem] = []
     /// Note files in the library that cannot be read at all.
@@ -109,6 +121,7 @@ final class NoteStore: ObservableObject {
         let path = ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] ?? ThemeManager.shared.settings.libraryPath
         rootURL = URL(fileURLWithPath: path, isDirectory: true)
         prepareRoot()
+        loadOrganization()
         reload()
         purgeTrash()
         // Notices when another app or a sync service changes the open note.
@@ -130,6 +143,7 @@ final class NoteStore: ObservableObject {
         scanner.clearCache()
         ThemeManager.shared.settings.libraryPath = url.path
         prepareRoot()
+        loadOrganization()
         reload()
         purgeTrash()
     }
@@ -148,7 +162,7 @@ final class NoteStore: ObservableObject {
         func nodes(_ fs: [LibraryScanner.Folder]) -> [FolderNode] {
             fs.map { FolderNode(url: $0.url, name: $0.name, children: $0.children.isEmpty ? nil : nodes($0.children)) }
         }
-        folders = nodes(result.folders)
+        folders = orderedFolders(nodes(result.folders), parent: "")
         notes = renewingDuplicateIDs(result.notes.map { NoteRef(meta: $0.meta, url: $0.url) })
         let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
         damagedNotes = damaged
@@ -192,7 +206,7 @@ final class NoteStore: ObservableObject {
     var isSearching: Bool { !activeSearch.isEmpty }
 
     var filteredNotes: [NoteRef] {
-        let key = "\(notesVersion)|\(String(describing: sidebarSelection))|\(searchText)|\(String(describing: searchFilter))|\(searchEverywhere)|\(includeSubfolders)|\(templates.count)"
+        let key = "\(notesVersion)|\(String(describing: sidebarSelection))|\(searchText)|\(String(describing: searchFilter))|\(searchEverywhere)|\(includeSubfolders)|\(templates.count)|\(organizationVersion)"
         if let memo = filterMemo, memo.key == key { return memo.notes }
         let result = computeFilteredNotes()
         filterMemo = (key, result)
@@ -207,25 +221,15 @@ final class NoteStore: ObservableObject {
             switch sidebarSelection ?? .all {
             case .all: break
             case .pinned: list = list.filter(\.meta.pinned)
+            case .favorites: list = list.filter { organization.isFavorite($0.id) }
+            case .smartView(let id): list = smartViewNotes(id, in: list)
             case .folder(let url): list = list.filter { isInFolder($0.folderURL, url) }
             case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
             case .trash, .damaged, .templates, .graph: list = []
             }
         }
-        if !search.isEmpty {
-            let root = rootURL.standardizedFileURL.path
-            list = list.filter { ref in
-                let folder = ref.folderURL.standardizedFileURL.path
-                let rel = folder.hasPrefix(root) ? String(folder.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")) : ref.folderURL.lastPathComponent
-                return search.matches(ref.meta, folderPath: rel,
-                                      kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref),
-                                      haystack: ref.haystack)
-            }
-        }
-        return list.sorted { a, b in
-            if a.meta.pinned != b.meta.pinned { return a.meta.pinned }
-            return a.meta.modified > b.meta.modified
-        }
+        if !search.isEmpty { list = notesMatching(search, in: list) }
+        return sorted(list)
     }
 
     /// Whether `noteFolder` is `folder` itself or (with "include subfolders") below it.
@@ -313,7 +317,7 @@ final class NoteStore: ObservableObject {
     /// notes, so ⌘N always opens the note with the cursor in it (#162). Nil keeps the selection.
     static func selectionAfterCreatingNote(_ selection: SidebarItem?) -> SidebarItem? {
         switch selection ?? .all {
-        case .pinned, .graph, .trash, .damaged: return .all
+        case .pinned, .graph, .trash, .damaged, .favorites, .smartView: return .all
         default: return nil
         }
     }
@@ -409,6 +413,8 @@ final class NoteStore: ObservableObject {
         let target = url.deletingLastPathComponent().appendingPathComponent(Self.sanitize(name), isDirectory: true)
         guard target != url else { return }
         for doc in documents.values { doc.saveNow() }
+        // Taken while the folder still exists: paths of missing folders do not resolve the same way.
+        let oldPath = relativeFolderName(url)
         do {
             try FileManager.default.moveItem(at: url, to: target)
         } catch {
@@ -418,6 +424,7 @@ final class NoteStore: ObservableObject {
         for doc in documents.values where doc.url.path.hasPrefix(url.path + "/") {
             doc.url = URL(fileURLWithPath: target.path + doc.url.path.dropFirst(url.path.count))
         }
+        organizationRenamedFolder(from: oldPath, to: relativeFolderName(target))
         reload()
         sidebarSelection = .folder(target)
     }

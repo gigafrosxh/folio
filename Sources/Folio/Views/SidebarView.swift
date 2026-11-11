@@ -15,6 +15,7 @@ struct SidebarView: View {
     @State private var showImport = false
     @State private var collapsed: Set<URL> = []
     @State private var tagAction: TagActionRequest?
+    @State private var renamingView: UUID?
 
     struct TagActionRequest: Identifiable {
         var tag: String
@@ -42,6 +43,8 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         row(icon: "tray.full", title: "Alle Notizen", count: store.notes.count, item: .all)
                         row(icon: "pin", title: "Angepinnt", count: store.notes.filter(\.meta.pinned).count, item: .pinned)
+                        row(icon: "star", title: "Favoriten", count: store.favoriteCount, item: .favorites)
+                            .dropDestination(for: String.self) { items, _ in addFavorites(items) }
                         // The graph as its own section, one click away (#127).
                         row(icon: "point.3.connected.trianglepath.dotted", title: "Graph", count: nil, item: .graph)
                         row(icon: "doc.on.doc", title: "Vorlagen", count: store.templates.count, item: .templates)
@@ -51,6 +54,8 @@ struct SidebarView: View {
                             row(icon: "exclamationmark.triangle", title: "Beschädigt", count: store.damagedNotes.count, item: .damaged)
                         }
                     }
+
+                    smartViewSection
 
                     VStack(alignment: .leading, spacing: 2) {
                         sectionTitle("Ordner")
@@ -223,13 +228,56 @@ struct SidebarView: View {
         return out
     }
 
+    /// Notes dragged onto „Favoriten“ become favorites (#15).
+    private func addFavorites(_ items: [String]) -> Bool {
+        let ids = items.compactMap(UUID.init(uuidString:)).filter { !store.isFavorite($0) }
+        for id in ids { store.toggleFavorite(id) }
+        return !ids.isEmpty
+    }
+
+    @ViewBuilder private var smartViewSection: some View {
+        if !store.organization.smartViews.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                sectionTitle("Intelligente Ansichten")
+                ForEach(store.organization.smartViews) { view in smartViewRow(view) }
+            }
+            .alert("Ansicht umbenennen", isPresented: Binding(get: { renamingView != nil }, set: { if !$0 { renamingView = nil } })) {
+                TextField("Name", text: $folderName)
+                Button("Umbenennen") { if let id = renamingView { store.renameSmartView(id, to: folderName) } }
+                Button("Abbrechen", role: .cancel) {}
+            }
+        }
+    }
+
+    /// A saved search (#14): click shows its notes, the menu changes or removes it.
+    private func smartViewRow(_ view: SmartView) -> some View {
+        row(icon: "sparkle.magnifyingglass", title: view.name, count: store.smartViewCount(view.id), item: .smartView(view.id))
+            .helpLabel(view.summary)
+            .contextMenu {
+                Button("Umbenennen …") { folderName = view.name; renamingView = view.id }
+                Button("Suche bearbeiten") { store.editSmartView(view.id) }
+                if store.isSearching { Button("Durch aktuelle Suche ersetzen") { store.updateSmartView(view.id) } }
+                Divider()
+                Button("Nach oben") { store.stepSmartView(view.id, by: -1) }
+                Button("Nach unten") { store.stepSmartView(view.id, by: 1) }
+                Divider()
+                Button("Ansicht löschen", role: .destructive) { store.deleteSmartView(view.id) }
+            }
+    }
+
+    /// Folders take dropped notes (move) and dropped folders of the same parent (own order, #13).
     private func folderRow(_ folder: FolderNode, depth: Int) -> some View {
         row(icon: "folder", title: folder.name, count: store.noteCount(in: folder.url), item: .folder(folder.url),
             depth: depth, hasChildren: !(folder.children ?? []).isEmpty, url: folder.url)
+            .draggable(Self.folderDragPrefix + folder.url.path)
             .dropDestination(for: String.self) { items, _ in
                 var moved = false
                 for item in items {
                     if let id = UUID(uuidString: item) { store.move(id, to: folder.url); moved = true }
+                    else if item.hasPrefix(Self.folderDragPrefix) {
+                        let url = URL(fileURLWithPath: String(item.dropFirst(Self.folderDragPrefix.count)), isDirectory: true)
+                        if url != folder.url, store.moveFolder(url, before: folder.url) { moved = true }
+                    }
                 }
                 return moved
             }
@@ -247,10 +295,20 @@ struct SidebarView: View {
                 Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
                 Button("Als Markdown exportieren …") { MarkdownTransfer.exportFolderWithPanel(folder.url) }
                 Toggle("Unterordner einbeziehen", isOn: $store.includeSubfolders)
+                Menu("Anordnen") {
+                    Button("Nach oben") { store.stepFolder(folder.url, by: -1) }
+                    Button("Nach unten") { store.stepFolder(folder.url, by: 1) }
+                    Button("Alphabetisch sortieren") { store.sortFoldersAlphabetically(besides: folder.url) }
+                }
                 Divider()
                 Button("In den Papierkorb legen", role: .destructive) { store.deleteFolder(folder.url) }
             }
     }
+}
+
+extension SidebarView {
+    /// Dragged folders carry their path behind this prefix, so they are not mistaken for notes.
+    static let folderDragPrefix = "folio-folder:"
 }
 
 /// Tags as chips that wrap across lines.

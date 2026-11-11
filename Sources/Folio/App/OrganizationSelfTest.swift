@@ -29,7 +29,43 @@ enum OrganizationSelfTest {
         await markdownChecks(store: store)
         // Recents (#20)
         check(store.recent.ids.first == store.currentDocument?.id && store.recent.ids.contains(a.id), "Zuletzt geöffnet")
+        await organizationChecks(store: store, a: a, b: b)
         print("ORG done"); fflush(stdout)
+    }
+
+    /// Order, favorites, smart views, note information and printing (1.4.0: #13, #14, #15, #19, #169).
+    private static func organizationChecks(store: NoteStore, a: NoteRef, b: NoteRef) async {
+        store.sidebarSelection = .all
+        store.organization.sortMode = .title
+        let titles = store.filteredNotes.filter { !$0.meta.pinned }.map { $0.meta.title.isEmpty ? "Neue Notiz" : $0.meta.title }
+        check(titles == titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending }, "Sortierung nach Titel")
+        store.moveNote(a.id, before: store.filteredNotes.first?.id)
+        let saved = LibraryOrganization.load(from: store.rootURL)
+        check(store.organization.sortMode == .manual && saved == .loaded(store.organization), "Eigene Reihenfolge wird in der Bibliothek gesichert")
+        store.organization.sortMode = .modified
+
+        store.toggleFavorite(b.id)
+        store.sidebarSelection = .favorites
+        check(store.filteredNotes.map(\.id) == [b.id] && store.notes.first { $0.id == b.id }?.meta.pinned == false, "Favorit ohne Anheften")
+        store.toggleFavorite(b.id)
+
+        store.sidebarSelection = .all
+        store.searchText = "Quelle typ:code"
+        let view = store.saveSearchAsSmartView(named: "Code-Quellen")
+        check(view != nil && store.sidebarSelection == view.map { .smartView($0.id) } && store.filteredNotes.map(\.id) == [b.id],
+              "Intelligente Ansicht zeigt die passenden Notizen")
+        if let view { store.deleteSmartView(view.id) }
+        check(store.sidebarSelection == .all && store.organization.smartViews.isEmpty, "Intelligente Ansicht gelöscht")
+
+        store.open(noteID: b.id)
+        await wait(0.3)
+        if let doc = store.currentDocument {
+            let stats = doc.statistics
+            check(stats.words >= 6 && stats.codeBlocks <= 1 && stats.characters > stats.charactersWithoutSpaces, "Wortstatistik der Notiz (\(stats.words) Wörter)")
+            let data = try? await NotePDFExporter.pdfData(doc)
+            let op = data.flatMap { try? NotePrinter.operation(for: $0, title: doc.meta.title) }
+            check(op?.showsPrintPanel == true, "Druckauftrag mit Systemdialog vorbereitet")
+        } else { check(false, "Notiz für Statistik und Druck geöffnet") }
     }
 
     private static func templateChecks(store: NoteStore) async {

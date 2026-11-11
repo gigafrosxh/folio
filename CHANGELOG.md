@@ -7,6 +7,16 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Sortierung und eigene Reihenfolge** (#13): Die Notizliste hat ein Sortiermenü (zuletzt bearbeitet, Erstellungsdatum, Titel, eigene Reihenfolge). Notizen lassen sich in der Liste aufeinander ziehen oder über das Kontextmenü nach oben und unten schieben; Ordner in der Seitenleiste genauso (Kontextmenü „Anordnen“). Jede Liste (alle Notizen, Ordner, Tag) merkt sich ihre eigene Reihenfolge, angeheftete Notizen bleiben oben, neue erscheinen zuerst. Das Bearbeitungsdatum der Notizen ändert sich dabei nicht.
+- **Intelligente Ansichten** (#14): Eine Suche samt Filtern (Tag, Ordner, Zeitraum, Inhalt, Eigenschaften) lässt sich über das Lupen-Plus in der Notizliste sichern. Die Ansicht steht in der Seitenleiste, zeigt immer die aktuell passenden Notizen und lässt sich umbenennen, bearbeiten, ersetzen und löschen.
+- **Favoriten** (#15): Der Stern in der Notiz oder im Kontextmenü legt eine Notiz in die neue Liste „Favoriten“, unabhängig vom Anheften. Die Favoriten haben ihre eigene, per Ziehen änderbare Reihenfolge.
+- **Informationen zur Notiz** (#19): Ein Klick auf die Statuszeile unten rechts (oder Ablage › Informationen zur Notiz) zeigt Erstellungs- und Änderungsdatum, Wörter, Zeichen, Absätze, Lesezeit, Code-Blöcke, Codezeilen und Dateigröße. Die Wortzahl zählt nur noch den Text, keine Listenzeichen.
+- **Drucken** (#169): Ablage › Drucken … und das Drucker-Symbol in der Notiz öffnen direkt den Druckdialog von macOS mit Papierformat, Ausrichtung, Seitenbereich und Skalierung. Folio nutzt dafür den PDF-Export; es bleibt keine Datei zurück. ⌘P bleibt „Schnell öffnen“.
+
+### Technik
+- Reihenfolge, Favoriten und Ansichten liegen in `.folio/organization.json` in der Bibliothek und wandern so mit Sync und Backup mit. Eine unlesbare Datei wird beiseitegelegt und gemeldet; Notizen sind davon nie betroffen.
+
 ## [1.3.13] – 2026-11-11
 
 ### Sicherheit

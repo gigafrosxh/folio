@@ -121,6 +121,11 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("y", modifiers: [.command, .option])
             Button("Als PDF exportieren …") { NotificationCenter.default.post(name: .folioInsert, object: "exportpdf") }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+            Button("Informationen zur Notiz") { NotePrinter.showInfoForCurrentNote() }
+        }
+        // ⌘P stays „Schnell öffnen“ (#73), so printing has no shortcut of its own (#169).
+        CommandGroup(replacing: .printItem) {
+            Button("Drucken …") { NotePrinter.printCurrentNote() }
         }
         CommandMenu("Format") {
             ForEach(TextStyle.allCases) { style in

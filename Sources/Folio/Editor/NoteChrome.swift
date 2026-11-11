@@ -10,8 +10,7 @@ struct NoteActionsBar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            button(doc.meta.pinned ? "pin.fill" : "pin", doc.meta.pinned ? "Loslösen" : "Anpinnen",
-                   tint: doc.meta.pinned ? theme.accent : nil) { store.togglePin(doc.id) }
+            markButtons
             ShareLink(item: doc.url) {
                 Image(systemName: "square.and.arrow.up").frame(width: 30, height: 28)
             }
@@ -40,6 +39,7 @@ struct NoteActionsBar: View {
             button("clock.arrow.circlepath", "Versionsverlauf (⌥⌘Y)") {
                 NotificationCenter.default.post(name: .folioShowHistory, object: nil)
             }
+            button("printer", "Drucken …") { NotePrinter.print(doc) }
             button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
             button("trash", "In den Papierkorb legen") { store.delete(doc.id) }
         }
@@ -47,6 +47,14 @@ struct NoteActionsBar: View {
         .foregroundStyle(Color.primary)
         .padding(5)
         .solidBar()
+    }
+
+    /// Pin (top of every list) and favorite (own list in the sidebar, #15) are independent.
+    @ViewBuilder private var markButtons: some View {
+        let pinned = doc.meta.pinned, favorite = store.isFavorite(doc.id)
+        button(pinned ? "pin.fill" : "pin", pinned ? "Loslösen" : "Anpinnen", tint: pinned ? theme.accent : nil) { store.togglePin(doc.id) }
+        button(favorite ? "star.fill" : "star", favorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
+               tint: favorite ? .yellow : nil) { store.toggleFavorite(doc.id) }
     }
 
     private func button(_ icon: String, _ help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
@@ -61,12 +69,25 @@ struct NoteActionsBar: View {
     }
 }
 
-/// Small floating pill in the bottom-right corner with tags, words and compressed file size.
+/// Small floating pill in the bottom-right corner with tags, words and compressed file size. A click shows
+/// all details about the note (#19).
 struct NoteStatusPill: View {
     @ObservedObject var doc: NoteDocument
     @State private var fileSize: Int64 = 0
+    @State private var showInfo = false
+    @State private var wordCount = 0
 
     var body: some View {
+        Button { showInfo.toggle() } label: { pill }
+            .buttonStyle(.plain)
+            .helpLabel("Informationen zur Notiz")
+            .popover(isPresented: $showInfo, arrowEdge: .top) { NoteInfoView(doc: doc, fileSize: fileSize) }
+            .onReceive(NotificationCenter.default.publisher(for: .folioShowNoteInfo)) { note in
+                if (note.object as? UUID) == doc.id { showInfo = true }
+            }
+    }
+
+    private var pill: some View {
         HStack(spacing: 8) {
             if !doc.meta.tags.isEmpty {
                 Text("\(doc.meta.tags.count) Tag\(doc.meta.tags.count == 1 ? "" : "s")")
@@ -91,11 +112,9 @@ struct NoteStatusPill: View {
 
     private var dot: some View { Text("·").foregroundStyle(.tertiary) }
 
-    private var wordCount: Int {
-        doc.meta.searchText.split { $0.isWhitespace || $0.isNewline }.count
-    }
 
     private func refresh() {
+        wordCount = doc.statistics.words
         let attrs = try? FileManager.default.attributesOfItem(atPath: doc.url.path)
         fileSize = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
     }

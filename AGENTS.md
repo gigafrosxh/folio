@@ -34,7 +34,7 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
 
 | Pfad | Inhalt |
 | --- | --- |
-| `Sources/FolioCore` | Plattformnahe Logik ohne UI, voll getestet: Dateiformat (`FolioArchive`, `NoteFile`), Tags, Syntax-Highlighting, Code-Ausführung und Kernels, Datenbank-Clients, Updates, Versionen (`NoteHistory`), Papierkorb (`LibraryTrash`), Diagnose (`FolioDiagnostics`), Backups (`LibraryBackup`), Suche/Filter/Links/Vorlagen (`Organization.swift`), Markdown-Struktur, Audio-Analyse, Render-Skripte für KaTeX/Mermaid |
+| `Sources/FolioCore` | Plattformnahe Logik ohne UI, voll getestet: Dateiformat (`FolioArchive`, `NoteFile`), Tags, Syntax-Highlighting, Code-Ausführung und Kernels, Datenbank-Clients, Updates, Versionen (`NoteHistory`), Papierkorb (`LibraryTrash`), Diagnose (`FolioDiagnostics`), Backups (`LibraryBackup`), Suche/Filter/Links/Vorlagen (`Organization.swift`), Reihenfolge/Favoriten/intelligente Ansichten/Notizstatistik (`LibraryOrganization.swift`, gespeichert in `<Bibliothek>/.folio/organization.json`, Notizdateien bleiben unberührt), Markdown-Struktur, Audio-Analyse, Render-Skripte für KaTeX/Mermaid |
 | `Sources/Folio/App` | App, Menüs (`FolioApp.swift`), Tastenkürzel, Update-Manager, Debug-Harness (`LayoutDebug`) und Selbsttests (`*SelfTest.swift`) |
 | `Sources/Folio/Storage` | `NoteStore` (Bibliothek, offene Dokumente, Tabs, Split View, Fenster, Konflikte, Papierkorb, Vorlagen, Tags), `BackupManager`, `MarkdownTransfer`, Startvorlagen |
 | `Sources/Folio/Model` | `NoteDocument`/`BlockModel` (Blöcke, Speichern, Undo für Blockoperationen), RTF-Codec |
@@ -107,7 +107,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.3.13** (Sicherheitstests und Release-Sperre) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.4.0** (Organisation und Drucken) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
