@@ -57,4 +57,4 @@ func label(for count: Int, hidden: Bool) -> String {   // Punkte
 Die Refactoring-Issues #138–#155 beruhten auf einer heuristischen Erstbewertung von Commit `c5858c1` (57 von 1.646 Einheiten über 15).
 Die AST-Messung von Version 1.3.7 zählt 1.933 Einheiten. Alle in #138–#149, #150, #151, #152 und #153 genannten Einheiten liegen jetzt bei
 höchstens 15. Weiter über dem Grenzwert stehen 50 Einheiten, fast alle SwiftUI-`body`-Properties, die die Erstbewertung niedriger
-eingeschätzt hatte. Sie stehen in der Baseline. Mit 1.3.8 sind auch die Einheiten aus #154 und #155 unter dem Grenzwert; die Baseline hat danach 47 Einträge.
+eingeschätzt hatte. Sie stehen in der Baseline. Mit 1.3.8 sind auch die Einheiten aus #154 und #155 unter dem Grenzwert; die Baseline hat danach 47 Einträge, seit 1.3.9 noch 46.

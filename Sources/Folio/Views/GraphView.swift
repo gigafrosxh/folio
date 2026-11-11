@@ -186,10 +186,11 @@ struct GraphView: View {
             .simultaneousGesture(MagnifyGesture().onChanged { v in magnify(v.magnification) }.onEnded { _ in pinchStart = nil })
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(focus == nil ? "Graph aller Notizen" : "Lokaler Graph")
-            .accessibilityValue("\(m.noteCount) Notizen, \(m.folders.count) Ordner, \(m.edges.count) Verknüpfungen\(threeD ? ", 3D" : "")")
+            .accessibilityValue(summary(m).spoken + (threeD ? ", 3D" : ""))
+            // Every note and folder the filters show can be opened, like with a click (#163).
             .accessibilityActions {
-                ForEach(m.nodes.filter { m.folders[$0.id] == nil }.prefix(30), id: \.id) { node in
-                    Button("„\(node.title)“ öffnen") { open(node.id) }
+                ForEach(Self.accessibleNodes(m), id: \.id) { node in
+                    Button(node.label) { node.isFolder ? showFolder(m.folders[node.id] ?? "") : open(node.id) }
                 }
             }
     }
@@ -203,9 +204,27 @@ struct GraphView: View {
     /// A note opens; a folder bubble shows that folder's notes in the list.
     private func openNode(at location: CGPoint, _ m: Model, _ proj: GraphProjection) {
         guard let id = node(at: location, m, proj), !NSEvent.modifierFlags.contains(.option) else { return }
-        guard let path = m.folders[id] else { open(id); return }
+        if let path = m.folders[id] { showFolder(path) } else { open(id) }
+    }
+
+    private func showFolder(_ path: String) {
         store.searchText = ""
         store.sidebarSelection = .folder(path.split(separator: "/").reduce(store.rootURL) { $0.appendingPathComponent(String($1), isDirectory: true) })
+    }
+
+    /// Notes first, then folders, each sorted by name, so the list of actions is easy to search (#163).
+    static func accessibleNodes(_ m: Model) -> [(id: UUID, label: String, isFolder: Bool)] {
+        let notes = m.nodes.filter { m.folders[$0.id] == nil }
+            .map { (id: $0.id, label: "„\($0.title.isEmpty ? "Ohne Titel" : $0.title)“ öffnen", isFolder: false) }
+        let folders = m.folders.map { (id: $0.key, label: "Ordner „\($0.value)“ zeigen", isFolder: true) }
+        let byLabel: ((id: UUID, label: String, isFolder: Bool), (id: UUID, label: String, isFolder: Bool)) -> Bool = {
+            $0.label.localizedStandardCompare($1.label) == .orderedAscending
+        }
+        return notes.sorted(by: byLabel) + folders.sorted(by: byLabel)
+    }
+
+    private func summary(_ m: Model) -> GraphSummary {
+        GraphSummary(notes: m.noteCount, folders: m.folders.count, links: m.edges.count, orphans: m.orphans.intersection(m.nodes.map(\.id)).count)
     }
 
     /// 3D: dragging turns the graph; ⇧-drag (and any drag in 2D) moves it.
@@ -305,7 +324,7 @@ struct GraphView: View {
 
     private func legend(_ m: Model) -> some View {
         HStack(spacing: 12) {
-            Text("\(m.noteCount) Notizen · \(m.folders.count) Ordner · \(m.edges.count) Verknüpfungen · \(m.orphans.intersection(m.nodes.map(\.id)).count) verwaist")
+            Text(summary(m).legend)
             Spacer()
             Text(threeD ? "Klick öffnet · Ziehen dreht · ⇧-Ziehen verschiebt · Zwei Finger zoomen"
                         : "Klick öffnet · ⌥-Klick auf zwei Notizen zeigt den Weg · Ziehen verschiebt · Zwei Finger zoomen")

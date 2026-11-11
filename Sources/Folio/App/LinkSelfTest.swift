@@ -186,6 +186,12 @@ enum LinkSelfTest {
         await wait(1.5)
         check(NSApp.windows.contains { $0.title == "Graph" && $0.isVisible }, "Graph-Fenster öffnet (⌃⌘G)")
         if let path = ProcessInfo.processInfo.environment["FOLIO_GRAPH_SNAPSHOT"] { graphSnapshots(to: path, store: store, alpha: alpha) }
+        // ⌘N while the graph is shown opens the new note in the editor (#162).
+        store.sidebarSelection = .graph
+        let created = store.createNote()
+        await wait(0.5)
+        check(created != nil && store.sidebarSelection == .all && store.currentDocument?.id == created?.id,
+              "Neue Notiz aus dem Graphen öffnet den Editor (#162)")
     }
 
     private static func assistantChecks(store: NoteStore) async {

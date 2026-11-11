@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **⌘N im Graphen** (#162): Die neue Notiz öffnet sich jetzt im Editor mit der Einfügemarke darin, wie aus „Alle Notizen“. Das gilt auch aus Papierkorb und beschädigten Notizen.
+- **Graph mit Bedienungshilfen** (#163): Jede im Graphen sichtbare Notiz und jeder Ordner lässt sich über die Aktionen öffnen, nicht mehr nur die ersten 30 Notizen. Die Aktionen sind nach Namen sortiert.
+- **Zähler beim Graphen** (#164): Neben „Graph“ in der Seitenleiste steht keine irreführende Zahl mehr.
+- **Einzahl im Graphen** (#165): Die Statistik schreibt „1 Notiz, 1 Ordner, 1 Verknüpfung“; die Anzeige und die Bedienungshilfen nutzen denselben Text.
+
 ## [1.3.8] – 2026-11-10
 
 ### Intern

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import FolioCore
 
 /// Floating sidebar panel: search, library, folder tree and tag chips.
 struct SidebarView: View {
@@ -42,7 +43,7 @@ struct SidebarView: View {
                         row(icon: "tray.full", title: "Alle Notizen", count: store.notes.count, item: .all)
                         row(icon: "pin", title: "Angepinnt", count: store.notes.filter(\.meta.pinned).count, item: .pinned)
                         // The graph as its own section, one click away (#127).
-                        row(icon: "point.3.connected.trianglepath.dotted", title: "Graph", count: store.linkIndex.edges().count, item: .graph)
+                        row(icon: "point.3.connected.trianglepath.dotted", title: "Graph", count: nil, item: .graph)
                         row(icon: "doc.on.doc", title: "Vorlagen", count: store.templates.count, item: .templates)
                             .simultaneousGesture(TapGesture().onEnded { store.ensureStarterTemplates() })
                         row(icon: "trash", title: "Papierkorb", count: store.trashItems.count, item: .trash)
@@ -161,24 +162,12 @@ struct SidebarView: View {
             .padding(.bottom, 4)
     }
 
-    private func row(icon: String, title: String, count: Int, item: SidebarItem, depth: Int = 0,
+    /// `count` nil: a place without notes of its own, such as the graph, shows no number (#164).
+    private func row(icon: String, title: String, count: Int?, item: SidebarItem, depth: Int = 0,
                      hasChildren: Bool = false, url: URL? = nil) -> some View {
         let selected = store.sidebarSelection == item
         return HStack(spacing: 8) {
-            if hasChildren, let url {
-                Button {
-                    if collapsed.contains(url) { collapsed.remove(url) } else { collapsed.insert(url) }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .rotationEffect(.degrees(collapsed.contains(url) ? 0 : 90))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 12)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Color.clear.frame(width: depth > 0 || url != nil ? 12 : 0)
-            }
+            disclosure(hasChildren: hasChildren, url: url, depth: depth)
             Image(systemName: icon)
                 .font(.system(size: 13))
                 .foregroundStyle(theme.accent)
@@ -187,7 +176,7 @@ struct SidebarView: View {
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text("\(count)")
+            Text(count.map(String.init) ?? "")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -200,8 +189,26 @@ struct SidebarView: View {
         .onTapGesture { store.sidebarSelection = item }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityValue("\(count) Notizen")
+        .accessibilityValue(count.map { GermanCount.format($0, "Notiz", "Notizen") } ?? "")
         .accessibilityAction { store.sidebarSelection = item }
+    }
+
+    /// The arrow that folds a folder with subfolders; other rows keep its room when they are indented.
+    @ViewBuilder private func disclosure(hasChildren: Bool, url: URL?, depth: Int) -> some View {
+        if hasChildren, let url {
+            Button {
+                if collapsed.contains(url) { collapsed.remove(url) } else { collapsed.insert(url) }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(collapsed.contains(url) ? 0 : 90))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+            }
+            .buttonStyle(.plain)
+        } else {
+            Color.clear.frame(width: depth > 0 || url != nil ? 12 : 0)
+        }
     }
 
     private var flatFolders: [(node: FolderNode, depth: Int)] {

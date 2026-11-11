@@ -275,7 +275,7 @@ final class NoteStore: ObservableObject {
         }
         let ref = NoteRef(meta: meta, url: url)
         notes.append(ref)
-        if case .pinned = sidebarSelection ?? .all { sidebarSelection = .all }
+        if let next = Self.selectionAfterCreatingNote(sidebarSelection) { sidebarSelection = next }
         // An empty new note matches no search; it would be missing from the list (#102).
         if isSearching {
             searchText = ""
@@ -285,6 +285,15 @@ final class NoteStore: ObservableObject {
         FormattingController.shared.holdTypingForNewNote()
         selectedNoteID = ref.id
         return ref
+    }
+
+    /// Places that cannot show the new note in the editor (pinned list, graph, trash, damaged notes) switch to all
+    /// notes, so ⌘N always opens the note with the cursor in it (#162). Nil keeps the selection.
+    static func selectionAfterCreatingNote(_ selection: SidebarItem?) -> SidebarItem? {
+        switch selection ?? .all {
+        case .pinned, .graph, .trash, .damaged: return .all
+        default: return nil
+        }
     }
 
     func write(_ imported: [ImportedNote]) -> Int {

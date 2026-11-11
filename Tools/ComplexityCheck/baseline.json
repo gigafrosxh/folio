@@ -39,7 +39,6 @@
   "Sources/Folio/Views/SafetyViews.swift|VersionHistorySheet.body" : 22,
   "Sources/Folio/Views/ShortcutSettingsView.swift|ShortcutSettingsView.shortcutRow(_:)" : 22,
   "Sources/Folio/Views/SidebarView.swift|SidebarView.body" : 25,
-  "Sources/Folio/Views/SidebarView.swift|SidebarView.row(icon:title:count:item:depth:hasChildren:url:)" : 20,
   "Sources/Folio/Views/UpdateView.swift|UpdateView.body" : 18,
   "Sources/FolioCore/DatabaseClient.swift|DatabaseClient.execute(_:arguments:input:environment:timeout:sqlcmd:)" : 32,
   "Sources/FolioCore/MarkdownStructure.swift|MarkdownStructure.pieces(_:)" : 37,
