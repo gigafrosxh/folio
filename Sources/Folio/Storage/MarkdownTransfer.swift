@@ -156,8 +156,9 @@ enum MarkdownTransfer {
                 blocks.append(b)
             case .image(let alt, let path):
                 let decoded = path.removingPercentEncoding ?? path
-                if let base = baseURL, !decoded.contains("://"),
-                   let data = try? Data(contentsOf: base.appendingPathComponent(decoded)) {
+                // Only pictures next to the Markdown file: a path like ../../.ssh/id_rsa must not pull other files in (#161).
+                if let base = baseURL, let file = LinkSafety.fileInside(base, relativePath: decoded),
+                   let data = try? Data(contentsOf: file) {
                     let name = (decoded as NSString).lastPathComponent
                     let a = FolioArchive.Attachment(filename: name, typeIdentifier: UTType(filenameExtension: (name as NSString).pathExtension)?.identifier ?? "public.image", data: data)
                     attachments.append(a)

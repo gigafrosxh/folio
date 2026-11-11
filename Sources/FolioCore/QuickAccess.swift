@@ -16,6 +16,14 @@ public enum FolioAction: Equatable, Sendable {
     case open
 }
 
+public extension FolioAction {
+    /// Whether carrying out the link changes the library (#161). Only `new` does, and only after the user agrees.
+    var changesLibrary: Bool {
+        if case .newNote = self { return true }
+        return false
+    }
+}
+
 public enum FolioURLError: LocalizedError, Equatable {
     case notFolio
     case unknownAction(String)

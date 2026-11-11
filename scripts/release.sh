@@ -24,6 +24,15 @@ gh auth status >/dev/null 2>&1 || die "gh ist nicht angemeldet (gh auth login)"
 git fetch -q origin main
 git merge-base --is-ancestor origin/main HEAD || die "main liegt hinter origin/main zurück – erst pullen."
 
+# Rote Tests blockieren jedes Release (#161): Unit-Tests (mit leerer Testbibliothek) und die Komplexitätsprüfung.
+CHECK_LOG="$(mktemp -t folio-release-tests)"
+echo "Prüfe vor dem Release: Unit-Tests (Log: $CHECK_LOG) …"
+FOLIO_LIBRARY="$(mktemp -d)" swift test >"$CHECK_LOG" 2>&1 || die "Unit-Tests sind rot, kein Release. Log: $CHECK_LOG"
+echo "Prüfe vor dem Release: Komplexität …"
+swift run -c release --package-path Tools/ComplexityCheck complexity-check \
+    --baseline Tools/ComplexityCheck/baseline.json Sources >>"$CHECK_LOG" 2>&1 \
+    || die "Die Komplexitätsprüfung schlägt fehl, kein Release. Log: $CHECK_LOG"
+
 CURRENT="$(pb 'Print :CFBundleShortVersionString')"
 IFS=. read -r MA MI PA <<<"${CURRENT%%-*}"
 case "$1" in

@@ -106,7 +106,9 @@ public enum DatabaseClient {
                                            "could not translate host", "login failed", "login timeout expired", "tcp provider",
                                            "unable to complete login"].contains { lower.contains($0) }
                     if process.terminationStatus != 0 || error.lowercased().contains("error") || (!sqlcmd && connectionError) {
-                        let message = diagnostics.isEmpty ? "Die Abfrage ist fehlgeschlagen (\(process.terminationStatus))." : diagnostics
+                        // A tool may repeat its connection string; the password never reaches the note or the screen (#161).
+                        let message = diagnostics.isEmpty ? "Die Abfrage ist fehlgeschlagen (\(process.terminationStatus))."
+                            : SecretRedaction.redact(diagnostics, secrets: SecretRedaction.secrets(in: environment))
                         throw connectionError ? DatabaseError.connectionFailed(message) : DatabaseError.queryFailed(message)
                     }
                     continuation.resume(returning: output)

@@ -136,9 +136,8 @@ final class UpdateManager: ObservableObject {
               info["CFBundleIdentifier"] as? String == bundleID else {
             throw InstallError.step("Das heruntergeladene Abbild enthält keine gültige Folio-App.")
         }
-        if let v = info["CFBundleShortVersionString"] as? String, v != expectedVersion {
-            throw InstallError.step("Unerwartete Version im Download (\(v) statt \(expectedVersion)).")
-        }
+        try verifyVersion(info["CFBundleShortVersionString"] as? String, expected: expectedVersion,
+                          installed: NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String)
         try verifySignature(of: mounted, matching: app)
         // Copy next to the old app first, so a failure never leaves the user without Folio.
         report(0.9, "Kopiere die neue Version …")
@@ -162,8 +161,24 @@ final class UpdateManager: ObservableObject {
         guard let newInfo = signingInfo(new), newInfo.valid else {
             throw InstallError.step("Die Signatur der heruntergeladenen Version ist ungültig.")
         }
-        if let team = signingInfo(current)?.team, newInfo.team != team {
+        try verifyTeam(new: newInfo.team, installed: signingInfo(current)?.team)
+    }
+
+    /// Once the installed app has a Developer ID team, every update must come from the same team (#161).
+    nonisolated static func verifyTeam(new: String?, installed: String?) throws {
+        if let installed, new != installed {
             throw InstallError.step("Die heruntergeladene Version ist nicht vom selben Entwickler signiert.")
+        }
+    }
+
+    /// The download must state exactly the announced version, and it must be newer than the installed one:
+    /// an old, vulnerable version is never installed over a newer one (#161).
+    nonisolated static func verifyVersion(_ downloaded: String?, expected: String, installed: String?) throws {
+        guard let downloaded, downloaded == expected else {
+            throw InstallError.step("Unerwartete Version im Download (\(downloaded ?? "keine") statt \(expected)).")
+        }
+        if let installed, !UpdateChecker.isNewer(downloaded, than: installed) {
+            throw InstallError.step("Folio \(downloaded) ist nicht neuer als die installierte Version \(installed).")
         }
     }
 

@@ -59,10 +59,24 @@ enum DeepLinks {
         NoteStore.shared.searchText = q
     }
 
+    /// A link from a web page or another app never writes without asking (#161).
+    /// Self-tests run without anyone to click; FOLIO_LIBRARY marks such a run.
+    static var confirmNewNote: (_ title: String?, _ text: String?) -> Bool = { title, text in
+        if ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] != nil { return true }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Neue Notiz aus einem Link anlegen?"
+        let preview = [title, text].compactMap { $0 }.joined(separator: "\n")
+        alert.informativeText = preview.isEmpty ? "Ein Link möchte eine leere Notiz anlegen." : "Inhalt:\n\(preview.prefix(300))"
+        alert.addButton(withTitle: "Anlegen")
+        alert.addButton(withTitle: "Abbrechen")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private static func newNote(title: String?, text: String?) {
         let store = NoteStore.shared
         QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)
-        guard store.createNote() != nil, let doc = store.currentDocument else { return }
+        guard confirmNewNote(title, text), store.createNote() != nil, let doc = store.currentDocument else { return }
         let theme = ThemeManager.shared
         let s = NSMutableAttributedString()
         if let title { s.append(NSAttributedString(string: title, attributes: TextStyle.title.attributes(theme: theme))) }

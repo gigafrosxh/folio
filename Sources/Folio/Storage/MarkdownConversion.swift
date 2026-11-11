@@ -253,7 +253,8 @@ extension MarkdownTransfer {
             return (t, a)
         }
         guard let t = group(7), let u = group(8) else { return ("", a) }
-        a[.link] = URL(string: u) ?? u
+        // javascript:, file: and other schemes stay plain text; only web, mail and Folio links are clickable (#161).
+        if LinkSafety.isSafe(u) { a[.link] = URL(string: u) ?? u }
         return (t, a)
     }
 }

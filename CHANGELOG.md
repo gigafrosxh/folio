@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Sicherheit
+- **Sicherheitstests und Release-Sperre** (#161): `make release` führt jetzt die Unit-Tests und die Komplexitätsprüfung aus und bricht ab, wenn etwas rot ist. Neue Negativtests prüfen Notizdateien, Updates, Links, Importe und Geheimnisse; sie laufen auch im CI. Überblick in `SECURITY.md`.
+- **Notizdateien**: Eine Datei, die riesige Inhalte vorgibt (etwa ein „Entpack-Bombe“), wird abgelehnt, bevor Speicher belegt wird. Deine Notizen liegen weit unter den Grenzen.
+- **Updates**: Folio installiert nur genau die angekündigte Version und nie eine ältere als die installierte.
+- **Links**: `folio://new` legt eine Notiz erst nach einer Rückfrage an.
+- **Markdown-Import**: Bilder werden nur aus dem Ordner der Markdown-Datei übernommen; Links mit `javascript:`, `file:` und ähnlichen Schemata bleiben reiner Text.
+- **Datenbanken**: Passwörter erscheinen nicht mehr in Fehlermeldungen von Datenbank-Blöcken.
+
 ## [1.3.12] – 2026-11-11
 
 ### Behoben

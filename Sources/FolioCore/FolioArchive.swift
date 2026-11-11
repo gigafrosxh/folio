@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 
 /// The `.folio` container: a small binary envelope around LZFSE-compressed sections.
@@ -92,6 +93,7 @@ public struct FolioArchive: Sendable {
 
         let body = try r.readSection(compressed: compressed)
         let count: UInt32 = try r.read()
+        guard count <= ArchiveLimits.maxAttachments else { throw FolioFormatError.tooLarge }
         var attachments: [Attachment] = []
         let decoder = JSONDecoder()
         for _ in 0..<count {
@@ -123,9 +125,12 @@ public enum FolioFormatError: Error, LocalizedError, Equatable {
     case truncated
     case checksumMismatch
     case compressionFailed
+    /// A section or attachment count beyond `ArchiveLimits` (#161).
+    case tooLarge
 
     public var errorDescription: String? {
         switch self {
+        case .tooLarge: return "Die Datei gibt unglaubwürdig große Inhalte an und wird nicht geöffnet."
         case .badMagic: return "Keine Folio-Notiz (falsche Dateikennung)."
         case .unsupportedVersion(let v): return "Dateiversion \(v) wird nicht unterstützt."
         case .truncated: return "Die Datei ist unvollständig."
@@ -143,9 +148,20 @@ private enum Codec {
         do { return try (data as NSData).compressed(using: .lzfse) as Data } catch { throw FolioFormatError.compressionFailed }
     }
 
-    static func decompress(_ data: Data) throws -> Data {
-        if data.isEmpty { return Data() }
-        do { return try (data as NSData).decompressed(using: .lzfse) as Data } catch { throw FolioFormatError.compressionFailed }
+    /// Unpacks into a buffer of exactly the size the file states, so a forged file can never grow beyond it (#161).
+    static func decompress(_ data: Data, size: Int) throws -> Data {
+        if data.isEmpty || size == 0 { return Data() }
+        // One byte more than stated: if it gets filled, the file holds more than it claims.
+        var out = Data(count: size + 1)
+        let written = out.withUnsafeMutableBytes { dst in
+            data.withUnsafeBytes { src in
+                compression_decode_buffer(dst.bindMemory(to: UInt8.self).baseAddress!, size + 1,
+                                          src.bindMemory(to: UInt8.self).baseAddress!, data.count, nil, COMPRESSION_LZFSE)
+            }
+        }
+        guard written == size else { throw FolioFormatError.compressionFailed }
+        out.removeLast()
+        return out
     }
 }
 
@@ -169,6 +185,8 @@ struct ByteWriter {
 struct ByteReader {
     private let bytes: Data
     private var offset: Int
+    /// Bytes unpacked so far, against `ArchiveLimits.maxTotal`.
+    private var unpacked: UInt64 = 0
 
     init(_ data: Data) {
         bytes = data
@@ -192,8 +210,11 @@ struct ByteReader {
         let rawLength: UInt64 = try read()
         let storedLength: UInt64 = try read()
         guard storedLength <= UInt64(Int.max) else { throw FolioFormatError.truncated }
+        guard !compressed || ArchiveLimits.allows(raw: rawLength, stored: storedLength),
+              rawLength <= ArchiveLimits.maxTotal - unpacked else { throw FolioFormatError.tooLarge }
+        unpacked += rawLength
         let stored = Data(try readBytes(Int(storedLength)))
-        let raw = compressed ? try Codec.decompress(stored) : stored
+        let raw = compressed ? try Codec.decompress(stored, size: Int(rawLength)) : stored
         guard raw.count == rawLength else { throw FolioFormatError.truncated }
         return raw
     }
