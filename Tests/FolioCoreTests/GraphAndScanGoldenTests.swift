@@ -157,3 +157,18 @@ final class LibraryScanEdgeCaseTests: XCTestCase {
         XCTAssertEqual(scanner.scan(root).cacheHits, 1)
     }
 }
+
+/// A Finder copy of a note is found next to the original (#166).
+final class LibraryScanCopyTests: XCTestCase {
+    func testCopiesWithTheSameIDAreBothListed() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("folio-copy-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("A"), withIntermediateDirectories: true)
+        let original = root.appendingPathComponent("A/Original.folio")
+        try NoteFile(meta: NoteMetadata(title: "Original"), body: NoteBody()).write(to: original)
+        try FileManager.default.copyItem(at: original, to: root.appendingPathComponent("A/Original Kopie.folio"))
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("Verweis.folio"), withDestinationURL: original)
+        let r = LibraryScanner().scan(root)
+        XCTAssertEqual(r.notes.map(\.url.lastPathComponent).sorted(), ["Original Kopie.folio", "Original.folio"], "Kopie sichtbar, Verweis nur einmal")
+    }
+}

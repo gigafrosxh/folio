@@ -149,7 +149,7 @@ final class NoteStore: ObservableObject {
             fs.map { FolderNode(url: $0.url, name: $0.name, children: $0.children.isEmpty ? nil : nodes($0.children)) }
         }
         folders = nodes(result.folders)
-        notes = result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }
+        notes = renewingDuplicateIDs(result.notes.map { NoteRef(meta: $0.meta, url: $0.url) })
         let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
         damagedNotes = damaged
         skippedLinks = result.skippedLinks.map { "\($0.url.lastPathComponent): \($0.reason)" }
@@ -161,6 +161,28 @@ final class NoteStore: ObservableObject {
         tabs.removeAll { !known.contains($0) }
         if let s = splitNoteID, !known.contains(s) { splitNoteID = nil }
         releaseUnused()
+    }
+
+    /// Copies of a note file with the same id get a new identity, so each shows up as its own note (#166). The file
+    /// Folio already knew under the id keeps it. A copy that cannot be rewritten stays hidden and is reported.
+    private func renewingDuplicateIDs(_ found: [NoteRef]) -> [NoteRef] {
+        let known = Dictionary(notes.map { ($0.id, $0.url) }, uniquingKeysWith: { a, _ in a })
+        let resolution = NoteIdentity.resolve(found.map { ($0.url, $0.id) }, known: known)
+        guard !resolution.renew.isEmpty else { return found }
+        let renew = Set(resolution.renew)
+        var refs = found.filter { !renew.contains($0.url) }
+        var failed: [String] = []
+        for url in resolution.renew {
+            do {
+                let file = NoteIdentity.renewed(try NoteFile.read(from: url))
+                try file.write(to: url)
+                refs.append(NoteRef(meta: file.meta, url: url))
+            } catch {
+                failed.append(url.lastPathComponent)
+            }
+        }
+        if !failed.isEmpty { lastError = "Diese Kopien haben dieselbe Kennung wie eine andere Notiz und konnten nicht angepasst werden: \(failed.joined(separator: ", "))" }
+        return refs
     }
 
     // MARK: Queries

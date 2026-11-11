@@ -47,9 +47,10 @@ public final class LibraryScanner: @unchecked Sendable {
         for (url, meta) in zip(walk.notePaths, metas) {
             if let meta { notes.append((url, meta)) } else { unreadable.append(url) }
         }
-        // The same note reachable twice (through a link inside the library) is listed once.
-        var seen = Set<UUID>()
-        notes = notes.filter { seen.insert($0.1.id).inserted }
+        // The same file reachable twice (through a link inside the library) is listed once. Two real files with the
+        // same id (a copy made in the Finder, a sync conflict) are both listed; `NoteIdentity` sorts them out (#166).
+        var seen = Set<String>()
+        notes = notes.filter { seen.insert($0.0.resolvingSymlinksInPath().standardizedFileURL.path).inserted }
         return Result(folders: folders, notes: notes, unreadable: unreadable, skippedLinks: walk.skipped, cacheHits: hits)
     }
 
