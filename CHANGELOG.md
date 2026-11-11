@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.4.1] – 2026-11-11
+
 ### Behoben
 - **Eigene Reihenfolge und Suche** (#170): Wer eine Notiz während einer Suche verschiebt, ändert nur noch ihren Platz; die Reihenfolge aller anderen Notizen bleibt erhalten.
 - **Sync und Wiederherstellung** (#175): Ändert sich `.folio/organization.json` von außen, übernimmt Folio Favoriten, Ansichten und Reihenfolgen innerhalb weniger Sekunden und überschreibt sie nicht mehr mit dem eigenen alten Stand. Haben beide Seiten etwas ergänzt, bleibt beides erhalten.
