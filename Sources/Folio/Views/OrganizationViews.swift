@@ -294,24 +294,14 @@ struct BacklinksView: View {
                     }
                 }
             }
-            HStack(spacing: 14) {
-                Button("Eigenschaft hinzufügen") { NotificationCenter.default.post(name: .folioAddProperty, object: noteID) }
-                    .helpLabel("Status, Datum, Zahl, Ja/Nein oder Text zu dieser Notiz (#121)")
-                Button(showMentions ? "Erwähnungen ausblenden" : "Unverlinkte Erwähnungen suchen") { showMentions.toggle() }
-                Button(showGraph ? "Lokalen Graph ausblenden" : "Lokalen Graph zeigen") { withAnimation(Motion.quick) { showGraph.toggle() } }
-                if showGraph {
-                    Picker("Tiefe", selection: $depth) {
-                        Text("1 Schritt").tag(1)
-                        Text("2 Schritte").tag(2)
-                        Text("3 Schritte").tag(3)
-                    }
-                    .pickerStyle(.segmented).fixedSize().labelsHidden()
-                    .helpLabel("Wie viele Verknüpfungen weit der lokale Graph reicht")
-                }
-                Spacer()
+            // Side by side, or below each other when the editor is narrow; never broken inside a word (#177).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) { noteTools; Spacer() }
+                VStack(alignment: .leading, spacing: 8) { noteTools }
             }
             .buttonStyle(.borderless)
             .font(.system(size: 12))
+            .lineLimit(1)
             if showMentions {
                 if mentions.isEmpty {
                     Text("Keine Notiz erwähnt diesen Titel ohne Link.").font(.caption).foregroundStyle(.secondary)
@@ -338,6 +328,26 @@ struct BacklinksView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
         .padding(.leading, BlockRow.gutter)
+    }
+
+    /// Tools below the note text: properties, unlinked mentions, the local graph.
+    @ViewBuilder private var noteTools: some View {
+        Button("Eigenschaft hinzufügen") { NotificationCenter.default.post(name: .folioAddProperty, object: noteID) }
+            .helpLabel("Status, Datum, Zahl, Ja/Nein oder Text zu dieser Notiz (#121)")
+            .fixedSize()
+        Button(showMentions ? "Erwähnungen ausblenden" : "Unverlinkte Erwähnungen suchen") { showMentions.toggle() }
+            .fixedSize()
+        Button(showGraph ? "Lokalen Graph ausblenden" : "Lokalen Graph zeigen") { withAnimation(Motion.quick) { showGraph.toggle() } }
+            .fixedSize()
+        if showGraph {
+            Picker("Tiefe", selection: $depth) {
+                Text("1 Schritt").tag(1)
+                Text("2 Schritte").tag(2)
+                Text("3 Schritte").tag(3)
+            }
+            .pickerStyle(.segmented).fixedSize().labelsHidden()
+            .helpLabel("Wie viele Verknüpfungen weit der lokale Graph reicht")
+        }
     }
 
     private func chip(_ ref: NoteRef) -> some View {

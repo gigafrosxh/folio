@@ -12,7 +12,10 @@ extension NoteDocument {
 /// Dates and counts of a note, shown from the status pill or Ablage › Informationen zur Notiz (#19).
 struct NoteInfoView: View {
     @ObservedObject var doc: NoteDocument
-    var fileSize: Int64
+
+    private var fileSize: Int64 {
+        ((try? FileManager.default.attributesOfItem(atPath: doc.url.path))?[.size] as? NSNumber)?.int64Value ?? 0
+    }
 
     var body: some View {
         let stats = doc.statistics

@@ -5,6 +5,8 @@ import FolioCore
 /// Floating pill to the right of the formatting bar: pin, share, show in Finder, delete.
 struct NoteActionsBar: View {
     @ObservedObject var doc: NoteDocument
+    /// Narrow windows: history, printing and Finder move into a „more“ menu (#177).
+    var compact = false
     @EnvironmentObject var store: NoteStore
     @EnvironmentObject var theme: ThemeManager
 
@@ -36,17 +38,36 @@ struct NoteActionsBar: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .helpLabel("Terminal (⌃`) – gedrückt halten: Ausführungsumgebung")
-            button("clock.arrow.circlepath", "Versionsverlauf (⌥⌘Y)") {
-                NotificationCenter.default.post(name: .folioShowHistory, object: nil)
-            }
-            button("printer", "Drucken …") { NotePrinter.print(doc) }
-            button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
+            fileActions
             button("trash", "In den Papierkorb legen") { store.delete(doc.id) }
         }
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(Color.primary)
         .padding(5)
         .solidBar()
+    }
+
+    /// History, printing, Finder: as buttons, or in one menu when there is little room.
+    @ViewBuilder private var fileActions: some View {
+        if compact {
+            Menu {
+                Button("Versionsverlauf … (⌥⌘Y)") { NotificationCenter.default.post(name: .folioShowHistory, object: nil) }
+                Button("Drucken …") { NotePrinter.print(doc) }
+                Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
+            } label: {
+                Image(systemName: "ellipsis.circle").frame(width: 30, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .helpLabel("Weitere Aktionen: Versionsverlauf, Drucken, Im Finder zeigen")
+        } else {
+            button("clock.arrow.circlepath", "Versionsverlauf (⌥⌘Y)") {
+                NotificationCenter.default.post(name: .folioShowHistory, object: nil)
+            }
+            button("printer", "Drucken …") { NotePrinter.print(doc) }
+            button("folder", "Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([doc.url]) }
+        }
     }
 
     /// Pin (top of every list) and favorite (own list in the sidebar, #15) are independent.
@@ -73,18 +94,15 @@ struct NoteActionsBar: View {
 /// all details about the note (#19).
 struct NoteStatusPill: View {
     @ObservedObject var doc: NoteDocument
+    /// The editor owns the popover, so the menu command also works while this pill is hidden (#173).
+    @Binding var showInfo: Bool
     @State private var fileSize: Int64 = 0
-    @State private var showInfo = false
     @State private var wordCount = 0
 
     var body: some View {
         Button { showInfo.toggle() } label: { pill }
             .buttonStyle(.plain)
             .helpLabel("Informationen zur Notiz")
-            .popover(isPresented: $showInfo, arrowEdge: .top) { NoteInfoView(doc: doc, fileSize: fileSize) }
-            .onReceive(NotificationCenter.default.publisher(for: .folioShowNoteInfo)) { note in
-                if (note.object as? UUID) == doc.id { showInfo = true }
-            }
     }
 
     private var pill: some View {

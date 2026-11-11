@@ -252,7 +252,9 @@ struct SidebarView: View {
     /// A saved search (#14): click shows its notes, the menu changes or removes it.
     private func smartViewRow(_ view: SmartView) -> some View {
         row(icon: "sparkle.magnifyingglass", title: view.name, count: store.smartViewCount(view.id), item: .smartView(view.id))
-            .helpLabel(view.summary)
+            // The name stays what VoiceOver reads; the filter is only a hint (#178).
+            .help(view.summary)
+            .accessibilityHint(Text("Zeigt Notizen zu: \(view.summary)"))
             .contextMenu {
                 Button("Umbenennen …") { folderName = view.name; renamingView = view.id }
                 Button("Suche bearbeiten") { store.editSmartView(view.id) }

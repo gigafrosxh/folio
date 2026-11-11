@@ -27,6 +27,11 @@ extension NoteStore {
             await Task.yield()
         }
         tagEdit?.finished = true
+        // The tag's own note order and saved searches follow the new name (#174).
+        if let failures = tagEdit?.failures, failures.isEmpty {
+            organization.renameTag(tag.lowercased(), to: newTag?.lowercased())
+            if tag != tag.lowercased() { organization.renameTag(tag, to: newTag) }
+        }
         if case .tag(let t) = sidebarSelection, t == tag { sidebarSelection = newTag.map { .tag($0) } ?? .all }
         for id in reopen { reloadDocument(id) }
     }

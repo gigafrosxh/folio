@@ -114,6 +114,104 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertFalse(back.matches(meta, folderPath: ""))
     }
 
+    // MARK: Fixes of 1.4.1
+
+    func testReorderingAPartKeepsTheRest() {
+        // #170: a search shows B and D; D goes in front of B; E, A and C keep their places.
+        XCTAssertEqual(ManualOrder.merging(["D", "B"], into: ["E", "A", "B", "C", "D"]), ["E", "A", "D", "C", "B"])
+        XCTAssertEqual(ManualOrder.merging(["x", "D", "B", "D"], into: ["E", "A", "B", "C", "D"]), ["E", "A", "D", "C", "B"], "strangers and doubles are ignored")
+        XCTAssertEqual(ManualOrder.merging([String](), into: ["a", "b"]), ["a", "b"])
+        XCTAssertEqual(ManualOrder.merging(["c", "b", "a"], into: ["a", "b", "c"]), ["c", "b", "a"])
+    }
+
+    func testDoublesAreDroppedOnLoad() throws {
+        // #171
+        let a = UUID(), b = UUID(), v = UUID()
+        let json = """
+        {"favorites":["\(a)","\(b)","\(a)"],"noteOrder":{"all":["\(b)","\(b)","\(a)"]},"folderOrder":{"":["X","Y","X"]},
+         "smartViews":[{"id":"\(v)","name":"Eins","filter":{}},{"id":"\(v)","name":"Zwei","filter":{}}]}
+        """
+        var org = try JSONDecoder().decode(LibraryOrganization.self, from: Data(json.utf8))
+        XCTAssertEqual(org.favorites, [a, b])
+        XCTAssertEqual(org.noteOrder["all"], [b, a])
+        XCTAssertEqual(org.folderOrder[""], ["X", "Y"])
+        XCTAssertEqual(org.smartViews.map(\.name), ["Eins"])
+        org.favorites = [a, a]
+        org.toggleFavorite(a)
+        XCTAssertFalse(org.isFavorite(a), "one click removes a favorite even when it is stored twice")
+    }
+
+    func testMergingKeepsWhatBothSidesAdded() {
+        // #175
+        let a = UUID(), b = UUID(), c = UUID()
+        var mine = LibraryOrganization(), theirs = LibraryOrganization()
+        mine.sortMode = .title
+        mine.favorites = [a, b]
+        mine.noteOrder = ["all": [a, b]]
+        mine.smartViews = [SmartView(name: "Meine", filter: SearchFilter(text: "x"))]
+        theirs.favorites = [c, a]
+        theirs.noteOrder = ["all": [b, a], "tag:x": [c]]
+        theirs.folderOrder = ["": ["Z", "A"]]
+        theirs.smartViews = [mine.smartViews[0], SmartView(name: "Ihre", filter: SearchFilter(text: "y"))]
+        let merged = mine.merging(theirs)
+        XCTAssertEqual(merged.sortMode, .title)
+        XCTAssertEqual(merged.favorites, [a, b, c])
+        XCTAssertEqual(merged.noteOrder, ["all": [a, b], "tag:x": [c]])
+        XCTAssertEqual(merged.folderOrder, ["": ["Z", "A"]])
+        XCTAssertEqual(merged.smartViews.map(\.name), ["Meine", "Ihre"])
+        XCTAssertEqual(mine.merging(LibraryOrganization()), mine)
+    }
+
+    func testRenamedTagKeepsItsOrderAndViews() {
+        // #174
+        let a = UUID(), b = UUID(), c = UUID()
+        var org = LibraryOrganization()
+        org.noteOrder = ["tag:alt": [a, b], "tag:alt/unter": [c], "tag:altbau": [c], "all": [a]]
+        org.smartViews = [SmartView(name: "V", filter: SearchFilter(tags: ["alt", "anders"]))]
+        org.renameTag("alt", to: "neu")
+        XCTAssertEqual(org.noteOrder, ["tag:neu": [a, b], "tag:neu/unter": [c], "tag:altbau": [c], "all": [a]])
+        XCTAssertEqual(org.smartViews[0].filter.tags, ["neu", "anders"])
+
+        org.noteOrder["tag:ziel"] = [c, a]
+        org.renameTag("neu", to: "ziel")
+        XCTAssertEqual(org.noteOrder["tag:ziel"], [c, a, b], "merging keeps the target's order and adds the rest")
+        XCTAssertEqual(org.noteOrder["tag:ziel/unter"], [c])
+
+        org.renameTag("ziel", to: nil)
+        XCTAssertNil(org.noteOrder["tag:ziel"])
+        XCTAssertNil(org.noteOrder["tag:ziel/unter"])
+        XCTAssertEqual(org.smartViews[0].filter.tags, ["anders"])
+        XCTAssertEqual(org.noteOrder["all"], [a])
+    }
+
+    func testListNumbersAreNotWords() {
+        // #179
+        XCTAssertEqual(NoteStatistics.wordCount("Testnotiz\nInhalt\n1. eins\n2. zwei"), 4)
+        XCTAssertEqual(NoteStatistics.wordCount("\t12) zwölf Dinge\n3."), 3, "a line with only a number keeps it")
+        XCTAssertEqual(NoteStatistics.wordCount("Im Jahr 2024. war es 1.000 mal"), 7, "numbers inside a sentence count")
+        XCTAssertEqual(NoteStatistics.wordCount("2024. war ein Jahr"), 4, "a year at the start of a line is no list number")
+        XCTAssertEqual(NoteStatistics.wordCount("1. "), 0)
+    }
+
+    func testBackupContainsTheOrganization() throws {
+        // #176
+        let lib = try library()
+        try FileManager.default.createDirectory(at: lib.appendingPathComponent("Notizen"), withIntermediateDirectories: true)
+        try NoteFile(meta: NoteMetadata(title: "A"), body: NoteBody()).write(to: lib.appendingPathComponent("Notizen/A.folio"))
+        var org = LibraryOrganization()
+        org.favorites = [UUID()]
+        org.smartViews = [SmartView(name: "Gesichert", filter: SearchFilter(text: "x"))]
+        try org.save(to: lib)
+        try Data("verlauf".utf8).write(to: lib.appendingPathComponent(".folio/sonstiges.txt"))
+        let backups = try library()
+        let backup = try LibraryBackup.create(library: lib, in: backups)
+        XCTAssertEqual(try LibraryBackup.verify(backup.url).damaged, [])
+        let restored = try LibraryBackup.restore(backup.url, into: backups, name: "Zurück")
+        XCTAssertEqual(LibraryOrganization.load(from: restored), .loaded(org))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: restored.appendingPathComponent(".folio/sonstiges.txt").path), "the rest of .folio stays out")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restored.appendingPathComponent("Notizen/A.folio").path))
+    }
+
     // MARK: Statistics
 
     func testStatistics() {

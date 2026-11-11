@@ -38,6 +38,23 @@ public enum ManualOrder {
         return list
     }
 
+    /// Puts a new order of some items (`part`, e.g. the notes a search shows) back into the whole list: the
+    /// places those items had in `full` are filled in their new order, everything else stays where it was (#170).
+    /// Items of `part` that `full` does not contain are ignored.
+    public static func merging<K: Hashable>(_ part: [K], into full: [K]) -> [K] {
+        let known = Set(full)
+        var seen = Set<K>()
+        var queue = part.filter { known.contains($0) && seen.insert($0).inserted }[...]
+        let moved = Set(queue)
+        return full.map { moved.contains($0) ? queue.removeFirst() : $0 }
+    }
+
+    /// Without doubles, keeping the first of each (#171).
+    public static func unique<K: Hashable>(_ items: [K]) -> [K] {
+        var seen = Set<K>()
+        return items.filter { seen.insert($0).inserted }
+    }
+
     /// The order after moving `item` one place up (-1) or down (+1) within `visible`.
     public static func stepping<K: Hashable>(_ item: K, by delta: Int, in visible: [K]) -> [K] {
         guard let i = visible.firstIndex(of: item) else { return visible }
@@ -121,16 +138,51 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         sortMode = (try? c.decodeIfPresent(NoteSortMode.self, forKey: .sortMode)) ?? .modified
-        favorites = try c.decodeIfPresent([UUID].self, forKey: .favorites) ?? []
-        noteOrder = try c.decodeIfPresent([String: [UUID]].self, forKey: .noteOrder) ?? [:]
-        folderOrder = try c.decodeIfPresent([String: [String]].self, forKey: .folderOrder) ?? [:]
-        smartViews = try c.decodeIfPresent([SmartView].self, forKey: .smartViews) ?? []
+        // Doubles (a hand-edited or merged file) would be counted twice and survive a removal (#171).
+        favorites = ManualOrder.unique(try c.decodeIfPresent([UUID].self, forKey: .favorites) ?? [])
+        noteOrder = (try c.decodeIfPresent([String: [UUID]].self, forKey: .noteOrder) ?? [:]).mapValues(ManualOrder.unique)
+        folderOrder = (try c.decodeIfPresent([String: [String]].self, forKey: .folderOrder) ?? [:]).mapValues(ManualOrder.unique)
+        var ids = Set<UUID>()
+        smartViews = (try c.decodeIfPresent([SmartView].self, forKey: .smartViews) ?? []).filter { ids.insert($0.id).inserted }
+    }
+
+    /// This organization with what `other` (the file as another Mac or a restore left it) has in addition (#175):
+    /// its extra favorites and views, and its orders for lists this one has no order for. Nothing of either is dropped.
+    public func merging(_ other: LibraryOrganization) -> LibraryOrganization {
+        var out = self
+        out.favorites = ManualOrder.unique(favorites + other.favorites)
+        out.noteOrder.merge(other.noteOrder) { mine, _ in mine }
+        out.folderOrder.merge(other.folderOrder) { mine, _ in mine }
+        let have = Set(smartViews.map(\.id))
+        out.smartViews += other.smartViews.filter { !have.contains($0.id) }
+        return out
+    }
+
+    /// A renamed tag keeps the order of its list and its place in saved searches (#174); nested tags follow.
+    public mutating func renameTag(_ old: String, to new: String?) {
+        func renamed(_ tag: String) -> String? {
+            if tag == old { return new }
+            if tag.hasPrefix(old + "/") { return new.map { $0 + tag.dropFirst(old.count) } }
+            return tag
+        }
+        var orders: [String: [UUID]] = [:]
+        for (key, value) in noteOrder {
+            guard key.hasPrefix("tag:") else { orders[key] = value; continue }
+            guard let tag = renamed(String(key.dropFirst(4))) else { continue }
+            // Merging into a tag that has an order already: that order stays, the other notes follow.
+            orders["tag:" + tag] = ManualOrder.unique((orders["tag:" + tag] ?? []) + value)
+        }
+        if let new, let kept = noteOrder["tag:" + new] { orders["tag:" + new] = ManualOrder.unique(kept + (orders["tag:" + new] ?? [])) }
+        noteOrder = orders
+        for i in smartViews.indices {
+            smartViews[i].filter.tags = Set(smartViews[i].filter.tags.compactMap(renamed))
+        }
     }
 
     public func isFavorite(_ id: UUID) -> Bool { favorites.contains(id) }
 
     public mutating func toggleFavorite(_ id: UUID) {
-        if let i = favorites.firstIndex(of: id) { favorites.remove(at: i) } else { favorites.append(id) }
+        if favorites.contains(id) { favorites.removeAll { $0 == id } } else { favorites.append(id) }
     }
 
     public static func file(in library: URL) -> URL {
@@ -157,11 +209,19 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
     }
 
     public func save(to library: URL) throws {
+        _ = try saved(to: library)
+    }
+
+    /// Writes the file and returns what was written, to tell later changes by others apart from our own (#175).
+    @discardableResult
+    public func saved(to library: URL) throws -> Data {
         let url = Self.file(in: library)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(self).write(to: url, options: .atomic)
+        let data = try enc.encode(self)
+        try data.write(to: url, options: .atomic)
+        return data
     }
 
     /// Drops ids of notes that no longer exist anywhere (not even in the trash) and empty orders.
@@ -200,7 +260,18 @@ public struct NoteStatistics: Equatable, Sendable {
     /// Words as people count them: runs of letters or digits („E-Mail“ and „1.000“ are one word each); list
     /// bullets and checkboxes are not words.
     public static func wordCount(_ text: String) -> Int {
-        text.split { $0.isWhitespace || $0.isNewline }.filter { w in w.contains { $0.isLetter || $0.isNumber } }.count
+        text.split(whereSeparator: \.isNewline).reduce(0) { total, line in
+            var words = line.split(whereSeparator: \.isWhitespace).filter { w in w.contains { $0.isLetter || $0.isNumber } }
+            // The number of a numbered list („1.“, „12)“) is a list mark, not a word (#179).
+            if let first = words.first, isListNumber(first), words.count > 1 || line.contains(where: \.isWhitespace) { words.removeFirst() }
+            return total + words.count
+        }
+    }
+
+    private static func isListNumber(_ word: Substring) -> Bool {
+        guard let last = word.last, last == "." || last == ")" else { return false }
+        let digits = word.dropLast()
+        return !digits.isEmpty && digits.count <= 3 && digits.allSatisfy(\.isNumber)
     }
 
     /// Minutes to read at about 200 words per minute, at least one when there is text.

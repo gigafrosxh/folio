@@ -7,6 +7,7 @@ extension NoteStore {
 
     /// Called every few seconds and when Folio becomes active.
     func checkExternalChange() {
+        checkOrganizationChange()
         guard conflict == nil else { return }
         for doc in Array(documents.values) {
             guard let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url) else { continue }   // moved/deleted: the next save recreates it

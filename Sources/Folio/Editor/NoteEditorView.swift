@@ -24,6 +24,7 @@ struct NoteEditorView: View {
     @AppStorage("folio.chatVisible") private var chatRemembered = false
     @State private var showChat = false
     @State private var showHistory = false
+    @State private var showInfo = false
     @StateObject private var find = FindModel()
     @State private var showFind = false
     @State private var showTerminal = false
@@ -110,6 +111,8 @@ struct NoteEditorView: View {
                 .font(.system(size: 11.5))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, BlockRow.gutter)
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 2)
             PropertiesView(doc: doc)
@@ -162,7 +165,17 @@ struct NoteEditorView: View {
     private var decoratedColumn: some View {
         editorColumn
             .overlay(alignment: .bottomTrailing) {
-                if !showChat && !focusMode { NoteStatusPill(doc: doc).padding(16) }
+                // The anchor is always there: in focus mode or with the chat open there is no pill to hang the
+                // information on (#173).
+                ZStack(alignment: .bottomTrailing) {
+                    Color.clear.frame(width: 1, height: 1)
+                    if !showChat && !focusMode { NoteStatusPill(doc: doc, showInfo: $showInfo) }
+                }
+                .popover(isPresented: $showInfo, arrowEdge: .top) { NoteInfoView(doc: doc) }
+                .padding(16)
+                .onReceive(NotificationCenter.default.publisher(for: .folioShowNoteInfo)) { note in
+                    if (note.object as? UUID) == doc.id { showInfo = true }
+                }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { areaWidth = $0 }
             .overlay(alignment: .topTrailing) { chatPanel }
@@ -359,7 +372,9 @@ struct NoteEditorView: View {
             // Still too narrow (e.g. chat open in a small window): two rows, then the smallest bar.
             stackedBars(.minimal)
             stackedBars(.tiny)
-            ScrollView(.horizontal) { stackedBars(.tiny).padding(.horizontal, 2) }.scrollIndicators(.automatic)
+            // Narrow window: rarely used note actions move into a menu before anything has to scroll (#177).
+            stackedBars(.tiny, compactActions: true)
+            ScrollView(.horizontal) { stackedBars(.tiny, compactActions: true).padding(.horizontal, 2) }.scrollIndicators(.automatic)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -372,10 +387,10 @@ struct NoteEditorView: View {
         .zIndex(1)
     }
 
-    private func stackedBars(_ layout: FormatToolbar.Layout) -> some View {
+    private func stackedBars(_ layout: FormatToolbar.Layout, compactActions: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             FormatToolbar(actions: actions, layout: layout)
-            NoteActionsBar(doc: doc)
+            NoteActionsBar(doc: doc, compact: compactActions)
         }
         .fixedSize()
     }

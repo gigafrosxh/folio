@@ -7,6 +7,18 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Eigene Reihenfolge und Suche** (#170): Wer eine Notiz während einer Suche verschiebt, ändert nur noch ihren Platz; die Reihenfolge aller anderen Notizen bleibt erhalten.
+- **Sync und Wiederherstellung** (#175): Ändert sich `.folio/organization.json` von außen, übernimmt Folio Favoriten, Ansichten und Reihenfolgen innerhalb weniger Sekunden und überschreibt sie nicht mehr mit dem eigenen alten Stand. Haben beide Seiten etwas ergänzt, bleibt beides erhalten.
+- **Backup** (#176): Backups enthalten jetzt Reihenfolge, Favoriten und intelligente Ansichten. In 1.4.0 fehlten sie, anders als dort im Changelog stand.
+- **Schmales Fenster** (#177): Die Aktionsleiste der Notiz fasst Versionsverlauf, Drucken und „Im Finder zeigen“ bei wenig Platz in einem Menü zusammen, statt abgeschnitten zu werden. Die Werkzeuge unter der Notiz stehen dann untereinander und brechen nicht mehr mitten im Wort um; die Datumszeile bleibt im Editor.
+- **VoiceOver** (#178): Intelligente Ansichten werden mit ihrem Namen vorgelesen; der Filter ist nur noch der Hinweis.
+- **Favoriten** (#171): Doppelte Einträge in der Datei werden beim Laden entfernt; Zähler und Stern stimmen.
+- **Intelligente Ansichten** (#172): Eine Ansicht merkt sich den Ordner oder Tag, in dem gesucht wurde, wenn „überall suchen“ aus ist.
+- **Informationen zur Notiz** (#173): Der Menübefehl funktioniert auch im Fokusmodus und bei offenem Chat.
+- **Tags** (#174): Die eigene Reihenfolge einer Tag-Liste und Ansichten mit diesem Tag folgen beim Umbenennen und Zusammenführen.
+- **Wortzahl** (#179): Die Nummern nummerierter Listen zählen nicht mehr als Wörter.
+
 ## [1.4.0] – 2026-11-11
 
 ### Neu

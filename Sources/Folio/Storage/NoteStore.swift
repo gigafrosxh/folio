@@ -101,6 +101,8 @@ final class NoteStore: ObservableObject {
     var organizationVersion = 0
     /// Set while the library's organization is read, so reading does not write it back.
     var loadingOrganization = false
+    /// The organization file as Folio last read or wrote it; anything else on disk was changed by someone else (#175).
+    var organizationOnDisk: Data?
     /// Items in Folio's trash.
     @Published internal(set) var trashItems: [TrashItem] = []
     /// Note files in the library that cannot be read at all.
@@ -215,21 +217,23 @@ final class NoteStore: ObservableObject {
 
     func computeFilteredNotes() -> [NoteRef] {
         if sidebarSelection == .templates { return templates.sorted { $0.meta.title.localizedStandardCompare($1.meta.title) == .orderedAscending } }
-        var list = notes
         let search = activeSearch
-        if !(search.isEmpty == false && searchEverywhere) {
-            switch sidebarSelection ?? .all {
-            case .all: break
-            case .pinned: list = list.filter(\.meta.pinned)
-            case .favorites: list = list.filter { organization.isFavorite($0.id) }
-            case .smartView(let id): list = smartViewNotes(id, in: list)
-            case .folder(let url): list = list.filter { isInFolder($0.folderURL, url) }
-            case .tag(let tag): list = list.filter { $0.meta.tags.contains(tag) }
-            case .trash, .damaged, .templates, .graph: list = []
-            }
-        }
+        var list = !search.isEmpty && searchEverywhere ? notes : selectionNotes()
         if !search.isEmpty { list = notesMatching(search, in: list) }
         return sorted(list)
+    }
+
+    /// The notes of the selected place in the sidebar, before any search.
+    func selectionNotes() -> [NoteRef] {
+        switch sidebarSelection ?? .all {
+        case .all: return notes
+        case .pinned: return notes.filter(\.meta.pinned)
+        case .favorites: return notes.filter { organization.isFavorite($0.id) }
+        case .smartView(let id): return smartViewNotes(id, in: notes)
+        case .folder(let url): return notes.filter { isInFolder($0.folderURL, url) }
+        case .tag(let tag): return notes.filter { $0.meta.tags.contains(tag) }
+        case .trash, .damaged, .templates, .graph: return []
+        }
     }
 
     /// Whether `noteFolder` is `folder` itself or (with "include subfolders") below it.

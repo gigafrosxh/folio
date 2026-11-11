@@ -168,6 +168,110 @@ final class OrganizationStoreTests: XCTestCase {
         XCTAssertTrue(store.smartViewNotes(view.id, in: store.notes).isEmpty, "a deleted view shows nothing and does not crash")
     }
 
+    func testReorderingInsideASearchKeepsTheOtherNotes() throws {
+        // #170
+        var ids: [String: UUID] = [:]
+        for (i, t) in ["A", "B treffer", "C", "D treffer", "E"].enumerated() { ids[t] = try note(t, modified: Double(1000 - i)) }
+        store.reload()
+        store.sidebarSelection = .folder(folder)
+        store.moveNote(ids["E"]!, before: ids["A"]!)
+        XCTAssertEqual(shown(), ["E", "A", "B treffer", "C", "D treffer"])
+        store.searchEverywhere = false
+        store.searchText = "treffer"
+        store.moveNote(ids["D treffer"]!, before: ids["B treffer"]!)
+        XCTAssertEqual(shown(), ["D treffer", "B treffer"])
+        store.searchText = ""
+        XCTAssertEqual(shown(), ["E", "A", "D treffer", "C", "B treffer"])
+
+        store.searchEverywhere = true
+        store.searchText = "treffer"
+        store.stepNote(ids["B treffer"]!, by: -1)
+        store.searchText = ""
+        XCTAssertEqual(shown(), ["E", "A", "B treffer", "C", "D treffer"])
+        XCTAssertEqual(Set(store.organization.noteOrder[store.orderKey(for: .folder(folder))!] ?? []), Set(ids.values),
+                       "only this folder's notes are in its order")
+    }
+
+    func testSmartViewRemembersWhereTheSearchRan() throws {
+        // #172
+        let sub = try XCTUnwrap(store.createFolder(named: "Innen", in: folder))
+        try note("Drin", text: "wort #marke", modified: 300, in: sub)
+        try note("Draussen", text: "wort", modified: 200)
+        store.reload()
+        store.searchEverywhere = false
+        store.sidebarSelection = .folder(sub)
+        store.searchText = "wort"
+        XCTAssertEqual(shown(), ["Drin"])
+        let view = try XCTUnwrap(store.saveSearchAsSmartView(named: "Innen"))
+        XCTAssertEqual(view.filter.folder, store.relativeFolderName(sub))
+        XCTAssertEqual(shown(), ["Drin"], "the view shows what the list showed")
+        store.deleteSmartView(view.id)
+
+        store.searchEverywhere = true
+        store.sidebarSelection = .folder(sub)
+        store.searchText = "wort"
+        let everywhere = try XCTUnwrap(store.saveSearchAsSmartView(named: "Überall"))
+        XCTAssertNil(everywhere.filter.folder)
+        XCTAssertEqual(Set(shown()), ["Drin", "Draussen"])
+        store.deleteSmartView(everywhere.id)
+    }
+
+    func testChangesFromOutsideAreTakenOverNotOverwritten() throws {
+        // #175
+        let a = try note("A", modified: 300), b = try note("B", modified: 200)
+        store.reload()
+        store.toggleFavorite(a)
+        var theirs = store.organization
+        let view = SmartView(name: "Vom anderen Mac", filter: SearchFilter(text: "x"))
+        theirs.smartViews.append(view)
+        theirs.favorites.append(b)
+        try theirs.save(to: store.rootURL)
+
+        // Folio changes something before it noticed the new file: both sides survive.
+        store.organization.sortMode = .title
+        XCTAssertEqual(store.organization.smartViews.map(\.name), ["Vom anderen Mac"])
+        XCTAssertEqual(store.organization.favorites, [a, b])
+        XCTAssertEqual(store.organization.sortMode, .title)
+        XCTAssertEqual(LibraryOrganization.load(from: store.rootURL), .loaded(store.organization))
+
+        // And without any change here, the regular check picks the file up.
+        theirs = store.organization
+        theirs.smartViews = []
+        theirs.sortMode = .created
+        try theirs.save(to: store.rootURL)
+        store.sidebarSelection = .smartView(view.id)
+        store.checkOrganizationChange()
+        XCTAssertEqual(store.organization, theirs)
+        XCTAssertEqual(store.sidebarSelection, .all, "a view that is gone is not left selected")
+
+        // An unreadable file from outside is not taken over and not destroyed by the check.
+        try Data("{kaputt".utf8).write(to: LibraryOrganization.file(in: store.rootURL))
+        store.checkOrganizationChange()
+        XCTAssertEqual(store.organization, theirs)
+    }
+
+    func testRenamingATagKeepsItsOrder() async throws {
+        // #174
+        func tagged(_ title: String, _ modified: TimeInterval) throws -> UUID {
+            var b = BlockRecord(kind: .text)
+            b.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: "\(title) #ordnungalt"))
+            var meta = NoteMetadata(title: title, tags: ["ordnungalt"], modified: Date(timeIntervalSince1970: modified), searchText: "\(title) #ordnungalt")
+            meta.kinds = ["text"]
+            try NoteFile(meta: meta, body: NoteBody(blocks: [b])).write(to: store.uniqueURL(in: folder, base: title))
+            return meta.id
+        }
+        let a = try tagged("TA", 300), b = try tagged("TB", 200)
+        store.reload()
+        store.sidebarSelection = .tag("ordnungalt")
+        store.moveNote(b, before: a)
+        XCTAssertEqual(shown(), ["TB", "TA"])
+        await store.editTag("ordnungalt", to: "ordnungneu")
+        store.tagEdit = nil
+        XCTAssertEqual(store.sidebarSelection, .tag("ordnungneu"))
+        XCTAssertEqual(store.filteredNotes.map(\.id), [b, a], "the own order survives the rename")
+        XCTAssertNil(store.organization.noteOrder["tag:ordnungalt"])
+    }
+
     func testUnreadableOrganizationFileIsReported() throws {
         let url = LibraryOrganization.file(in: store.rootURL)
         try Data("kaputt".utf8).write(to: url)

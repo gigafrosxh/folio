@@ -7,6 +7,7 @@ extension NoteStore {
     // MARK: Loading and saving
 
     func loadOrganization() {
+        organizationOnDisk = try? Data(contentsOf: LibraryOrganization.file(in: rootURL))
         let loaded: LibraryOrganization
         switch LibraryOrganization.load(from: rootURL) {
         case .loaded(let org): loaded = org
@@ -24,11 +25,35 @@ extension NoteStore {
 
     func saveOrganization() {
         guard !loadingOrganization else { return }
+        // Someone else (sync, a restore) changed the file since Folio last saw it: keep what they added (#175).
+        if let theirs = organizationChangedByOthers() {
+            loadingOrganization = true
+            organization = organization.merging(theirs)
+            loadingOrganization = false
+        }
         do {
-            try organization.save(to: rootURL)
+            organizationOnDisk = try organization.saved(to: rootURL)
         } catch {
             lastError = "Reihenfolge und Favoriten konnten nicht gesichert werden: \(error.localizedDescription)"
         }
+    }
+
+    /// The organization on disk when it is not what Folio last read or wrote, and readable. A missing or
+    /// unreadable file is not a change to take over.
+    private func organizationChangedByOthers() -> LibraryOrganization? {
+        guard let data = try? Data(contentsOf: LibraryOrganization.file(in: rootURL)), data != organizationOnDisk else { return nil }
+        return try? JSONDecoder().decode(LibraryOrganization.self, from: data)
+    }
+
+    /// Called every two seconds with the other checks for outside changes: takes over a changed organization file,
+    /// so favorites, views and orders from another Mac show up without a restart (#175).
+    func checkOrganizationChange() {
+        guard let theirs = organizationChangedByOthers() else { return }
+        organizationOnDisk = try? Data(contentsOf: LibraryOrganization.file(in: rootURL))
+        loadingOrganization = true
+        organization = theirs
+        loadingOrganization = false
+        if case .smartView(let id) = sidebarSelection, smartView(id) == nil { sidebarSelection = .all }
     }
 
     // MARK: Sorting
@@ -84,15 +109,18 @@ extension NoteStore {
     }
 
     private func reorderNotes(_ change: ([UUID]) -> [UUID]) {
-        let visible = filteredNotes.map(\.id)
+        // The whole list of this place in its current order; a search only shows part of it, and only that part
+        // changes places (#170). Notes a search found elsewhere do not belong to this list's order.
+        let full = sorted(selectionNotes()).map(\.id)
+        let order = ManualOrder.merging(change(filteredNotes.map(\.id)), into: full)
         if sidebarSelection == .favorites {
-            let hidden = organization.favorites.filter { !visible.contains($0) }
-            organization.favorites = change(visible) + hidden
+            let hidden = organization.favorites.filter { !full.contains($0) }
+            organization.favorites = order + hidden
             return
         }
         guard let key = orderKey(for: sidebarSelection) else { return }
         var org = organization
-        org.noteOrder[key] = change(visible)
+        org.noteOrder[key] = order
         org.sortMode = .manual
         organization = org
     }
@@ -206,12 +234,25 @@ extension NoteStore {
     func saveSearchAsSmartView(named name: String) -> SmartView? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, isSearching else { return nil }
-        let view = SmartView(name: trimmed, filter: activeSearch)
+        let view = SmartView(name: trimmed, filter: searchWithItsPlace())
         organization.smartViews.append(view)
         searchText = ""
         searchFilter = SearchFilter()
         sidebarSelection = .smartView(view.id)
         return view
+    }
+
+    /// The search as the list shows it: without „search everywhere“ it only covers the selected folder or tag, so a
+    /// saved view has to remember that place too (#172).
+    func searchWithItsPlace() -> SearchFilter {
+        var filter = activeSearch
+        guard !searchEverywhere else { return filter }
+        switch sidebarSelection ?? .all {
+        case .folder(let url): if filter.folder == nil { filter.folder = relativeFolderName(url) }
+        case .tag(let tag): filter.tags.insert(tag.lowercased())
+        default: break
+        }
+        return filter
     }
 
     func renameSmartView(_ id: UUID, to name: String) {
@@ -233,7 +274,7 @@ extension NoteStore {
     /// Replaces the view's search with the current one.
     func updateSmartView(_ id: UUID) {
         guard isSearching, let i = organization.smartViews.firstIndex(where: { $0.id == id }) else { return }
-        organization.smartViews[i].filter = activeSearch
+        organization.smartViews[i].filter = searchWithItsPlace()
         searchText = ""
         searchFilter = SearchFilter()
         sidebarSelection = .smartView(id)

@@ -63,6 +63,10 @@ public enum LibraryBackup {
         try JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]).write(to: manifest)
         try run("/usr/bin/zip", ["-q", "-j", partial.path, manifest.path], cwd: nil)
         try run("/usr/bin/zip", ["-r", "-q", "-y", partial.path, ".", "-x", ".folio/*", "*.DS_Store", ".partial-*", "*Folio-Backup-*.zip"], cwd: library, allowNothingToDo: true)
+        // Folio's own folder stays out (history, trash, caches), except the library's order, favorites and smart views (#176).
+        if fm.fileExists(atPath: LibraryOrganization.file(in: library).path) {
+            try run("/usr/bin/zip", ["-q", partial.path, "\(LibraryData.folderName)/organization.json"], cwd: library, allowNothingToDo: true)
+        }
         try fm.moveItem(at: partial, to: final)
         let size = (try? final.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
         return BackupInfo(url: final, date: date, size: size)
