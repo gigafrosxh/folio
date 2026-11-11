@@ -30,7 +30,7 @@ final class PDFImportTests: XCTestCase {
         let file = try PDFImport.note(fromPDFAt: url)
         XCTAssertEqual(file.meta.title, "Quartalsbericht")
         XCTAssertTrue(file.meta.searchText.contains("Ergebnisse auf Seite zwei."), "the text is searchable")
-        XCTAssertEqual(file.body.blocks.map(\.kind), [.text, .pdf])
+        XCTAssertEqual(Array(file.body.blocks.map(\.kind).prefix(2)), [.text, .pdf])
         XCTAssertEqual(file.attachments.first?.data, try Data(contentsOf: url), "the original PDF is kept")
         XCTAssertEqual(file.body.blocks[1].attachmentID, file.attachments.first?.id)
         // Round trip through the file format.

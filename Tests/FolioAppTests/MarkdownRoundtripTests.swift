@@ -138,3 +138,16 @@ final class ChatAnswerFormatterTests: XCTestCase {
         XCTAssertEqual((s.attribute(.font, at: 4, effectiveRange: nil) as? NSFont)?.isFixedPitch, true)
     }
 }
+
+/// Bullets as Apple Notes writes them, with a tab (#167).
+@MainActor
+final class AppleBulletMarkdownTests: XCTestCase {
+    func testTabBulletsBecomeMarkdownLists() {
+        let text = NSAttributedString(string: "•\tEins\n\t•\tZwei", attributes: ThemeManager.shared.bodyAttributes)
+        XCTAssertEqual(MarkdownTransfer.markdown(from: text), "- Eins\n  - Zwei")
+    }
+
+    func testTabBulletsInMarkdownBecomeFolioLists() {
+        XCTAssertEqual(MarkdownTransfer.attributed(fromMarkdown: "  •\tEins\n•  Zwei").string, "\t• Eins\n• Zwei")
+    }
+}

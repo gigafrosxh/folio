@@ -19,7 +19,8 @@ enum MarkdownSyntax {
 
     /// A Markdown bullet or checklist line with Folio's list marker, nil for any other line.
     static func bulletLine(_ line: String, tabs: String) -> String? {
-        let markers = [(#"^\s*[-*+] \[ \] "#, "☐ "), (#"^\s*[-*+] \[[xX]\] "#, "☑ "), (#"^\s*[-*+] "#, "• ")]
+        // „•“ with a tab is how Apple Notes writes bullets (#167).
+        let markers = [(#"^\s*[-*+] \[ \] "#, "☐ "), (#"^\s*[-*+] \[[xX]\] "#, "☑ "), (#"^\s*[-*+•][ \t]+"#, "• ")]
         for (pattern, marker) in markers {
             if let r = line.range(of: pattern, options: .regularExpression) {
                 return line.replacingCharacters(in: r, with: tabs + marker)
@@ -166,7 +167,7 @@ extension MarkdownTransfer {
     }
 
     private static func listMarker(in rest: String, tabs: Int) -> String {
-        for (marker, markdown) in [("• ", "- "), ("☐ ", "- [ ] "), ("☑ ", "- [x] ")] where rest.hasPrefix(marker) {
+        for (marker, markdown) in [("•", "- "), ("☐", "- [ ] "), ("☑", "- [x] ")] where rest.hasPrefix(marker + " ") || rest.hasPrefix(marker + "\t") {
             return markdown + rest.dropFirst(2)
         }
         let isRule = tabs == 0 && rest.hasPrefix("—") && rest.trimmingCharacters(in: CharacterSet(charactersIn: "— ")).isEmpty
