@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.4.0] – 2026-11-11
+
 ### Neu
 - **Sortierung und eigene Reihenfolge** (#13): Die Notizliste hat ein Sortiermenü (zuletzt bearbeitet, Erstellungsdatum, Titel, eigene Reihenfolge). Notizen lassen sich in der Liste aufeinander ziehen oder über das Kontextmenü nach oben und unten schieben; Ordner in der Seitenleiste genauso (Kontextmenü „Anordnen“). Jede Liste (alle Notizen, Ordner, Tag) merkt sich ihre eigene Reihenfolge, angeheftete Notizen bleiben oben, neue erscheinen zuerst. Das Bearbeitungsdatum der Notizen ändert sich dabei nicht.
 - **Intelligente Ansichten** (#14): Eine Suche samt Filtern (Tag, Ordner, Zeitraum, Inhalt, Eigenschaften) lässt sich über das Lupen-Plus in der Notizliste sichern. Die Ansicht steht in der Seitenleiste, zeigt immer die aktuell passenden Notizen und lässt sich umbenennen, bearbeiten, ersetzen und löschen.
