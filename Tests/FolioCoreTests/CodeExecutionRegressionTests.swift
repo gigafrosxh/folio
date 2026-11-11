@@ -42,8 +42,12 @@ final class CodeExecutionRegressionTests: XCTestCase {
 
     func testCancelStopsTheProcess() async throws {
         let run = CodeRun()
-        async let result = run.run(code: "echo los; sleep 20", language: Languages.spec(for: "bash"), timeout: 30)
-        try await Task.sleep(for: .milliseconds(500))
+        // Cancel once the program has printed, however long a busy build server takes to start it.
+        let started = expectation(description: "first output")
+        started.assertForOverFulfill = false
+        async let result = run.run(code: "echo los; sleep 20", language: Languages.spec(for: "bash"), timeout: 30,
+                                   onOutput: { _ in started.fulfill() })
+        await fulfillment(of: [started], timeout: 15)
         run.cancel()
         let r = try await result
         XCTAssertTrue(r.cancelled)
