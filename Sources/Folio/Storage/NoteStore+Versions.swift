@@ -10,7 +10,17 @@ extension NoteStore {
         do {
             var file = try history.read(version)
             doc.saveNow()
-            if let current = try? Data(contentsOf: doc.url) { try? history.record(current, noteID: doc.id, force: true) }
+            // The current state must be safe before an older one replaces it (#193).
+            guard !doc.isDirty else {
+                lastError = "Die Version wurde nicht wiederhergestellt: Die aktuellen Änderungen konnten nicht gesichert werden."
+                return
+            }
+            if let current = try? Data(contentsOf: doc.url) {
+                do { _ = try history.record(current, noteID: doc.id, force: true) } catch {
+                    lastError = "Die Version wurde nicht wiederhergestellt: Der aktuelle Stand konnte nicht im Versionsverlauf gesichert werden (\(error.localizedDescription))."
+                    return
+                }
+            }
             file.meta.id = doc.id
             file.meta.pinned = doc.meta.pinned
             file.meta.modified = Date()

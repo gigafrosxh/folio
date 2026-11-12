@@ -29,7 +29,8 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
         # This harness needs a second note with an attachment; generate an image fixture.
         env["FOLIO_SAMPLE_MEDIA"] = str(RUN / "no-audio-needed.wav")
     with log.open("w") as output:
-        proc = subprocess.Popen([BINARY], env=env,
+        # Never stopped by macOS asking to restore windows after an earlier crashed run (#195).
+        proc = subprocess.Popen([BINARY, "-ApplePersistenceIgnoreState", "YES"], env=env,
                                 stdout=output, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 60

@@ -200,9 +200,18 @@ public struct NoteFile: Sendable {
 
     public static func decode(_ data: Data) throws -> NoteFile {
         let archive = try FolioArchive.decode(data)
-        return NoteFile(meta: try decoder.decode(NoteMetadata.self, from: archive.meta),
-                        body: try decoder.decode(NoteBody.self, from: archive.body),
-                        attachments: uniqueAttachments(archive.attachments))
+        let attachments = uniqueAttachments(archive.attachments)
+        var body = try decoder.decode(NoteBody.self, from: archive.body)
+        // Attachments that got a new id are not referenced by any block and would be dropped on the next save;
+        // a file block at the end keeps each of them in the note (#194).
+        let renamed = Set(attachments.map(\.id)).subtracting(archive.attachments.map(\.id))
+        for att in attachments where renamed.contains(att.id) {
+            var block = BlockRecord(kind: .file)
+            block.attachmentID = att.id
+            block.caption = "Wiederhergestellter Anhang: \(att.header.filename)"
+            body.blocks.append(block)
+        }
+        return NoteFile(meta: try decoder.decode(NoteMetadata.self, from: archive.meta), body: body, attachments: attachments)
     }
 
     /// A damaged or hand-made file can list two attachments under the same id. The first keeps it (blocks refer to

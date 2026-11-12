@@ -7,6 +7,15 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Beenden** (#189): Können Notizen nicht gesichert werden (Ordner gesperrt, Datenträger voll), fragt Folio vor dem Beenden: nicht beenden, erneut versuchen oder trotzdem beenden. Vorher gingen die Änderungen ohne Rückfrage verloren.
+- **Ordner löschen** (#192): Ein Ordner mit ungesicherten Notizen wird nicht gelöscht. Die Notizen werden erst geschlossen, wenn der Ordner wirklich im Papierkorb liegt; scheitert das Löschen, bleiben sie offen.
+- **Bibliothek wechseln** (#190), **Notiz löschen** (#191) und **Version wiederherstellen** (#193): Folio bricht mit einer Meldung ab, solange die aktuellen Änderungen nicht gesichert werden können. Beim Wiederherstellen muss außerdem der aktuelle Stand sicher im Versionsverlauf liegen.
+- **Doppelte Anhang-Kennung** (#194): Der zweite Anhang einer beschädigten Datei bleibt beim Speichern erhalten; er steht als „Wiederhergestellter Anhang“ am Ende der Notiz.
+
+### Technik
+- Hintergrund-Testläufe stellen keine Fenster wieder her und bleiben nach einem früheren Absturz nicht mehr am Dialog „Fenster wiederherstellen?“ hängen (#195).
+
 ## [1.4.3] – 2026-11-12
 
 ### Behoben

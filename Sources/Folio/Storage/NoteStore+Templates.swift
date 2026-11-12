@@ -151,11 +151,21 @@ extension NoteStore {
         if let i = notes.firstIndex(where: { $0.id == id }) { notes[i].meta = file.meta }
     }
 
+    /// Saves an open note before it goes to the trash. False (with a message) when its newest changes could not be
+    /// written: the trash would only get the older state (#191).
+    private func savedBeforeDeleting(_ id: UUID) -> Bool {
+        guard let doc = documents[id] else { return true }
+        doc.saveNow()
+        guard doc.isDirty else { return true }
+        lastError = "„\(doc.meta.title.isEmpty ? "Neue Notiz" : doc.meta.title)“ wurde nicht gelöscht: Die letzten Änderungen konnten nicht gesichert werden."
+        return false
+    }
+
     /// Moves a note into Folio's trash (restorable; its versions are kept).
     func delete(_ id: UUID) {
         if let t = templates.first(where: { $0.id == id }) { deleteTemplate(t); return }
         guard let ref = notes.first(where: { $0.id == id }) else { return }
-        documents[id]?.saveNow()
+        guard savedBeforeDeleting(id) else { return }
         let wasSelected = selectedNoteID == id
         let tabsBefore = tabs
         if let data = try? Data(contentsOf: ref.url) { try? history.record(data, noteID: id, force: true) }
@@ -170,17 +180,20 @@ extension NoteStore {
         let idx = list.firstIndex(where: { $0.id == id })
         notes.removeAll { $0.id == id }
         closeDocument(id)
-        if wasSelected {
-            if tabsBefore.count > 1 {
-                let i = tabsBefore.firstIndex(of: id) ?? 0
-                let next = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)]
-                let saved = tabs
-                selectedNoteID = next
-                tabs = saved
-            } else {
-                let remaining = filteredNotes
-                selectedNoteID = idx.flatMap { remaining.indices.contains($0) ? remaining[$0].id : remaining.last?.id }
-            }
+        if wasSelected { selectAfterDeleting(id, tabsBefore: tabsBefore, listIndex: idx) }
+    }
+
+    /// The next tab, or the note that took the deleted one's place in the list.
+    private func selectAfterDeleting(_ id: UUID, tabsBefore: [UUID], listIndex idx: Int?) {
+        if tabsBefore.count > 1 {
+            let i = tabsBefore.firstIndex(of: id) ?? 0
+            let next = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)]
+            let saved = tabs
+            selectedNoteID = next
+            tabs = saved
+        } else {
+            let remaining = filteredNotes
+            selectedNoteID = idx.flatMap { remaining.indices.contains($0) ? remaining[$0].id : remaining.last?.id }
         }
     }
 

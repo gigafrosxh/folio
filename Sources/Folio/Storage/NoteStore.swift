@@ -49,6 +49,19 @@ final class NoteStore: ObservableObject {
     /// Saves every open note (before quitting, updating, backing up).
     func saveAll() { for doc in documents.values { doc.saveNow() } }
 
+    /// Saves every open note (or those `matching`) and returns the ones whose changes could still not be written.
+    /// Callers that would close or replace notes stop when this is not empty (#189–#193).
+    func unsavedAfterSaving(_ matching: (NoteDocument) -> Bool = { _ in true }) -> [NoteDocument] {
+        let docs = documents.values.filter(matching)
+        for doc in docs { doc.saveNow() }
+        return docs.filter(\.isDirty)
+    }
+
+    /// Titles for a message about unsaved notes.
+    static func titles(_ docs: [NoteDocument]) -> String {
+        docs.map { "„\($0.meta.title.isEmpty ? "Neue Notiz" : $0.meta.title)“" }.joined(separator: ", ")
+    }
+
     /// Like `isVisible`, but focus mode hides the split view, so its note cannot receive commands then.
     func isOnScreen(_ id: UUID) -> Bool {
         if UserDefaults.standard.bool(forKey: "folio.focusMode") { return id == selectedNoteID || windowNoteIDs.contains(id) }
@@ -134,8 +147,16 @@ final class NoteStore: ObservableObject {
 
     // MARK: Library
 
-    func setLibrary(_ url: URL) {
-        for doc in documents.values { doc.saveNow() }
+    /// Switches to another library folder. Refused while open notes cannot be saved, or their changes would be
+    /// lost with the switch (#190).
+    @discardableResult
+    func setLibrary(_ url: URL) -> Bool {
+        let unsaved = unsavedAfterSaving()
+        guard unsaved.isEmpty else {
+            lastError = "Die Bibliothek wurde nicht gewechselt: \(Self.titles(unsaved)) konnte nicht gesichert werden. "
+                + "Sichere die Notiz zuerst (oder kopiere den Text), dann versuche es erneut."
+            return false
+        }
         tabs = []
         splitNoteID = nil
         selectedNoteID = nil
@@ -148,6 +169,7 @@ final class NoteStore: ObservableObject {
         loadOrganization()
         reload()
         purgeTrash()
+        return true
     }
 
     func prepareRoot() {
@@ -439,15 +461,24 @@ final class NoteStore: ObservableObject {
     }
 
     func deleteFolder(_ url: URL) {
+        // Notes inside with changes that cannot be saved keep the folder where it is (#192).
+        let unsaved = unsavedAfterSaving { $0.url.path.hasPrefix(url.path + "/") }
+        guard unsaved.isEmpty else {
+            lastError = "Der Ordner wurde nicht gelöscht: \(Self.titles(unsaved)) hat Änderungen, die nicht gesichert werden konnten."
+            return
+        }
         for doc in documents.values { doc.saveNow() }
         let inside = documents.values.filter { $0.url.path.hasPrefix(url.path + "/") }.map(\.id)
-        if let sel = selectedNoteID, inside.contains(sel) { selectedNoteID = nil }
-        for id in inside { closeDocument(id) }
         do {
             try trash.moveToTrash(url)
         } catch {
+            // Nothing was moved: the notes stay open as they are.
             lastError = "Ordner konnte nicht gelöscht werden: \(error.localizedDescription)"
+            return
         }
+        // Closed only once the folder really is in the trash.
+        if let sel = selectedNoteID, inside.contains(sel) { selectedNoteID = nil }
+        for id in inside { closeDocument(id) }
         sidebarSelection = .all
         reload()
     }

@@ -271,6 +271,12 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertEqual(Set(file.attachments.map(\.id)).count, 2, "every attachment has its own id now")
         XCTAssertEqual(file.attachments.first { $0.id == id }?.data, Data("A".utf8), "the block keeps the first one")
         XCTAssertEqual(Set(file.attachments.map(\.data)), [Data("A".utf8), Data("B".utf8)], "no data is dropped")
+        // #194: the second one is kept in a block of its own, so saving does not drop it.
+        let extra = try XCTUnwrap(file.attachments.first { $0.id != id })
+        XCTAssertTrue(file.body.blocks.contains { $0.kind == .file && $0.attachmentID == extra.id })
+        let again = try NoteFile.decode(file.encoded())
+        XCTAssertEqual(Set(again.attachments.map(\.data)), [Data("A".utf8), Data("B".utf8)])
+        XCTAssertEqual(again.body.blocks.count, file.body.blocks.count, "a healthy file gets no extra blocks")
         let report = FolioDiagnostics.diagnose(data)
         XCTAssertTrue(report.problems.contains { $0.message.contains("doppelte Kennung") }, "the diagnosis names the problem")
     }

@@ -108,6 +108,60 @@ final class SaveFailureTests: XCTestCase {
         store.lastError = nil
     }
 
+    func testUnsavedNotesBlockQuitLibrarySwitchAndDeletion() async throws {
+        // #189, #190, #191, #192
+        let doc = try openNote("Festgehalten", text: "Anfang")
+        let (id, url) = (doc.id, doc.url)
+        type(doc, " UNGESICHERT_144")
+        let root = store.rootURL
+        try await locked {
+            XCTAssertEqual(store.unsavedAfterSaving().map(\.id), [id], "the quit question sees the note (#189)")
+
+            XCTAssertFalse(store.setLibrary(root.appendingPathComponent("../andere-\(UUID().uuidString.prefix(4))").standardizedFileURL))
+            XCTAssertEqual(store.rootURL, root, "the library did not change (#190)")
+            XCTAssertTrue(shows(id, "UNGESICHERT_144"))
+
+            store.delete(id)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "the note was not moved to the trash (#191)")
+            XCTAssertTrue(shows(id, "UNGESICHERT_144"))
+
+            store.deleteFolder(folder)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path), "the folder stays (#192)")
+            XCTAssertTrue(shows(id, "UNGESICHERT_144"))
+        }
+        store.lastError = nil
+        XCTAssertTrue(store.unsavedAfterSaving().isEmpty, "with a writable folder everything saves")
+        XCTAssertTrue(onDisk(doc).contains("UNGESICHERT_144"))
+    }
+
+    func testFailedFolderDeletionKeepsTheNotesOpen() async throws {
+        // #192: the notes are saved, but the folder cannot be moved to the trash.
+        let doc = try openNote("Bleibt offen", text: "Inhalt")
+        let parent = folder.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: parent.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path) }
+        store.deleteFolder(folder)
+        XCTAssertNotNil(store.documents[doc.id], "the note stays open when the folder could not be deleted")
+        XCTAssertNotNil(store.lastError)
+        store.lastError = nil
+    }
+
+    func testRestoreKeepsTheCurrentStateWhenItCannotBeSaved() async throws {
+        // #193
+        let doc = try openNote("Wiederherstellen", text: "ALT_193")
+        _ = try store.history.record(try doc.makeFile().encoded(), noteID: doc.id, force: true)
+        let first = try XCTUnwrap(store.history.versions(of: doc.id).first)
+        type(doc, " NEU_193")
+        doc.saveNow()
+        let historyDir = store.history.directory.appendingPathComponent(doc.id.uuidString)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: historyDir.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: historyDir.path) }
+        store.restoreVersion(first, of: doc)
+        XCTAssertTrue(onDisk(doc).contains("NEU_193"), "nothing replaced the current state")
+        XCTAssertNotNil(store.lastError)
+        store.lastError = nil
+    }
+
     func testKeepMineSavesTheNewestOutsideVersion() async throws {
         // #185
         let doc = try openNote("Zweimal", text: "Anfang")

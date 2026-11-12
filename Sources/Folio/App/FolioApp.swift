@@ -11,6 +11,9 @@ enum BackgroundRun {
 
     /// Runs before Core Animation commits, so a new window is transparent from its first frame on.
     @MainActor static func start() {
+        // Never restore windows or ask about it after an earlier crash of a test run: the prompt would block every
+        // background run (#195). Registered defaults are not written to disk.
+        UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
         NSApp.setActivationPolicy(.accessory)
         let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0) { _, _ in
             MainActor.assumeIsolated {
@@ -50,6 +53,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Load the on-device model in the background so the first suggestion comes quickly.
         if ThemeManager.shared.settings.aiPredictions { TextPredictor.prewarm() }
+    }
+
+    /// Notes that cannot be saved hold the quit until the user decides (#189). A background test run quits.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            let store = NoteStore.shared
+            var unsaved = store.unsavedAfterSaving()
+            while !unsaved.isEmpty, !BackgroundRun.isOn {
+                switch UnsavedOnQuit.ask(unsaved) {
+                case .retry: unsaved = store.unsavedAfterSaving()
+                case .cancel: return .terminateCancel
+                case .quitAnyway: return .terminateNow
+                }
+            }
+            return .terminateNow
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
