@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.4.2] – 2026-11-12
+
 ### Behoben
 - **Konflikt „Beide behalten“** (#182): Folio sichert die eigene Fassung jetzt zuerst im Versionsverlauf. Kann die Kopie nicht geschrieben werden (Datenträger voll, Ordner gesperrt), bleiben die eigenen Änderungen im Editor und der Konflikt offen; vorher gingen sie verloren.
 - **Sync der Ordnungsdatei** (#180): Ändert sich `.folio/organization.json` gleichzeitig von außen, gleicht Folio beide Seiten mit dem gemeinsamen Ausgangsstand ab. Was hier entfernt wurde (Favorit, Ansicht, Reihenfolge), kommt nicht mehr zurück; was dort ergänzt oder geändert wurde, kommt dazu.
