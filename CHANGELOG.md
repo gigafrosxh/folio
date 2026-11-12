@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.4.3] – 2026-11-12
+
 ### Behoben
 - **Tab schließen** (#183): Kann eine Notiz gerade nicht gesichert werden (Ordner gesperrt, Datenträger voll), bleibt ihr Tab offen, statt mit den ungesicherten Änderungen zu verschwinden. Das gilt auch, wenn ein Klick auf eine andere Notiz den Tab ersetzen würde.
 - **Tag umbenennen** (#184): Notizen mit Änderungen, die sich nicht sichern ließen, werden nicht mehr neu geladen; sie erscheinen in der Liste der nicht geänderten Notizen.
