@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.5.0] – 2026-11-12
+
 ### Neu
 - **PDF-Volltextsuche** (#43): Die Suche findet jetzt auch Text in eingebetteten PDFs. Neue PDFs werden beim Einfügen gelesen, bestehende Notizen einmalig im Hintergrund; das Änderungsdatum der Notizen bleibt dabei unverändert. Gescannte PDFs ohne Text bleiben unauffindbar.
 - **PDF markieren und kommentieren** (#44): Im PDF-Block gibt es „Markieren“ (gelb, für ausgewählten Text), „Kommentar“ (Notizzettel an der Auswahl oder der sichtbaren Seite) und „Entfernen“. Die Anmerkungen werden im PDF der Notiz gespeichert und sind auch in Vorschau sichtbar; der Versionsverlauf hat den Stand davor.
