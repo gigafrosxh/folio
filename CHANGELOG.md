@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.4.5] – 2026-11-12
+
 ### Behoben
 - **Direkt nach einer Titeländerung** (#196): Duplizieren, Löschen und Verschieben klappen jetzt auch, wenn die Notiz gerade einen neuen Titel bekommen hat und noch nicht automatisch gesichert war. Vorher scheiterten sie mit einer Fehlermeldung, weil Folio den alten Dateinamen benutzte.
 - **Update** (#197): Folio installiert ein Update nur, wenn alle Notizen gesichert werden können; sonst bricht es vor dem Herunterladen (und noch einmal vor dem Ersetzen) mit einer Meldung ab. Vorher konnte die Rückfrage beim Beenden die alte Version aus dem schon ersetzten App-Paket weiterlaufen lassen.
