@@ -170,7 +170,8 @@ final class NoteDocument: ObservableObject, Identifiable {
         meta = file.meta
         self.url = url
         blocks = file.body.blocks.map(BlockModel.init(record:))
-        attachments = Dictionary(uniqueKeysWithValues: file.attachments.map { ($0.id, $0) })
+        // Never trap on doubled ids (#187); NoteFile.decode already renumbers them, this is the last guard.
+        attachments = Dictionary(file.attachments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         if blocks.first?.kind != .text { blocks.insert(.text(), at: 0) }
         if blocks.last?.kind != .text { blocks.append(.text()) }
     }

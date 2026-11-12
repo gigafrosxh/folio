@@ -295,6 +295,29 @@ final class OrganizationStoreTests: XCTestCase {
         XCTAssertEqual(try decodeOnDisk(), store.organization)
     }
 
+    func testFileWithoutReadPermissionIsKeptBeforeOverwriting() throws {
+        // #188
+        let a = try note("A", modified: 300)
+        store.reload()
+        store.toggleFavorite(a)
+        let file = LibraryOrganization.file(in: store.rootURL)
+        let folder = file.deletingLastPathComponent()
+        for f in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        where f.lastPathComponent.hasPrefix("organization-defekt-") { try FileManager.default.removeItem(at: f) }
+        let before = try Data(contentsOf: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: file.path)
+        store.lastError = nil
+        store.toggleFavorite(a)
+        let kept = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("organization-defekt-") }
+        XCTAssertEqual(kept.count, 1)
+        try kept.forEach { try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: $0.path) }
+        XCTAssertEqual(try Data(contentsOf: kept[0]), before)
+        XCTAssertEqual(try decodeOnDisk(), store.organization)
+        XCTAssertNotNil(store.lastError)
+        store.lastError = nil
+        kept.forEach { try? FileManager.default.removeItem(at: $0) }
+    }
+
     private func decodeOnDisk() throws -> LibraryOrganization? {
         try JSONDecoder().decode(LibraryOrganization.self, from: Data(contentsOf: LibraryOrganization.file(in: store.rootURL)))
     }

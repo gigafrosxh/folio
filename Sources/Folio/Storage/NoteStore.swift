@@ -375,6 +375,11 @@ final class NoteStore: ObservableObject {
     func releaseUnused() {
         for (id, doc) in documents where !isVisible(id) && !tabs.contains(id) {
             doc.saveNow()
+            // A note that could not be saved stays open in a tab instead of being dropped with its changes (#183).
+            if doc.isDirty {
+                tabs.append(id)
+                continue
+            }
             // Closing a note ends its shared code sessions (variables of linked code blocks) and terminal.
             KernelManager.shared.shutdown(note: id)
             TerminalSession.close(note: id)

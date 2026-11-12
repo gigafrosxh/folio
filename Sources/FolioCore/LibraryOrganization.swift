@@ -237,12 +237,21 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
     /// Reads the library's organization. An unreadable file is renamed, never overwritten, so nothing is lost.
     public static func load(from library: URL, now: Date = Date()) -> LoadResult {
         let url = file(in: library)
-        guard let data = try? Data(contentsOf: url) else { return .missing }
+        guard let data = try? Data(contentsOf: url) else {
+            // There but not readable (no read permission): set aside like a broken file, never treated as missing (#188).
+            guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+            return .unreadable(keptAs: setAside(url, now: now))
+        }
         if let org = try? JSONDecoder().decode(LibraryOrganization.self, from: data) { return .loaded(org) }
+        return .unreadable(keptAs: setAside(url, now: now))
+    }
+
+    /// Renames the file to `organization-defekt-<date>.json`; nil when that failed too.
+    private static func setAside(_ url: URL, now: Date) -> String? {
         let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "-")
         let kept = url.deletingLastPathComponent().appendingPathComponent("organization-defekt-\(stamp).json")
         let ok = (try? FileManager.default.moveItem(at: url, to: kept)) != nil
-        return .unreadable(keptAs: ok ? kept.lastPathComponent : nil)
+        return ok ? kept.lastPathComponent : nil
     }
 
     public func save(to library: URL) throws {

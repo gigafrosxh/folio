@@ -64,9 +64,13 @@ extension NoteStore {
     /// writes its own state over it, as on start (#181).
     private func setAsideUnreadableOrganization() {
         let file = LibraryOrganization.file(in: rootURL)
-        guard let data = try? Data(contentsOf: file), data != organizationOnDisk, !data.isEmpty,
-              (try? JSONDecoder().decode(LibraryOrganization.self, from: data)) == nil,
-              case .unreadable(let kept) = LibraryOrganization.load(from: rootURL) else { return }
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        if let data = try? Data(contentsOf: file) {
+            // Readable: only a non-empty file that is not what Folio wrote and does not decode is set aside.
+            guard data != organizationOnDisk, !data.isEmpty, (try? JSONDecoder().decode(LibraryOrganization.self, from: data)) == nil else { return }
+        }
+        // Not readable at all (#188) or broken (#181).
+        guard case .unreadable(let kept) = LibraryOrganization.load(from: rootURL) else { return }
         lastError = "Die Datei mit Reihenfolge, Favoriten und intelligenten Ansichten war von außen unlesbar geworden. "
             + "Folio hat seinen Stand gesichert; deine Notizen sind nicht betroffen."
             + (kept.map { " Die unlesbare Datei liegt als „\($0)“ im Ordner .folio der Bibliothek." } ?? "")

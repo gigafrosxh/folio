@@ -30,18 +30,41 @@ extension NoteStore {
     enum ConflictChoice { case keepMine, takeTheirs, keepBoth }
 
     /// Resolves a conflict; whatever is not kept stays in the version history.
+    /// Writes a version into the history; on failure the conflict stays open with a message (#186).
+    private func keepInHistory(_ data: Data, _ conflict: NoteConflict) -> Bool {
+        do {
+            _ = try history.record(data, noteID: conflict.doc.id, force: true)
+            return true
+        } catch {
+            reopenConflict(conflict, "Die Fassung, die ersetzt würde, konnte nicht im Versionsverlauf gesichert werden (\(error.localizedDescription)).")
+            return false
+        }
+    }
+
+    private func reopenConflict(_ conflict: NoteConflict, _ message: String) {
+        self.conflict = conflict
+        lastError = message + " Es wurde nichts überschrieben; der Konflikt bleibt offen."
+    }
+
     func resolve(_ conflict: NoteConflict, _ choice: ConflictChoice) {
         let doc = conflict.doc
         self.conflict = nil
         let mine = doc.makeFile()
         switch choice {
         case .keepMine:
-            if let theirs = conflict.diskData { try? history.record(theirs, noteID: doc.id, force: true) }
+            // Keep what is on disk now, not only what was there when the conflict came up: the file may have
+            // changed again since (#185). Without a copy in the history it is not overwritten (#186).
+            let now = try? Data(contentsOf: doc.url)
+            for data in [conflict.diskData, now].compactMap({ $0 }) where !keepInHistory(data, conflict) { return }
             doc.diskFingerprint = FileFingerprint.of(doc.url)
             doc.markDirty()
             doc.saveNow()
         case .takeTheirs:
-            if let data = try? mine.encoded() { try? history.record(data, noteID: doc.id, force: true) }
+            // The own version is only dropped once it is safe in the history (#186).
+            guard let data = try? mine.encoded(), keepInHistory(data, conflict) else {
+                if (try? mine.encoded()) == nil { reopenConflict(conflict, "Die eigene Fassung konnte nicht vorbereitet werden.") }
+                return
+            }
             reloadDocument(doc.id)
         case .keepBoth:
             // Own version into the history first, so it survives whatever happens next (#182).

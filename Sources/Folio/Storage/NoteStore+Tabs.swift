@@ -19,6 +19,11 @@ extension NoteStore {
     func closeTab(_ id: UUID) {
         guard let i = tabs.firstIndex(of: id) else { return }
         documents[id]?.saveNow()
+        // Saving failed: the tab stays, or its unsaved text would be gone (#183).
+        if documents[id]?.isDirty == true {
+            lastError = (lastError ?? "Speichern fehlgeschlagen.") + " Der Tab bleibt offen, damit nichts verloren geht."
+            return
+        }
         tabs.remove(at: i)
         if selectedNoteID == id {
             let next = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)]

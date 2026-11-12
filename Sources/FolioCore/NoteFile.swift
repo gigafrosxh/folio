@@ -202,7 +202,22 @@ public struct NoteFile: Sendable {
         let archive = try FolioArchive.decode(data)
         return NoteFile(meta: try decoder.decode(NoteMetadata.self, from: archive.meta),
                         body: try decoder.decode(NoteBody.self, from: archive.body),
-                        attachments: archive.attachments)
+                        attachments: uniqueAttachments(archive.attachments))
+    }
+
+    /// A damaged or hand-made file can list two attachments under the same id. The first keeps it (blocks refer to
+    /// it); every further one gets a new id, so its data stays in the note instead of crashing Folio (#187).
+    static func uniqueAttachments(_ list: [FolioArchive.Attachment]) -> [FolioArchive.Attachment] {
+        var seen = Set<UUID>()
+        return list.map { att in
+            guard seen.insert(att.id).inserted else {
+                var copy = att
+                copy.header.id = UUID()
+                seen.insert(copy.id)
+                return copy
+            }
+            return att
+        }
     }
 
     public static func read(from url: URL) throws -> NoteFile {

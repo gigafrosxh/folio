@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Tab schließen** (#183): Kann eine Notiz gerade nicht gesichert werden (Ordner gesperrt, Datenträger voll), bleibt ihr Tab offen, statt mit den ungesicherten Änderungen zu verschwinden. Das gilt auch, wenn ein Klick auf eine andere Notiz den Tab ersetzen würde.
+- **Tag umbenennen** (#184): Notizen mit Änderungen, die sich nicht sichern ließen, werden nicht mehr neu geladen; sie erscheinen in der Liste der nicht geänderten Notizen.
+- **Konflikt „Meine Version behalten“** (#185): Folio sichert die Datei so im Versionsverlauf, wie sie gerade auf der Platte liegt. Eine zweite Änderung von außen während des offenen Konflikts geht nicht mehr verloren.
+- **Konflikt „Geänderte Datei übernehmen“** (#186): Die eigene Fassung wird erst verworfen, wenn sie sicher im Versionsverlauf liegt; sonst bleibt der Konflikt mit einer Meldung offen. Gleiches gilt beim Überschreiben mit „Meine Version behalten“.
+- **Doppelte Anhang-Kennung** (#187): Eine beschädigte Notizdatei mit zwei gleichen Anhang-Kennungen lässt Folio nicht mehr abstürzen; der zweite Anhang bekommt eine neue Kennung, und die Diagnose nennt das Problem.
+- **Ordnungsdatei ohne Leserecht** (#188): Eine vorhandene, aber nicht lesbare `.folio/organization.json` wird wie eine kaputte beiseitegelegt, statt wie eine fehlende ersetzt zu werden.
+
 ## [1.4.2] – 2026-11-12
 
 ### Behoben

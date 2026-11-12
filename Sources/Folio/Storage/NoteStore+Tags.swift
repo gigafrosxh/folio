@@ -20,9 +20,14 @@ extension NoteStore {
         for doc in documents.values { doc.saveNow() }
         let affected = notes.filter { ref in ref.meta.tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
         tagEdit = TagEditProgress(total: affected.count)
-        let reopen = affected.map(\.id).filter { documents[$0] != nil }
+        var reopen: [UUID] = []
         for ref in affected {
-            applyTagEdit(to: ref, tag: tag, newTag: newTag)
+            if let doc = documents[ref.id], doc.isDirty {
+                // Its own changes could not be saved: changing the file and reloading it would lose them (#184).
+                tagEdit?.failures.append("\(ref.meta.title.isEmpty ? ref.url.lastPathComponent : ref.meta.title): Ungesicherte Änderungen konnten nicht gesichert werden; der Tag wurde hier nicht geändert.")
+            } else if applyTagEdit(to: ref, tag: tag, newTag: newTag), documents[ref.id] != nil {
+                reopen.append(ref.id)
+            }
             tagEdit?.done += 1
             await Task.yield()
         }
@@ -36,19 +41,22 @@ extension NoteStore {
         for id in reopen { reloadDocument(id) }
     }
 
-    /// One failed note is listed; the others go on.
-    private func applyTagEdit(to ref: NoteRef, tag: String, newTag: String?) {
+    /// One failed note is listed; the others go on. True when the file was changed.
+    @discardableResult
+    private func applyTagEdit(to ref: NoteRef, tag: String, newTag: String?) -> Bool {
         do {
             let data = try Data(contentsOf: ref.url)
             var file = try NoteFile.decode(data)
-            guard Self.renameTag(tag, to: newTag, in: &file) else { return }
+            guard Self.renameTag(tag, to: newTag, in: &file) else { return false }
             try? history.record(data, noteID: file.meta.id, force: true)
             let updated = NoteDocument(file: file, url: ref.url).makeFile()
             try updated.write(to: ref.url)
             if let i = notes.firstIndex(where: { $0.id == ref.id }) { notes[i].meta = updated.meta }
             tagEdit?.changed += 1
+            return true
         } catch {
             tagEdit?.failures.append("\(ref.meta.title.isEmpty ? ref.url.lastPathComponent : ref.meta.title): \(error.localizedDescription)")
+            return false
         }
     }
 

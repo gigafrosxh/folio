@@ -198,6 +198,10 @@ private struct DiagnosisReader {
     }
 
     private mutating func checkReferences() {
+        let ids = report.attachments.map(\.id)
+        if Set(ids).count != ids.count {
+            add(.warning, "\(ids.count - Set(ids).count) Anhang/Anhänge tragen eine doppelte Kennung; Folio vergibt beim Öffnen neue (#187).")
+        }
         let missing = Set(report.blocks.compactMap(\.attachmentID)).subtracting(report.attachments.map(\.id))
         if !missing.isEmpty, report.lostAttachments == 0 { add(.warning, "\(missing.count) Block/Blöcke verweisen auf fehlende Anhänge.") }
     }

@@ -243,6 +243,38 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: restored.appendingPathComponent("Notizen/A.folio").path))
     }
 
+    func testFileWithoutReadPermissionIsSetAsideNotTreatedAsMissing() throws {
+        // #188
+        let lib = try library()
+        var org = LibraryOrganization()
+        org.favorites = [UUID()]
+        try org.save(to: lib)
+        let url = LibraryOrganization.file(in: lib)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        guard case .unreadable(let kept) = LibraryOrganization.load(from: lib) else { return XCTFail("not set aside") }
+        let name = try XCTUnwrap(kept)
+        let moved = url.deletingLastPathComponent().appendingPathComponent(name)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: moved.path)
+        XCTAssertEqual(try JSONDecoder().decode(LibraryOrganization.self, from: Data(contentsOf: moved)), org, "nothing of it was lost")
+        XCTAssertEqual(LibraryOrganization.load(from: lib), .missing)
+    }
+
+    func testDoubledAttachmentIdsDoNotCrash() throws {
+        // #187
+        let id = UUID()
+        var block = BlockRecord(kind: .image)
+        block.attachmentID = id
+        let atts = [FolioArchive.Attachment(id: id, filename: "a.txt", typeIdentifier: "public.plain-text", data: Data("A".utf8)),
+                    FolioArchive.Attachment(id: id, filename: "b.txt", typeIdentifier: "public.plain-text", data: Data("B".utf8))]
+        let data = try NoteFile(meta: NoteMetadata(title: "Doppelt"), body: NoteBody(blocks: [block]), attachments: atts).encoded()
+        let file = try NoteFile.decode(data)
+        XCTAssertEqual(Set(file.attachments.map(\.id)).count, 2, "every attachment has its own id now")
+        XCTAssertEqual(file.attachments.first { $0.id == id }?.data, Data("A".utf8), "the block keeps the first one")
+        XCTAssertEqual(Set(file.attachments.map(\.data)), [Data("A".utf8), Data("B".utf8)], "no data is dropped")
+        let report = FolioDiagnostics.diagnose(data)
+        XCTAssertTrue(report.problems.contains { $0.message.contains("doppelte Kennung") }, "the diagnosis names the problem")
+    }
+
     // MARK: Statistics
 
     func testStatistics() {
