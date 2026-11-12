@@ -40,6 +40,21 @@ final class CodeExecutionRegressionTests: XCTestCase {
         XCTAssertEqual(b.stderr, "B\nB\nB\n")
     }
 
+    func testMemoryIsMeasuredAsFootprintIncludingCompressiblePages() throws {
+        // #198: pages full of one value compress well; the footprint counts them, resident size may not.
+        let pid = getpid()
+        let before = try XCTUnwrap(ServerDetector.physicalFootprint(of: pid))
+        let size = 300 * 1_048_576
+        let block = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 4096)
+        defer { block.deallocate() }
+        for i in stride(from: 0, to: size, by: 4096) { block.storeBytes(of: 1, toByteOffset: i, as: UInt8.self) }
+        let after = try XCTUnwrap(ServerDetector.physicalFootprint(of: pid))
+        XCTAssertGreaterThan(after - before, UInt64(250 * 1_048_576))
+        XCTAssertGreaterThanOrEqual(ServerDetector.residentMemoryMB(of: [pid]), Int(after / 1_048_576) - 1)
+        XCTAssertNil(ServerDetector.physicalFootprint(of: 999_999), "a process that does not exist")
+        XCTAssertEqual(ServerDetector.residentMemoryMB(of: []), 0)
+    }
+
     func testCancelStopsTheProcess() async throws {
         let run = CodeRun()
         // Cancel once the program has printed, however long a busy build server takes to start it.

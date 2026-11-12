@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Arbeitsspeicher-Limit für Code** (#198): Folio misst den Speicher eines Code-Blocks jetzt wie die Aktivitätsanzeige (einschließlich komprimierter und ausgelagerter Seiten). Vorher zählte nur der gerade im RAM liegende Teil, sodass ein Programm unter Last mehr belegen konnte als erlaubt.
+
 ## [1.4.5] – 2026-11-12
 
 ### Behoben

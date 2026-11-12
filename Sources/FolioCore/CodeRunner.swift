@@ -490,11 +490,31 @@ public enum ServerDetector {
     }
 
     /// Resident memory of the given processes together, in megabytes.
+    /// Memory of the processes in MB as Activity Monitor counts it: the physical footprint, which includes
+    /// compressed and swapped pages. Resident memory alone let compressible data slip past the limit (#198).
+    /// Processes that cannot be asked fall back to their resident size.
     public static func residentMemoryMB(of pids: [pid_t]) -> Int {
         guard !pids.isEmpty else { return 0 }
-        let out = run("/bin/ps", ["-o", "rss=", "-p", pids.map(String.init).joined(separator: ",")])
-        let kb = out.split(whereSeparator: \.isNewline).compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }.reduce(0, +)
-        return kb / 1024
+        var bytes: UInt64 = 0
+        var fallback: [pid_t] = []
+        for pid in pids {
+            if let footprint = physicalFootprint(of: pid) { bytes += footprint } else { fallback.append(pid) }
+        }
+        var mb = Int(bytes / 1_048_576)
+        if !fallback.isEmpty {
+            let out = run("/bin/ps", ["-o", "rss=", "-p", fallback.map(String.init).joined(separator: ",")])
+            mb += out.split(whereSeparator: \.isNewline).compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }.reduce(0, +) / 1024
+        }
+        return mb
+    }
+
+    /// `phys_footprint` of one process, nil when it cannot be read (gone, or another user's).
+    public static func physicalFootprint(of pid: pid_t) -> UInt64? {
+        var info = rusage_info_v2()
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+        }
+        return result == 0 ? info.ri_phys_footprint : nil
     }
 
     /// Stops a process and everything it started (dev servers often spawn workers).
