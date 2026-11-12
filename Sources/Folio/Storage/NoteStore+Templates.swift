@@ -164,8 +164,8 @@ extension NoteStore {
     /// Moves a note into Folio's trash (restorable; its versions are kept).
     func delete(_ id: UUID) {
         if let t = templates.first(where: { $0.id == id }) { deleteTemplate(t); return }
-        guard let ref = notes.first(where: { $0.id == id }) else { return }
-        guard savedBeforeDeleting(id) else { return }
+        // Saved before the path is read: a new title renames the file (#196).
+        guard notes.contains(where: { $0.id == id }), savedBeforeDeleting(id), let ref = notes.first(where: { $0.id == id }) else { return }
         let wasSelected = selectedNoteID == id
         let tabsBefore = tabs
         if let data = try? Data(contentsOf: ref.url) { try? history.record(data, noteID: id, force: true) }
@@ -200,8 +200,9 @@ extension NoteStore {
     /// Copies a note with all blocks and attachments under new ids (#16), next to the original.
     @discardableResult
     func duplicate(_ id: UUID) -> NoteRef? {
-        guard let ref = notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id }) else { return nil }
+        // Saving first: a new title renames the file, so its path is only known afterwards (#196).
         documents[id]?.saveNow()
+        guard let ref = notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id }) else { return nil }
         guard let original = try? NoteFile.read(from: ref.url) else {
             lastError = "„\(ref.meta.title)“ konnte nicht gelesen werden."
             return nil
@@ -245,9 +246,10 @@ extension NoteStore {
     }
 
     func move(_ id: UUID, to folder: URL) {
+        // Saved before the path is read: a new title renames the file (#196).
+        documents[id]?.saveNow()
         guard let ref = notes.first(where: { $0.id == id }),
               ref.folderURL.standardizedFileURL != folder.standardizedFileURL else { return }
-        documents[id]?.saveNow()
         let target = uniqueURL(in: folder, base: ref.url.deletingPathExtension().lastPathComponent)
         do {
             try FileManager.default.moveItem(at: ref.url, to: target)

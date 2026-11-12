@@ -70,7 +70,13 @@ final class UpdateManager: ObservableObject {
             state = .failed("Keine Schreibrechte für \(app.deletingLastPathComponent().path). Lade das Update auf GitHub herunter.")
             return
         }
-        NoteStore.shared.saveAll()
+        // The app is replaced and restarted at the end; notes that cannot be saved would hold the quit after the
+        // replacement and leave the old version running (#197). Nothing is downloaded or replaced then.
+        let unsaved = NoteStore.shared.unsavedAfterSaving()
+        guard unsaved.isEmpty else {
+            state = .failed("Das Update wurde nicht installiert: \(NoteStore.titles(unsaved)) konnte nicht gesichert werden. Sichere die Notiz und versuche es erneut.")
+            return
+        }
         // One bar for the whole update: download 0–80 %, then check, install and restart.
         state = .installing(UpdateProgress(fraction: 0, step: "Lade Folio \(release.version) herunter …"))
         Task {
@@ -79,6 +85,12 @@ final class UpdateManager: ObservableObject {
                 state = .installing(UpdateProgress(fraction: 0.82, step: "Prüfe die neue Version …"))
                 let report: @Sendable (Double, String) -> Void = { fraction, step in
                     Task { @MainActor in UpdateManager.shared.state = .installing(UpdateProgress(fraction: fraction, step: step)) }
+                }
+                // Checked again right before the app is replaced: the download takes a while (#197).
+                let stillUnsaved = NoteStore.shared.unsavedAfterSaving()
+                guard stillUnsaved.isEmpty else {
+                    state = .failed("Das Update wurde nicht installiert: \(NoteStore.titles(stillUnsaved)) konnte nicht gesichert werden. Sichere die Notiz und versuche es erneut.")
+                    return
                 }
                 let newApp = try await Task.detached {
                     try Self.replace(app: app, withAppIn: dmg, expectedVersion: release.version, report: report)

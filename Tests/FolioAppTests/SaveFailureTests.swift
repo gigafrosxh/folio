@@ -162,6 +162,35 @@ final class SaveFailureTests: XCTestCase {
         store.lastError = nil
     }
 
+    /// The first line changed and not saved yet: saving renames the file.
+    private func retitled(_ title: String) throws -> NoteDocument {
+        let doc = try openNote(title, text: "\(title)\nText")
+        let block = try XCTUnwrap(doc.blocks.first { $0.kind == .text })
+        block.storage.replaceCharacters(in: NSRange(location: 0, length: (title as NSString).length), with: title + " Neu")
+        doc.markDirty()
+        return doc
+    }
+
+    func testDuplicateDeleteAndMoveRightAfterATitleChange() throws {
+        // #196
+        let a = try retitled("Dupli")
+        store.lastError = nil
+        let copy = try XCTUnwrap(store.duplicate(a.id), store.lastError ?? "")
+        XCTAssertTrue(onDisk(a).contains("Dupli Neu"))
+        XCTAssertTrue(((try? NoteFile.read(from: copy.url)).map(NoteText.of) ?? "").contains("Dupli Neu"), "the copy has the new title")
+
+        let b = try retitled("Weg")
+        store.delete(b.id)
+        XCTAssertNil(store.lastError)
+        XCTAssertFalse(store.notes.contains { $0.id == b.id })
+
+        let c = try retitled("Rueber")
+        let target = try XCTUnwrap(store.createFolder(named: "Ziel", in: folder))
+        store.move(c.id, to: target)
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(store.notes.first { $0.id == c.id }?.folderURL.standardizedFileURL, target.standardizedFileURL)
+    }
+
     func testKeepMineSavesTheNewestOutsideVersion() async throws {
         // #185
         let doc = try openNote("Zweimal", text: "Anfang")
