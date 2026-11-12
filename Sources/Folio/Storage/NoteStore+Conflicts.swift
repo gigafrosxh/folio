@@ -44,8 +44,16 @@ extension NoteStore {
             if let data = try? mine.encoded() { try? history.record(data, noteID: doc.id, force: true) }
             reloadDocument(doc.id)
         case .keepBoth:
+            // Own version into the history first, so it survives whatever happens next (#182).
+            if let data = try? mine.encoded() { try? history.record(data, noteID: doc.id, force: true) }
             let stamp = Date().formatted(date: .numeric, time: .shortened).replacingOccurrences(of: ":", with: ".")
-            saveAsNewNote(mine, in: doc.url.deletingLastPathComponent(), suffix: "(Konflikt \(stamp))")
+            guard saveAsNewNote(mine, in: doc.url.deletingLastPathComponent(), suffix: "(Konflikt \(stamp))") != nil else {
+                // The copy could not be written: keep the own changes in the editor and the conflict open.
+                self.conflict = conflict
+                lastError = (lastError ?? "Die Kopie konnte nicht gesichert werden.")
+                    + " Deine Änderungen sind weiter geöffnet und im Versionsverlauf gesichert; der Konflikt bleibt offen."
+                return
+            }
             reloadDocument(doc.id)
         }
         if documents[doc.id] == nil, conflict.diskData == nil { reload() }

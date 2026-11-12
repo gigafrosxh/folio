@@ -25,11 +25,15 @@ extension NoteStore {
 
     func saveOrganization() {
         guard !loadingOrganization else { return }
-        // Someone else (sync, a restore) changed the file since Folio last saw it: keep what they added (#175).
+        // Someone else (sync, a restore) changed the file since Folio last saw it: merge against the state both
+        // started from, so their additions come in and removals made here stick (#175, #180).
         if let theirs = organizationChangedByOthers() {
+            let base = organizationOnDisk.flatMap { try? JSONDecoder().decode(LibraryOrganization.self, from: $0) }
             loadingOrganization = true
-            organization = organization.merging(theirs)
+            organization = organization.merging(theirs, base: base)
             loadingOrganization = false
+        } else {
+            setAsideUnreadableOrganization()
         }
         do {
             organizationOnDisk = try organization.saved(to: rootURL)
@@ -54,6 +58,18 @@ extension NoteStore {
         organization = theirs
         loadingOrganization = false
         if case .smartView(let id) = sidebarSelection, smartView(id) == nil { sidebarSelection = .all }
+    }
+
+    /// A file someone else left unreadable (a half-synced write) is kept as `organization-defekt-….json` before Folio
+    /// writes its own state over it, as on start (#181).
+    private func setAsideUnreadableOrganization() {
+        let file = LibraryOrganization.file(in: rootURL)
+        guard let data = try? Data(contentsOf: file), data != organizationOnDisk, !data.isEmpty,
+              (try? JSONDecoder().decode(LibraryOrganization.self, from: data)) == nil,
+              case .unreadable(let kept) = LibraryOrganization.load(from: rootURL) else { return }
+        lastError = "Die Datei mit Reihenfolge, Favoriten und intelligenten Ansichten war von außen unlesbar geworden. "
+            + "Folio hat seinen Stand gesichert; deine Notizen sind nicht betroffen."
+            + (kept.map { " Die unlesbare Datei liegt als „\($0)“ im Ordner .folio der Bibliothek." } ?? "")
     }
 
     // MARK: Sorting

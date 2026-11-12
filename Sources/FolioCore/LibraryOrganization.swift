@@ -146,15 +146,52 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
         smartViews = (try c.decodeIfPresent([SmartView].self, forKey: .smartViews) ?? []).filter { ids.insert($0.id).inserted }
     }
 
-    /// This organization with what `other` (the file as another Mac or a restore left it) has in addition (#175):
-    /// its extra favorites and views, and its orders for lists this one has no order for. Nothing of either is dropped.
-    public func merging(_ other: LibraryOrganization) -> LibraryOrganization {
+    /// This organization together with `other` (the file as another Mac or a restore left it) (#175).
+    ///
+    /// With `base`, the state both started from, it is a three-way merge (#180): what the other side added or
+    /// changed comes in, what it removed goes, and what this side removed or changed stays that way. Without a
+    /// base nothing of either side is dropped.
+    public func merging(_ other: LibraryOrganization, base: LibraryOrganization? = nil) -> LibraryOrganization {
+        guard let base else {
+            var out = self
+            out.favorites = ManualOrder.unique(favorites + other.favorites)
+            out.noteOrder.merge(other.noteOrder) { mine, _ in mine }
+            out.folderOrder.merge(other.folderOrder) { mine, _ in mine }
+            let have = Set(smartViews.map(\.id))
+            out.smartViews += other.smartViews.filter { !have.contains($0.id) }
+            return out
+        }
         var out = self
-        out.favorites = ManualOrder.unique(favorites + other.favorites)
-        out.noteOrder.merge(other.noteOrder) { mine, _ in mine }
-        out.folderOrder.merge(other.folderOrder) { mine, _ in mine }
-        let have = Set(smartViews.map(\.id))
-        out.smartViews += other.smartViews.filter { !have.contains($0.id) }
+        if sortMode == base.sortMode { out.sortMode = other.sortMode }
+        out.favorites = Self.mergeList(mine: favorites, theirs: other.favorites, base: base.favorites, key: { $0 })
+        out.noteOrder = Self.mergeMap(mine: noteOrder, theirs: other.noteOrder, base: base.noteOrder)
+        out.folderOrder = Self.mergeMap(mine: folderOrder, theirs: other.folderOrder, base: base.folderOrder)
+        var views = Self.mergeList(mine: smartViews, theirs: other.smartViews, base: base.smartViews, key: \.id)
+        // A view both sides kept: the side that changed it wins, this side when both did.
+        for i in views.indices {
+            let id = views[i].id
+            if let b = base.smartViews.first(where: { $0.id == id }), views[i] == b, let t = other.smartViews.first(where: { $0.id == id }) { views[i] = t }
+        }
+        out.smartViews = views
+        return out
+    }
+
+    /// Items of `mine`, minus what the other side removed, plus what it added (in its order, at the end).
+    private static func mergeList<T, K: Hashable>(mine: [T], theirs: [T], base: [T], key: (T) -> K) -> [T] {
+        let baseKeys = Set(base.map(key)), theirKeys = Set(theirs.map(key)), myKeys = Set(mine.map(key))
+        let removedThere = baseKeys.subtracting(theirKeys)
+        let addedThere = theirs.filter { !baseKeys.contains(key($0)) && !myKeys.contains(key($0)) }
+        var seen = Set<K>()
+        return (mine.filter { !removedThere.contains(key($0)) } + addedThere).filter { seen.insert(key($0)).inserted }
+    }
+
+    /// Per key: unchanged here takes the other side's value (or its removal), changed here keeps this side's.
+    private static func mergeMap<V: Equatable>(mine: [String: V], theirs: [String: V], base: [String: V]) -> [String: V] {
+        var out: [String: V] = [:]
+        for key in Set(mine.keys).union(theirs.keys).union(base.keys) {
+            let m = mine[key], t = theirs[key], b = base[key]
+            out[key] = m == b ? t : m
+        }
         return out
     }
 

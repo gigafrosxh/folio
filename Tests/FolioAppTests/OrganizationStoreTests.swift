@@ -250,6 +250,95 @@ final class OrganizationStoreTests: XCTestCase {
         XCTAssertEqual(store.organization, theirs)
     }
 
+    func testRemovalsHereSurviveAChangeThere() throws {
+        // #180
+        let a = try note("A", modified: 300), b = try note("B", modified: 200)
+        store.reload()
+        store.toggleFavorite(a)
+        store.toggleFavorite(b)
+        let view = SmartView(name: "Hier gelöscht", filter: SearchFilter(text: "x"))
+        store.organization.smartViews.append(view)
+        var theirs = try XCTUnwrap(decodeOnDisk())
+        theirs.smartViews.append(SmartView(name: "Vom anderen Mac", filter: SearchFilter(text: "y")))
+        try theirs.save(to: store.rootURL)
+        store.toggleFavorite(a)
+        store.deleteSmartView(view.id)
+        XCTAssertEqual(store.organization.favorites, [b])
+        XCTAssertEqual(store.organization.smartViews.map(\.name), ["Vom anderen Mac"])
+        XCTAssertEqual(try decodeOnDisk(), store.organization)
+    }
+
+    func testUnreadableFileFromOutsideIsKeptBeforeOverwriting() throws {
+        // #181
+        let a = try note("A", modified: 300)
+        store.reload()
+        store.toggleFavorite(a)
+        let file = LibraryOrganization.file(in: store.rootURL)
+        for f in try FileManager.default.contentsOfDirectory(at: file.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+        where f.lastPathComponent.hasPrefix("organization-defekt-") { try FileManager.default.removeItem(at: f) }
+        try Data("{halb geschrieben".utf8).write(to: file)
+        store.lastError = nil
+        store.toggleFavorite(a)
+        let folder = file.deletingLastPathComponent()
+        let kept = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("organization-defekt-") }
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(try Data(contentsOf: kept[0]), Data("{halb geschrieben".utf8))
+        XCTAssertEqual(try decodeOnDisk(), store.organization)
+        XCTAssertTrue(store.lastError?.contains("Notizen sind nicht betroffen") == true)
+        store.lastError = nil
+        kept.forEach { try? FileManager.default.removeItem(at: $0) }
+
+        // An empty file (a sync placeholder) is simply replaced, without a message.
+        try Data().write(to: file)
+        store.toggleFavorite(a)
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(try decodeOnDisk(), store.organization)
+    }
+
+    private func decodeOnDisk() throws -> LibraryOrganization? {
+        try JSONDecoder().decode(LibraryOrganization.self, from: Data(contentsOf: LibraryOrganization.file(in: store.rootURL)))
+    }
+
+    func testKeepBothDoesNotLoseOwnChangesWhenTheCopyFails() async throws {
+        // #182
+        try note("Konfliktnotiz", modified: 300)
+        store.reload()
+        let ref = try XCTUnwrap(store.notes.first { $0.meta.title == "Konfliktnotiz" })
+        store.selectedNoteID = ref.id
+        let doc = try XCTUnwrap(store.documents[ref.id])
+        var theirs = try NoteFile.read(from: ref.url)
+        var code = BlockRecord(kind: .code)
+        code.code = "VON AUSSEN"
+        theirs.body.blocks.append(code)
+        try await Task.sleep(for: .milliseconds(1100))   // a new modification date on volumes with 1 s resolution
+        try theirs.write(to: ref.url)
+        let text = NSAttributedString(string: "MEINE ÄNDERUNG")
+        if let block = doc.blocks.first(where: { $0.kind == .text }) { block.storage.setAttributedString(text) } else {
+            let block = BlockModel(kind: .text)
+            block.storage.setAttributedString(text)
+            doc.blocks.append(block)
+        }
+        doc.markDirty()
+        store.checkExternalChange()
+        let conflict = try XCTUnwrap(store.conflict, "conflict raised")
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: folder.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        store.resolve(conflict, .keepBoth)
+        try FileManager.default.setAttributes([.posixPermissions: attrs[.posixPermissions]!], ofItemAtPath: folder.path)
+        store.lastError = nil
+
+        XCTAssertNotNil(store.conflict, "the conflict stays open")
+        XCTAssertTrue(store.documents[ref.id]?.blocks.contains { $0.storage.string.contains("MEINE ÄNDERUNG") } == true, "own changes stay in the editor")
+        let inHistory = store.history.versions(of: ref.id).contains { ((try? store.history.read($0)).map(NoteText.of) ?? "").contains("MEINE ÄNDERUNG") }
+        XCTAssertTrue(inHistory, "own changes are in the history")
+
+        // With a writable folder the same choice now works.
+        store.resolve(try XCTUnwrap(store.conflict), .keepBoth)
+        XCTAssertNil(store.conflict)
+        XCTAssertTrue(store.notes.contains { $0.meta.title.contains("Konflikt") && $0.meta.searchText.contains("MEINE ÄNDERUNG") })
+    }
+
     func testRenamingATagKeepsItsOrder() async throws {
         // #174
         func tagged(_ title: String, _ modified: TimeInterval) throws -> UUID {

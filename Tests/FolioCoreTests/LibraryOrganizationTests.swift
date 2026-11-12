@@ -162,6 +162,37 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertEqual(mine.merging(LibraryOrganization()), mine)
     }
 
+    func testThreeWayMergeKeepsRemovalsOfBothSides() {
+        // #180
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        var base = LibraryOrganization()
+        base.favorites = [a, b, c]
+        let keep = SmartView(name: "Bleibt", filter: SearchFilter(text: "k")), gone = SmartView(name: "Weg", filter: SearchFilter(text: "w"))
+        base.smartViews = [keep, gone]
+        base.noteOrder = ["all": [a, b], "tag:x": [c]]
+        var mine = base, theirs = base
+        mine.favorites.removeAll { $0 == a }               // removed here
+        mine.smartViews.removeAll { $0.id == gone.id }      // deleted here
+        mine.noteOrder["all"] = [b, a]                      // reordered here
+        theirs.favorites.removeAll { $0 == c }              // removed there
+        theirs.favorites.append(d)                          // added there
+        let added = SmartView(name: "Neu dort", filter: SearchFilter(text: "n"))
+        theirs.smartViews.append(added)
+        theirs.smartViews[0].name = "Umbenannt dort"
+        theirs.noteOrder["tag:x"] = nil                     // dropped there
+        theirs.sortMode = .title
+        let merged = mine.merging(theirs, base: base)
+        XCTAssertEqual(merged.favorites, [b, d])
+        XCTAssertEqual(merged.smartViews.map(\.name), ["Umbenannt dort", "Neu dort"])
+        XCTAssertEqual(merged.noteOrder, ["all": [b, a]])
+        XCTAssertEqual(merged.sortMode, .title, "unchanged here, so the other side's choice wins")
+        var both = mine
+        both.sortMode = .created
+        XCTAssertEqual(both.merging(theirs, base: base).sortMode, .created, "changed on both sides: this side wins")
+        XCTAssertEqual(base.merging(base, base: base), base)
+        XCTAssertEqual(mine.merging(base, base: base), mine, "nothing changed there: this side stays as it is")
+    }
+
     func testRenamedTagKeepsItsOrderAndViews() {
         // #174
         let a = UUID(), b = UUID(), c = UUID()
