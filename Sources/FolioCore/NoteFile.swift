@@ -159,6 +159,12 @@ public struct BlockRecord: Codable, Sendable, Identifiable {
     public var outputCollapsed: Bool?
     /// Code blocks: what a run is expected to produce (#29).
     public var test: BlockTest?
+    /// Images: text that describes the picture for VoiceOver and exports (#46).
+    public var altText: String?
+    /// Images: crop and rotation; the attachment keeps the original (#45).
+    public var imageEdit: ImageEdit?
+    /// PDFs: their text, for the note search (#43). Nil = not indexed yet.
+    public var pdfText: String?
 
     public init(id: UUID = UUID(), kind: BlockKind) {
         self.id = id

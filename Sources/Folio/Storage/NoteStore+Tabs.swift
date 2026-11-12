@@ -72,6 +72,7 @@ extension NoteStore {
             doc.diskFingerprint = FileFingerprint(data: data)
             documents[id] = doc
             AttachmentSync.syncExternalEdits(in: doc)
+            doc.indexPDFs()
             // The state on disk before any edit is always in the history.
             recordVersion(data, noteID: file.meta.id, force: true)
         } catch {

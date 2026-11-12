@@ -16,7 +16,6 @@
   "Sources/Folio/Embeds/DatabaseBlockView.swift|DatabaseConnectionSheet.body" : 23,
   "Sources/Folio/Embeds/DatabaseBlockView.swift|SchemaTableRow.body" : 23,
   "Sources/Folio/Embeds/DrawingBlockView.swift|DrawingBlockView.toolbar" : 23,
-  "Sources/Folio/Embeds/EmbedViews.swift|ImageBlockView.body" : 17,
   "Sources/Folio/Embeds/EmbedViews.swift|WebBlockView.body" : 16,
   "Sources/Folio/Embeds/RenderedBlocks.swift|RenderedBlockView.body" : 20,
   "Sources/Folio/Import/AppleNotesImporter.swift|AppleNotesImporter.fetch()" : 19,

@@ -300,7 +300,9 @@ extension NotePDFExporter {
         }
 
         private func appendPicture(_ block: BlockModel) {
-            guard let data = attachment(of: block)?.data, let image = NSImage(data: data) else { return }
+            // Printed and exported as shown: with crop and rotation (#45).
+            guard let data = attachment(of: block)?.data,
+                  let image = EditedImage.image(data, edit: block.imageEdit, key: block.id.uuidString) else { return }
             appendImage(image, fraction: CGFloat(block.width))
             appendCaption(block.caption)
         }

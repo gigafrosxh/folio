@@ -44,8 +44,12 @@ private final class MarkdownAttachmentLinks {
     }
 
     /// The Markdown for a linked attachment; empty when the attachment is missing.
-    func part(_ id: UUID?, _ format: (_ name: String, _ path: String) -> String) -> [String] {
-        guard let id, let attachment = file.attachments.first(where: { $0.id == id }) else { return [] }
+    func part(_ id: UUID?, edit: ImageEdit? = nil, _ format: (_ name: String, _ path: String) -> String) -> [String] {
+        guard let id, var attachment = file.attachments.first(where: { $0.id == id }) else { return [] }
+        if let edit, !edit.isIdentity, let png = edit.renderedPNG(from: attachment.data) {
+            attachment.data = png
+            attachment.header.filename = (attachment.header.filename as NSString).deletingPathExtension + ".png"
+        }
         var name = MarkdownStructure.safeFileName(attachment.header.filename)
         if usedNames.contains(name) { name = "\(id.uuidString.prefix(6))-\(name)" }
         usedNames.insert(name)
@@ -65,6 +69,12 @@ extension MarkdownTransfer {
         return (parts.joined(separator: "\n\n") + "\n", links.files)
     }
 
+    /// Alt text of an image in Markdown: its description, else its caption; brackets would end the alt text (#46).
+    static func altText(_ b: BlockRecord) -> String {
+        let text = (b.altText?.isEmpty == false ? b.altText : b.caption) ?? ""
+        return text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "[", with: "(").replacingOccurrences(of: "]", with: ")")
+    }
+
     private static func markdownParts(of b: BlockRecord, links: MarkdownAttachmentLinks) -> [String] {
         let code = b.code ?? ""
         switch b.kind {
@@ -74,7 +84,8 @@ extension MarkdownTransfer {
         case .database: return ["```sql\n\(code)\n```"]
         case .math: return ["$$\n\(code)\n$$"]
         case .diagram: return ["```mermaid\n\(code)\n```"]
-        case .image: return links.part(b.attachmentID) { _, path in "![\(b.caption ?? "")](\(path))" }
+        // The alt text is the Markdown alt text (#46); the edited picture is exported (#45).
+        case .image: return links.part(b.attachmentID, edit: b.imageEdit) { _, path in "![\(altText(b))](\(path))" }
         // Drawings are exported as their PencilKit data; a PNG preview is not available here.
         case .drawing: return links.part(b.attachmentID) { _, path in "[Zeichnung](\(path))" }
         case .pdf, .file: return links.part(b.attachmentID) { name, path in "[\(name)](\(path))" }

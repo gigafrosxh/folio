@@ -7,6 +7,15 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **PDF-Volltextsuche** (#43): Die Suche findet jetzt auch Text in eingebetteten PDFs. Neue PDFs werden beim Einfügen gelesen, bestehende Notizen einmalig im Hintergrund; das Änderungsdatum der Notizen bleibt dabei unverändert. Gescannte PDFs ohne Text bleiben unauffindbar.
+- **PDF markieren und kommentieren** (#44): Im PDF-Block gibt es „Markieren“ (gelb, für ausgewählten Text), „Kommentar“ (Notizzettel an der Auswahl oder der sichtbaren Seite) und „Entfernen“. Die Anmerkungen werden im PDF der Notiz gespeichert und sind auch in Vorschau sichtbar; der Versionsverlauf hat den Stand davor.
+- **Bilder drehen und zuschneiden** (#45): Am Bild (beim Darüberfahren) gibt es Drehen nach links und rechts, „Zuschneiden …“ mit verschiebbarem Rahmen und „Original zeigen“. Das Original bleibt in der Notiz; Drucken, PDF- und Markdown-Export nehmen das bearbeitete Bild.
+- **Alternativtexte** (#46): Der „ALT“-Knopf am Bild hinterlegt eine Beschreibung. VoiceOver liest sie vor (sonst die Bildunterschrift), der Markdown-Export nutzt sie als Alt-Text, und die Suche findet sie.
+
+### Technik
+- Neue, optionale Blockfelder `altText`, `imageEdit` und `pdfText`; ältere Folio-Versionen ignorieren sie.
+
 ## [1.4.6] – 2026-11-12
 
 ### Behoben

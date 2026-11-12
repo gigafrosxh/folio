@@ -67,6 +67,7 @@ enum AttachmentSync {
             guard mod.timeIntervalSince(reference) > 1, let fresh = read(url), fresh.data != att.data else { continue }
             doc.attachments[id]?.data = fresh.data
             doc.attachments[id]?.header.isPackage = fresh.isPackage
+            block.pdfText = nil   // edited elsewhere: index the new text (#43)
             block.syncedAt = mod
             block.revision += 1
             changed = true

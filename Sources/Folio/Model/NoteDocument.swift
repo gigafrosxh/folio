@@ -19,6 +19,12 @@ final class BlockModel: ObservableObject, Identifiable {
     @Published var width: Double
     @Published var mode: String
     @Published var caption: String
+    /// Images: description for VoiceOver and exports (#46).
+    @Published var altText = ""
+    /// Images: non-destructive crop and rotation (#45).
+    @Published var imageEdit: ImageEdit?
+    /// PDFs: extracted text for the search (#43); nil until indexed.
+    var pdfText: String?
     @Published var revision = 0
     var syncedAt: Date?
     @Published var connection: DatabaseConnection?
@@ -73,6 +79,9 @@ final class BlockModel: ObservableObject, Identifiable {
         if let w = r.width { width = w }
         if let m = r.mode { mode = m }
         caption = r.caption ?? ""
+        altText = r.altText ?? ""
+        imageEdit = r.imageEdit
+        pdfText = r.pdfText
         syncedAt = r.syncedAt
     }
 
@@ -87,6 +96,8 @@ final class BlockModel: ObservableObject, Identifiable {
         if let w = r.width { width = w }
         mode = r.mode ?? ""
         caption = r.caption ?? ""
+        altText = r.altText ?? ""
+        imageEdit = r.imageEdit
         connection = r.connection
         stdin = r.stdin
         interactive = r.interactive ?? false
@@ -136,8 +147,18 @@ final class BlockModel: ObservableObject, Identifiable {
         }
         if !mode.isEmpty { r.mode = mode }
         if !caption.isEmpty { r.caption = caption }
+        addMediaFields(to: &r)
         r.syncedAt = syncedAt
         return r
+    }
+
+    /// Alt text and crop of images (#45, #46), search text of PDFs (#43).
+    private func addMediaFields(to r: inout BlockRecord) {
+        if kind == .image {
+            if !altText.isEmpty { r.altText = altText }
+            if let imageEdit, !imageEdit.isIdentity { r.imageEdit = imageEdit }
+        }
+        if kind == .pdf { r.pdfText = pdfText }
     }
 
     var plainText: String {
@@ -146,6 +167,9 @@ final class BlockModel: ObservableObject, Identifiable {
         case .web: return url
         case .audio: return [caption, output ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
         case .embed: return "![[\(storage.string)]]"
+        // Alt text and the text inside PDFs are found by the search (#43, #46).
+        case .image: return [caption, altText].filter { !$0.isEmpty }.joined(separator: "\n")
+        case .pdf: return [caption, pdfText ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
         default: return caption
         }
     }
@@ -179,6 +203,7 @@ final class NoteDocument: ObservableObject, Identifiable {
     // MARK: Saving
 
     func markDirty() {
+        keepModifiedOnSave = false
         isDirty = true
         saveTask?.cancel()
         saveTask = Task { [weak self] in
@@ -193,9 +218,43 @@ final class NoteDocument: ObservableObject, Identifiable {
 
     func saveNow() {
         saveTask?.cancel()
+        indexPDFs()
         guard isDirty else { return }
         isDirty = false
         store?.save(self)
+        keepModifiedOnSave = false
+    }
+
+    // MARK: PDF search text (#43)
+
+    /// Set when the only change is new search text: saving then keeps the note's modification date, so indexing
+    /// does not move notes to „Heute“.
+    private var keepModifiedOnSave = false
+    /// PDF blocks whose text is being extracted.
+    private var indexing: Set<UUID> = []
+
+    /// Extracts the text of PDF blocks that have none yet, in the background, and saves it with the note.
+    func indexPDFs() {
+        for block in blocks where block.kind == .pdf && block.pdfText == nil && !indexing.contains(block.id) {
+            guard let id = block.attachmentID, let data = attachments[id]?.data else { continue }
+            indexing.insert(block.id)
+            Task { [weak self, weak block] in
+                let text = await Task.detached(priority: .utility) { PDFSearchText.of(data) }.value
+                guard let self, let block else { return }
+                self.indexing.remove(block.id)
+                // The PDF changed meanwhile (annotations, edited outside): a newer pass indexes it.
+                guard block.attachmentID == id, self.attachments[id]?.data == data else { return }
+                block.pdfText = text
+                if !self.isDirty { self.keepModifiedOnSave = true }
+                self.isDirty = true
+                self.saveTask?.cancel()
+                self.saveTask = Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(700))
+                    guard !Task.isCancelled else { return }
+                    self?.saveNow()
+                }
+            }
+        }
     }
 
     /// Builds the file representation and refreshes title, preview and tags.
@@ -234,7 +293,7 @@ final class NoteDocument: ObservableObject, Identifiable {
             }
         }
         meta.links = links
-        meta.modified = Date()
+        if !keepModifiedOnSave { meta.modified = Date() }
 
         let used = Set(blocks.compactMap(\.attachmentID))
         let atts = attachments.values.filter { used.contains($0.id) }
@@ -415,6 +474,8 @@ final class NoteDocument: ObservableObject, Identifiable {
         guard var a = attachments[id] else { return }
         a.data = data
         attachments[id] = a
+        // New content: its PDF text is extracted again (#43).
+        for b in blocks where b.attachmentID == id { b.pdfText = nil }
         markDirty()
     }
 

@@ -194,6 +194,7 @@ final class NoteStore: ObservableObject {
         trashItems = trash.items()
         templates = Self.scanTemplates(LibraryData.folder(rootURL, "templates"))
         if sidebarSelection == .damaged, damaged.isEmpty { sidebarSelection = .all }
+        indexPDFsInLibrary()
         let known = Set(notes.map(\.id)).union(templates.map(\.id))
         if let id = selectedNoteID, !known.contains(id) { selectedNoteID = nil }
         tabs.removeAll { !known.contains($0) }

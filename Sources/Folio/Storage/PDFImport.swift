@@ -145,6 +145,7 @@ struct PDFNoteBuilder {
         var block = BlockRecord(kind: kind)
         block.attachmentID = attachment.id
         if kind == .image { block.width = 1 }
+        if kind == .pdf { block.pdfText = PDFSearchText.of(attachment.data) }
         blocks.append(block)
     }
 }

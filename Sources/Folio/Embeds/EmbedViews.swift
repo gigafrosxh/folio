@@ -70,11 +70,74 @@ struct EmbedCard<Content: View, Actions: View>: View {
 
 // MARK: - PDF
 
+/// Lets the block's toolbar act on the PDF view it shows (#44).
+@MainActor
+final class PDFAnnotationController: ObservableObject {
+    weak var view: PDFView?
+    @Published var hasSelection = false
+
+    /// Yellow highlight over the selected text, line by line.
+    func highlightSelection() -> Bool {
+        guard let selection = view?.currentSelection, !(selection.string ?? "").isEmpty else { return false }
+        for line in selection.selectionsByLine() {
+            for page in line.pages {
+                let annotation = PDFAnnotation(bounds: line.bounds(for: page), forType: .highlight, withProperties: nil)
+                annotation.color = NSColor.systemYellow.withAlphaComponent(0.45)
+                page.addAnnotation(annotation)
+            }
+        }
+        view?.clearSelection()
+        return true
+    }
+
+    /// A note icon with `text` next to the selection, or at the top left of the visible page.
+    func addComment(_ text: String) -> Bool {
+        guard let view, let page = view.currentSelection?.pages.first ?? view.currentPage else { return false }
+        let anchor = view.currentSelection.map { $0.bounds(for: page) }
+        let pageBox = page.bounds(for: .cropBox)
+        let origin = anchor.map { CGPoint(x: min($0.maxX + 4, pageBox.maxX - 24), y: $0.maxY - 20) }
+            ?? CGPoint(x: pageBox.minX + 24, y: pageBox.maxY - 48)
+        let note = PDFAnnotation(bounds: CGRect(origin: origin, size: CGSize(width: 20, height: 20)), forType: .text, withProperties: nil)
+        note.contents = text
+        note.color = .systemYellow
+        page.addAnnotation(note)
+        return true
+    }
+
+    /// Highlights and comments under the selection, or all on the visible page without a selection.
+    func removeAnnotations() -> Int {
+        guard let view else { return 0 }
+        var removed = 0
+        let targets: [(PDFPage, CGRect?)] = view.currentSelection.map { sel in sel.pages.map { ($0, sel.bounds(for: $0)) } }
+            ?? (view.currentPage.map { [($0, nil)] } ?? [])
+        for (page, rect) in targets {
+            for a in page.annotations where [PDFAnnotationSubtype.highlight.rawValue, PDFAnnotationSubtype.text.rawValue].contains(a.type ?? "")
+                || a.type == "Highlight" || a.type == "Text" {
+                if let rect, !a.bounds.intersects(rect) { continue }
+                page.removeAnnotation(a)
+                removed += 1
+            }
+        }
+        return removed
+    }
+
+    /// The PDF with its annotations, to store in the note.
+    var data: Data? { view?.document?.dataRepresentation() }
+}
+
 struct PDFKitView: NSViewRepresentable {
     var data: Data
     var revision: Int
+    var controller: PDFAnnotationController? = nil
 
-    final class Coordinator { var revision = -1 }
+    final class Coordinator: NSObject {
+        var revision = -1
+        weak var controller: PDFAnnotationController?
+        @objc func selectionChanged(_ note: Notification) {
+            let view = note.object as? PDFView
+            MainActor.assumeIsolated { controller?.hasSelection = !(view?.currentSelection?.string ?? "").isEmpty }
+        }
+    }
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> PDFView {
@@ -83,10 +146,15 @@ struct PDFKitView: NSViewRepresentable {
         v.displayMode = .singlePageContinuous
         v.displaysPageBreaks = true
         v.backgroundColor = .clear
+        controller?.view = v
+        context.coordinator.controller = controller
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.selectionChanged(_:)),
+                                               name: .PDFViewSelectionChanged, object: v)
         return v
     }
 
     func updateNSView(_ v: PDFView, context: Context) {
+        controller?.view = v
         if context.coordinator.revision != revision || v.document == nil {
             context.coordinator.revision = revision
             v.document = PDFDocument(data: data)
@@ -97,22 +165,46 @@ struct PDFKitView: NSViewRepresentable {
 struct PDFBlockView: View {
     @ObservedObject var block: BlockModel
     @ObservedObject var doc: NoteDocument
+    @StateObject private var annotations = PDFAnnotationController()
+    @State private var commenting = false
+    @State private var comment = ""
 
     var body: some View {
         let att = block.attachmentID.flatMap { doc.attachments[$0] }
         EmbedCard(title: att?.header.filename ?? "PDF", icon: "doc.richtext", height: $block.height, onCommit: { doc.markDirty() }) {
+            Button { if annotations.highlightSelection() { store() } } label: { Label("Markieren", systemImage: "highlighter") }
+                .disabled(!annotations.hasSelection)
+                .helpLabel("Ausgewählten Text gelb markieren")
+            Button { comment = ""; commenting = true } label: { Label("Kommentar", systemImage: "text.bubble") }
+                .helpLabel("Kommentar an die Auswahl oder die sichtbare Seite heften")
+            Button { if annotations.removeAnnotations() > 0 { store() } } label: { Label("Entfernen", systemImage: "eraser") }
+                .helpLabel("Markierungen und Kommentare der Auswahl entfernen (ohne Auswahl: der sichtbaren Seite)")
             Button { AttachmentSync.open(block, in: doc) } label: { Label("In Vorschau öffnen", systemImage: "arrow.up.forward.app") }
                 .help("Im Standardprogramm öffnen")
         } content: {
             if let att {
                 VStack(spacing: 0) {
-                    PDFKitView(data: att.data, revision: block.revision)
+                    PDFKitView(data: att.data, revision: block.revision, controller: annotations)
                     AttachmentInfoBar(attachment: att, revision: block.revision)
                 }
             } else {
                 Text("PDF fehlt").foregroundStyle(.secondary)
             }
         }
+        .alert("Kommentar", isPresented: $commenting) {
+            TextField("Text", text: $comment)
+            Button("Hinzufügen") {
+                let text = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty, annotations.addComment(text) { store() }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        }
+    }
+
+    /// Markings live in the PDF itself, inside the note; the version history keeps the state before (#44).
+    private func store() {
+        guard let id = block.attachmentID, let data = annotations.data else { return }
+        doc.replaceAttachmentData(id, data: data)
     }
 }
 
@@ -240,46 +332,125 @@ struct ImageBlockView: View {
     @ObservedObject var doc: NoteDocument
     @EnvironmentObject var theme: ThemeManager
     @State private var hovering = false
+    @State private var cropping = false
+    @State private var editingAlt = false
 
     var body: some View {
         let att = block.attachmentID.flatMap { doc.attachments[$0] }
         VStack(spacing: 6) {
-            if let att, let image = NSImage(data: att.data) {
-                GeometryReader { geo in
-                    let w = geo.size.width * CGFloat(block.width)
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: w)
-                        .clipShape(RoundedRectangle(cornerRadius: CGFloat(theme.settings.cornerRadius), style: .continuous))
-                        .shadow(color: .black.opacity(theme.settings.shadows ? 0.15 : 0), radius: 12, y: 5)
-                        .frame(maxWidth: .infinity)
-                        .overlay(alignment: .topTrailing) {
-                            if hovering { controls.padding(10) }
-                        }
-                }
-                .aspectRatio(max(image.size.width, 1) / max(image.size.height, 1) / CGFloat(block.width), contentMode: .fit)
-                .draggable(image)
+            if let att, let image = EditedImage.image(att.data, edit: block.imageEdit, key: block.id.uuidString) {
+                picture(image)
             } else {
                 Label("Bild fehlt", systemImage: "photo").foregroundStyle(.secondary).frame(height: 80)
             }
             if hovering, let att { AttachmentInfoBar(attachment: att, revision: block.revision, showsDivider: false) }
-            // The caption field only shows while hovering or once it has text.
-            if hovering || !block.caption.isEmpty {
-                TextField("Bildunterschrift", text: $block.caption)
-                    .textFieldStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .onSubmit { doc.markDirty() }
-                    .onChange(of: block.caption) { doc.markDirty() }
-            }
+            captionField
         }
         .onHover { hovering = $0 }
+        .modifier(sheets)
+    }
+
+    private func picture(_ image: NSImage) -> some View {
+        GeometryReader { geo in
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: geo.size.width * CGFloat(block.width))
+                .clipShape(RoundedRectangle(cornerRadius: CGFloat(theme.settings.cornerRadius), style: .continuous))
+                .shadow(color: .black.opacity(theme.settings.shadows ? 0.15 : 0), radius: 12, y: 5)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .topTrailing) { if hovering { controls.padding(10) } }
+                .overlay(alignment: .bottomLeading) { altBadge.padding(10) }
+                // VoiceOver reads the description, else the caption (#46).
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isImage)
+                .accessibilityLabel(spokenDescription)
+                .accessibilityAction(named: "Alternativtext bearbeiten") { editingAlt = true }
+        }
+        .aspectRatio(max(image.size.width, 1) / max(image.size.height, 1) / CGFloat(block.width), contentMode: .fit)
+        .draggable(image)
+    }
+
+    private var spokenDescription: String {
+        if !block.altText.isEmpty { return block.altText }
+        return block.caption.isEmpty ? "Bild ohne Beschreibung" : block.caption
+    }
+
+    /// The caption field only shows while hovering or once it has text.
+    @ViewBuilder private var captionField: some View {
+        if hovering || !block.caption.isEmpty {
+            TextField("Bildunterschrift", text: $block.caption)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .onSubmit { doc.markDirty() }
+                .onChange(of: block.caption) { doc.markDirty() }
+        }
+    }
+
+    private var sheets: ImageSheets { ImageSheets(block: block, doc: doc, cropping: $cropping, editingAlt: $editingAlt) }
+}
+
+/// The crop and alt-text sheets of an image block (#45, #46).
+struct ImageSheets: ViewModifier {
+    @ObservedObject var block: BlockModel
+    @ObservedObject var doc: NoteDocument
+    @Binding var cropping: Bool
+    @Binding var editingAlt: Bool
+
+    func body(content: Content) -> some View {
+        content
+        .sheet(isPresented: $cropping) {
+            if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
+                CropSheet(data: att.data, edit: block.imageEdit ?? ImageEdit()) { edit in
+                    doc.changeBlock(block, "Bild zuschneiden") { block.imageEdit = edit.isIdentity ? nil : edit }
+                }
+            }
+        }
+        .sheet(isPresented: $editingAlt) {
+            AltTextSheet(text: block.altText) { text in
+                doc.changeBlock(block, "Alternativtext ändern") { block.altText = text }
+            }
+        }
+    }
+}
+
+extension ImageBlockView {
+    /// Shows that the picture has a description; a click edits it.
+    @ViewBuilder private var altBadge: some View {
+        if !block.altText.isEmpty || hovering {
+            Button { editingAlt = true } label: {
+                Text(block.altText.isEmpty ? "+ ALT" : "ALT")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .floatingCapsule()
+            }
+            .buttonStyle(.plain)
+            .helpLabel(block.altText.isEmpty ? "Alternativtext hinzufügen (für VoiceOver)" : "Alternativtext: \(block.altText)")
+        }
+    }
+
+    private func rotate(clockwise: Bool) {
+        doc.changeBlock(block, "Bild drehen") {
+            let turned = (block.imageEdit ?? ImageEdit()).rotated(clockwise: clockwise)
+            block.imageEdit = turned.isIdentity ? nil : turned
+        }
     }
 
     private var controls: some View {
         HStack(spacing: 4) {
+            Button { rotate(clockwise: false) } label: { Image(systemName: "rotate.left") }
+                .buttonStyle(.borderless).helpLabel("Nach links drehen")
+            Button { rotate(clockwise: true) } label: { Image(systemName: "rotate.right") }
+                .buttonStyle(.borderless).helpLabel("Nach rechts drehen")
+            Button { cropping = true } label: { Image(systemName: "crop") }
+                .buttonStyle(.borderless).helpLabel("Zuschneiden …")
+            if block.imageEdit != nil {
+                Button { doc.changeBlock(block, "Original wiederherstellen") { block.imageEdit = nil } } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.borderless).helpLabel("Original zeigen (Zuschnitt und Drehung zurücksetzen)")
+            }
+            Divider().frame(height: 14)
             ForEach([(0.5, "S"), (0.75, "M"), (1.0, "L")], id: \.0) { size, label in
                 Button(label) { doc.changeBlock(block, "Bildgröße ändern") { block.width = size } }
                     .buttonStyle(.borderless)
