@@ -318,6 +318,36 @@ final class OrganizationStoreTests: XCTestCase {
         kept.forEach { try? FileManager.default.removeItem(at: $0) }
     }
 
+    func testDailyNoteFromATemplateIsFoundAgain() throws {
+        // #208
+        store.ensureStarterTemplates()
+        let template = try XCTUnwrap(store.templates.first { $0.meta.title == "Meeting" })
+        let saved = ThemeManager.shared.settings
+        defer { ThemeManager.shared.settings = saved }
+        ThemeManager.shared.settings.dailyTemplate = template.id.uuidString
+        ThemeManager.shared.settings.dailyFolder = folder.lastPathComponent
+        let day = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = try XCTUnwrap(store.openDailyNote(for: day))
+        let doc = try XCTUnwrap(store.documents[first.id])
+        doc.blocks.first { $0.kind == .text }?.storage.append(NSAttributedString(string: " Notiz"))
+        doc.markDirty()
+        doc.saveNow()
+        XCTAssertNotEqual(store.notes.first { $0.id == first.id }?.meta.title, DailyNote.title(for: day), "the title came from the template")
+        let again = try XCTUnwrap(store.openDailyNote(for: day))
+        XCTAssertEqual(again.id, first.id, "the same note, no second one")
+        XCTAssertEqual(store.notes.filter { $0.folderURL.standardizedFileURL == folder.standardizedFileURL }.count, 1)
+    }
+
+    func testNoteFromATemplateLeavesTheGraph() throws {
+        // #210
+        store.ensureStarterTemplates()
+        store.sidebarSelection = .graph
+        let template = try XCTUnwrap(store.templates.first)
+        let made = try XCTUnwrap(store.createNote(from: template, in: folder))
+        XCTAssertEqual(store.sidebarSelection, .all)
+        XCTAssertEqual(store.selectedNoteID, made.id)
+    }
+
     private func decodeOnDisk() throws -> LibraryOrganization? {
         try JSONDecoder().decode(LibraryOrganization.self, from: Data(contentsOf: LibraryOrganization.file(in: store.rootURL)))
     }

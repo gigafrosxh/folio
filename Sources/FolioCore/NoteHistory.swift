@@ -70,6 +70,10 @@ public struct NoteHistory: Sendable {
     static func sameContent(_ a: Data, _ b: Data) -> Bool {
         guard let x = try? FolioArchive.decode(a), let y = try? FolioArchive.decode(b),
               x.attachments.map(\.data) == y.attachments.map(\.data) else { return false }
+        // Properties (status, dates …) live in the metadata; a change to them is a new version (#209).
+        let px = (try? JSONDecoder().decode(NoteMetadata.self, from: x.meta))?.properties
+        let py = (try? JSONDecoder().decode(NoteMetadata.self, from: y.meta))?.properties
+        guard px == py else { return false }
         // JSONEncoder does not promise a key order, so equal bodies can differ byte for byte (#98).
         return x.body == y.body || canonical(x.body) == canonical(y.body)
     }

@@ -281,6 +281,35 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertTrue(report.problems.contains { $0.message.contains("doppelte Kennung") }, "the diagnosis names the problem")
     }
 
+    func testPropertyOnlyChangesAreNewVersions() throws {
+        // #209
+        let lib = try library()
+        let history = NoteHistory(library: lib)
+        var meta = NoteMetadata(title: "Aufgabe")
+        meta.properties = [NoteProperty(name: "Status", kind: .status, value: "Offen", options: ["Offen", "Erledigt"])]
+        let id = meta.id
+        let first = try NoteFile(meta: meta, body: NoteBody()).encoded()
+        XCTAssertNotNil(try history.record(first, noteID: id, force: true))
+        meta.properties?[0].value = "Erledigt"
+        let second = try NoteFile(meta: meta, body: NoteBody()).encoded()
+        XCTAssertNotNil(try history.record(second, noteID: id, date: Date().addingTimeInterval(1), force: true), "a new status is a new version")
+        XCTAssertEqual(history.versions(of: id).count, 2)
+        meta.title = "Nur der Titel"
+        let third = try NoteFile(meta: meta, body: NoteBody()).encoded()
+        XCTAssertNil(try history.record(third, noteID: id, date: Date().addingTimeInterval(2), force: true), "other metadata alone still is no new version")
+    }
+
+    func testDailyNotesSurviveAMerge() {
+        // #208
+        var mine = LibraryOrganization(), theirs = LibraryOrganization()
+        let a = UUID(), b = UUID()
+        mine.dailyNotes = ["2027-01-15": a]
+        theirs.dailyNotes = ["2027-01-15": b, "2027-01-16": b]
+        let merged = mine.merging(theirs, base: LibraryOrganization())
+        XCTAssertEqual(merged.dailyNotes, ["2027-01-15": a, "2027-01-16": b])
+        XCTAssertEqual(mine.merging(theirs).dailyNotes, ["2027-01-15": a, "2027-01-16": b])
+    }
+
     // MARK: Statistics
 
     func testStatistics() {

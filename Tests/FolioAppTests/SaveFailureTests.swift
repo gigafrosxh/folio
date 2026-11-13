@@ -191,6 +191,40 @@ final class SaveFailureTests: XCTestCase {
         XCTAssertEqual(store.notes.first { $0.id == c.id }?.folderURL.standardizedFileURL, target.standardizedFileURL)
     }
 
+    func testAnOpenConflictKeepsTheNoteUnsaved() async throws {
+        // #206
+        let doc = try openNote("Konfliktbleibt", text: "Anfang")
+        try await changeOutside(doc, "AUSSEN_206")
+        type(doc, " MEIN_206")
+        store.checkExternalChange()
+        XCTAssertNotNil(store.conflict)
+        type(doc, " WEITER_206")
+        doc.saveNow()
+        XCTAssertTrue(doc.isDirty, "writing on during a conflict is still unsaved")
+        XCTAssertEqual(store.unsavedAfterSaving().map(\.id), [doc.id], "the quit question sees it")
+        store.closeTab(doc.id)
+        XCTAssertTrue(store.tabs.contains(doc.id), "the tab stays")
+        XCTAssertTrue(store.lastError?.contains("Konflikt") == true)
+        store.lastError = nil
+        store.resolve(try XCTUnwrap(store.conflict), .keepMine)
+        XCTAssertFalse(store.documents[doc.id]?.isDirty ?? true)
+        XCTAssertTrue(onDisk(doc).contains("WEITER_206"))
+    }
+
+    func testCaptureIntoAnOpenNoteThatCannotBeSavedSaysSo() async throws {
+        // #207
+        let doc = try openNote("Ziel", text: "Inhalt")
+        var result: (ok: Bool, message: String) = (false, "")
+        await locked { result = CaptureService.shared.save(CaptureItem(text: "ERFASST_207", target: .note(doc.id))) }
+        XCTAssertFalse(result.message.hasPrefix("In der Notiz gespeichert"), result.message)
+        XCTAssertTrue(result.message.contains("noch nicht gesichert"), result.message)
+        XCTAssertTrue(shows(doc.id, "ERFASST_207"))
+        store.lastError = nil
+        doc.saveNow()
+        XCTAssertTrue(onDisk(doc).contains("ERFASST_207"))
+        XCTAssertTrue(CaptureService.shared.save(CaptureItem(text: "ZWEI", target: .note(doc.id))).message.hasPrefix("In der Notiz gespeichert"))
+    }
+
     func testKeepMineSavesTheNewestOutsideVersion() async throws {
         // #185
         let doc = try openNote("Zweimal", text: "Anfang")

@@ -80,17 +80,25 @@ extension NoteStore {
         let title = DailyNote.title(for: date)
         let name = settings.dailyFolder.trimmingCharacters(in: .whitespacesAndNewlines)
         let folder = name.isEmpty ? rootURL : rootURL.appendingPathComponent(Self.sanitize(name), isDirectory: true)
+        let day = DailyNote.title(for: date)
+        // The note made for this day, wherever it is and whatever it is called now (#208); else one with the date as title.
+        if let id = organization.dailyNotes[day], let known = notes.first(where: { $0.id == id }) {
+            open(noteID: known.id)
+            return known
+        }
         if let existing = notes.first(where: { $0.meta.title == title && $0.folderURL.standardizedFileURL == folder.standardizedFileURL }) {
+            organization.dailyNotes[day] = existing.id
             open(noteID: existing.id)
             return existing
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         if let template = templates.first(where: { $0.id.uuidString == settings.dailyTemplate }),
            let ref = createNote(from: template, in: folder, title: title, date: date) {
+            organization.dailyNotes[day] = ref.id
             return ref
         }
         let ref = createNote(titled: title, in: folder)
-        if let ref { open(noteID: ref.id) }
+        if let ref { organization.dailyNotes[day] = ref.id; open(noteID: ref.id) }
         return ref
     }
 }

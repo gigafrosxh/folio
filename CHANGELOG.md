@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Offener Konflikt** (#206): Wer bei einem offenen Konflikt weiterschreibt, behält eine ungesicherte Notiz; Tab schließen, Beenden und Bibliothek wechseln schützen sie jetzt. Vorher galt sie nach dem nächsten Speicherversuch fälschlich als gesichert.
+- **Schnellerfassung** (#207): Kann die offene Zielnotiz gerade nicht gesichert werden, sagt die Schnellerfassung das, statt „gespeichert“ zu melden; der Text bleibt in der offenen Notiz.
+- **Tagesnotiz mit Vorlage** (#208): Folio merkt sich die Tagesnotiz jedes Tages und findet sie wieder, auch wenn die Vorlage ihr einen anderen Titel gibt. Vorher entstand nach dem ersten Bearbeiten eine zweite.
+- **Versionsverlauf** (#209): Reine Änderungen an Eigenschaften (Status, Datum …) werden als eigene Version gesichert.
+- **Vorlage im Graphen** (#210): Eine neue Notiz aus einer Vorlage öffnet sich auch dann im Editor, wenn gerade der Graph gezeigt wird.
+
 ## [1.5.2] – 2026-11-13
 
 ### Behoben

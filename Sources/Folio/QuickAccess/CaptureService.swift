@@ -33,8 +33,12 @@ final class CaptureService: ObservableObject {
     @discardableResult
     func save(_ item: CaptureItem) -> (ok: Bool, message: String) {
         do {
-            try deliver(item)
+            let saved = try deliver(item)
             lastMessage = nil
+            // In an open note that could not be written yet the text is safe in the editor, not on disk (#207).
+            guard saved else {
+                return (true, "In die offene Notiz übernommen, aber noch nicht gesichert (\(NoteStore.shared.lastError ?? "Speichern fehlgeschlagen")). Folio versucht es bei der nächsten Änderung erneut; die Notiz bleibt offen.")
+            }
             return (true, item.target == .inbox ? "In der Inbox gespeichert." : "In der Notiz gespeichert.")
         } catch let error as CaptureError where error.isTemporary {
             var queued = item
@@ -53,7 +57,7 @@ final class CaptureService: ObservableObject {
 
     func retryPending() {
         guard !queue.items().isEmpty else { refresh(); return }
-        let done = queue.retry { try self.deliver($0) }
+        let done = queue.retry { _ = try self.deliver($0) }
         refresh()
         if done > 0 { lastMessage = "\(done) wartende Erfassung\(done == 1 ? "" : "en") gespeichert." }
     }
@@ -64,16 +68,15 @@ final class CaptureService: ObservableObject {
     }
 
     /// Open notes get the capture through their document (so unsaved edits are kept); others on disk.
-    private func deliver(_ item: CaptureItem) throws {
+    /// False when the text went into an open note that could not be saved yet.
+    private func deliver(_ item: CaptureItem) throws -> Bool {
         let store = NoteStore.shared
         if case .note(let id) = item.target, let doc = store.document(for: id) {
-            append(item, to: doc)
-            return
+            return append(item, to: doc)
         }
         let writer = CaptureWriter(library: store.rootURL)
         if item.target == .inbox, let id = (try? NoteFile.readMetadata(at: writer.inboxURL))?.id, let doc = store.document(for: id) {
-            append(item, to: doc)
-            return
+            return append(item, to: doc)
         }
         var url: URL?
         if case .note(let id) = item.target { url = store.notes.first { $0.id == id }?.url }
@@ -88,9 +91,11 @@ final class CaptureService: ObservableObject {
             file.meta = meta
         }
         store.reload()
+        return true
     }
 
-    private func append(_ item: CaptureItem, to doc: NoteDocument) {
+    @discardableResult
+    private func append(_ item: CaptureItem, to doc: NoteDocument) -> Bool {
         let (records, attachments) = CaptureBlocks.make(item, rtf: Self.rtf, dateText: Self.dateText)
         for a in attachments { doc.attachments[a.id] = a }
         var anchor = doc.blocks.last?.id
@@ -100,6 +105,7 @@ final class CaptureService: ObservableObject {
             anchor = b.id
         }
         doc.saveNow()
+        return !doc.isDirty
     }
 
     static func rtf(_ text: String) -> Data? {

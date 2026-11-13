@@ -48,7 +48,8 @@ extension NoteStore {
         guard let url = writeNewNote(file, in: folder) else { return nil }
         let ref = NoteRef(meta: file.meta, url: url)
         notes.append(ref)
-        if [.templates, .trash, .damaged, .pinned].contains(sidebarSelection) { sidebarSelection = .all }
+        // Like a plain new note (#162): places that cannot show it switch to all notes, the graph too (#210).
+        if sidebarSelection == .templates || Self.selectionAfterCreatingNote(sidebarSelection) != nil { sidebarSelection = .all }
         selectedNoteID = ref.id
         if let cursor { FormattingController.shared.focus(blockID: cursor.block, at: cursor.offset) }
         return ref

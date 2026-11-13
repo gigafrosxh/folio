@@ -21,7 +21,8 @@ extension NoteStore {
         documents[id]?.saveNow()
         // Saving failed: the tab stays, or its unsaved text would be gone (#183).
         if documents[id]?.isDirty == true {
-            lastError = (lastError ?? "Speichern fehlgeschlagen.") + " Der Tab bleibt offen, damit nichts verloren geht."
+            let reason = conflict?.doc.id == id ? "Die Notiz hat einen offenen Konflikt; entscheide zuerst, welche Fassung gilt." : (lastError ?? "Speichern fehlgeschlagen.")
+            lastError = reason + " Der Tab bleibt offen, damit nichts verloren geht."
             return
         }
         tabs.remove(at: i)
@@ -88,7 +89,8 @@ extension NoteStore {
 
     func save(_ doc: NoteDocument) {
         // Never overwrite a change made outside Folio since the note was loaded or last saved.
-        if conflict?.doc === doc { return }
+        // Still unresolved: the own changes are not on disk, so the note stays unsaved for every guard (#206).
+        if conflict?.doc === doc { doc.markDirtyWithoutSaving(); return }
         if let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url), current != expected {
             raiseConflict(doc)
             return
