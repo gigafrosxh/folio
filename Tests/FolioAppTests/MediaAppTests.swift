@@ -75,6 +75,48 @@ final class MediaAppTests: XCTestCase {
         XCTAssertNil(doc.blocks.first { $0.kind == .pdf }?.pdfText, "new content is indexed again")
     }
 
+    func testAltTextBackslashKeepsTheLinkValid() {
+        // #202
+        let att = FolioArchive.Attachment(filename: "Bild.png", typeIdentifier: "public.png", data: png)
+        var b = BlockRecord(kind: .image)
+        b.attachmentID = att.id
+        b.altText = #"Pfad C:\"#
+        let md = MarkdownTransfer.markdown(for: NoteFile(meta: NoteMetadata(title: "T"), body: NoteBody(blocks: [b]), attachments: [att]), filesFolder: "D").0
+        XCTAssertTrue(md.contains(#"![Pfad C:\\](D/Bild.png)"#), md)
+    }
+
+    func testPicturesOfTheSameSizeNeverShareAPreview() throws {
+        // #200: same length, different content, same key.
+        func picture(_ color: NSColor) -> Data {
+            let image = NSImage(size: NSSize(width: 8, height: 4), flipped: false) { r in color.setFill(); r.fill(); return true }
+            var data = NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+            data.append(Data(count: 4096 - data.count % 4096))   // same length for both
+            return data
+        }
+        let red = picture(.red), blue = picture(.blue)
+        XCTAssertEqual(red.count, blue.count)
+        let edit = ImageEdit(quarterTurns: 1)
+        let a = try XCTUnwrap(EditedImage.image(red, edit: edit, key: "crop-x"))
+        let b = try XCTUnwrap(EditedImage.image(blue, edit: edit, key: "crop-x"))
+        XCTAssertFalse(a === b)
+        XCTAssertNotEqual(a.tiffRepresentation, b.tiffRepresentation)
+    }
+
+    func testPDFChangedDuringIndexingIsIndexedAgain() async throws {
+        // #199
+        let big = pdf(String(repeating: "Altes Wort ", count: 40))
+        let att = FolioArchive.Attachment(filename: "A.pdf", typeIdentifier: "com.adobe.pdf", data: big)
+        var block = BlockRecord(kind: .pdf)
+        block.attachmentID = att.id
+        let doc = NoteDocument(file: NoteFile(meta: NoteMetadata(title: "P"), body: NoteBody(blocks: [block]), attachments: [att]),
+                               url: URL(fileURLWithPath: "/dev/null"))
+        doc.indexPDFs()
+        doc.replaceAttachmentData(att.id, data: pdf("Neuer Begriff Zellmembran"))
+        let pdfBlock = try XCTUnwrap(doc.blocks.first { $0.kind == .pdf })
+        for _ in 0..<60 where !(pdfBlock.pdfText ?? "").contains("Zellmembran") { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertTrue(pdfBlock.pdfText?.contains("Zellmembran") == true, "the new PDF is read without any further change")
+    }
+
     func testHighlightCommentAndRemove() throws {
         let view = PDFView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
         view.document = PDFDocument(data: pdf("Wichtiger Satz zum Markieren"))

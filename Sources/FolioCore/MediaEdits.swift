@@ -70,15 +70,31 @@ public struct ImageEdit: Codable, Equatable, Sendable {
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
         guard let turned = ctx.makeImage() else { return nil }
         guard let c = crop else { return turned }
-        let rect = CGRect(x: c.x * Double(turnedW), y: c.y * Double(turnedH), width: c.width * Double(turnedW), height: c.height * Double(turnedH)).integral
+        // Edges a hair off a whole pixel (rounding noise after turning) snap to it before rounding outward (#203).
+        func snap(_ v: Double) -> Double { abs(v - v.rounded()) < 1e-6 ? v.rounded() : v }
+        let minX = snap(c.x * Double(turnedW)), minY = snap(c.y * Double(turnedH))
+        let maxX = snap((c.x + c.width) * Double(turnedW)), maxY = snap((c.y + c.height) * Double(turnedH))
+        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY).integral
         return turned.cropping(to: rect.intersection(CGRect(x: 0, y: 0, width: turnedW, height: turnedH)))
+    }
+
+    /// The picture as it is meant to be seen: camera photos stored sideways are turned by their EXIF orientation,
+    /// so edits start from what the user sees (#201).
+    public static func orientedImage(from data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        guard orientation != 1 else { return CGImageSourceCreateImageAtIndex(source, 0, nil) }
+        let w = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let h = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: max(w, h, 1), kCGImageSourceShouldCacheImmediately: true]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) ?? CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
     /// PNG of the edited picture (for exports); nil when the data is no picture.
     public func renderedPNG(from data: Data) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary),
-              let edited = apply(to: image) else { return nil }
+        guard let image = Self.orientedImage(from: data), let edited = apply(to: image) else { return nil }
         let out = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(out, "public.png" as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(dest, edited, nil)

@@ -72,7 +72,9 @@ extension MarkdownTransfer {
     /// Alt text of an image in Markdown: its description, else its caption; brackets would end the alt text (#46).
     static func altText(_ b: BlockRecord) -> String {
         let text = (b.altText?.isEmpty == false ? b.altText : b.caption) ?? ""
-        return text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "[", with: "(").replacingOccurrences(of: "]", with: ")")
+        // A backslash first, or it would escape the closing bracket (#202).
+        return text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "[", with: "(").replacingOccurrences(of: "]", with: ")")
     }
 
     private static func markdownParts(of b: BlockRecord, links: MarkdownAttachmentLinks) -> [String] {

@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreText
+import ImageIO
 import XCTest
 @testable import FolioCore
 
@@ -63,6 +64,41 @@ final class MediaEditTests: XCTestCase {
         XCTAssertTrue((0..<2).allSatisfy { x in (0..<2).allSatisfy { isRed(top, x, $0) } })
         let bottom = try XCTUnwrap(ImageEdit(quarterTurns: 1, crop: .init(x: 0, y: 0.5, width: 1, height: 0.5)).apply(to: picture()))
         XCTAssertFalse(isRed(bottom, 0, 0))
+    }
+
+    func testFourTurnsKeepTheSameCrop() throws {
+        // #203
+        let ctx = CGContext(data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 0, green: 1, blue: 0, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        let img = ctx.makeImage()!
+        var edit = ImageEdit(crop: .init(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
+        let before = try XCTUnwrap(edit.apply(to: img))
+        for _ in 0..<4 { edit = edit.rotated(clockwise: true) }
+        let after = try XCTUnwrap(edit.apply(to: img))
+        XCTAssertEqual([after.width, after.height], [before.width, before.height])
+        XCTAssertEqual([before.width, before.height], [20, 10])
+        for _ in 0..<7 { edit = edit.rotated(clockwise: false) }
+        let odd = try XCTUnwrap(edit.apply(to: img))
+        XCTAssertEqual([odd.width, odd.height], [10, 20], "an odd number of turns swaps the sides exactly")
+    }
+
+    func testCameraOrientationIsTheStartingPoint() throws {
+        // #201: a 40×20 JPEG stored sideways (EXIF orientation 6) is shown 20×40.
+        let ctx = CGContext(data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        let out = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(out, "public.jpeg" as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, ctx.makeImage()!, [kCGImagePropertyOrientation: 6] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(dest))
+        let jpeg = out as Data
+        let shown = try XCTUnwrap(ImageEdit.orientedImage(from: jpeg))
+        XCTAssertEqual([shown.width, shown.height], [20, 40])
+        let turned = try XCTUnwrap(ImageEdit(quarterTurns: 1).renderedPNG(from: jpeg))
+        let src = try XCTUnwrap(CGImageSourceCreateWithData(turned as CFData, nil))
+        let png = try XCTUnwrap(CGImageSourceCreateImageAtIndex(src, 0, nil))
+        XCTAssertEqual([png.width, png.height], [40, 20], "one turn from what is shown")
     }
 
     func testCropIsKeptInsideAndFullMeansNone() {

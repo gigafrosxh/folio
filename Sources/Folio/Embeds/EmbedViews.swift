@@ -403,7 +403,7 @@ struct ImageSheets: ViewModifier {
         content
         .sheet(isPresented: $cropping) {
             if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
-                CropSheet(data: att.data, edit: block.imageEdit ?? ImageEdit()) { edit in
+                CropSheet(data: att.data, key: block.id.uuidString, edit: block.imageEdit ?? ImageEdit()) { edit in
                     doc.changeBlock(block, "Bild zuschneiden") { block.imageEdit = edit.isIdentity ? nil : edit }
                 }
             }

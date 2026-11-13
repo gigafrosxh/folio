@@ -8,20 +8,30 @@ enum EditedImage {
 
     @MainActor static func image(_ data: Data, edit: ImageEdit?, key: String) -> NSImage? {
         guard let edit, !edit.isIdentity else { return NSImage(data: data) }
-        let cacheKey = "\(key)|\(edit.quarterTurns)|\(String(describing: edit.crop))|\(data.count)"
+        // The content is part of the key: two pictures of the same size must never share an entry (#200).
+        let cacheKey = "\(key)|\(edit.quarterTurns)|\(String(describing: edit.crop))|\(fingerprint(data))"
         if let hit = cache[cacheKey] { return hit }
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let cg = CGImageSourceCreateImageAtIndex(source, 0, nil), let out = edit.apply(to: cg) else { return NSImage(data: data) }
+        guard let cg = ImageEdit.orientedImage(from: data), let out = edit.apply(to: cg) else { return NSImage(data: data) }
         let image = NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height))
         if cache.count > 40 { cache.removeAll() }
         cache[cacheKey] = image
         return image
+    }
+
+    /// Cheap content identity: size plus hashes of the first and last 64 KB (pictures differ there).
+    private static func fingerprint(_ data: Data) -> String {
+        var h = Hasher()
+        h.combine(data.prefix(65_536))
+        h.combine(data.suffix(65_536))
+        return "\(data.count)-\(h.finalize())"
     }
 }
 
 /// Crop with a frame that can be moved and resized at its corners (#45). The original stays untouched.
 struct CropSheet: View {
     var data: Data
+    /// The block's id, so the preview is never another picture's (#200).
+    var key: String
     @State var edit: ImageEdit
     var onDone: (ImageEdit) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -31,7 +41,7 @@ struct CropSheet: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("Bild zuschneiden").font(.headline)
-            if let image = EditedImage.image(data, edit: ImageEdit(quarterTurns: edit.quarterTurns), key: "crop") {
+            if let image = EditedImage.image(data, edit: ImageEdit(quarterTurns: edit.quarterTurns), key: "crop-" + key) {
                 GeometryReader { geo in
                     let size = fitted(image.size, into: geo.size)
                     ZStack(alignment: .topLeading) {

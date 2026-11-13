@@ -242,8 +242,11 @@ final class NoteDocument: ObservableObject, Identifiable {
                 let text = await Task.detached(priority: .utility) { PDFSearchText.of(data) }.value
                 guard let self, let block else { return }
                 self.indexing.remove(block.id)
-                // The PDF changed meanwhile (annotations, edited outside): a newer pass indexes it.
-                guard block.attachmentID == id, self.attachments[id]?.data == data else { return }
+                // The PDF changed meanwhile (annotations, edited outside): read the new one now (#199).
+                guard block.attachmentID == id, self.attachments[id]?.data == data else {
+                    self.indexPDFs()
+                    return
+                }
                 block.pdfText = text
                 if !self.isDirty { self.keepModifiedOnSave = true }
                 self.isDirty = true

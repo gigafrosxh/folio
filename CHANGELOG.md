@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Kamerafotos drehen und zuschneiden** (#201): Fotos, die die Kamera seitlich speichert und nur per EXIF-Angabe aufrecht zeigt, werden vor dem Drehen und Zuschneiden richtig ausgerichtet; Drucken, PDF- und Markdown-Export ebenso. Ein in 1.5.0 bearbeitetes Foto dieser Art kann danach anders aussehen: dann einmal „Original zeigen“ und neu bearbeiten.
+- **Zuschneiden** (#200): Der Dialog zeigt immer das eigene Bild; vorher konnte er bei zwei gleich großen, gedrehten Bildern das andere zeigen.
+- **PDF-Suche** (#199): Wird ein PDF geändert, während sein Text noch gelesen wird, liest Folio gleich danach das neue PDF.
+- **Markdown-Export** (#202): Backslashes im Alternativtext werden maskiert, der Bildlink bleibt gültig.
+- **Drehen** (#203): Viermal drehen ergibt wieder genau denselben Ausschnitt (vorher je ein Pixel mehr).
+
 ## [1.5.0] – 2026-11-12
 
 ### Neu
