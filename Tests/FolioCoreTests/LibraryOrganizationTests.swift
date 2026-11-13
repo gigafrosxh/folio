@@ -310,6 +310,15 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertEqual(mine.merging(theirs).dailyNotes, ["2027-01-15": a, "2027-01-16": b])
     }
 
+    func testWholeWordsKnowLettersBeyondTheBasicPlane() {
+        // #212: 𐐀 (U+10400) is a letter in two UTF-16 units.
+        let text = "𐐀cat cat𐐀 cat"
+        let hits = FindInText.ranges(of: "cat", in: text, options: .init(wholeWord: true))
+        XCTAssertEqual(hits, [NSRange(location: 12, length: 3)])
+        XCTAssertEqual(FindInText.ranges(of: "cat", in: "😀cat cat😀", options: .init(wholeWord: true)).count, 2, "emoji are no letters")
+        XCTAssertEqual(FindInText.ranges(of: "cat", in: "cat", options: .init(wholeWord: true)).count, 1)
+    }
+
     // MARK: Statistics
 
     func testStatistics() {

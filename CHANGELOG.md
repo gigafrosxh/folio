@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Backups** (#211): Fehlen im Backup die neuesten Änderungen einer Notiz (etwa bei einem offenen Konflikt oder einem Speicherfehler), sagt Folio das nach dem Sichern und nennt die Notizen, statt nur „Gesichert und geprüft“ zu melden.
+- **Suche „Ganze Wörter“** (#212): Buchstaben außerhalb der Basisebene von Unicode (z. B. alte Schriften) gelten jetzt als Teil eines Wortes; vorher fand die Suche auch Treffer direkt daneben.
+
 ## [1.5.3] – 2026-11-13
 
 ### Behoben

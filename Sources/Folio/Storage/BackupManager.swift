@@ -13,6 +13,8 @@ final class BackupManager: ObservableObject {
     /// Last result shown in the settings ("Gesichert und geprüft: 42 Notizen").
     @Published private(set) var status: String?
     @Published private(set) var lastError: String?
+    /// Titles of notes whose newest changes the running backup does not contain (#211).
+    private var missing: [String] = []
     private var timer: Timer?
 
     private static let lastKey = "folio.lastBackup"
@@ -55,7 +57,9 @@ final class BackupManager: ObservableObject {
         isRunning = true
         lastError = nil
         status = "Sichere die Bibliothek …"
-        NoteStore.shared.saveAll()
+        // Notes whose newest state could not be written are not in the backup with it; the result says so (#211).
+        let store = NoteStore.shared
+        missing = store.unsavedAfterSaving().map { NoteStore.titles([$0]) }
         let library = NoteStore.shared.rootURL, dir = directory
         Task.detached(priority: .utility) {
             let result: Result<(BackupInfo, BackupCheck), Error> = Result {
@@ -73,7 +77,10 @@ final class BackupManager: ObservableObject {
         switch result {
         case .success(let (info, check)):
             UserDefaults.standard.set(info.date, forKey: Self.lastKey)
-            if check.isValid {
+            if check.isValid && !missing.isEmpty {
+                status = "Gesichert und geprüft: \(check.notes) Notiz\(check.notes == 1 ? "" : "en"), \(ByteCountFormatter.string(fromByteCount: info.size, countStyle: .file))."
+                lastError = "Ohne die ungesicherten Änderungen in \(missing.joined(separator: ", ")): Diese Notizen sind nur mit ihrem zuletzt gesicherten Stand enthalten. Löse den Konflikt oder sichere sie, dann noch einmal sichern."
+            } else if check.isValid {
                 status = "Gesichert und geprüft: \(check.notes) Notiz\(check.notes == 1 ? "" : "en"), \(ByteCountFormatter.string(fromByteCount: info.size, countStyle: .file))."
             } else {
                 status = nil

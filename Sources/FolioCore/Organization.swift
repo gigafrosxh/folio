@@ -363,10 +363,27 @@ public enum FindInText {
     }
 
     private static func isWordBoundary(_ ns: NSString, _ r: NSRange) -> Bool {
-        func isWordChar(_ i: Int) -> Bool {
-            guard i >= 0, i < ns.length, let scalar = Unicode.Scalar(ns.character(at: i)) else { return false }
-            return CharacterSet.alphanumerics.contains(scalar) || scalar == "_"
+        // Characters beyond the basic plane take two UTF-16 units; read them whole (#212).
+        func scalar(endingAt i: Int) -> Unicode.Scalar? {
+            guard i >= 0, i < ns.length else { return nil }
+            let low = ns.character(at: i)
+            if UTF16.isTrailSurrogate(low), i > 0, UTF16.isLeadSurrogate(ns.character(at: i - 1)) {
+                return Unicode.Scalar(String(utf16CodeUnits: [ns.character(at: i - 1), low], count: 2).unicodeScalars.first!.value)
+            }
+            return Unicode.Scalar(low)
         }
-        return !isWordChar(r.location - 1) && !isWordChar(NSMaxRange(r))
+        func scalar(startingAt i: Int) -> Unicode.Scalar? {
+            guard i >= 0, i < ns.length else { return nil }
+            let high = ns.character(at: i)
+            if UTF16.isLeadSurrogate(high), i + 1 < ns.length, UTF16.isTrailSurrogate(ns.character(at: i + 1)) {
+                return Unicode.Scalar(String(utf16CodeUnits: [high, ns.character(at: i + 1)], count: 2).unicodeScalars.first!.value)
+            }
+            return Unicode.Scalar(high)
+        }
+        func isWordChar(_ s: Unicode.Scalar?) -> Bool {
+            guard let s else { return false }
+            return CharacterSet.alphanumerics.contains(s) || s == "_"
+        }
+        return !isWordChar(scalar(endingAt: r.location - 1)) && !isWordChar(scalar(startingAt: NSMaxRange(r)))
     }
 }

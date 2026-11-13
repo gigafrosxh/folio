@@ -211,6 +211,24 @@ final class SaveFailureTests: XCTestCase {
         XCTAssertTrue(onDisk(doc).contains("WEITER_206"))
     }
 
+    func testBackupSaysWhichNewestChangesItLacks() async throws {
+        // #211
+        let doc = try openNote("Backupkonflikt", text: "Anfang")
+        try await changeOutside(doc, "AUSSEN_211")
+        type(doc, " NUR_IM_EDITOR")
+        store.checkExternalChange()
+        XCTAssertNotNil(store.conflict)
+        let backups = BackupManager.shared
+        backups.backupNow()
+        for _ in 0..<200 where backups.isRunning { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertFalse(backups.isRunning)
+        XCTAssertTrue(backups.lastError?.contains("Backupkonflikt") == true, backups.lastError ?? backups.status ?? "–")
+        store.resolve(try XCTUnwrap(store.conflict), .keepMine)
+        backups.backupNow()
+        for _ in 0..<200 where backups.isRunning { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertNil(backups.lastError, "with everything saved there is no warning")
+    }
+
     func testCaptureIntoAnOpenNoteThatCannotBeSavedSaysSo() async throws {
         // #207
         let doc = try openNote("Ziel", text: "Inhalt")
