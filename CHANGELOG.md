@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.5.3] – 2026-11-13
+
 ### Behoben
 - **Offener Konflikt** (#206): Wer bei einem offenen Konflikt weiterschreibt, behält eine ungesicherte Notiz; Tab schließen, Beenden und Bibliothek wechseln schützen sie jetzt. Vorher galt sie nach dem nächsten Speicherversuch fälschlich als gesichert.
 - **Schnellerfassung** (#207): Kann die offene Zielnotiz gerade nicht gesichert werden, sagt die Schnellerfassung das, statt „gespeichert“ zu melden; der Text bleibt in der offenen Notiz.
