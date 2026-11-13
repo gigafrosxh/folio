@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Zuschneiden** (#200): Die Bildvorschau unterscheidet Bilder jetzt sicher an ihrem ganzen Anfang und Ende. In 1.5.1 konnte das Hashen der Daten auf manchen Systemen nur die ersten Bytes ansehen, die bei gleich großen Bildern oft gleich sind; die CI hat das gezeigt.
+
 ## [1.5.1] – 2026-11-13
 
 ### Behoben

@@ -100,6 +100,8 @@ final class MediaAppTests: XCTestCase {
         let red = picture(1, 0), blue = picture(0, 1)
         XCTAssertEqual(red.count, blue.count)
         XCTAssertNotEqual(red, blue, "two different pictures")
+        XCTAssertEqual(red.prefix(80), blue.prefix(80), "with the same header, which is where hashing a Data value stops")
+        XCTAssertNotEqual(EditedImage.fingerprint(red), EditedImage.fingerprint(blue))
         let edit = ImageEdit(quarterTurns: 1)
         let a = try XCTUnwrap(EditedImage.image(red, edit: edit, key: "crop-x"))
         let b = try XCTUnwrap(EditedImage.image(blue, edit: edit, key: "crop-x"))

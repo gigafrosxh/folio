@@ -18,11 +18,13 @@ enum EditedImage {
         return image
     }
 
-    /// Cheap content identity: size plus hashes of the first and last 64 KB (pictures differ there).
-    private static func fingerprint(_ data: Data) -> String {
+    /// Cheap content identity: size plus the bytes of the first and last 64 KB. The bytes are hashed one by one:
+    /// hashing a `Data` value only looks at its first bytes, which are the same header in many pictures (#200).
+    static func fingerprint(_ data: Data) -> String {
         var h = Hasher()
-        h.combine(data.prefix(65_536))
-        h.combine(data.suffix(65_536))
+        for part in [data.prefix(65_536), data.suffix(65_536)] {
+            part.withUnsafeBytes { h.combine(bytes: $0) }
+        }
         return "\(data.count)-\(h.finalize())"
     }
 }
