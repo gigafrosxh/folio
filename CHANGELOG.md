@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.5.1] – 2026-11-13
+
 ### Behoben
 - **Kamerafotos drehen und zuschneiden** (#201): Fotos, die die Kamera seitlich speichert und nur per EXIF-Angabe aufrecht zeigt, werden vor dem Drehen und Zuschneiden richtig ausgerichtet; Drucken, PDF- und Markdown-Export ebenso. Ein in 1.5.0 bearbeitetes Foto dieser Art kann danach anders aussehen: dann einmal „Original zeigen“ und neu bearbeiten.
 - **Zuschneiden** (#200): Der Dialog zeigt immer das eigene Bild; vorher konnte er bei zwei gleich großen, gedrehten Bildern das andere zeigen.
