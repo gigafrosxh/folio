@@ -145,9 +145,25 @@ public struct SearchFilter: Equatable, Sendable {
     /// `typ:code`, `seit:7` (days) or `seit:heute`. Everything else stays free text.
     public static func parse(_ input: String) -> SearchFilter {
         var f = SearchFilter()
-        let words = input.split(separator: " ").map(String.init).filter { !f.apply($0) }
+        let words = words(of: input).filter { !f.apply($0) }
         f.text = words.joined(separator: " ")
         return f
+    }
+
+    /// Words of the search, where quotes keep spaces together (`ordner:"Apple Notizen"`, „…“ too) and are removed (#224).
+    static func words(of input: String) -> [String] {
+        var words: [String] = [], current = "", quoted = false
+        for ch in input {
+            if ch == "\"" || ch == "„" || ch == "“" || ch == "”" { quoted.toggle(); continue }
+            if ch == " " && !quoted {
+                if !current.isEmpty { words.append(current) }
+                current = ""
+            } else {
+                current.append(ch)
+            }
+        }
+        if !current.isEmpty { words.append(current) }
+        return words
     }
 
     /// Takes one word as a filter; false leaves it as free text.
@@ -225,10 +241,12 @@ public struct SearchFilter: Equatable, Sendable {
         return tags.allSatisfy { tag in noteTags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
     }
 
+    /// A folder filter matches that folder and its subfolders, wherever it lies: `ordner:Schule` finds
+    /// „Apple Notizen/Schule/Deutsch“ too (#224); a path like „Projekte/Alt“ works as before.
     private func matchesFolder(_ folderPath: String) -> Bool {
         guard let folder, !folder.isEmpty else { return true }
-        let f = folder.lowercased(), p = folderPath.lowercased()
-        return p == f || p.hasPrefix(f + "/")
+        let f = folder.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/")), p = folderPath.lowercased()
+        return p == f || p.hasPrefix(f + "/") || ("/" + p + "/").contains("/" + f + "/")
     }
 
     private func matchesPeriod(_ meta: NoteMetadata, now: Date) -> Bool {

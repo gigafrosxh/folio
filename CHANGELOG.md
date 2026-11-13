@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Suche nach Ordnern** (#224): `ordner:Schule` findet jetzt Notizen in jedem Ordner namens „Schule“ samt Unterordnern, egal wie tief er liegt. Ordnernamen mit Leerzeichen gehen in Anführungszeichen: `ordner:"Apple Notizen"` (auch „…“).
+
 ## [1.5.4] – 2026-11-13
 
 ### Behoben

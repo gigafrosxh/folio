@@ -319,6 +319,23 @@ final class LibraryOrganizationTests: XCTestCase {
         XCTAssertEqual(FindInText.ranges(of: "cat", in: "cat", options: .init(wholeWord: true)).count, 1)
     }
 
+    func testFolderFilterFindsFoldersAnywhereAndWithSpaces() {
+        // #224
+        let meta = NoteMetadata(title: "Lesen")
+        let path = "Apple Notizen/Schule/Deutsch"
+        XCTAssertTrue(SearchFilter.parse("ordner:Schule").matches(meta, folderPath: path))
+        XCTAssertTrue(SearchFilter.parse("ordner:deutsch").matches(meta, folderPath: path))
+        XCTAssertTrue(SearchFilter.parse(#"ordner:"Apple Notizen""#).matches(meta, folderPath: path))
+        XCTAssertTrue(SearchFilter.parse("ordner:„Apple Notizen“ lesen").matches(meta, folderPath: path))
+        XCTAssertEqual(SearchFilter.parse(#"ordner:"Apple Notizen" lesen"#).folder, "Apple Notizen")
+        XCTAssertEqual(SearchFilter.parse(#"ordner:"Apple Notizen" lesen"#).text, "lesen")
+        XCTAssertTrue(SearchFilter.parse("ordner:Apple Notizen/Schule").folder == "Apple", "without quotes a space still ends the filter")
+        XCTAssertFalse(SearchFilter.parse("ordner:Schul").matches(meta, folderPath: path), "whole folder names, no prefixes")
+        XCTAssertFalse(SearchFilter.parse("ordner:Mathe").matches(meta, folderPath: path))
+        XCTAssertTrue(SearchFilter.parse("ordner:Apple Notizen/Schule".replacingOccurrences(of: "Apple Notizen", with: "\"Apple Notizen\"")).matches(meta, folderPath: path))
+        XCTAssertTrue(SearchFilter(folder: "Schule/Deutsch").matches(meta, folderPath: path), "a partial path from the filter menu")
+    }
+
     // MARK: Statistics
 
     func testStatistics() {
