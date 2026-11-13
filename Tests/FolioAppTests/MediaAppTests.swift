@@ -87,14 +87,19 @@ final class MediaAppTests: XCTestCase {
 
     func testPicturesOfTheSameSizeNeverShareAPreview() throws {
         // #200: same length, different content, same key.
-        func picture(_ color: NSColor) -> Data {
-            let image = NSImage(size: NSSize(width: 8, height: 4), flipped: false) { r in color.setFill(); r.fill(); return true }
-            var data = NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+        // Drawn with Core Graphics, not AppKit: on a build server without a screen AppKit may draw nothing.
+        func picture(_ r: CGFloat, _ b: CGFloat) -> Data {
+            let ctx = CGContext(data: nil, width: 8, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            ctx.setFillColor(red: r, green: 0, blue: b, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: 8, height: 4))
+            var data = NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
             data.append(Data(count: 4096 - data.count % 4096))   // same length for both
             return data
         }
-        let red = picture(.red), blue = picture(.blue)
+        let red = picture(1, 0), blue = picture(0, 1)
         XCTAssertEqual(red.count, blue.count)
+        XCTAssertNotEqual(red, blue, "two different pictures")
         let edit = ImageEdit(quarterTurns: 1)
         let a = try XCTUnwrap(EditedImage.image(red, edit: edit, key: "crop-x"))
         let b = try XCTUnwrap(EditedImage.image(blue, edit: edit, key: "crop-x"))
