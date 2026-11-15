@@ -176,6 +176,7 @@ struct SettingsView: View {
             } header: {
                 Text("Vorhersage")
             }
+            AIProviderSection()
         }.formStyle(.grouped)
     }
 

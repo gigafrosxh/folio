@@ -107,7 +107,7 @@ Codex mit Computer Use braucht die Freigabe des Nutzers im Terminal („Allow Co
 
 ## Stand und nächste Schritte
 
-Aktuelle Version: **1.5.5** (Ordnerfilter in der Suche) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
+Aktuelle Version: **1.6.0** (Ollama, KI-Aktionen, Antworten als Blöcke, Tag-Vorschläge) (siehe `CHANGELOG.md`). Die Bugs #73–#77 aus dem Test von 0.16.0 sind als 0.16.1–0.16.5 behoben;
 Codex testet 0.16 weiter und legt neue „[Bug]“-Issues an – jedes davon als nächstes Patch-Release beheben (0.16.6 …). Erledigte Roadmap-Pakete: 0.13 Medien, 0.14 Datensicherheit,
 0.15 Organisation, 0.16 Editor & Multitasking, 0.17 Developer Experience (#23, #24, #25, #27, #30, #32), 0.18 KI & intelligentes Arbeiten (#33, #34, #35, #38, #39, #41), 0.19 Performance & Qualität (#56, #57, #58, #59, #60, #62, #65, #68, #69), 0.20 Quick Access (#85, #86, #87, #88, #89, #93).
 **Nach 0.20 steht laut Nutzer das gründliche Testen an** (auch mit Codex, nur mit Bibliothekskopien; Bugs als „[Bug]“-Issues, jeder als eigenes Patch-Release).
@@ -234,6 +234,7 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
 - Gefunden und behoben: #94 Start-Hänger durch `MenuBarExtra`-Bindung (0.20.1), #96 Listenzeichen im Titel (0.20.2),
   #97 Titelverlust bei Notizen ohne Text (0.20.3), #95 Datumszeile als Titel nach Schnellerfassung (0.20.4).
 - Weitere Selbsttests: `FOLIO_QUICK_TEST` (braucht `FOLIO_CAPTURE_QUEUE`), `FOLIO_AI_TEST` (echtes Apple Intelligence),
+  die KI-Teile ohne Modell (Kontextmenü, Antwortblöcke, Tags, Ollama-Fehler) prüft `AIAssistSelfTest` im ORG-Lauf,
   `FOLIO_SWEEP_TEST=<ausgabeordner>` gegen eine Kopie der echten Bibliothek (prüft jede Notiz auf stabile Titel/Tags/Text,
   Markdown-Rundweg, PDF-Export, Duplikat, Diagnose).
 - Achtung bei SwiftUI-Bindungen auf `ThemeManager.settings`: jede Zuweisung löst ein Update aus, auch mit gleichem Wert –
@@ -250,3 +251,12 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
 - Der Sweep trennt Textblöcke mit Zeilenumbrüchen, damit an Blockgrenzen keine künstlichen Wörter entstehen.
   Unbekannte Titeländerungen und instabile Titel beim erneuten Öffnen bleiben Fehler.
 - Details und Grenzen: `docs/RELEASE-1.0.0-rc.1.md`. Developer ID fehlt weiterhin; #63 bleibt offen.
+
+### KI ab 1.6.0
+
+- Anbieter: `AIProvider` (App) wählt Apple Intelligence oder `OllamaClient` (FolioCore, nur localhost). Mit Ollama hat der Chat
+  keine Werkzeuge, ändert also keine Notizen. Textvorhersage bleibt bei Apple Intelligence.
+- Kontextmenü-Aktionen: `AITextAction` (FolioCore), Fenster `AIActionSheet`; Ersetzen nur, wenn der Text am alten Bereich unverändert ist.
+- Antworten als Blöcke: `AnswerBlocks.segments` (FolioCore), eingefügt über `NoteDocument.insertAnswerBlocks`.
+- Tag-Vorschläge: `TagSuggester` (FolioCore), `TagSuggestionPopover`; Tags kommen nur per Klick als `#tag` in den letzten Textblock.
+- iPhone-Version (#213) ist noch offen und braucht Entscheidungen des Nutzers (eigener Meilenstein, Apple-Entwicklerkonto).

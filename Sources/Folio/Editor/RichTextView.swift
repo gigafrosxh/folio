@@ -474,6 +474,11 @@ final class FolioTextView: NSTextView {
             menu.insertItem(.separator(), at: 0)
             menu.insertItem(FolioTextView.deviceImportItem(), at: 0)
         }
+        // Explain, simplify, rewrite, quiz questions for the selection (#36).
+        if let ai = aiActionsItem() {
+            menu.insertItem(.separator(), at: 0)
+            menu.insertItem(ai, at: 0)
+        }
         return menu
     }
 

@@ -30,6 +30,7 @@ enum OrganizationSelfTest {
         // Recents (#20)
         check(store.recent.ids.first == store.currentDocument?.id && store.recent.ids.contains(a.id), "Zuletzt geöffnet")
         await organizationChecks(store: store, a: a, b: b)
+        await AIAssistSelfTest.run(store: store)
         print("ORG done"); fflush(stdout)
     }
 

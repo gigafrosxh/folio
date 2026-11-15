@@ -14,6 +14,7 @@ Folio ist eine native Notizen-App für macOS ab Version 15, geschrieben in Swift
 - Numbers-Tabellen erstellen und extern bearbeiten.
 - Bilder mit Image Playground erstellen, sofern auf dem Mac verfügbar.
 - Import aus Apple Notizen.
+- KI auf dem Mac: Chat über Notizen, Aktionen für markierten Text (erklären, vereinfachen, umschreiben, Quizfragen) und Tag-Vorschläge, wahlweise mit Apple Intelligence oder einem lokalen Ollama.
 - Heller und dunkler Modus, anpassbare Schriftarten, Akzentfarben und Code-Themes.
 - Schwebende Bedienelemente mit Glas-, Material- oder deckender Darstellung; Glas verwendet auf älteren macOS-Versionen einen Material-Ersatz.
 

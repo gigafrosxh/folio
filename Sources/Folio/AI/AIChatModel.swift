@@ -229,6 +229,10 @@ final class AIChatModel: ObservableObject, Identifiable {
     """
 
     private func respond(_ question: String, plan: ContextPlan, history: String, selection: String?) async {
+        if AIProvider.usesOllama {
+            await streamFromOllama(Self.prompt(question: question, plan: plan, history: history, selection: selection))
+            return
+        }
         guard case .available = availability.state else {
             // Without Apple Intelligence: show where the answer probably is (#41).
             answerWithoutModel(plan)
@@ -276,6 +280,26 @@ final class AIChatModel: ObservableObject, Identifiable {
     }
     #endif
 
+    /// Ollama answers without the note tools: questions and citations work, changes to notes stay with Apple
+    /// Intelligence (#42).
+    private static let ollamaInstructions = """
+    Du bist der Assistent der Notizen-App Folio und läufst lokal auf dem Mac. Antworte in der Sprache des Nutzers, \
+    knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
+    Stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in eckigen Klammern, \
+    z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich. Notizen ändern kannst du nicht.
+    """
+
+    private func streamFromOllama(_ prompt: String) async {
+        do {
+            _ = try await AIProvider.complete(system: Self.ollamaInstructions, prompt: prompt) { [weak self] text in
+                self?.updateStreamingMessage(text: text)
+            }
+        } catch {
+            if !Task.isCancelled { errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+        }
+        finishStreaming()
+    }
+
     private func updateStreamingMessage(text: String) {
         guard let i = messages.lastIndex(where: { $0.isStreaming }) else { return }
         messages[i].text = text
@@ -315,11 +339,13 @@ private extension Int {
 
 /// Why Apple Intelligence can or cannot be used, with what the user can do about it (#41).
 struct AIAvailability {
-    enum State: Equatable { case available, notEnabled, notReady, unsupportedMac, unsupportedSystem, other(String) }
+    enum State: Equatable { case available, notEnabled, notReady, unsupportedMac, unsupportedSystem, other(String), ollama(String) }
 
     var state: State
 
-    static var current: AIAvailability {
+    @MainActor static var current: AIAvailability {
+        // A local Ollama the user chose counts as available; problems show up when it is asked (#42).
+        if ThemeManager.shared.settings.aiProvider == "ollama" { return AIAvailability(state: .ollama(ThemeManager.shared.settings.ollamaModel)) }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
@@ -337,11 +363,17 @@ struct AIAvailability {
         return AIAvailability(state: .unsupportedSystem)
     }
 
-    var isAvailable: Bool { state == .available }
+    var isAvailable: Bool {
+        switch state {
+        case .available, .ollama: return true
+        default: return false
+        }
+    }
 
     var title: String {
         switch state {
         case .available: return "Apple Intelligence ist bereit"
+        case .ollama(let model): return "Lokales Ollama\(model.isEmpty ? "" : " (\(model))")"
         case .notEnabled: return "Apple Intelligence ist ausgeschaltet"
         case .notReady: return "Apple Intelligence wird noch geladen"
         case .unsupportedMac: return "Dieser Mac unterstützt Apple Intelligence nicht"
@@ -352,7 +384,7 @@ struct AIAvailability {
 
     var explanation: String {
         switch state {
-        case .available: return ""
+        case .available, .ollama: return ""
         case .notEnabled: return "Schalte Apple Intelligence in den Systemeinstellungen ein. Bis dahin zeigt Folio passende Stellen aus deinen Notizen statt einer formulierten Antwort."
         case .notReady: return "macOS lädt das Sprachmodell gerade herunter. Das kann einige Minuten dauern; danach funktioniert der Chat ohne Neustart."
         case .unsupportedMac: return "Apple Intelligence braucht einen Mac mit Apple-Chip (M1 oder neuer). Alles andere in Folio funktioniert normal; Fragen beantwortet Folio mit passenden Stellen aus deinen Notizen."

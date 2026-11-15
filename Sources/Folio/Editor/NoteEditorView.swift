@@ -24,6 +24,8 @@ struct NoteEditorView: View {
     @AppStorage("folio.chatVisible") private var chatRemembered = false
     @State private var showChat = false
     @State private var showHistory = false
+    @State private var aiRequest: AIActionRequest?
+    @State private var showTagSuggestions = false
     @State private var showInfo = false
     @StateObject private var find = FindModel()
     @State private var showFind = false
@@ -132,12 +134,26 @@ struct NoteEditorView: View {
     }
 
     @ViewBuilder private var tagRow: some View {
-        if !doc.meta.tags.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(doc.meta.tags, id: \.self, content: tagButton)
+        HStack(spacing: 6) {
+            ForEach(doc.meta.tags, id: \.self, content: tagButton)
+            // Tag ideas from the text and the library (#37); nothing is added until a chip is clicked.
+            Button { showTagSuggestions = true } label: {
+                Label(doc.meta.tags.isEmpty ? "Tags vorschlagen" : "", systemImage: "tag")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .contentShape(Capsule())
             }
-            .padding(.leading, BlockRow.gutter)
+            .buttonStyle(.plain)
+            .opacity(doc.meta.tags.isEmpty && !headerHover ? 0.55 : 1)
+            .help("Tags vorschlagen")
+            .popover(isPresented: $showTagSuggestions, arrowEdge: .bottom) {
+                TagSuggestionPopover(doc: doc, libraryTags: store.tagCounts) { doc.appendTag($0) }
+                    .environmentObject(theme)
+            }
         }
+        .padding(.leading, BlockRow.gutter)
     }
 
     private func tagButton(_ tag: String) -> some View {
@@ -181,6 +197,7 @@ struct NoteEditorView: View {
             .overlay(alignment: .topTrailing) { chatPanel }
             .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
             .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
+            .sheet(item: $aiRequest) { req in AIActionSheet(request: req) { applyAIResult($0, of: req, replace: $1) } }
     }
 
     @ViewBuilder private var chatPanel: some View {
@@ -209,6 +226,7 @@ struct NoteEditorView: View {
             .onReceive(NotificationCenter.default.publisher(for: .folioOpenChat)) { _ in openChat(library: false) }
             .onReceive(NotificationCenter.default.publisher(for: .folioAskLibrary)) { _ in openChat(library: true) }
             .onReceive(NotificationCenter.default.publisher(for: .folioFind)) { note in openFind(showReplace: note.object as? Bool) }
+            .onReceive(NotificationCenter.default.publisher(for: .folioAIAction), perform: receiveAIAction)
             .onDisappear { find.detach() }
             .animation(Motion.quick, value: showFind)
             .animation(Motion.quick, value: headerHover)
@@ -346,7 +364,14 @@ struct NoteEditorView: View {
     }
 
     /// Inserts a chat answer at the cursor (or at the end of the note), turning Markdown lists and bold into note formatting.
+    /// Answers with code or tables become their own blocks after the current one (#40).
     private func insertChatAnswer(_ markdown: String) {
+        let segments = AnswerBlocks.segments(of: markdown)
+        if segments.contains(where: { if case .text = $0 { return false } else { return true } }) {
+            let anchor = formatting.activeTextView.flatMap(\.blockID).flatMap { doc.block($0) != nil ? $0 : nil }
+            doc.insertAnswerBlocks(markdown, after: anchor, theme: theme)
+            return
+        }
         let result = ChatAnswerFormatter.attributed(fromMarkdown: markdown, theme: theme)
         if let tv = formatting.activeTextView, tv.window != nil, doc.block(tv.blockID ?? UUID()) != nil {
             let range = tv.selectedRange()
@@ -359,6 +384,36 @@ struct NoteEditorView: View {
             last.storage.append(result)
             doc.markDirty()
         }
+    }
+
+    private func receiveAIAction(_ note: Notification) {
+        guard let info = note.userInfo, let raw = info["action"] as? String, let action = AITextAction(rawValue: raw),
+              let text = info["text"] as? String, let loc = info["location"] as? Int, let len = info["length"] as? Int,
+              let idString = info["block"] as? String, let blockID = UUID(uuidString: idString), doc.block(blockID) != nil
+        else { return }
+        aiRequest = AIActionRequest(action: action, text: text, range: NSRange(location: loc, length: len), blockID: blockID)
+    }
+
+    /// Replaces the selection only if it still holds the same text; otherwise (and for „Darunter einfügen“) the result
+    /// becomes a new block after the one it came from, so nothing typed in the meantime is overwritten (#36).
+    private func applyAIResult(_ answer: String, of req: AIActionRequest, replace: Bool) {
+        guard let block = doc.block(req.blockID) else { return }
+        let ns = block.storage.string as NSString
+        let unchanged = NSMaxRange(req.range) <= ns.length && ns.substring(with: req.range) == req.text
+        if replace && unchanged {
+            let attrs = block.storage.attributes(at: req.range.location, effectiveRange: nil)
+            let replacement = NSAttributedString(string: answer, attributes: attrs)
+            if let tv = formatting.activeTextView, tv.blockID == req.blockID, tv.textStorage === block.storage {
+                if tv.shouldChangeText(in: req.range, replacementString: answer) {
+                    tv.textStorage?.replaceCharacters(in: req.range, with: replacement)
+                    tv.didChangeText()
+                }
+            } else {
+                doc.editText(of: block) { $0.replaceCharacters(in: req.range, with: replacement) }
+            }
+            return
+        }
+        doc.insertAnswerBlocks(answer, after: req.blockID, theme: theme)
     }
 
     /// Opaque header like in Apple Notes: content scrolls underneath it, and a hairline plus a soft

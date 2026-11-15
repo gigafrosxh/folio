@@ -117,6 +117,10 @@ struct ThemeSettings: Codable, Equatable {
     var libraryPath: String = ThemeSettings.defaultLibraryPath
     /// Grey inline completions from Apple Intelligence (Foundation Models), accepted with Tab.
     var aiPredictions = true
+    /// Where chat and AI actions run: "apple" (Apple Intelligence, default) or "ollama" (local, opt-in, #42).
+    var aiProvider = "apple"
+    var ollamaURL = "http://localhost:11434"
+    var ollamaModel = ""
     /// The system's own inline word predictions in text fields.
     var systemPredictions = true
     /// Grey code completions in code blocks (needs `aiPredictions`).
@@ -190,6 +194,9 @@ struct ThemeSettings: Codable, Equatable {
         interpreterOverrides = v(.interpreterOverrides, d.interpreterOverrides)
         libraryPath = v(.libraryPath, d.libraryPath)
         aiPredictions = v(.aiPredictions, d.aiPredictions)
+        aiProvider = v(.aiProvider, d.aiProvider)
+        ollamaURL = v(.ollamaURL, d.ollamaURL)
+        ollamaModel = v(.ollamaModel, d.ollamaModel)
         systemPredictions = v(.systemPredictions, d.systemPredictions)
         codePredictions = v(.codePredictions, d.codePredictions)
         codeCompletion = v(.codeCompletion, d.codeCompletion)

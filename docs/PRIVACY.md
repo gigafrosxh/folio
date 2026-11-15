@@ -45,6 +45,8 @@ oder Skripte aus dem Netz geladen.
 
 - KI-Chat, Zusammenfassungen und Textvorhersage nutzen **Apple Intelligence auf dem Gerät** (Foundation Models).
   Das Modell läuft lokal; Folio schickt keine Notizen an einen Cloud-Dienst.
+- Wahlweise lässt sich ein **lokales Ollama** nutzen (Einstellungen › Allgemein › KI). Folio akzeptiert dafür nur
+  Adressen auf diesem Mac (`localhost`, `127.0.0.1`, `::1`, `*.localhost`); Anfragen an andere Rechner lehnt es ab.
 - KI-Chats werden in `<Bibliothek>/.folio/chats` gespeichert und lassen sich im Chat löschen.
 - Die Transkription von Audioaufnahmen läuft lokal mit Apples Spracherkennung auf dem Gerät.
 

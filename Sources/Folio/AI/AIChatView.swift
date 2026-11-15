@@ -70,7 +70,7 @@ struct AIChatView: View {
                     .foregroundStyle(theme.accent)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Apple Intelligence").font(.system(size: 13, weight: .semibold))
+                    Text(AIProvider.name).font(.system(size: 13, weight: .semibold))
                     Text(chat.availability.isAvailable ? "Läuft auf diesem Mac" : "Nicht verfügbar · Fundstellen statt Antworten")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
