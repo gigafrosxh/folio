@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.0] – 2026-11-15
+
 ### Hinzugefügt
 - **Lokales Ollama als KI** (#42): In den Einstellungen (Allgemein › KI) lässt sich statt Apple Intelligence ein Ollama auf diesem Mac wählen, mit Adresse und Modell. Folio spricht nur mit Adressen auf dem eigenen Mac (localhost), damit Notizen ihn nicht verlassen. Mit Ollama beantwortet der Chat Fragen, ändert aber keine Notizen; läuft Ollama nicht oder fehlt das Modell, sagt Folio, was zu tun ist. Apple Intelligence bleibt voreingestellt.
 - **KI-Aktionen für markierten Text** (#36): Im Kontextmenü unter „KI“: Erklären, Vereinfachen, Umschreiben und Quizfragen. Das Ergebnis erscheint erst in einem Fenster; von dort lässt es sich ersetzen (nur wenn der markierte Text noch derselbe ist), darunter einfügen oder kopieren. Ersetzen lässt sich widerrufen.
