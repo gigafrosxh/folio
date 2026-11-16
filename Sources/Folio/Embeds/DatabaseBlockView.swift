@@ -139,11 +139,12 @@ struct DatabaseBlockView: View {
             Image(systemName: "cylinder.split.1x2").foregroundStyle(theme.accent)
             if let c = block.connection {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(c.name.isEmpty ? c.driver.name : c.name).font(.system(size: 12, weight: .semibold))
+                    Text(c.name.isEmpty ? c.driver.name : c.name).font(.system(size: 12, weight: .semibold)).lineLimit(1).truncationMode(.middle)
                     Text("\(c.driver.name) · \(c.summary)").font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
                 }
             } else {
-                Text("Keine Verbindung").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                // One line, never broken into syllables (#247).
+                Text("Keine Verbindung").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).fixedSize()
             }
             Spacer()
             if let r = state.result, state.error == nil {

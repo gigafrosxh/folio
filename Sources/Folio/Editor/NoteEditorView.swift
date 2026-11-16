@@ -134,7 +134,8 @@ struct NoteEditorView: View {
     }
 
     @ViewBuilder private var tagRow: some View {
-        HStack(spacing: 6) {
+        // Many tags wrap onto further lines instead of squeezing every chip (#248).
+        FlowLayout(spacing: 6) {
             ForEach(doc.meta.tags, id: \.self, content: tagButton)
             // Tag ideas from the text and the library (#37); nothing is added until a chip is clicked.
             Button { showTagSuggestions = true } label: {
@@ -159,6 +160,8 @@ struct NoteEditorView: View {
     private func tagButton(_ tag: String) -> some View {
         Button { store.sidebarSelection = .tag(tag) } label: {
             Text("#\(tag)")
+                .lineLimit(1)
+                .fixedSize()
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(theme.accent)
                 .padding(.horizontal, 9)
@@ -185,7 +188,8 @@ struct NoteEditorView: View {
                 // information on (#173).
                 ZStack(alignment: .bottomTrailing) {
                     Color.clear.frame(width: 1, height: 1)
-                    if !showChat && !focusMode { NoteStatusPill(doc: doc, showInfo: $showInfo) }
+                    // With the terminal open the pill would sit on its input line (#251).
+                    if !showChat && !focusMode && !showTerminal { NoteStatusPill(doc: doc, showInfo: $showInfo) }
                 }
                 .popover(isPresented: $showInfo, arrowEdge: .top) { NoteInfoView(doc: doc) }
                 .padding(16)

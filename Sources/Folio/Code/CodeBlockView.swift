@@ -95,7 +95,7 @@ struct CodeBlockView: View {
     private func headerRow(_ level: HeaderLevel) -> some View {
         HStack(spacing: 8) {
             if level != .minimal { fileLabel }
-            if spec.id == "sql" { connectionMenu }
+            if spec.id == "sql" { connectionMenu(compact: level == .minimal) }
             if level == .full { interpreterLabel }
             Spacer(minLength: 6)
             if level == .full, let runInfo = runs.info[block.id] {
@@ -106,6 +106,27 @@ struct CodeBlockView: View {
             sessionMenu(withTools: level == .minimal)
             runControl(iconOnly: level != .full)
         }
+    }
+
+    /// Long connection names are shortened in the middle so the header keeps its actions; the narrowest
+    /// header shows only the symbol (#246).
+    static func shortName(_ name: String, limit: Int = 24) -> String {
+        guard name.count > limit else { return name }
+        let half = (limit - 1) / 2
+        return String(name.prefix(half)) + "…" + String(name.suffix(half))
+    }
+
+    private func connectionLabel(compact: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "cylinder.split.1x2").font(.system(size: 10))
+            if !compact { Text(Self.shortName(block.connection.map { $0.name.isEmpty ? $0.driver.name : $0.name } ?? "In-Memory")) }
+            Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
+        }
+        .font(.system(size: 10.5, weight: .medium))
+        .foregroundStyle(block.connection == nil ? Color(nsColor: codeTheme.color(for: .comment)) : theme.accent)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Color.primary.opacity(0.06), in: Capsule())
     }
 
     @ViewBuilder private var fileLabel: some View {
@@ -597,7 +618,7 @@ struct CodeBlockView: View {
     private var usesDatabase: Bool { spec.id == "sql" && block.connection != nil }
     private var dbState: DatabaseBlockState { DatabaseBlockState.forBlock(block.id) }
 
-    private var connectionMenu: some View {
+    private func connectionMenu(compact: Bool) -> some View {
         Menu {
             Button { block.connection = nil; doc.markDirty() } label: {
                 Label("SQLite im Arbeitsspeicher (ohne Verbindung)", systemImage: block.connection == nil ? "checkmark" : "memorychip")
@@ -621,16 +642,7 @@ struct CodeBlockView: View {
             Button("Neue Verbindung…") { editingConnection = true }
             if block.connection != nil { Button("Verbindung bearbeiten…") { editingConnection = true } }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "cylinder.split.1x2").font(.system(size: 10))
-                Text(block.connection.map { $0.name.isEmpty ? $0.driver.name : $0.name } ?? "In-Memory")
-                Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
-            }
-            .font(.system(size: 10.5, weight: .medium))
-            .foregroundStyle(block.connection == nil ? Color(nsColor: codeTheme.color(for: .comment)) : theme.accent)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(Color.primary.opacity(0.06), in: Capsule())
+            connectionLabel(compact: compact)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

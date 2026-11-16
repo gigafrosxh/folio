@@ -14,6 +14,8 @@ struct ContentView: View {
     /// Focus mode (#10): only the note, no sidebar, list, tabs or toolbar.
     @AppStorage("folio.focusMode") private var focusMode = false
     @State private var hoverExit = false
+    @State private var rowWidth: CGFloat = 1400
+    @State private var splitPaneWidth: CGFloat = 600
 
     var body: some View {
         withAlerts(withNotifications(decoratedRow))
@@ -23,7 +25,7 @@ struct ContentView: View {
 
     private var mainRow: some View {
         HStack(spacing: 0) {
-            if sidebarVisible && !focusMode {
+            if sidebarVisible && !focusMode && !sidebarHiddenForSplit {
                 SidebarView()
                     .frame(width: 240)
                     .padding(.trailing, 12)
@@ -31,6 +33,15 @@ struct ContentView: View {
             }
             mainArea
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+    }
+
+    /// Two editors side by side need room: in a narrow window the note list steps aside while the split is
+    /// open, instead of pushing the layout wider than the window (#250).
+    private var listHiddenForSplit: Bool {
+        guard store.splitNoteID != nil else { return false }
+        let sidebar: CGFloat = sidebarVisible ? 252 : 0
+        return rowWidth < sidebar + CGFloat(listWidth) + 12 + 2 * 340
     }
 
     /// Trash, graph and damaged notes take the whole area; everything else shows the list and the editor.
@@ -48,8 +59,13 @@ struct ContentView: View {
         }
     }
 
+    /// Still too narrow for two editors: the sidebar steps aside as well while the split is open.
+    private var sidebarHiddenForSplit: Bool {
+        store.splitNoteID != nil && sidebarVisible && rowWidth < 252 + 2 * 380
+    }
+
     @ViewBuilder private var listAndEditor: some View {
-        if !focusMode {
+        if !focusMode && !listHiddenForSplit {
             NoteListView(sidebarVisible: $sidebarVisible)
                 .frame(width: CGFloat(listWidth))
                 .frame(maxHeight: .infinity)
@@ -157,35 +173,41 @@ struct ContentView: View {
     @ViewBuilder
     private func pane(_ id: UUID?, isSplit: Bool) -> some View {
         let focused = store.splitNoteID != nil && store.focusedNoteID == id
-        Group {
-            if let id, let damaged = store.failures[id] {
-                DamagedNoteView(damaged: damaged)
-            } else if let doc = store.document(for: id) {
-                NoteEditorView(doc: doc)
-                    // A reloaded note (restored version, external change) is a new document with the same id.
-                    .id(ObjectIdentifier(doc))
-                    .transition(Motion.enabled ? .opacity.combined(with: .offset(y: 8)) : .identity)
-            } else if !isSplit {
-                emptyState
-            }
-        }
+        paneContent(id, isSplit: isSplit)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .top) {
             // In the split view, a thin accent line marks the editor that menus and shortcuts act on.
             if store.splitNoteID != nil { Rectangle().fill(focused ? theme.accent : .clear).frame(height: 2) }
         }
-        .overlay(alignment: .bottomLeading) {
-            if isSplit {
-                Button { store.splitNoteID = nil } label: {
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if isSplit { splitPaneWidth = $0 } }
+        .overlay(alignment: .bottomLeading) { if isSplit { splitCloseButton } }
+    }
+
+    @ViewBuilder private func paneContent(_ id: UUID?, isSplit: Bool) -> some View {
+        if let id, let damaged = store.failures[id] {
+            DamagedNoteView(damaged: damaged)
+        } else if let doc = store.document(for: id) {
+            NoteEditorView(doc: doc)
+                // A reloaded note (restored version, external change) is a new document with the same id.
+                .id(ObjectIdentifier(doc))
+                .transition(Motion.enabled ? .opacity.combined(with: .offset(y: 8)) : .identity)
+        } else if !isSplit {
+            emptyState
+        }
+    }
+
+    private var splitCloseButton: some View {
+        Button { store.splitNoteID = nil } label: {
+                    // Only the symbol in a narrow pane, so it does not sit on the word count (#250).
                     Label("Teilung schließen", systemImage: "rectangle.righthalf.inset.filled.arrow.right")
+                        .labelStyle(SplitCloseLabelStyle(iconOnly: splitPaneWidth < 480))
                         .font(.system(size: 11.5, weight: .medium))
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .floatingCapsule()
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Teilung schließen")
                 .padding(14)
-            }
-        }
     }
 
     private var emptyState: some View {
@@ -259,5 +281,12 @@ private extension View {
     /// The trash, graph, damaged notes and the editor fill the remaining room in a panel.
     func fullPanel(theme: ThemeManager) -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity).panel(theme: theme, fill: Color(nsColor: .textBackgroundColor))
+    }
+}
+
+private struct SplitCloseLabelStyle: LabelStyle {
+    var iconOnly: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        if iconOnly { AnyView(configuration.icon.help("Teilung schließen")) } else { AnyView(Label(configuration)) }
     }
 }

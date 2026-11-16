@@ -376,65 +376,86 @@ struct DrawingBlockView: View {
         }
     }
 
+    /// One row when the block is wide enough, otherwise two or three rows, so no tool leaves the block (#249).
     private var toolbar: some View {
-        HStack(spacing: 4) {
-            ForEach(DrawTool.allCases) { tool in
-                toolButton(tool.icon, tool.label, selected: model.tool == tool) { model.tool = tool }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) { toolsRow; divider; paletteRow; divider; strokeRow }
+            VStack(spacing: 4) {
+                HStack(spacing: 4) { toolsRow; divider; strokeRow }
+                HStack(spacing: 4) { paletteRow }
             }
-            Divider().frame(height: 18).padding(.horizontal, 3)
-            Menu {
-                ForEach(DrawShape.allCases) { shape in
-                    Button { model.shape = shape } label: { Label(shape.label, systemImage: shape.icon) }
-                }
-            } label: {
-                Image(systemName: model.shape.icon).frame(width: 26, height: 24)
+            VStack(spacing: 4) {
+                HStack(spacing: 4) { toolsRow }
+                HStack(spacing: 4) { paletteRow }
+                HStack(spacing: 4) { strokeRow }
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .helpLabel("Form")
-            Divider().frame(height: 18).padding(.horizontal, 3)
-            ForEach(Self.palette, id: \.self) { color in
-                Button { model.color = color; if model.tool == .eraser { model.tool = .pen } } label: {
-                    Circle()
-                        .fill(Color(nsColor: color))
-                        .frame(width: 15, height: 15)
-                        .overlay(Circle().stroke(Color.primary.opacity(model.color == color ? 0.9 : 0.15), lineWidth: model.color == color ? 2 : 1).padding(-2))
-                }
-                .buttonStyle(.plain)
-            }
-            Button { openColorPanel() } label: {
-                Circle()
-                    .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
-                    .frame(width: 15, height: 15)
-                    .overlay(Circle().stroke(Color.primary.opacity(isCustomColor ? 0.9 : 0.15), lineWidth: isCustomColor ? 2 : 1).padding(-2))
-            }
-            .buttonStyle(.plain)
-            .helpLabel("Eigene Farbe")
-            Divider().frame(height: 18).padding(.horizontal, 3)
-            Menu {
-                ForEach([1.5, 3, 5, 8, 12] as [CGFloat], id: \.self) { w in
-                    Button { model.width = w } label: {
-                        Text(w == model.width ? "● \(Int(w * 2)) pt" : "   \(Int(w * 2)) pt")
-                    }
-                }
-            } label: {
-                Circle()
-                    .fill(Color.primary)
-                    .frame(width: min(4 + model.width, 16), height: min(4 + model.width, 16))
-                    .frame(width: 26, height: 24)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .helpLabel("Strichstärke")
-            toolButton("arrow.uturn.backward", "Rückgängig", selected: false, action: model.undo).disabled(!model.canUndo)
-            toolButton("arrow.uturn.forward", "Wiederholen", selected: false, action: model.redo).disabled(!model.canRedo)
         }
         .font(.system(size: 12, weight: .medium))
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .floating(cornerRadius: 12)
+        .padding(.horizontal, 8)
+    }
+
+    private var divider: some View { Divider().frame(height: 18).padding(.horizontal, 3) }
+
+    @ViewBuilder private var toolsRow: some View {
+        ForEach(DrawTool.allCases) { tool in
+            toolButton(tool.icon, tool.label, selected: model.tool == tool) { model.tool = tool }
+        }
+        divider
+        Menu {
+            ForEach(DrawShape.allCases) { shape in
+                Button { model.shape = shape } label: { Label(shape.label, systemImage: shape.icon) }
+            }
+        } label: {
+            Image(systemName: model.shape.icon).frame(width: 26, height: 24)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .helpLabel("Form")
+    }
+
+    @ViewBuilder private var paletteRow: some View {
+        ForEach(Self.palette, id: \.self) { color in
+            Button { model.color = color; if model.tool == .eraser { model.tool = .pen } } label: {
+                Circle()
+                    .fill(Color(nsColor: color))
+                    .frame(width: 15, height: 15)
+                    .overlay(Circle().stroke(Color.primary.opacity(model.color == color ? 0.9 : 0.15), lineWidth: model.color == color ? 2 : 1).padding(-2))
+            }
+            .buttonStyle(.plain)
+        }
+        Button { openColorPanel() } label: {
+            Circle()
+                .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
+                .frame(width: 15, height: 15)
+                .overlay(Circle().stroke(Color.primary.opacity(isCustomColor ? 0.9 : 0.15), lineWidth: isCustomColor ? 2 : 1).padding(-2))
+        }
+        .buttonStyle(.plain)
+        .helpLabel("Eigene Farbe")
+    }
+
+    @ViewBuilder private var strokeRow: some View {
+        Menu {
+            ForEach([1.5, 3, 5, 8, 12] as [CGFloat], id: \.self) { w in
+                Button { model.width = w } label: {
+                    Text(w == model.width ? "● \(Int(w * 2)) pt" : "   \(Int(w * 2)) pt")
+                }
+            }
+        } label: {
+            Circle()
+                .fill(Color.primary)
+                .frame(width: min(4 + model.width, 16), height: min(4 + model.width, 16))
+                .frame(width: 26, height: 24)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .helpLabel("Strichstärke")
+        toolButton("arrow.uturn.backward", "Rückgängig", selected: false, action: model.undo).disabled(!model.canUndo)
+        toolButton("arrow.uturn.forward", "Wiederholen", selected: false, action: model.redo).disabled(!model.canRedo)
     }
 
     private var isCustomColor: Bool { !Self.palette.contains(model.color) }

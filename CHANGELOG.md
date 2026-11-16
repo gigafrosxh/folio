@@ -7,6 +7,15 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Formatierung aus der KI** (#245): Fett, kursiv, durchgestrichen und Code werden jetzt mit Apples Markdown-Parser umgesetzt, auch verschachtelt wie `*a **b***`. Keine übrigen Sternchen mehr.
+- **Viele Tags unter dem Titel** (#248): Die Tags brechen in weitere Zeilen um, statt silbenweise untereinander zu stehen.
+- **SQL-Block im schmalen Fenster** (#246): Lange Verbindungsnamen werden in der Mitte gekürzt, im schmalsten Kopf bleibt nur das Symbol; Sprache, Menü und Ausführen bleiben sichtbar.
+- **Datenbank-Block** (#247): „Keine Verbindung“ steht in einer Zeile.
+- **Zeichnung im schmalen Fenster** (#249): Die Werkzeugleiste verteilt sich bei wenig Platz auf zwei oder drei Zeilen und bleibt im Block.
+- **Split-Ansicht im schmalen Fenster** (#250): Ist zu wenig Platz für zwei Notizen, weichen Notizliste und notfalls Seitenleiste, solange die Teilung offen ist. „Teilung schließen“ wird in schmalen Hälften zum Symbol und liegt nicht mehr auf der Wortzahl.
+- **Terminal** (#251): Die Wortzahl-Anzeige verschwindet, solange das Terminal offen ist, und verdeckt die Eingabezeile nicht mehr.
+
 ## [1.6.4] – 2026-11-16
 
 ### Behoben

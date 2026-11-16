@@ -4,10 +4,6 @@ import FolioCore
 /// A chat answer as note text: Markdown lists, headings, bold and code become real formatting (#143).
 @MainActor
 enum ChatAnswerFormatter {
-    /// Groups: 1 bold (its closing `**` may follow an inner `*`, as in `***x***`, #239), 2 code, 3 strikethrough, 4 and 5 italics (`*…*`, `_…_`, not inside words like snake_case) (#234).
-    private static let spans = try! NSRegularExpression(pattern:
-        #"\*\*(.+?)\*\*(?!\*)|`([^`]+)`|~~(.+?)~~|(?<![\w*])\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)|(?<!\w)_(?![\s_])(.+?)(?<![\s_])_(?!\w)"#)
-
     /// `base` replaces the body style, e.g. the style of the text an AI result replaces (#227).
     static func attributed(fromMarkdown markdown: String, theme: ThemeManager, base: [NSAttributedString.Key: Any]? = nil) -> NSAttributedString {
         let result = NSMutableAttributedString()
@@ -34,39 +30,33 @@ enum ChatAnswerFormatter {
         return (line.replacingCharacters(in: r, with: ""), keepStyle ? body : TextStyle.subheading.attributes(theme: theme))
     }
 
+    /// Inline Markdown through Foundation's parser (#245): bold, italics, strikethrough and code in any nesting,
+    /// `snake_case` and `5 * 6` stay as written. Unparseable lines are taken literally.
     private static func appendSpans(of line: String, attrs: [NSAttributedString.Key: Any], to result: NSMutableAttributedString, theme: ThemeManager) {
-        let ns = line as NSString
-        var cursor = 0
-        for match in spans.matches(in: line, range: NSRange(location: 0, length: ns.length)) {
-            if match.range.location > cursor {
-                result.append(NSAttributedString(string: ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor)), attributes: attrs))
-            }
-            result.append(span(match, in: ns, attrs: attrs, theme: theme))
-            cursor = NSMaxRange(match.range)
+        guard let parsed = try? AttributedString(markdown: line, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
+            result.append(NSAttributedString(string: line, attributes: attrs))
+            return
         }
-        if cursor < ns.length { result.append(NSAttributedString(string: ns.substring(from: cursor), attributes: attrs)) }
+        for run in parsed.runs {
+            let text = String(parsed[run.range].characters)
+            result.append(NSAttributedString(string: text, attributes: styled(attrs, intent: run.inlinePresentationIntent, theme: theme)))
+        }
     }
 
-    private static func span(_ match: NSTextCheckingResult, in ns: NSString, attrs: [NSAttributedString.Key: Any], theme: ThemeManager) -> NSAttributedString {
+    private static func styled(_ attrs: [NSAttributedString.Key: Any], intent: InlinePresentationIntent?, theme: ThemeManager) -> [NSAttributedString.Key: Any] {
+        guard let intent else { return attrs }
         var a = attrs
-        let group = (1...5).first { match.range(at: $0).location != NSNotFound } ?? 2
-        let text = ns.substring(with: match.range(at: group))
-        let font = a[.font] as? NSFont
-        switch group {
-        case 1:
-            if let font { a[.font] = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
-        case 3:
-            a[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
-        case 4, 5:
-            if let font { a[.font] = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
-        default:
+        if intent.contains(.code) {
             a[.font] = NSFont.monospacedSystemFont(ofSize: theme.bodyFont().pointSize * 0.92, weight: .regular)
             a[.backgroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.12)
+            return a
         }
-        guard group != 2 else { return NSAttributedString(string: text, attributes: a) }
-        // Markup inside markup, e.g. bold inside italics (#238).
-        let inner = NSMutableAttributedString()
-        appendSpans(of: text, attrs: a, to: inner, theme: theme)
-        return inner
+        if var font = a[.font] as? NSFont {
+            if intent.contains(.stronglyEmphasized) { font = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
+            if intent.contains(.emphasized) { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
+            a[.font] = font
+        }
+        if intent.contains(.strikethrough) { a[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+        return a
     }
 }

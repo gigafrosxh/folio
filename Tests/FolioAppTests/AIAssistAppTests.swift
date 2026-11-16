@@ -138,4 +138,14 @@ final class AIAssistAppTests: XCTestCase {
         // Plain bold followed by text still works.
         XCTAssertEqual(ChatAnswerFormatter.attributed(fromMarkdown: "**a** und **b**", theme: ThemeManager.shared).string, "a und b")
     }
+
+    func testItalicAroundBoldAtTheEnd() {
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "*a **b***", theme: ThemeManager.shared)
+        XCTAssertEqual(out.string, "a b")
+        let t0 = (out.attribute(.font, at: 0, effectiveRange: nil) as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
+        let t2 = (out.attribute(.font, at: 2, effectiveRange: nil) as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
+        XCTAssertTrue(t0.contains(.italicFontMask) && !t0.contains(.boldFontMask))
+        XCTAssertTrue(t2.contains([.italicFontMask, .boldFontMask]))
+        XCTAssertEqual(ChatAnswerFormatter.attributed(fromMarkdown: "\\*kein\\* Kursiv", theme: ThemeManager.shared).string, "*kein* Kursiv")
+    }
 }
