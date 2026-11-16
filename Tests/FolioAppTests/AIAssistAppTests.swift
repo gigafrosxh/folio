@@ -75,4 +75,27 @@ final class AIAssistAppTests: XCTestCase {
         let font = out.attribute(.font, at: 5, effectiveRange: nil) as? NSFont
         XCTAssertTrue(font?.fontDescriptor.symbolicTraits.contains(.bold) == true)
     }
+
+    func testItalicStrikeAndSnakeCase() {
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "*Kursiv* und _anders_, ~~weg~~, snake_case_name und 2 * 3 * 4", theme: ThemeManager.shared)
+        XCTAssertEqual(out.string, "Kursiv und anders, weg, snake_case_name und 2 * 3 * 4")
+        func italic(_ i: Int) -> Bool { (out.attribute(.font, at: i, effectiveRange: nil) as? NSFont)?.fontDescriptor.symbolicTraits.contains(.italic) == true }
+        XCTAssertTrue(italic(0))
+        XCTAssertTrue(italic(11))
+        XCTAssertFalse(italic(30))
+        XCTAssertNotNil(out.attribute(.strikethroughStyle, at: 19, effectiveRange: nil))
+    }
+
+    func testHeadingKeepsReplacedStyle() {
+        var base = TextStyle.title.attributes(theme: ThemeManager.shared)
+        base[.foregroundColor] = NSColor.systemRed
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "# Neue Überschrift", theme: ThemeManager.shared, base: base)
+        XCTAssertEqual(out.string, "Neue Überschrift")
+        XCTAssertEqual((out.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.pointSize, (base[.font] as? NSFont)?.pointSize)
+        XCTAssertEqual(out.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemRed)
+        // Inserting from the chat keeps the heading style.
+        let chat = ChatAnswerFormatter.attributed(fromMarkdown: "# Neu", theme: ThemeManager.shared)
+        XCTAssertEqual((chat.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.pointSize,
+                       (TextStyle.subheading.attributes(theme: ThemeManager.shared)[.font] as? NSFont)?.pointSize)
+    }
 }

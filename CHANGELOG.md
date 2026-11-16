@@ -7,6 +7,11 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Abgebrochene Ollama-Antwort** (#233): Endet die Antwort von Ollama, ohne fertig zu sein (etwa weil Ollama abstürzt), meldet Folio das. Der Teiltext lässt sich nur noch kopieren, nicht ersetzen oder einfügen.
+- **Kursiv und Durchgestrichen aus der KI** (#234): `*kursiv*`, `_kursiv_` und `~~durchgestrichen~~` werden beim Ersetzen und beim Einfügen aus dem Chat zu echter Formatierung statt zu Sternchen. Wörter wie `snake_case` bleiben unverändert.
+- **Ersetzen mit Überschrift** (#235): Antwortet die KI mit einer `#`-Überschrift, behält „Ersetzen“ Größe und Farbe des markierten Textes; nur die `#` fallen weg.
+
 ## [1.6.1] – 2026-11-16
 
 ### Behoben

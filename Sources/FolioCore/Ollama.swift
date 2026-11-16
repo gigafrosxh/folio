@@ -9,6 +9,7 @@ public struct OllamaClient: Sendable {
         case noModel
         case modelMissing(String)
         case notChat(String)
+        case incomplete
         case server(String)
 
         public var errorDescription: String? {
@@ -18,6 +19,7 @@ public struct OllamaClient: Sendable {
             case .noModel: return "In Ollama ist noch kein Modell ausgewählt. Wähle eines in den Einstellungen (Allgemein › KI) oder lade eines mit `ollama pull llama3.2`."
             case .modelMissing(let name): return "Das Modell „\(name)“ ist in Ollama nicht installiert. Lade es mit `ollama pull \(name)` oder wähle ein anderes."
             case .notChat(let name): return "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Allgemein › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
+            case .incomplete: return "Ollama hat die Antwort abgebrochen, bevor sie fertig war. Versuch es noch einmal."
             case .server(let message): return "Ollama meldet einen Fehler: \(message)"
             }
         }
@@ -78,14 +80,17 @@ public struct OllamaClient: Sendable {
             throw Self.failure(status: http.statusCode, body: body, model: model)
         }
         var text = ""
+        var finished = false
         for try await line in bytes.lines {
             try Task.checkCancellation()
             guard let piece = Self.piece(line) else { continue }
             if let error = piece.error { throw Failure.server(error) }
             text += piece.content
             onPart(text)
-            if piece.done { break }
+            if piece.done { finished = true; break }
         }
+        // A stream that ends without `done` was cut off (e.g. Ollama crashed): never a finished answer (#233).
+        guard finished else { throw Failure.incomplete }
         return text
     }
 
