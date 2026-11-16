@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.5] – 2026-11-16
+
 ### Behoben
 - **Formatierung aus der KI** (#245): Fett, kursiv, durchgestrichen und Code werden jetzt mit Apples Markdown-Parser umgesetzt, auch verschachtelt wie `*a **b***`. Keine übrigen Sternchen mehr.
 - **Viele Tags unter dem Titel** (#248): Die Tags brechen in weitere Zeilen um, statt silbenweise untereinander zu stehen.
