@@ -1,7 +1,7 @@
 import SwiftUI
 import FolioCore
 
-/// Settings › Allgemein › KI: Apple Intelligence (default) or a local Ollama (#42).
+/// Settings › Editor › KI: Apple Intelligence (default) or a local Ollama (#42).
 struct AIProviderSection: View {
     @EnvironmentObject var theme: ThemeManager
     @State private var models: [String] = []

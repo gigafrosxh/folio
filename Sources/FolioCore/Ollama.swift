@@ -16,9 +16,9 @@ public struct OllamaClient: Sendable {
             switch self {
             case .notLocal(let url): return "„\(url)“ ist kein Server auf diesem Mac. Folio spricht nur mit einem lokalen Ollama (localhost), damit Notizen den Mac nicht verlassen."
             case .notRunning(let url): return "Ollama antwortet nicht unter \(url). Starte die Ollama-App oder im Terminal `ollama serve`."
-            case .noModel: return "In Ollama ist noch kein Modell ausgewählt. Wähle eines in den Einstellungen (Allgemein › KI) oder lade eines mit `ollama pull llama3.2`."
+            case .noModel: return "In Ollama ist noch kein Modell ausgewählt. Wähle eines in den Einstellungen (Editor › KI) oder lade eines mit `ollama pull llama3.2`."
             case .modelMissing(let name): return "Das Modell „\(name)“ ist in Ollama nicht installiert. Lade es mit `ollama pull \(name)` oder wähle ein anderes."
-            case .notChat(let name): return "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Allgemein › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
+            case .notChat(let name): return "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Editor › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
             case .incomplete: return "Ollama hat die Antwort abgebrochen, bevor sie fertig war. Versuch es noch einmal."
             case .server(let message): return "Ollama meldet einen Fehler: \(message)"
             }

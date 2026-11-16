@@ -22,15 +22,10 @@ struct PropertiesView: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(properties) { p in row(p) }
             if adding {
-                HStack {
-                    TextField("Name, z. B. Status", text: $newName).textFieldStyle(.roundedBorder).frame(width: 160)
-                        .onSubmit(add)
-                    Picker("Art", selection: $newKind) {
-                        ForEach(NoteProperty.Kind.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    .labelsHidden().fixedSize()
-                    Button("Hinzufügen", action: add).disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
-                    Button("Abbrechen") { adding = false; newName = "" }
+                // One row when there is room, otherwise the buttons get their own line (#242).
+                ViewThatFits(in: .horizontal) {
+                    HStack { addFields; addButtons }
+                    VStack(alignment: .leading, spacing: 6) { HStack { addFields }; HStack { addButtons } }
                 }
                 .font(.system(size: 12))
             }
@@ -39,6 +34,20 @@ struct PropertiesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .folioAddProperty)) { note in
             if (note.object as? UUID) == doc.id { adding = true }
         }
+    }
+
+    @ViewBuilder private var addFields: some View {
+        TextField("Name, z. B. Status", text: $newName).textFieldStyle(.roundedBorder).frame(minWidth: 100, maxWidth: 160)
+            .onSubmit(add)
+        Picker("Art", selection: $newKind) {
+            ForEach(NoteProperty.Kind.allCases, id: \.self) { Text($0.label).tag($0) }
+        }
+        .labelsHidden().fixedSize()
+    }
+
+    @ViewBuilder private var addButtons: some View {
+        Button("Hinzufügen", action: add).disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty).fixedSize()
+        Button("Abbrechen") { adding = false; newName = "" }.fixedSize()
     }
 
     private func update(_ p: NoteProperty) {

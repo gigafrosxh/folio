@@ -4,9 +4,9 @@ import FolioCore
 /// A chat answer as note text: Markdown lists, headings, bold and code become real formatting (#143).
 @MainActor
 enum ChatAnswerFormatter {
-    /// Groups: 1 bold, 2 code, 3 strikethrough, 4 and 5 italics (`*…*`, `_…_`, not inside words like snake_case) (#234).
+    /// Groups: 1 bold (its closing `**` may follow an inner `*`, as in `***x***`, #239), 2 code, 3 strikethrough, 4 and 5 italics (`*…*`, `_…_`, not inside words like snake_case) (#234).
     private static let spans = try! NSRegularExpression(pattern:
-        #"\*\*(.+?)\*\*|`([^`]+)`|~~(.+?)~~|(?<![\w*])\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)|(?<!\w)_(?![\s_])(.+?)(?<![\s_])_(?!\w)"#)
+        #"\*\*(.+?)\*\*(?!\*)|`([^`]+)`|~~(.+?)~~|(?<![\w*])\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)|(?<!\w)_(?![\s_])(.+?)(?<![\s_])_(?!\w)"#)
 
     /// `base` replaces the body style, e.g. the style of the text an AI result replaces (#227).
     static func attributed(fromMarkdown markdown: String, theme: ThemeManager, base: [NSAttributedString.Key: Any]? = nil) -> NSAttributedString {

@@ -75,67 +75,103 @@ struct CodeBlockView: View {
         }
     }
 
+    /// Narrow editors (#240): the header first drops the interpreter and run info, then folds the tools into a
+    /// menu, so it never forces the window layout wider than the window.
     private var header: some View {
-        HStack(spacing: 8) {
-            Text("main.\(spec.fileExtension)")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
-            if isLinked { sessionChip }
-            if spec.id == "sql" { connectionMenu }
-            if spec.isRunnable && !isLinked && !usesDatabase {
-                Text(interpreter ?? "kein Interpreter gefunden")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(interpreter == nil ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)).opacity(0.8))
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 6)
-            if let runInfo = runs.info[block.id] {
-                Text(runInfo).font(.system(size: 10.5)).foregroundStyle(runs.server(block.id) != nil ? Color.green : .secondary).lineLimit(1)
-            }
-            Menu {
-                ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
-                    Button(lang.name) { doc.changeBlock(block, "Sprache ändern") { block.language = lang.id } }
-                }
-                Divider()
-                Button("Nur Text") { doc.changeBlock(block, "Sprache ändern") { block.language = "plain" } }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(spec.name)
-                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
-                }
-                .font(.system(size: 11.5, weight: .medium))
-                .padding(.horizontal, 9)
-                .frame(height: 26)
-                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(Color.primary.opacity(0.15)))
-                .contentShape(Rectangle())
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-
-            headerButton("doc.on.doc", "Code kopieren") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(block.storage.string, forType: .string)
-            }
-            headerButton("wand.and.rays", formatHelp, action: formatCode)
-            sessionMenu
-            headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
-
-            if spec.isRunnable {
-                if runs.isRunning(block.id) {
-                    runButton("Stopp", icon: "stop.fill", color: .red) { runs.stop(block.id) }
-                } else {
-                    runButton("Ausführen", icon: "play.fill", color: Color(red: 0.12, green: 0.55, blue: 0.27), action: run)
-                        .helpLabel("Mit installiertem Interpreter ausführen (⌘↩)")
-                        .disabled(interpreter == nil)
-                        .opacity(interpreter == nil ? 0.5 : 1)
-                }
-            }
+        ViewThatFits(in: .horizontal) {
+            headerRow(.full)
+            headerRow(.compact)
+            headerRow(.minimal)
         }
         .padding(.leading, 14)
         .padding(.trailing, 8)
         .padding(.vertical, 7)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
+    }
+
+    enum HeaderLevel { case full, compact, minimal }
+
+    private func headerRow(_ level: HeaderLevel) -> some View {
+        HStack(spacing: 8) {
+            if level != .minimal { fileLabel }
+            if spec.id == "sql" { connectionMenu }
+            if level == .full { interpreterLabel }
+            Spacer(minLength: 6)
+            if level == .full, let runInfo = runs.info[block.id] {
+                Text(runInfo).font(.system(size: 10.5)).foregroundStyle(runs.server(block.id) != nil ? Color.green : .secondary).lineLimit(1)
+            }
+            languageMenu
+            if level != .minimal { toolButtons }
+            sessionMenu(withTools: level == .minimal)
+            runControl(iconOnly: level != .full)
+        }
+    }
+
+    @ViewBuilder private var fileLabel: some View {
+        Text("main.\(spec.fileExtension)")
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(Color(nsColor: codeTheme.color(for: .comment)))
+            .lineLimit(1)
+            .fixedSize()
+        if isLinked { sessionChip }
+    }
+
+    @ViewBuilder private var interpreterLabel: some View {
+        if spec.isRunnable && !isLinked && !usesDatabase {
+            Text(interpreter ?? "kein Interpreter gefunden")
+                .font(.system(size: 10.5))
+                .foregroundStyle(interpreter == nil ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)).opacity(0.8))
+                .lineLimit(1)
+        }
+    }
+
+    private var languageMenu: some View {
+        Menu {
+            ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
+                Button(lang.name) { doc.changeBlock(block, "Sprache ändern") { block.language = lang.id } }
+            }
+            Divider()
+            Button("Nur Text") { doc.changeBlock(block, "Sprache ändern") { block.language = "plain" } }
+        } label: {
+            HStack(spacing: 4) {
+                Text(spec.name)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .font(.system(size: 11.5, weight: .medium))
+            .padding(.horizontal, 9)
+            .frame(height: 26)
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(Color.primary.opacity(0.15)))
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+
+    private func copyCode() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(block.storage.string, forType: .string)
+    }
+
+    @ViewBuilder private var toolButtons: some View {
+        headerButton("doc.on.doc", "Code kopieren", action: copyCode)
+        headerButton("wand.and.rays", formatHelp, action: formatCode)
+        headerButton("trash", "Code-Block entfernen") { doc.remove(block.id) }
+    }
+
+    @ViewBuilder private func runControl(iconOnly: Bool) -> some View {
+        if spec.isRunnable {
+            if runs.isRunning(block.id) {
+                runButton(iconOnly ? "" : "Stopp", icon: "stop.fill", color: .red) { runs.stop(block.id) }
+                    .helpLabel("Stopp")
+            } else {
+                runButton(iconOnly ? "" : "Ausführen", icon: "play.fill", color: Color(red: 0.12, green: 0.55, blue: 0.27), action: run)
+                    .helpLabel("Mit installiertem Interpreter ausführen (⌘↩)")
+                    .disabled(interpreter == nil)
+                    .opacity(interpreter == nil ? 0.5 : 1)
+            }
+        }
     }
 
     private func headerButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
@@ -152,7 +188,9 @@ struct CodeBlockView: View {
 
     private func runButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: icon)
+            Group {
+                if title.isEmpty { Image(systemName: icon) } else { Label(title, systemImage: icon) }
+            }
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 11)
@@ -457,47 +495,18 @@ struct CodeBlockView: View {
               : "Wird in der gemeinsamen \(spec.name)-Sitzung dieser Notiz ausgeführt, sobald du ihn startest.")
     }
 
-    private var sessionMenu: some View {
+    /// In narrow editors the copy/format/remove buttons live at the top of this menu (#240).
+    private func sessionMenu(withTools: Bool) -> some View {
         Menu {
+            if withTools { toolItems }
             Button("Alle Code-Blöcke der Notiz ausführen") { runs.runAll(doc: doc, theme: theme) }
-            if spec.isRunnable && !usesDatabase {
-                Button("Im Terminal ausführen") { runInTerminal() }
-                    .helpLabel("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
-                Divider()
-                Toggle("Eingabe (stdin) vorgeben", isOn: Binding(
-                    get: { showStdin || !(block.stdin ?? "").isEmpty },
-                    set: { v in
-                        showStdin = v
-                        if !v, !(block.stdin ?? "").isEmpty { doc.changeBlock(block, "Eingabe entfernen") { block.stdin = nil } }
-                    }))
-                Toggle("Während der Ausführung eingeben (interaktiv)", isOn: Binding(
-                    get: { block.interactive },
-                    set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
-            }
-            if spec.isRunnable && !usesDatabase {
-                Divider()
-                Toggle("Test für diesen Block", isOn: Binding(
-                    get: { block.test != nil },
-                    set: { v in
-                        doc.changeBlock(block, v ? "Test hinzufügen" : "Test entfernen") {
-                            block.test = v ? BlockTest() : nil
-                            block.testOutcome = nil
-                        }
-                    }))
-            }
+            if spec.isRunnable && !usesDatabase { runItems }
             if doc.blocks.contains(where: { $0.test != nil }) {
                 Button("Alle Blocktests der Notiz ausführen") { runs.runTests(doc: doc, theme: theme) }
                     .disabled(runs.testingNotes.contains(doc.id))
             }
             Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
-            if KernelManager.supportsSharing(block.language) {
-                Divider()
-                Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
-                    get: { block.mode != "isolated" },
-                    set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
-                Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: block.language) }
-                    .disabled(!sessionRunning)
-            }
+            if KernelManager.supportsSharing(block.language) { kernelItems }
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 12))
@@ -508,7 +517,47 @@ struct CodeBlockView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .helpLabel("Sitzung und Ausführung")
+        .helpLabel(withTools ? "Code, Sitzung und Ausführung" : "Sitzung und Ausführung")
+    }
+
+    @ViewBuilder private var toolItems: some View {
+        Button("Code kopieren", action: copyCode)
+        Button(formatHelp, action: formatCode)
+        Button("Code-Block entfernen", role: .destructive) { doc.remove(block.id) }
+        Divider()
+    }
+
+    @ViewBuilder private var runItems: some View {
+        Button("Im Terminal ausführen") { runInTerminal() }
+            .helpLabel("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
+        Divider()
+        Toggle("Eingabe (stdin) vorgeben", isOn: Binding(
+            get: { showStdin || !(block.stdin ?? "").isEmpty },
+            set: { v in
+                showStdin = v
+                if !v, !(block.stdin ?? "").isEmpty { doc.changeBlock(block, "Eingabe entfernen") { block.stdin = nil } }
+            }))
+        Toggle("Während der Ausführung eingeben (interaktiv)", isOn: Binding(
+            get: { block.interactive },
+            set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
+        Divider()
+        Toggle("Test für diesen Block", isOn: Binding(
+            get: { block.test != nil },
+            set: { v in
+                doc.changeBlock(block, v ? "Test hinzufügen" : "Test entfernen") {
+                    block.test = v ? BlockTest() : nil
+                    block.testOutcome = nil
+                }
+            }))
+    }
+
+    @ViewBuilder private var kernelItems: some View {
+        Divider()
+        Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
+            get: { block.mode != "isolated" },
+            set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
+        Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: block.language) }
+            .disabled(!sessionRunning)
     }
 
     private var formatHelp: String {

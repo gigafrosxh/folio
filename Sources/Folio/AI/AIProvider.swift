@@ -17,7 +17,7 @@ final class OllamaStatus: ObservableObject {
             let client = try AIProvider.ollama()
             let models = try await client.models()
             if s.ollamaModel.isEmpty { set(OllamaClient.Failure.noModel.errorDescription) }
-            else if !models.contains(s.ollamaModel) { set("„\(s.ollamaModel)“ ist in Ollama nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell in den Einstellungen (Allgemein › KI).") }
+            else if !models.contains(s.ollamaModel) { set("„\(s.ollamaModel)“ ist in Ollama nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell in den Einstellungen (Editor › KI).") }
             else { set(nil) }
         } catch {
             set((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)

@@ -48,20 +48,21 @@ struct NoteInfoView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(width: 300)
+        .frame(width: 340)
     }
 
     private func row(_ label: String, _ value: String) -> some View {
         GridRow {
-            Text(label).foregroundStyle(.secondary)
-            Text(value).textSelection(.enabled).monospacedDigit()
+            // Labels never shrink; long values wrap instead of being cut off (#243).
+            Text(label).foregroundStyle(.secondary).fixedSize()
+            Text(value).textSelection(.enabled).monospacedDigit().fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func number(_ n: Int) -> String { n.formatted(.number.locale(Locale(identifier: "de_DE"))) }
 
     static func date(_ d: Date) -> String {
-        d.formatted(Date.FormatStyle(date: .long, time: .shortened).locale(Locale(identifier: "de_DE")))
+        d.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "de_DE")))
     }
 }
 

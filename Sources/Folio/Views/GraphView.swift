@@ -269,57 +269,105 @@ struct GraphView: View {
 
     // MARK: Controls
 
+    /// One row in wide windows; narrow windows get two rows, then filters in a menu, so the graph never
+    /// pushes the window layout wider than the window (#241).
     private func toolbar(_ m: Model) -> some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Notiz im Graph suchen", text: $query)
-                    .textFieldStyle(.plain)
-                    .onSubmit {
-                        if let id = matches.compactMap({ id in store.linkIndex.nodes[id] }).sorted(by: { $0.modified > $1.modified }).first?.id {
-                            open(id)
-                        }
-                    }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { searchField; filterPickers; toggles; Spacer(); zoomButtons }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) { searchField; Spacer(); zoomButtons }
+                HStack(spacing: 10) { filterPickers; toggles }
             }
-            .padding(6)
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
-            .frame(maxWidth: 240)
-            Picker("Tag", selection: $tagFilter) {
-                Text("Alle Tags").tag("")
-                ForEach(store.tagCounts.map(\.tag), id: \.self) { Text("#\($0)").tag($0) }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) { searchField; Spacer(); zoomButtons }
+                HStack(spacing: 10) { filterMenu; toggles }
             }
-            .fixedSize()
-            Picker("Ordner", selection: $folderFilter) {
-                Text("Alle Ordner").tag("")
-                ForEach(store.allFolderURLs.map { store.relativeFolderName($0) }, id: \.self) { Text($0).tag($0) }
-            }
-            .fixedSize()
-            Picker("Tiefe", selection: $globalDepth) {
-                Text("Alle Notizen").tag(0)
-                Text("1 Schritt von der offenen Notiz").tag(1)
-                Text("2 Schritte").tag(2)
-                Text("3 Schritte").tag(3)
-            }
-            .fixedSize()
-            Picker("Farbe", selection: $colorBy) {
-                Text("Farbe nach Ordner").tag("folder")
-                Text("Farbe nach Tag").tag("tag")
-                Text("Einfarbig").tag("none")
-            }
-            .fixedSize()
-            Toggle("Verwaiste", isOn: $showOrphans).toggleStyle(.checkbox)
-                .helpLabel("Notizen ohne Verknüpfungen zeigen (gestrichelt umrandet)")
-            Toggle("Ordner", isOn: $showFolders).toggleStyle(.checkbox)
-                .helpLabel("Ordner als Blasen zeigen, verbunden mit ihren Notizen")
-            Toggle("3D", isOn: $threeD).toggleStyle(.checkbox)
-                .helpLabel("Räumlicher Graph: Ziehen dreht, ⇧-Ziehen verschiebt")
-            Spacer()
-            Button { zoom = max(zoom / 1.25, 0.15) } label: { Image(systemName: "minus.magnifyingglass") }.helpLabel("Verkleinern")
-            Button { zoom = min(zoom * 1.25, 4) } label: { Image(systemName: "plus.magnifyingglass") }.helpLabel("Vergrößern")
-            Button { if threeD { zoom = 1; pan = .zero; yaw = 0.6; pitch = -0.35 } else { fit(positions) } } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }.helpLabel("Alles zeigen")
         }
-        .labelsHidden()
         .padding(10)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Notiz im Graph suchen", text: $query)
+                .textFieldStyle(.plain)
+                .onSubmit {
+                    if let id = matches.compactMap({ id in store.linkIndex.nodes[id] }).sorted(by: { $0.modified > $1.modified }).first?.id {
+                        open(id)
+                    }
+                }
+        }
+        .padding(6)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
+        .frame(minWidth: 120, maxWidth: 240)
+    }
+
+    @ViewBuilder private var filterPickers: some View {
+        tagPicker.labelsHidden().fixedSize()
+        folderPicker.labelsHidden().fixedSize()
+        depthPicker.labelsHidden().fixedSize()
+        colorPicker.labelsHidden().fixedSize()
+    }
+
+    /// The same four filters as submenus, for very narrow windows.
+    private var filterMenu: some View {
+        Menu {
+            tagPicker.pickerStyle(.menu)
+            folderPicker.pickerStyle(.menu)
+            depthPicker.pickerStyle(.menu)
+            colorPicker.pickerStyle(.menu)
+        } label: {
+            Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+        }
+        .fixedSize()
+        .helpLabel("Filter: Tag, Ordner, Tiefe, Farbe")
+    }
+
+    private var tagPicker: some View {
+        Picker("Tag", selection: $tagFilter) {
+            Text("Alle Tags").tag("")
+            ForEach(store.tagCounts.map(\.tag), id: \.self) { Text("#\($0)").tag($0) }
+        }
+    }
+
+    private var folderPicker: some View {
+        Picker("Ordner", selection: $folderFilter) {
+            Text("Alle Ordner").tag("")
+            ForEach(store.allFolderURLs.map { store.relativeFolderName($0) }, id: \.self) { Text($0).tag($0) }
+        }
+    }
+
+    private var depthPicker: some View {
+        Picker("Tiefe", selection: $globalDepth) {
+            Text("Alle Notizen").tag(0)
+            Text("1 Schritt von der offenen Notiz").tag(1)
+            Text("2 Schritte").tag(2)
+            Text("3 Schritte").tag(3)
+        }
+    }
+
+    private var colorPicker: some View {
+        Picker("Farbe", selection: $colorBy) {
+            Text("Farbe nach Ordner").tag("folder")
+            Text("Farbe nach Tag").tag("tag")
+            Text("Einfarbig").tag("none")
+        }
+    }
+
+    @ViewBuilder private var toggles: some View {
+        Toggle("Verwaiste", isOn: $showOrphans).toggleStyle(.checkbox).fixedSize()
+            .helpLabel("Notizen ohne Verknüpfungen zeigen (gestrichelt umrandet)")
+        Toggle("Ordner", isOn: $showFolders).toggleStyle(.checkbox).fixedSize()
+            .helpLabel("Ordner als Blasen zeigen, verbunden mit ihren Notizen")
+        Toggle("3D", isOn: $threeD).toggleStyle(.checkbox).fixedSize()
+            .helpLabel("Räumlicher Graph: Ziehen dreht, ⇧-Ziehen verschiebt")
+    }
+
+    @ViewBuilder private var zoomButtons: some View {
+        Button { zoom = max(zoom / 1.25, 0.15) } label: { Image(systemName: "minus.magnifyingglass") }.helpLabel("Verkleinern")
+        Button { zoom = min(zoom * 1.25, 4) } label: { Image(systemName: "plus.magnifyingglass") }.helpLabel("Vergrößern")
+        Button { if threeD { zoom = 1; pan = .zero; yaw = 0.6; pitch = -0.35 } else { fit(positions) } } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }.helpLabel("Alles zeigen")
     }
 
     private func legend(_ m: Model) -> some View {

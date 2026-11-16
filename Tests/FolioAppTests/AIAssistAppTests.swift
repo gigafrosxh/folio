@@ -123,4 +123,19 @@ final class AIAssistAppTests: XCTestCase {
         theme.settings.aiProvider = "apple"
         if case .ollamaDown = AIAvailability.current.state { XCTFail("Apple Intelligence darf den Ollama-Status nicht zeigen") }
     }
+
+    func testBoldItalicWithSharedEnds() {
+        func traits(_ s: NSAttributedString, _ i: Int) -> NSFontTraitMask {
+            (s.attribute(.font, at: i, effectiveRange: nil) as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
+        }
+        let a = ChatAnswerFormatter.attributed(fromMarkdown: "***wichtig***", theme: ThemeManager.shared)
+        XCTAssertEqual(a.string, "wichtig")
+        XCTAssertTrue(traits(a, 0).contains([.boldFontMask, .italicFontMask]))
+        let b = ChatAnswerFormatter.attributed(fromMarkdown: "**fett und *kursiv***", theme: ThemeManager.shared)
+        XCTAssertEqual(b.string, "fett und kursiv")
+        XCTAssertTrue(traits(b, 0).contains(.boldFontMask) && !traits(b, 0).contains(.italicFontMask))
+        XCTAssertTrue(traits(b, 10).contains([.boldFontMask, .italicFontMask]))
+        // Plain bold followed by text still works.
+        XCTAssertEqual(ChatAnswerFormatter.attributed(fromMarkdown: "**a** und **b**", theme: ThemeManager.shared).string, "a und b")
+    }
 }
