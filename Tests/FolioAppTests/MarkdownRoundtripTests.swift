@@ -132,7 +132,9 @@ final class ChatAnswerFormatterTests: XCTestCase {
 
     func testBoldAndCodeBecomeFormatting() {
         let s = ChatAnswerFormatter.attributed(fromMarkdown: "x **y** `z` *k*", theme: theme)
-        XCTAssertEqual(s.string, "x y z *k*")
+        // Since 1.6.2 single asterisks become italics too (#234).
+        XCTAssertEqual(s.string, "x y z k")
+        XCTAssertTrue(NSFontManager.shared.traits(of: (s.attribute(.font, at: 6, effectiveRange: nil) as? NSFont)!).contains(.italicFontMask))
         let bold = s.attribute(.font, at: 2, effectiveRange: nil) as? NSFont
         XCTAssertTrue(NSFontManager.shared.traits(of: bold!).contains(.boldFontMask))
         XCTAssertEqual((s.attribute(.font, at: 4, effectiveRange: nil) as? NSFont)?.isFixedPitch, true)
