@@ -35,6 +35,21 @@ final class AIAssistTests: XCTestCase {
         XCTAssertEqual(AnswerBlocks.segments(of: "| nur | eine Zeile |"), [.text("| nur | eine Zeile |")])
     }
 
+    func testBackslashesStayInCells() {
+        let s = AnswerBlocks.segments(of: "| Pfad | Regex |\n|---|---|\n| C:\\Users\\Ada | \\d+\\s+ \\| x |\n")
+        XCTAssertEqual(s, [.table(header: ["Pfad", "Regex"], rows: [["C:\\Users\\Ada", "\\d+\\s+ | x"]])])
+    }
+
+    func testFencedTableBecomesTable() {
+        let table = "| A | B |\n|---|---|\n| 1 | 2 |"
+        for fence in ["```", "```text", "```markdown", "```md"] {
+            XCTAssertEqual(AnswerBlocks.segments(of: "\(fence)\n\(table)\n```"), [.table(header: ["A", "B"], rows: [["1", "2"]])], fence)
+        }
+        // Real code or more than a table stays code.
+        XCTAssertEqual(AnswerBlocks.segments(of: "```python\n\(table)\n```"), [.code(language: "python", code: table)])
+        XCTAssertEqual(AnswerBlocks.segments(of: "```\n\(table)\nmehr\n```"), [.code(language: "text", code: table + "\nmehr")])
+    }
+
     // MARK: Text actions (#36)
 
     func testTextActions() {
@@ -127,6 +142,13 @@ final class OllamaClientTests: XCTestCase {
         XCTAssertThrowsError(try OllamaClient(baseURL: "https://api.example.com", model: "x")) {
             XCTAssertEqual($0 as? OllamaClient.Failure, .notLocal("https://api.example.com"))
         }
+    }
+
+    func testOnlyChatModels() throws {
+        let json = #"{"models":[{"name":"embeddinggemma:latest","capabilities":["embedding"]},{"name":"gemma3:4b","capabilities":["completion","vision"]},{"name":"alt:1b"}]}"#
+        XCTAssertEqual(try OllamaClient.chatModels(in: Data(json.utf8)), ["alt:1b", "gemma3:4b"])
+        XCTAssertEqual(OllamaClient.failure(status: 400, body: #"{"error":"\"embeddinggemma:latest\" does not support chat"}"#, model: "embeddinggemma:latest"),
+                       .notChat("embeddinggemma:latest"))
     }
 
     func testStreamPieces() {

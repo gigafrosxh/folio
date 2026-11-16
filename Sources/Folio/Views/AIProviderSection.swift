@@ -37,7 +37,7 @@ struct AIProviderSection: View {
                 .disabled(checking)
         }
         if let status {
-            Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(AIActionSheet.markdown(status)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -61,7 +61,12 @@ struct AIProviderSection: View {
                 status = "Ollama läuft, hat aber noch kein Modell. Lade eines im Terminal, z. B. `ollama pull llama3.2`."
             } else {
                 status = "Ollama läuft, \(models.count) Modell\(models.count == 1 ? "" : "e") installiert."
-                if theme.settings.ollamaModel.isEmpty, let first = models.first { theme.settings.ollamaModel = first }
+                let chosen = theme.settings.ollamaModel
+                if chosen.isEmpty, let first = models.first { theme.settings.ollamaModel = first }
+                // A model chosen before 1.6.1 may be embedding-only or gone (#225).
+                if !chosen.isEmpty, !models.contains(chosen) {
+                    status = "„\(chosen)“ ist nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell."
+                }
             }
         } catch {
             models = []

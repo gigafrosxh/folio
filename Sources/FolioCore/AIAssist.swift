@@ -75,7 +75,16 @@ public enum AnswerBlocks {
         let language = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces).lowercased()
         var code: [String] = []
         while let next = lines.popFirst(), !next.trimmingCharacters(in: .whitespaces).hasPrefix(fence) { code.append(next) }
+        // Models sometimes fence a plain Markdown table; it still becomes a table (#226).
+        if ["", "text", "markdown", "md"].contains(language), let table = fencedTable(code) { return table }
         return .code(language: language.isEmpty ? "text" : language, code: code.joined(separator: "\n"))
+    }
+
+    /// A fence whose only content is one Markdown table.
+    static func fencedTable(_ code: [String]) -> AnswerSegment? {
+        var rest = code.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }[...]
+        guard let header = rest.popFirst(), let table = table(header: header, rest: &rest), rest.isEmpty else { return nil }
+        return table
     }
 
     /// A Markdown table: a pipe row followed by a separator row (`|---|`).
@@ -103,10 +112,11 @@ public enum AnswerBlocks {
         var t = line.trimmingCharacters(in: .whitespaces)
         if t.hasPrefix("|") { t.removeFirst() }
         if t.hasSuffix("|") && !t.hasSuffix("\\|") { t.removeLast() }
-        var cells: [String] = [], current = "", escaped = false
-        for ch in t {
-            if escaped { current.append(ch); escaped = false; continue }
-            if ch == "\\" { escaped = true; continue }
+        // Only `\|` is an escape (a pipe inside a cell); every other backslash is content: paths, regexes, LaTeX (#230).
+        var cells: [String] = [], current = ""
+        var chars = Array(t)[...]
+        while let ch = chars.popFirst() {
+            if ch == "\\", chars.first == "|" { current.append(chars.removeFirst()); continue }
             if ch == "|" { cells.append(current.trimmingCharacters(in: .whitespaces)); current = "" } else { current.append(ch) }
         }
         cells.append(current.trimmingCharacters(in: .whitespaces))

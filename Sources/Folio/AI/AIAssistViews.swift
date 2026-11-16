@@ -43,6 +43,8 @@ extension FolioTextView {
 /// Shows the AI result first; only „Ersetzen“ or „Darunter einfügen“ change the note (#36).
 struct AIActionSheet: View {
     let request: AIActionRequest
+    /// Whether the selected text is still there unchanged, so „Ersetzen“ can work (#228).
+    var canReplace: () -> Bool = { true }
     var onApply: (String, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var result = ""
@@ -54,14 +56,14 @@ struct AIActionSheet: View {
             Text("\(request.action.label) · \(AIProvider.name)").font(.headline)
             Text(request.text).font(.callout).foregroundStyle(.secondary).lineLimit(3)
             ScrollView {
-                Text(result.isEmpty ? (running ? "…" : "") : result)
+                Text(result.isEmpty ? AttributedString(running ? "…" : "") : Self.markdown(result))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 160, maxHeight: 360)
             .padding(8)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            if let error { Label(error, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange) }
+            notes
             buttons
         }
         .padding(18)
@@ -69,7 +71,28 @@ struct AIActionSheet: View {
         .task { await run() }
     }
 
-    private var ready: Bool { !running && !result.isEmpty }
+    /// After an error the text may be cut off: it can be copied, but not put into the note (#232).
+    private var ready: Bool { !running && !result.isEmpty && error == nil }
+    private var replaceable: Bool { ready && canReplace() }
+
+    @ViewBuilder private var notes: some View {
+        if let error {
+            Label { Text(Self.markdown(error)) } icon: { Image(systemName: "exclamationmark.triangle") }
+                .font(.callout).foregroundStyle(.orange)
+            if !result.isEmpty {
+                Text("Die Antwort ist unvollständig und lässt sich nur kopieren.").font(.caption).foregroundStyle(.secondary)
+            }
+        } else if ready && request.action.replacesSelection && !canReplace() {
+            Label("Der markierte Text hat sich inzwischen geändert. Ersetzen geht nicht mehr, das Ergebnis lässt sich darunter einfügen.",
+                  systemImage: "info.circle")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Bold, italics and `code` as formatting; line breaks stay (#227, #229).
+    static func markdown(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+    }
 
     private var buttons: some View {
         HStack {
@@ -80,10 +103,10 @@ struct AIActionSheet: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(result, forType: .string)
             }
-            .disabled(!ready)
-            if request.action.replacesSelection {
+            .disabled(running || result.isEmpty)
+            if request.action.replacesSelection && canReplace() {
                 Button("Darunter einfügen") { apply(replace: false) }.disabled(!ready)
-                Button("Ersetzen") { apply(replace: true) }.keyboardShortcut(.defaultAction).disabled(!ready)
+                Button("Ersetzen") { apply(replace: true) }.keyboardShortcut(.defaultAction).disabled(!replaceable)
             } else {
                 Button("Darunter einfügen") { apply(replace: false) }.keyboardShortcut(.defaultAction).disabled(!ready)
             }
@@ -144,7 +167,7 @@ struct TagSuggestionPopover: View {
                     .disabled(aiRunning)
                 Spacer()
             }
-            if let message { Text(message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            if let message { Text(AIActionSheet.markdown(message)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
         }
         .padding(14)
         .frame(width: 320)
@@ -224,28 +247,57 @@ extension NoteDocument {
         }
     }
 
+    /// Widest tab table that still fits a narrow editor; wider tables or long cells become one line per row (#231).
+    static let tableLimit: (cell: CGFloat, total: CGFloat) = (260, 480)
+
     static func table(header: [String], rows: [[String]], theme: ThemeManager) -> NSAttributedString {
         let body = theme.bodyAttributes
         let font = (body[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 14)
-        // One tab stop per column, wide enough for the longest cell.
-        let columns = ([header] + rows).map(\.count).max() ?? 0
-        var stops: [NSTextTab] = []
-        var x: CGFloat = 0
-        for c in 0..<max(columns - 1, 0) {
-            let widest = ([header] + rows).compactMap { $0.indices.contains(c) ? $0[c] : nil }
-                .map { ($0 as NSString).size(withAttributes: [.font: NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)]).width }.max() ?? 40
-            x += min(max(widest + 24, 60), 260)
-            stops.append(NSTextTab(textAlignment: .left, location: x))
+        let bold = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
+        let widths = columnWidths(header: header, rows: rows, font: bold)
+        let fits = widths.allSatisfy { $0 <= tableLimit.cell } && widths.reduce(0, +) <= tableLimit.total
+        return fits || rows.isEmpty ? tabTable(header: header, rows: rows, widths: widths, body: body, bold: bold)
+                    : recordTable(header: header, rows: rows, body: body, bold: bold)
+    }
+
+    static func columnWidths(header: [String], rows: [[String]], font: NSFont) -> [CGFloat] {
+        let all = [header] + rows
+        let columns = all.map(\.count).max() ?? 0
+        return (0..<columns).map { c in
+            let widest = all.compactMap { $0.indices.contains(c) ? $0[c] : nil }
+                .map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+            return max(widest + 24, 60)
         }
+    }
+
+    /// Short tables: one tab stop per column, bold header line.
+    private static func tabTable(header: [String], rows: [[String]], widths: [CGFloat], body: [NSAttributedString.Key: Any], bold: NSFont) -> NSAttributedString {
         let para = ((body[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
-        para.tabStops = stops
+        var x: CGFloat = 0
+        para.tabStops = widths.dropLast().map { x += $0; return NSTextTab(textAlignment: .left, location: x) }
         var attrs = body
         attrs[.paragraphStyle] = para
-        let out = NSMutableAttributedString()
-        var bold = attrs
-        bold[.font] = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
-        out.append(NSAttributedString(string: header.joined(separator: "\t"), attributes: bold))
+        var boldAttrs = attrs
+        boldAttrs[.font] = bold
+        let out = NSMutableAttributedString(string: header.joined(separator: "\t"), attributes: boldAttrs)
         for row in rows { out.append(NSAttributedString(string: "\n" + row.joined(separator: "\t"), attributes: attrs)) }
+        return out
+    }
+
+    /// Wide tables: every row on its own line as „Spalte: Wert · Spalte: Wert“, so no value lands in the wrong column.
+    private static func recordTable(header: [String], rows: [[String]], body: [NSAttributedString.Key: Any], bold: NSFont) -> NSAttributedString {
+        var boldAttrs = body
+        boldAttrs[.font] = bold
+        let out = NSMutableAttributedString()
+        for (r, row) in rows.enumerated() {
+            if r > 0 { out.append(NSAttributedString(string: "\n", attributes: body)) }
+            for (c, value) in row.enumerated() {
+                if c > 0 { out.append(NSAttributedString(string: " · ", attributes: body)) }
+                let label = header.indices.contains(c) && !header[c].isEmpty ? header[c] : "Spalte \(c + 1)"
+                out.append(NSAttributedString(string: label + ": ", attributes: boldAttrs))
+                out.append(NSAttributedString(string: value, attributes: body))
+            }
+        }
         return out
     }
 }

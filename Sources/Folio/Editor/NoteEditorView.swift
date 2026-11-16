@@ -197,7 +197,9 @@ struct NoteEditorView: View {
             .overlay(alignment: .topTrailing) { chatPanel }
             .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
             .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
-            .sheet(item: $aiRequest) { req in AIActionSheet(request: req) { applyAIResult($0, of: req, replace: $1) } }
+            .sheet(item: $aiRequest) { req in
+                AIActionSheet(request: req, canReplace: { selectionUnchanged(req) }) { applyAIResult($0, of: req, replace: $1) }
+            }
     }
 
     @ViewBuilder private var chatPanel: some View {
@@ -396,15 +398,20 @@ struct NoteEditorView: View {
 
     /// Replaces the selection only if it still holds the same text; otherwise (and for „Darunter einfügen“) the result
     /// becomes a new block after the one it came from, so nothing typed in the meantime is overwritten (#36).
+    private func selectionUnchanged(_ req: AIActionRequest) -> Bool {
+        guard let block = doc.block(req.blockID) else { return false }
+        let ns = block.storage.string as NSString
+        return NSMaxRange(req.range) <= ns.length && ns.substring(with: req.range) == req.text
+    }
+
     private func applyAIResult(_ answer: String, of req: AIActionRequest, replace: Bool) {
         guard let block = doc.block(req.blockID) else { return }
-        let ns = block.storage.string as NSString
-        let unchanged = NSMaxRange(req.range) <= ns.length && ns.substring(with: req.range) == req.text
-        if replace && unchanged {
+        if replace && selectionUnchanged(req) {
+            // Markdown becomes formatting in the style of the replaced text, not literal asterisks (#227).
             let attrs = block.storage.attributes(at: req.range.location, effectiveRange: nil)
-            let replacement = NSAttributedString(string: answer, attributes: attrs)
+            let replacement = ChatAnswerFormatter.attributed(fromMarkdown: answer, theme: theme, base: attrs)
             if let tv = formatting.activeTextView, tv.blockID == req.blockID, tv.textStorage === block.storage {
-                if tv.shouldChangeText(in: req.range, replacementString: answer) {
+                if tv.shouldChangeText(in: req.range, replacementString: replacement.string) {
                     tv.textStorage?.replaceCharacters(in: req.range, with: replacement)
                     tv.didChangeText()
                 }

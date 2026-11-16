@@ -8,6 +8,7 @@ public struct OllamaClient: Sendable {
         case notRunning(String)
         case noModel
         case modelMissing(String)
+        case notChat(String)
         case server(String)
 
         public var errorDescription: String? {
@@ -16,6 +17,7 @@ public struct OllamaClient: Sendable {
             case .notRunning(let url): return "Ollama antwortet nicht unter \(url). Starte die Ollama-App oder im Terminal `ollama serve`."
             case .noModel: return "In Ollama ist noch kein Modell ausgewählt. Wähle eines in den Einstellungen (Allgemein › KI) oder lade eines mit `ollama pull llama3.2`."
             case .modelMissing(let name): return "Das Modell „\(name)“ ist in Ollama nicht installiert. Lade es mit `ollama pull \(name)` oder wähle ein anderes."
+            case .notChat(let name): return "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Allgemein › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
             case .server(let message): return "Ollama meldet einen Fehler: \(message)"
             }
         }
@@ -42,12 +44,16 @@ public struct OllamaClient: Sendable {
         self.session = session
     }
 
-    /// Installed models, by name.
+    /// Installed models that can write text, by name. Embedding-only models are left out (#225); older Ollama
+    /// versions report no capabilities, then every model counts.
     public func models() async throws -> [String] {
-        let data = try await get("api/tags")
-        struct Tags: Decodable { struct Model: Decodable { var name: String }; var models: [Model] }
+        try Self.chatModels(in: await get("api/tags"))
+    }
+
+    static func chatModels(in data: Data) throws -> [String] {
+        struct Tags: Decodable { struct Model: Decodable { var name: String; var capabilities: [String]? }; var models: [Model] }
         guard let tags = try? JSONDecoder().decode(Tags.self, from: data) else { throw Failure.server("unerwartete Antwort auf /api/tags") }
-        return tags.models.map(\.name).sorted()
+        return tags.models.filter { $0.capabilities.map { $0.contains("completion") } ?? true }.map(\.name).sorted()
     }
 
     public struct Message: Codable, Equatable, Sendable {
@@ -92,6 +98,7 @@ public struct OllamaClient: Sendable {
 
     static func failure(status: Int, body: String, model: String) -> Failure {
         if status == 404, body.lowercased().contains("not found") { return .modelMissing(model) }
+        if body.lowercased().contains("does not support chat") || body.lowercased().contains("does not support generate") { return .notChat(model) }
         struct E: Decodable { var error: String }
         let message = (try? JSONDecoder().decode(E.self, from: Data(body.utf8)))?.error ?? "HTTP \(status)"
         return .server(message)

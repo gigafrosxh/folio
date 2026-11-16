@@ -55,4 +55,24 @@ final class AIAssistAppTests: XCTestCase {
         step { f.insertAnswerBlocks("```py\nprint(1)\n```", after: nil, theme: ThemeManager.shared) }
         XCTAssertEqual(f.blocks.first { $0.kind == .code }?.language, "python")
     }
+
+    func testWideTablesBecomeOneLinePerRow() {
+        let long = String(repeating: "lange Beschreibung ", count: 6)
+        let wide = NoteDocument.table(header: ["Beschreibung", "Preis"], rows: [[long, "9 EUR"], ["Kurz", "3 EUR"]], theme: ThemeManager.shared)
+        XCTAssertEqual(wide.string, "Beschreibung: \(long) · Preis: 9 EUR\nBeschreibung: Kurz · Preis: 3 EUR")
+        let small = NoteDocument.table(header: ["A", "B"], rows: [["1", "2"]], theme: ThemeManager.shared)
+        XCTAssertEqual(small.string, "A\tB\n1\t2")
+        let headerOnly = NoteDocument.table(header: [long, "x"], rows: [], theme: ThemeManager.shared)
+        XCTAssertEqual(headerOnly.string, long + "\tx")
+    }
+
+    func testReplacementKeepsStyleWithoutAsterisks() {
+        var base = ThemeManager.shared.bodyAttributes
+        base[.foregroundColor] = NSColor.systemRed
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "Ein **wichtiger** Satz", theme: ThemeManager.shared, base: base)
+        XCTAssertEqual(out.string, "Ein wichtiger Satz")
+        XCTAssertEqual(out.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemRed)
+        let font = out.attribute(.font, at: 5, effectiveRange: nil) as? NSFont
+        XCTAssertTrue(font?.fontDescriptor.symbolicTraits.contains(.bold) == true)
+    }
 }

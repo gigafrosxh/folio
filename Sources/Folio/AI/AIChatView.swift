@@ -402,7 +402,7 @@ struct AIChatView: View {
     private func composer(_ availability: AIAvailability) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let error = chat.errorText, !error.isEmpty {
-                Text(error)
+                Text(AIActionSheet.markdown(error))
                     .font(.caption)
                     .foregroundStyle(Color(nsColor: .systemOrange))
                     .textSelection(.enabled)

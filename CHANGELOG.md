@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Tabellen aus KI-Antworten** (#230): Backslashes in Zellen bleiben erhalten (Pfade wie `C:\Users`, reguläre Ausdrücke); nur `\|` steht für einen senkrechten Strich.
+- **Breite Tabellen** (#231): Tabellen mit langen Zellen oder vielen Spalten werden als eine Zeile pro Eintrag eingefügt („Spalte: Wert · Spalte: Wert“), damit kein Wert in die falsche Spalte rutscht. Schmale Tabellen bleiben ausgerichtet.
+- **Tabelle im Codezaun** (#226): Setzt das Modell eine Markdown-Tabelle in einen Codezaun ohne Sprache (oder `text`/`markdown`), wird sie trotzdem als Tabelle eingefügt.
+- **Ollama-Modell** (#225): Die Modellauswahl zeigt nur Modelle, die Text schreiben können; Embedding-Modelle werden nicht mehr automatisch gewählt. Ist eines gewählt, sagen Einstellungen und Fehlermeldung, dass es nicht chatten kann.
+- **KI-Ergebnisfenster** (#227, #228, #232): Das Ergebnis erscheint formatiert, und „Ersetzen“ übernimmt fett und Listen im Stil des ersetzten Textes statt Sternchen. Hat sich der markierte Text inzwischen geändert, sagt das Fenster das und bietet nur „Darunter einfügen“ an. Nach einem Fehler mitten in der Antwort lässt sich das unvollständige Ergebnis nur noch kopieren.
+- **Meldungen** (#229): Befehle wie `ollama serve` erscheinen in Einstellungen, Chat und KI-Fenstern hervorgehoben statt mit Backticks.
+
 ## [1.6.0] – 2026-11-15
 
 ### Hinzugefügt
