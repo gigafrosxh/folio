@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.4] – 2026-11-16
+
 ### Behoben
 - **Codeblöcke im schmalen Fenster** (#240): Der Kopf eines Codeblocks blendet bei wenig Platz erst Interpreter und Laufinfo aus, dann wandern Kopieren, Formatieren und Entfernen ins ⋯-Menü; der Ausführen-Knopf wird zum Symbol. Vorher wurde die ganze Ansicht breiter als das Fenster.
 - **Graph im schmalen Fenster** (#241): Die Filter brechen in eine zweite Zeile um oder liegen in einem Menü „Filter“. Die Häkchen „Verwaiste“, „Ordner“ und „3D“ sind jetzt beschriftet.
