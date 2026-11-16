@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.1] – 2026-11-16
+
 ### Behoben
 - **Tabellen aus KI-Antworten** (#230): Backslashes in Zellen bleiben erhalten (Pfade wie `C:\Users`, reguläre Ausdrücke); nur `\|` steht für einen senkrechten Strich.
 - **Breite Tabellen** (#231): Tabellen mit langen Zellen oder vielen Spalten werden als eine Zeile pro Eintrag eingefügt („Spalte: Wert · Spalte: Wert“), damit kein Wert in die falsche Spalte rutscht. Schmale Tabellen bleiben ausgerichtet.
