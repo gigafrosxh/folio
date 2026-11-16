@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.3] – 2026-11-16
+
 ### Behoben
 - **Benennung des KI-Chats** (#236): Menü, Werkzeugleiste, Tastenkürzel-Liste und VoiceOver sprechen von „KI-Chat“ bzw. nennen den gewählten Anbieter statt immer „Apple Intelligence“.
 - **Chat mit gestopptem Ollama** (#237): Der Chat prüft beim Öffnen und vor jeder Frage, ob Ollama antwortet und das Modell hat. Wenn nicht, sagt er das gleich oben und zeigt wie ohne Apple Intelligence passende Stellen aus den Notizen statt nur einer Fehlermeldung.
