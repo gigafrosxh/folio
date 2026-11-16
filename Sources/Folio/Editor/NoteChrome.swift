@@ -5,6 +5,7 @@ import FolioCore
 /// Floating pill to the right of the formatting bar: pin, share, show in Finder, delete.
 struct NoteActionsBar: View {
     @ObservedObject var doc: NoteDocument
+    @ObservedObject private var ollama = OllamaStatus.shared
     /// Narrow windows: history, printing and Finder move into a „more“ menu (#177).
     var compact = false
     @EnvironmentObject var store: NoteStore
@@ -19,7 +20,7 @@ struct NoteActionsBar: View {
             .buttonStyle(.plain)
             .helpLabel("Teilen")
             let ai = AIAvailability.current
-            button("apple.intelligence", ai.isAvailable ? "Chat mit Apple Intelligence (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
+            button("apple.intelligence", ai.isAvailable ? "KI-Chat mit \(AIProvider.name) (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
                    tint: ai.isAvailable ? theme.accent : .secondary) {
                 NotificationCenter.default.post(name: .folioToggleChat, object: nil)
             }

@@ -151,7 +151,7 @@ struct FolioCommands: Commands {
             Button("Link zu Notiz …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.link) }
                 .keyboardShortcut("k", modifiers: [.command, .option])
             Button("Writing Tools …") { f.showWritingTools() }.keyboardShortcut("w", modifiers: [.command, .shift])
-            Button("Chat mit Apple Intelligence") { NotificationCenter.default.post(name: .folioToggleChat, object: nil) }
+            Button("KI-Chat") { NotificationCenter.default.post(name: .folioToggleChat, object: nil) }
                 .keyboardShortcut("i", modifiers: [.command, .option])
             Button("Bibliothek fragen …") { NotificationCenter.default.post(name: .folioAskLibrary, object: nil) }
                 .keyboardShortcut("i", modifiers: [.command, .option, .shift])

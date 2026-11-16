@@ -63,6 +63,10 @@ enum ChatAnswerFormatter {
             a[.font] = NSFont.monospacedSystemFont(ofSize: theme.bodyFont().pointSize * 0.92, weight: .regular)
             a[.backgroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.12)
         }
-        return NSAttributedString(string: text, attributes: a)
+        guard group != 2 else { return NSAttributedString(string: text, attributes: a) }
+        // Markup inside markup, e.g. bold inside italics (#238).
+        let inner = NSMutableAttributedString()
+        appendSpans(of: text, attrs: a, to: inner, theme: theme)
+        return inner
     }
 }

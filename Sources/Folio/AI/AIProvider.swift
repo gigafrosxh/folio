@@ -4,6 +4,29 @@ import FolioCore
 import FoundationModels
 #endif
 
+/// Whether the chosen Ollama answers and has the chosen model (#237). Checked when the chat opens and before
+/// each question; while it does not, the chat shows matching passages instead of an answer.
+@MainActor
+final class OllamaStatus: ObservableObject {
+    static let shared = OllamaStatus()
+    @Published private(set) var problem: String?
+
+    func refresh() async {
+        let s = ThemeManager.shared.settings
+        do {
+            let client = try AIProvider.ollama()
+            let models = try await client.models()
+            if s.ollamaModel.isEmpty { set(OllamaClient.Failure.noModel.errorDescription) }
+            else if !models.contains(s.ollamaModel) { set("„\(s.ollamaModel)“ ist in Ollama nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell in den Einstellungen (Allgemein › KI).") }
+            else { set(nil) }
+        } catch {
+            set((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    private func set(_ value: String?) { if problem != value { problem = value } }
+}
+
 /// Which model answers: Apple Intelligence (default) or a local Ollama the user chose (#42). Chat, AI actions and
 /// tag suggestions all go through here.
 @MainActor

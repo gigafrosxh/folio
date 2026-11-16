@@ -98,4 +98,29 @@ final class AIAssistAppTests: XCTestCase {
         XCTAssertEqual((chat.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.pointSize,
                        (TextStyle.subheading.attributes(theme: ThemeManager.shared)[.font] as? NSFont)?.pointSize)
     }
+
+    func testNestedBoldInItalics() {
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "*ein **wichtiger** Satz*", theme: ThemeManager.shared)
+        XCTAssertEqual(out.string, "ein wichtiger Satz")
+        let traits = (out.attribute(.font, at: 5, effectiveRange: nil) as? NSFont).map { NSFontManager.shared.traits(of: $0) } ?? []
+        XCTAssertTrue(traits.contains(.boldFontMask) && traits.contains(.italicFontMask))
+        // Code stays literal.
+        XCTAssertEqual(ChatAnswerFormatter.attributed(fromMarkdown: "`a *b* c`", theme: ThemeManager.shared).string, "a *b* c")
+    }
+
+    func testOllamaDownMeansFallback() async {
+        let theme = ThemeManager.shared
+        let saved = theme.settings
+        defer { theme.settings = saved }
+        theme.settings.aiProvider = "ollama"
+        theme.settings.ollamaURL = "http://127.0.0.1:9"
+        theme.settings.ollamaModel = "x"
+        await OllamaStatus.shared.refresh()
+        let a = AIAvailability.current
+        XCTAssertFalse(a.isAvailable)
+        XCTAssertEqual(a.title, "Ollama antwortet nicht")
+        XCTAssertTrue(a.explanation.contains("passende Stellen"))
+        theme.settings.aiProvider = "apple"
+        if case .ollamaDown = AIAvailability.current.state { XCTFail("Apple Intelligence darf den Ollama-Status nicht zeigen") }
+    }
 }

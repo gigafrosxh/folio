@@ -106,7 +106,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .file: return "Datei, PDF oder Bild einfügen"
         case .playground: return "Bild mit Image Playground"
         case .link: return "Link hinzufügen"
-        case .chat: return "Chat mit Apple Intelligence"
+        case .chat: return "KI-Chat"
         case .writingTools: return "Writing Tools"
         case .runAll: return "Alle Code-Blöcke ausführen"
         case .database: return "Datenbank-Abfrage einfügen"
@@ -183,7 +183,7 @@ enum FixedShortcuts {
             ("⌘N / ⇧⌘N", "Neue Notiz / Neuer Ordner"),
             ("⌥⌘S", "Seitenleiste ein-/ausblenden"),
             ("⌥⌘F", "Notizen durchsuchen"),
-            ("⌥⌘I", "Chat mit Apple Intelligence"),
+            ("⌥⌘I", "KI-Chat"),
             ("⌘,", "Einstellungen"),
         ]),
     ]

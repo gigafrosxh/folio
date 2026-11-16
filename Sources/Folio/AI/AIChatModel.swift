@@ -230,6 +230,9 @@ final class AIChatModel: ObservableObject, Identifiable {
 
     private func respond(_ question: String, plan: ContextPlan, history: String, selection: String?) async {
         if AIProvider.usesOllama {
+            await OllamaStatus.shared.refresh()
+            // Ollama not running or without a usable model: matching passages instead of an error only (#237).
+            guard OllamaStatus.shared.problem == nil else { answerWithoutModel(plan); return }
             await streamFromOllama(Self.prompt(question: question, plan: plan, history: history, selection: selection))
             return
         }
@@ -309,14 +312,17 @@ final class AIChatModel: ObservableObject, Identifiable {
     private func answerWithoutModel(_ plan: ContextPlan) {
         guard let i = messages.lastIndex(where: { $0.isStreaming }) else { return }
         if plan.passages.isEmpty {
-            messages[i].text = "Ohne Apple Intelligence kann ich nicht antworten, und in den Notizen passt keine Stelle zu den Suchbegriffen."
+            messages[i].text = "Ohne \(Self.modelName) kann ich nicht antworten, und in den Notizen passt keine Stelle zu den Suchbegriffen."
         } else {
             let lines = plan.passages.prefix(6).enumerated().map { n, p in "- **\(p.noteTitle.isEmpty ? "Notiz" : p.noteTitle)** [\(n + 1)]: \(p.excerpt)" }
-            messages[i].text = "Ohne Apple Intelligence gibt es keine formulierte Antwort, aber diese Stellen passen zu deiner Frage:\n\n" + lines.joined(separator: "\n")
+            messages[i].text = "Ohne \(Self.modelName) gibt es keine formulierte Antwort, aber diese Stellen passen zu deiner Frage:\n\n" + lines.joined(separator: "\n")
         }
         messages[i].isFallback = true
         finishStreaming()
     }
+
+    /// „Ollama“ or „Apple Intelligence“ in the fallback answer.
+    private static var modelName: String { AIProvider.usesOllama ? "Ollama" : "Apple Intelligence" }
 
     private static func describe(_ error: Error) -> String {
         let text = String(describing: error)
@@ -339,13 +345,16 @@ private extension Int {
 
 /// Why Apple Intelligence can or cannot be used, with what the user can do about it (#41).
 struct AIAvailability {
-    enum State: Equatable { case available, notEnabled, notReady, unsupportedMac, unsupportedSystem, other(String), ollama(String) }
+    enum State: Equatable { case available, notEnabled, notReady, unsupportedMac, unsupportedSystem, other(String), ollama(String), ollamaDown(String) }
 
     var state: State
 
     @MainActor static var current: AIAvailability {
         // A local Ollama the user chose counts as available; problems show up when it is asked (#42).
-        if ThemeManager.shared.settings.aiProvider == "ollama" { return AIAvailability(state: .ollama(ThemeManager.shared.settings.ollamaModel)) }
+        if ThemeManager.shared.settings.aiProvider == "ollama" {
+            if let problem = OllamaStatus.shared.problem { return AIAvailability(state: .ollamaDown(problem)) }
+            return AIAvailability(state: .ollama(ThemeManager.shared.settings.ollamaModel))
+        }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
@@ -374,6 +383,7 @@ struct AIAvailability {
         switch state {
         case .available: return "Apple Intelligence ist bereit"
         case .ollama(let model): return "Lokales Ollama\(model.isEmpty ? "" : " (\(model))")"
+        case .ollamaDown: return "Ollama antwortet nicht"
         case .notEnabled: return "Apple Intelligence ist ausgeschaltet"
         case .notReady: return "Apple Intelligence wird noch geladen"
         case .unsupportedMac: return "Dieser Mac unterstützt Apple Intelligence nicht"
@@ -390,6 +400,7 @@ struct AIAvailability {
         case .unsupportedMac: return "Apple Intelligence braucht einen Mac mit Apple-Chip (M1 oder neuer). Alles andere in Folio funktioniert normal; Fragen beantwortet Folio mit passenden Stellen aus deinen Notizen."
         case .unsupportedSystem: return "Aktualisiere auf macOS 26, um den Chat, Textvorschläge und KI-Antworten zu nutzen. Bis dahin findet Folio passende Stellen in deinen Notizen."
         case .other(let reason): return reason
+        case .ollamaDown(let problem): return problem + " Bis dahin zeigt Folio passende Stellen aus deinen Notizen."
         }
     }
 

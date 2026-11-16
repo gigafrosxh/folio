@@ -54,6 +54,7 @@ struct AIProviderSection: View {
     private func load() async {
         checking = true
         defer { checking = false }
+        defer { Task { await OllamaStatus.shared.refresh() } }
         do {
             let client = try OllamaClient(baseURL: theme.settings.ollamaURL, model: theme.settings.ollamaModel)
             models = try await client.models()

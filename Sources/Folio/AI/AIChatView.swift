@@ -12,6 +12,7 @@ struct AIChatView: View {
     @State private var draft = ""
     @State private var showContext = false
     @State private var availabilityTick = 0
+    @ObservedObject private var ollama = OllamaStatus.shared
     @FocusState private var inputFocused: Bool
 
     private let onInsert: (String) -> Void
@@ -45,6 +46,8 @@ struct AIChatView: View {
         .tint(theme.accent)
         .floating(cornerRadius: 18)
         .onAppear { inputFocused = true }
+        // Whether a chosen Ollama answers, before the first question (#237).
+        .task(id: availabilityTick) { if AIProvider.usesOllama { await OllamaStatus.shared.refresh() } }
         .onChange(of: chat.noteID) {
             draft = ""
             inputFocused = true
@@ -115,7 +118,7 @@ struct AIChatView: View {
     private func unavailableNotice(_ a: AIAvailability) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(a.title, systemImage: "exclamationmark.circle").font(.system(size: 12.5, weight: .semibold))
-            Text(a.explanation).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(AIActionSheet.markdown(a.explanation)).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 if let url = a.settingsURL {
                     Button("Systemeinstellungen öffnen") { NSWorkspace.shared.open(url) }
@@ -499,7 +502,7 @@ private struct AIChatThinkingIndicator: View {
                 .padding(.leading, 4)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Apple Intelligence denkt nach")
+        .accessibilityLabel("\(AIProvider.name) denkt nach")
         .onAppear { pulsing = true }
     }
 }
