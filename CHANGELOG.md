@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.6.6] – 2026-11-17
+
 ### Behoben
 - **Links aus KI-Antworten** (#252): Links behalten ihr Ziel und lassen sich anklicken; übernommen werden nur Web- und Mail-Adressen.
 - **Inline-Code beim Ersetzen** (#253): Code richtet sich nach der Größe des ersetzten Textes statt der Standardgröße.
