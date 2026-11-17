@@ -26,6 +26,8 @@ struct NoteEditorView: View {
     @State private var showHistory = false
     @State private var aiRequest: AIActionRequest?
     @State private var showTagSuggestions = false
+    @State private var showAllTags = false
+    @State private var tagRowWidth: CGFloat = 600
     @State private var showInfo = false
     @StateObject private var find = FindModel()
     @State private var showFind = false
@@ -135,8 +137,18 @@ struct NoteEditorView: View {
 
     @ViewBuilder private var tagRow: some View {
         // Many tags wrap onto further lines instead of squeezing every chip (#248).
+        let shown = showAllTags ? doc.meta.tags.count : TagRowFit.count(doc.meta.tags, width: tagRowWidth)
         FlowLayout(spacing: 6) {
-            ForEach(doc.meta.tags, id: \.self, content: tagButton)
+            ForEach(doc.meta.tags.prefix(shown), id: \.self, content: tagButton)
+            // At most two rows of tags; the rest behind „+N weitere“, so many long tags do not push the note away (#257).
+            if shown < doc.meta.tags.count || showAllTags && TagRowFit.count(doc.meta.tags, width: tagRowWidth) < doc.meta.tags.count {
+                Button(showAllTags ? "Weniger" : "+\(doc.meta.tags.count - shown) weitere") { showAllTags.toggle() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(theme.accent)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .fixedSize()
+            }
             // Tag ideas from the text and the library (#37); nothing is added until a chip is clicked.
             Button { showTagSuggestions = true } label: {
                 Label(doc.meta.tags.isEmpty ? "Tags vorschlagen" : "", systemImage: "tag")
@@ -155,6 +167,7 @@ struct NoteEditorView: View {
             }
         }
         .padding(.leading, BlockRow.gutter)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagRowWidth = $0 - BlockRow.gutter }
     }
 
     private func tagButton(_ tag: String) -> some View {
@@ -664,5 +677,25 @@ struct NoteEditorView: View {
             doc.blocks.append(b)
             formatting.focus(blockID: b.id)
         }
+    }
+}
+
+/// How many tag chips fit into two rows of the tag row, leaving room for „+N weitere“ and the tag button (#257).
+enum TagRowFit {
+    static func count(_ tags: [String], width: CGFloat, rows: Int = 2) -> Int {
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let reserve: CGFloat = 130   // „+N weitere“ and the suggestion button at the end
+        var row = 1, x: CGFloat = 0
+        for (i, tag) in tags.enumerated() {
+            let w = ("#" + tag as NSString).size(withAttributes: [.font: font]).width + 18 + 6
+            let limit = row == rows && i < tags.count - 1 ? width - reserve : width
+            if x + w > limit, x > 0 {
+                row += 1
+                x = 0
+                if row > rows { return i }
+            }
+            x += w
+        }
+        return tags.count
     }
 }

@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Viele Tags unter dem Titel** (#257): Es stehen höchstens zwei Zeilen Tags über der Notiz, der Rest liegt hinter „+N weitere“ und lässt sich aufklappen („Weniger“ klappt wieder zu). Vorher schoben viele lange Tags im schmalen Fenster Titel und Text aus dem Bild.
+
 ## [1.6.6] – 2026-11-17
 
 ### Behoben

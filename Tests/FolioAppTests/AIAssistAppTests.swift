@@ -159,4 +159,16 @@ final class AIAssistAppTests: XCTestCase {
         let code = ChatAnswerFormatter.attributed(fromMarkdown: "a `b`", theme: ThemeManager.shared, base: base)
         XCTAssertEqual((code.attribute(.font, at: 2, effectiveRange: nil) as? NSFont)?.pointSize ?? 0, 24 * 0.92, accuracy: 0.01)
     }
+
+    func testTagRowFitsTwoRows() {
+        let short = ["a", "b", "c"]
+        XCTAssertEqual(TagRowFit.count(short, width: 400), 3)
+        let long = (1...18).map { "projektplanunglangertag\($0)" }
+        let narrow = TagRowFit.count(long, width: 220)
+        XCTAssertGreaterThanOrEqual(narrow, 1)
+        XCTAssertLessThanOrEqual(narrow, 2)
+        let wide = TagRowFit.count(long, width: 1000)
+        XCTAssertGreaterThan(wide, narrow)
+        XCTAssertLessThan(wide, 18)
+    }
 }
