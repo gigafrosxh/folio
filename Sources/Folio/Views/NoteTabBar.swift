@@ -10,13 +10,19 @@ struct NoteTabBar: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            ScrollView(.horizontal) {
-                HStack(spacing: 4) {
-                    ForEach(store.tabs, id: \.self) { id in tab(id) }
+            // The selected tab is always scrolled into view, also when it is chosen elsewhere (#256).
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 4) {
+                        ForEach(store.tabs, id: \.self) { id in tab(id).id(id) }
+                    }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
+                .scrollIndicators(.automatic)
+                .onAppear { reveal(store.selectedNoteID, with: proxy) }
+                .onChange(of: store.selectedNoteID) { _, id in reveal(id, with: proxy) }
+                .onChange(of: store.tabs) { _, _ in reveal(store.selectedNoteID, with: proxy) }
             }
-            .scrollIndicators(.never)
             Button { store.createNoteInNewTab() } label: {
                 Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).frame(width: 26, height: 26)
             }
@@ -27,6 +33,11 @@ struct NoteTabBar: View {
         .padding(.vertical, 6)
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
         .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
+    }
+
+    private func reveal(_ id: UUID?, with proxy: ScrollViewProxy) {
+        guard let id, store.tabs.contains(id) else { return }
+        withAnimation(Motion.quick) { proxy.scrollTo(id, anchor: .center) }
     }
 
     private func title(_ id: UUID) -> String {

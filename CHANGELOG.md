@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Links aus KI-Antworten** (#252): Links behalten ihr Ziel und lassen sich anklicken; übernommen werden nur Web- und Mail-Adressen.
+- **Inline-Code beim Ersetzen** (#253): Code richtet sich nach der Größe des ersetzten Textes statt der Standardgröße.
+- **Datenbank-Block im schmalen Fenster** (#254, #255): Der Kopf blendet bei wenig Platz Beschriftungen aus und legt Schema, Verbindung und CSV in ein Menü; Ausführen wird zum Symbol. In schmalen Blöcken steht das Schema über dem Editor statt daneben, die Ergebniszeile bleibt einzeilig („1 Zeile“ statt „1 Zeilen“).
+- **Viele Tabs** (#256): Die Tab-Leiste scrollt zum gewählten Tab und zeigt bei Bedarf einen Scrollbalken.
+
 ## [1.6.5] – 2026-11-16
 
 ### Behoben

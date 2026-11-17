@@ -74,6 +74,7 @@ struct DatabaseBlockView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var editorHeight: CGFloat = 60
     @State private var editingConnection = false
+    @State private var blockWidth: CGFloat = 700
 
     init(block: BlockModel, doc: NoteDocument) {
         self.block = block
@@ -87,28 +88,10 @@ struct DatabaseBlockView: View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.5)
-            HStack(alignment: .top, spacing: 0) {
-                if state.showSchema, block.connection != nil {
-                    schemaSidebar
-                        .frame(width: 200)
-                        .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
-                    Divider()
-                }
-                VStack(spacing: 0) {
-                    CodeEditorView(block: block, height: $editorHeight, codeTheme: codeTheme, font: theme.codeFont(),
-                                   showLineNumbers: theme.settings.showLineNumbers,
-                                   onChange: { doc.markDirty() }, onRun: run,
-                                   onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
-                                   linkedPrelude: { state.completionWords })
-                        .frame(height: max(editorHeight, 44))
-                        .background(Color(nsColor: codeTheme.backgroundColor))
-                    Divider()
-                    results
-                        .frame(height: CGFloat(block.height))
-                }
-            }
+            content
             resizeHandle
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { blockWidth = $0 }
         .background {
             RoundedRectangle(cornerRadius: CGFloat(theme.settings.cornerRadius), style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -134,42 +117,122 @@ struct DatabaseBlockView: View {
 
     // MARK: Header
 
+    private var wide: Bool { blockWidth >= 520 }
+
+    /// Schema, editor and results; narrow blocks put the schema above the editor instead of beside it (#255).
+    private var content: some View {
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        return layout {
+            if state.showSchema, block.connection != nil {
+                schemaSidebar
+                    .frame(width: wide ? 200 : nil)
+                    .frame(maxHeight: wide ? nil : 140)
+                    .transition(Motion.enabled ? .move(edge: .leading).combined(with: .opacity) : .identity)
+                Divider()
+            }
+            editorAndResults
+        }
+    }
+
+    private var editorAndResults: some View {
+        VStack(spacing: 0) {
+            CodeEditorView(block: block, height: $editorHeight, codeTheme: codeTheme, font: theme.codeFont(),
+                           showLineNumbers: theme.settings.showLineNumbers,
+                           onChange: { doc.markDirty() }, onRun: run,
+                           onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
+                           linkedPrelude: { state.completionWords })
+                .frame(height: max(editorHeight, 44))
+                .background(Color(nsColor: codeTheme.backgroundColor))
+            Divider()
+            results
+                .frame(height: CGFloat(block.height))
+        }
+    }
+
+    /// Full header when there is room; narrower blocks drop the labels and fold the tools into a menu, so the
+    /// block never forces the window layout wider than the window (#254, #255).
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "cylinder.split.1x2").foregroundStyle(theme.accent)
-            if let c = block.connection {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(c.name.isEmpty ? c.driver.name : c.name).font(.system(size: 12, weight: .semibold)).lineLimit(1).truncationMode(.middle)
-                    Text("\(c.driver.name) · \(c.summary)").font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
-                }
-            } else {
-                // One line, never broken into syllables (#247).
-                Text("Keine Verbindung").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).fixedSize()
-            }
-            Spacer()
-            if let r = state.result, state.error == nil {
-                Text(resultSummary(r)).font(.system(size: 10.5)).foregroundStyle(.secondary)
-            }
-            iconButton("sidebar.left", "Schema ein-/ausblenden") { state.showSchema.toggle() }
-                .disabled(block.connection == nil)
-            iconButton("gearshape", "Verbindung bearbeiten") { editingConnection = true }
-            iconButton("doc.on.doc", "Ergebnis als CSV kopieren") { copyCSV() }
-                .disabled(state.result?.columns.isEmpty ?? true)
-            Button(action: state.isRunning ? state.stop : run) {
-                Label(state.isRunning ? "Stopp" : "Ausführen", systemImage: state.isRunning ? "stop.fill" : "play.fill")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 11)
-                    .frame(height: 26)
-                    .background(state.isRunning ? Color.red : Color(red: 0.12, green: 0.55, blue: 0.27),
-                                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(block.connection == nil)
-            .help("Abfrage ausführen (⇧↩ oder ⌘↩)")
+        ViewThatFits(in: .horizontal) {
+            headerRow(compact: false)
+            headerRow(compact: true)
+            HStack(spacing: 8) { connectionIcon; Spacer(minLength: 4); toolsMenu; runButton(iconOnly: true) }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func headerRow(compact: Bool) -> some View {
+        HStack(spacing: 8) {
+            connectionIcon
+            if !compact { connectionLabel }
+            Spacer(minLength: 4)
+            if !compact, let r = state.result, state.error == nil {
+                Text(resultSummary(r)).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+            }
+            toolButtons
+            runButton(iconOnly: compact)
+        }
+    }
+
+    private var connectionIcon: some View {
+        Image(systemName: "cylinder.split.1x2").foregroundStyle(theme.accent)
+            .help(block.connection.map { $0.name.isEmpty ? $0.driver.name : $0.name } ?? "Keine Verbindung")
+    }
+
+    @ViewBuilder private var connectionLabel: some View {
+        if let c = block.connection {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(c.name.isEmpty ? c.driver.name : c.name).font(.system(size: 12, weight: .semibold)).lineLimit(1).truncationMode(.middle)
+                Text("\(c.driver.name) · \(c.summary)").font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+            }
+        } else {
+            // One line, never broken into syllables (#247).
+            Text("Keine Verbindung").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).fixedSize()
+        }
+    }
+
+    @ViewBuilder private var toolButtons: some View {
+        iconButton("sidebar.left", "Schema ein-/ausblenden") { state.showSchema.toggle() }
+            .disabled(block.connection == nil)
+        iconButton("gearshape", "Verbindung bearbeiten") { editingConnection = true }
+        iconButton("doc.on.doc", "Ergebnis als CSV kopieren") { copyCSV() }
+            .disabled(state.result?.columns.isEmpty ?? true)
+    }
+
+    private var toolsMenu: some View {
+        Menu {
+            Button("Schema ein-/ausblenden") { state.showSchema.toggle() }.disabled(block.connection == nil)
+            Button("Verbindung bearbeiten …") { editingConnection = true }
+            Button("Ergebnis als CSV kopieren") { copyCSV() }.disabled(state.result?.columns.isEmpty ?? true)
+        } label: {
+            Image(systemName: "ellipsis.circle").font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 26, height: 26)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .helpLabel("Schema, Verbindung, CSV")
+    }
+
+    private var runTitle: String { state.isRunning ? "Stopp" : "Ausführen" }
+    private var runIcon: String { state.isRunning ? "stop.fill" : "play.fill" }
+    private var runColor: Color { state.isRunning ? Color.red : Color(red: 0.12, green: 0.55, blue: 0.27) }
+
+    private func runButton(iconOnly: Bool) -> some View {
+        Button(action: state.isRunning ? state.stop : run) {
+            Group {
+                if iconOnly { Image(systemName: runIcon) } else { Label(runTitle, systemImage: runIcon) }
+            }
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .background(runColor, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(block.connection == nil)
+        .help("Abfrage ausführen (⇧↩ oder ⌘↩)")
+        .accessibilityLabel(runTitle)
     }
 
     private func iconButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
@@ -183,7 +246,8 @@ struct DatabaseBlockView: View {
     private func resultSummary(_ r: QueryResult) -> String {
         let time = String(format: "%.0f ms", r.duration * 1000)
         if r.columns.isEmpty { return "\(r.message ?? "Ausgeführt") · \(time)" }
-        return "\(r.rows.count)\(r.truncated ? "+" : "") Zeilen · \(time)"
+        let rows = r.rows.count == 1 && !r.truncated ? "1 Zeile" : "\(r.rows.count)\(r.truncated ? "+" : "") Zeilen"
+        return "\(rows) · \(time)"
     }
 
     // MARK: Schema

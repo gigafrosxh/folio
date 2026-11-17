@@ -148,4 +148,15 @@ final class AIAssistAppTests: XCTestCase {
         XCTAssertTrue(t2.contains([.italicFontMask, .boldFontMask]))
         XCTAssertEqual(ChatAnswerFormatter.attributed(fromMarkdown: "\\*kein\\* Kursiv", theme: ThemeManager.shared).string, "*kein* Kursiv")
     }
+
+    func testLinksKeepTargetAndCodeFollowsSize() {
+        let out = ChatAnswerFormatter.attributed(fromMarkdown: "Siehe [Beispiel](https://example.com) und [x](file:///etc/passwd)", theme: ThemeManager.shared)
+        XCTAssertEqual(out.string, "Siehe Beispiel und x")
+        XCTAssertEqual(out.attribute(.link, at: 7, effectiveRange: nil) as? URL, URL(string: "https://example.com"))
+        XCTAssertNil(out.attribute(.link, at: 19, effectiveRange: nil), "keine file:-Links aus KI-Antworten")
+        var base = ThemeManager.shared.bodyAttributes
+        base[.font] = NSFont.systemFont(ofSize: 24)
+        let code = ChatAnswerFormatter.attributed(fromMarkdown: "a `b`", theme: ThemeManager.shared, base: base)
+        XCTAssertEqual((code.attribute(.font, at: 2, effectiveRange: nil) as? NSFont)?.pointSize ?? 0, 24 * 0.92, accuracy: 0.01)
+    }
 }

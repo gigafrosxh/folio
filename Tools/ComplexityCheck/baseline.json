@@ -10,7 +10,6 @@
   "Sources/Folio/Code/TerminalPanel.swift|TerminalPanel.body" : 21,
   "Sources/Folio/Editor/FindBar.swift|FindBar.body" : 29,
   "Sources/Folio/Embeds/AudioBlockView.swift|AudioBlockView.body" : 18,
-  "Sources/Folio/Embeds/DatabaseBlockView.swift|DatabaseBlockView.header" : 20,
   "Sources/Folio/Embeds/DatabaseBlockView.swift|DatabaseConnectionSheet.body" : 23,
   "Sources/Folio/Embeds/DatabaseBlockView.swift|SchemaTableRow.body" : 23,
   "Sources/Folio/Embeds/EmbedViews.swift|WebBlockView.body" : 16,

@@ -39,7 +39,10 @@ enum ChatAnswerFormatter {
         }
         for run in parsed.runs {
             let text = String(parsed[run.range].characters)
-            result.append(NSAttributedString(string: text, attributes: styled(attrs, intent: run.inlinePresentationIntent, theme: theme)))
+            var a = styled(attrs, intent: run.inlinePresentationIntent, theme: theme)
+            // Links keep their target (#252); only web and mail addresses, nothing the model could use to run things.
+            if let url = run.link, ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") { a[.link] = url }
+            result.append(NSAttributedString(string: text, attributes: a))
         }
     }
 
@@ -47,7 +50,9 @@ enum ChatAnswerFormatter {
         guard let intent else { return attrs }
         var a = attrs
         if intent.contains(.code) {
-            a[.font] = NSFont.monospacedSystemFont(ofSize: theme.bodyFont().pointSize * 0.92, weight: .regular)
+            // Code follows the size of the surrounding text, e.g. the replaced selection (#253).
+            let size = (attrs[.font] as? NSFont)?.pointSize ?? theme.bodyFont().pointSize
+            a[.font] = NSFont.monospacedSystemFont(ofSize: size * 0.92, weight: .regular)
             a[.backgroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.12)
             return a
         }
