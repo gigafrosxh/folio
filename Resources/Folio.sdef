@@ -27,6 +27,7 @@
       <cocoa class="FolioAppendCommand"/>
       <direct-parameter type="text" description="ID, Titel oder Suchbegriff der Notiz."/>
       <parameter name="with text" code="FTxt" type="text" description="Der Text."><cocoa key="FTxt"/></parameter>
+      <result type="text" description="Was geschehen ist (gespeichert, wartet, nur im offenen Editor)."/>
     </command>
   </suite>
 </dictionary>

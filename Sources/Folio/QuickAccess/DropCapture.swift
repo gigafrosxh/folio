@@ -32,11 +32,13 @@ enum DropCapture {
                 problems.append("„\(url.lastPathComponent)“ ist größer als 1 GB.")
                 return nil
             }
-            guard let data = try? Data(contentsOf: url), NSImage(data: data) != nil else {
+            guard let data = try? Data(contentsOf: url), let image = NSImage(data: data) else {
                 problems.append("„\(url.lastPathComponent)“ ist kein lesbares Bild.")
                 return nil
             }
-            return data
+            // The capture stores PNG or JPEG; HEIC, TIFF, GIF … are converted so name and type fit the data (#351).
+            let isPNG = data.starts(with: [0x89, 0x50, 0x4E, 0x47]), isJPEG = data.starts(with: [0xFF, 0xD8])
+            return isPNG || isJPEG ? data : png(image)
         }
         if !images.isEmpty {
             let result = CaptureService.shared.save(CaptureItem(text: "", images: images))

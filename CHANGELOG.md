@@ -7,6 +7,15 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Kleinere Review-Funde 1.8/1.9** (#351):
+  - „An Notiz anhängen“ (Kurzbefehle, AppleScript) meldet, ob der Text gesichert ist, wartet oder nur im offenen Editor steht.
+  - Eingeklappte Abschnitte wirken in allen Fenstern einer Notiz.
+  - Markdown- und Obsidian-Import erkennen Codeblöcke mit mehr als drei Backticks richtig; `![[Version 1.2]]` gilt als Notiz, wenn es sie im Vault gibt.
+  - Auf das Dock-Symbol gezogene HEIC-, TIFF- oder GIF-Bilder werden als PNG gespeichert, passend zu Name und Typ.
+  - Die Teilen-Erweiterung meldet einen Fehler, wenn Folio nicht geöffnet werden kann.
+  - Ein Widget mit einer nicht mehr vorhandenen gewählten Notiz oder Checkliste zeigt den Leerzustand statt einer anderen; es kennt jetzt bis zu 1000 Notizen und 200 Checklisten.
+
 ## [1.9.3] – 2026-11-19
 
 ### Behoben

@@ -72,9 +72,8 @@ struct AppendToNoteIntent: AppIntent {
     @Parameter(title: "Notiz") var note: NoteEntity
     @Parameter(title: "Text") var text: String
 
-    @MainActor func perform() async throws -> some IntentResult {
-        try NoteAutomation.append(text, to: try NoteAutomation.find(note.id.uuidString))
-        return .result()
+    @MainActor func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        .result(value: try NoteAutomation.append(text, to: try NoteAutomation.find(note.id.uuidString)))
     }
 }
 

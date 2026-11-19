@@ -29,8 +29,13 @@ final class ShareViewController: NSViewController {
             }
         }
         if let link = WebClip.captureLink(title: title, url: url, excerpt: selection ?? text) {
-            NSWorkspace.shared.open(link)
-            extensionContext?.completeRequest(returningItems: nil)
+            // Report a failure instead of pretending the clip arrived (#351).
+            if NSWorkspace.shared.open(link) {
+                extensionContext?.completeRequest(returningItems: nil)
+            } else {
+                extensionContext?.cancelRequest(withError: NSError(domain: "de.daniel.folio.share", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Folio konnte nicht geöffnet werden. Ist Folio installiert?"]))
+            }
         } else {
             extensionContext?.cancelRequest(withError: NSError(domain: "de.daniel.folio.share", code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "Nichts zum Übernehmen: keine Webadresse und kein Text."]))

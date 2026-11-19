@@ -45,12 +45,13 @@ enum ObsidianImporter {
             report.failures.append("Im Ordner liegen keine Markdown-Notizen.")
             return report
         }
+        let names = Set(notes.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension.lowercased() })
         let folder = uniqueFolder(library.appendingPathComponent(NoteStore.sanitize(vault.lastPathComponent), isDirectory: true))
         report.folder = folder
         for rel in notes {
             do {
                 let text = try await Task.detached(priority: .userInitiated) { try readText(vault.appendingPathComponent(rel)) }.value
-                try importNote(rel, text: text, vault: vault, files: files, into: folder, report: &report)
+                try importNote(rel, text: text, vault: vault, files: files, names: names, into: folder, report: &report)
             } catch {
                 report.failures.append("\(rel): \(error.localizedDescription)")
             }
@@ -68,10 +69,10 @@ enum ObsidianImporter {
         return text
     }
 
-    private static func importNote(_ rel: String, text: String, vault: URL, files: [String: String], into folder: URL, report: inout Report) throws {
+    private static func importNote(_ rel: String, text: String, vault: URL, files: [String: String], names: Set<String>, into folder: URL, report: inout Report) throws {
         let source = vault.appendingPathComponent(rel)
         let title = (rel as NSString).lastPathComponent.replacingOccurrences(of: ".md", with: "", options: [.caseInsensitive, .anchored, .backwards])
-        let prepared = ObsidianImport.prepare(text, title: title, files: files, noteFolder: (rel as NSString).deletingLastPathComponent)
+        let prepared = ObsidianImport.prepare(text, title: title, files: files, notePaths: names, noteFolder: (rel as NSString).deletingLastPathComponent)
         report.missing += prepared.missing
         var file = MarkdownTransfer.note(fromMarkdown: prepared.markdown, title: title, baseURL: vault)
         if !prepared.properties.isEmpty {

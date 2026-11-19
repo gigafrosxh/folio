@@ -51,7 +51,6 @@ final class FolioAppendCommand: FolioScriptCommand {
         let addition = evaluatedArguments?["FTxt"] as? String ?? ""
         return onMain {
             try NoteAutomation.append(addition, to: try NoteAutomation.find(text))
-            return nil
         }
     }
 }

@@ -11,6 +11,30 @@ public enum MarkdownPiece: Equatable, Sendable {
     case image(alt: String, path: String)
 }
 
+/// A code fence as CommonMark has it: three or more backticks or tildes; only a run of the same character that is at
+/// least as long closes it, so a ```` ```` ```` block may contain ``` lines (#351).
+public struct MarkdownFence: Equatable, Sendable {
+    public var character: Character
+    public var length: Int
+    public var info: String
+
+    public static func opening(_ line: String) -> MarkdownFence? {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        guard let c = t.first, c == "`" || c == "~" else { return nil }
+        let run = t.prefix { $0 == c }.count
+        guard run >= 3 else { return nil }
+        let info = String(t.dropFirst(run)).trimmingCharacters(in: .whitespaces)
+        if c == "`" && info.contains("`") { return nil }
+        return MarkdownFence(character: c, length: run, info: info)
+    }
+
+    public func isClosed(by line: String) -> Bool {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        let run = t.prefix { $0 == character }.count
+        return run >= length && t.dropFirst(run).trimmingCharacters(in: .whitespaces).isEmpty
+    }
+}
+
 public enum MarkdownStructure {
     public static func pieces(_ markdown: String) -> [MarkdownPiece] {
         var out: [MarkdownPiece] = []
@@ -28,12 +52,11 @@ public enum MarkdownStructure {
         while i < lines.count {
             let line = lines[i]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                let fence = String(trimmed.prefix(3))
-                let lang = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces).lowercased()
+            if let fence = MarkdownFence.opening(line) {
+                let lang = fence.info.lowercased()
                 var body: [String] = []
                 i += 1
-                while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix(fence) { body.append(lines[i]); i += 1 }
+                while i < lines.count, !fence.isClosed(by: lines[i]) { body.append(lines[i]); i += 1 }
                 flushText()
                 let code = body.joined(separator: "\n")
                 if lang == "mermaid" { out.append(.mermaid(code)) }

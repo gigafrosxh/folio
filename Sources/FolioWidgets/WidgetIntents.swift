@@ -93,9 +93,20 @@ struct ConfiguredProvider<Intent: WidgetConfigurationIntent>: AppIntentTimelineP
 }
 
 extension ConfiguredProvider where Intent == PickNoteIntent {
-    static var note: Self { Self { intent, s in if let id = intent.note.flatMap({ UUID(uuidString: $0.id) }), s.note(id) != nil { s.featuredNoteID = id } } }
+    /// A chosen note that is no longer in the snapshot shows the empty state, never some other note (#351).
+    static var note: Self {
+        Self { intent, s in
+            guard let id = intent.note.flatMap({ UUID(uuidString: $0.id) }) else { return }
+            if s.note(id) != nil { s.featuredNoteID = id } else { s.notes = []; s.pinned = []; s.recent = []; s.featuredNoteID = nil }
+        }
+    }
 }
 
 extension ConfiguredProvider where Intent == PickChecklistIntent {
-    static var checklist: Self { Self { intent, s in if let id = intent.checklist.flatMap({ UUID(uuidString: $0.id) }), s.checklist(id) != nil { s.featuredChecklistID = id } } }
+    static var checklist: Self {
+        Self { intent, s in
+            guard let id = intent.checklist.flatMap({ UUID(uuidString: $0.id) }) else { return }
+            if s.checklist(id) != nil { s.featuredChecklistID = id } else { s.checklists = []; s.featuredChecklistID = nil }
+        }
+    }
 }

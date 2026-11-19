@@ -83,3 +83,14 @@ final class ObsidianP1Tests: XCTestCase {
         XCTAssertTrue(p.markdown.contains("![u](Projekt/oben.png)"))
     }
 }
+
+final class ObsidianP2Tests: XCTestCase {
+    func testLongFencesAndNoteEmbeds() {
+        let md = "````md\n```\n[[innen]]\n```\n````\n[[Ordner/außen]]\n![[Version 1.2]]"
+        let p = ObsidianImport.prepare(md, title: "T", files: [:], notePaths: ["version 1.2"])
+        XCTAssertTrue(p.markdown.contains("[[Ordner/außen]]") == false && p.markdown.contains("[[außen]]"))
+        XCTAssertTrue(p.markdown.contains("[[innen]]"), "inside the 4-backtick block nothing changes")
+        XCTAssertTrue(p.markdown.contains("[[Version 1.2]]") && p.missing.isEmpty, p.markdown)
+        XCTAssertEqual(MarkdownStructure.pieces("````\n```\nx\n```\n````"), [.code(language: "", code: "```\nx\n```")])
+    }
+}

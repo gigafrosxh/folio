@@ -135,8 +135,11 @@ extension NoteDocument {
     /// Puts the hidden ranges into every open text view of this note.
     func applyFolds() {
         for b in blocks where b.kind == .text {
-            guard let tv = FormattingController.shared.textView(for: b.id), tv.textStorage === b.storage else { continue }
-            tv.setHiddenRanges(hiddenRanges(in: b.id))
+            // Every view of the block: the note may be open in the main window and in a window of its own (#351).
+            let views = b.storage.layoutManagers.compactMap { $0.firstTextView as? FolioTextView }
+            guard !views.isEmpty else { continue }
+            let ranges = hiddenRanges(in: b.id)
+            for tv in views { tv.setHiddenRanges(ranges) }
         }
     }
 

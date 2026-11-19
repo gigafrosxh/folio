@@ -82,10 +82,13 @@ enum NoteAutomation {
         NoteStore.shared.open(noteID: ref.id)
     }
 
-    /// Appends text at the end of a note, like a quick capture (with date line).
-    static func append(_ text: String, to ref: NoteRef) throws {
+    /// Appends text at the end of a note, like a quick capture (with date line). Returns what happened: saved, waiting
+    /// in the queue, or only in the open editor because the note could not be saved yet (#351).
+    @discardableResult
+    static func append(_ text: String, to ref: NoteRef) throws -> String {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw Failure.empty }
         let result = CaptureService.shared.save(CaptureItem(text: text, target: .note(ref.id)))
         guard result.ok else { throw Failure.notCreated(result.message) }
+        return result.message
     }
 }

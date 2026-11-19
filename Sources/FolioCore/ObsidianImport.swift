@@ -128,7 +128,7 @@ public enum ObsidianImport {
     static func outsideCode(_ text: String, _ transform: (String) -> String) -> String {
         var out = ""
         var plain: [String] = []
-        var fence: String?
+        var fence: MarkdownFence?
         let lines = text.components(separatedBy: "\n")
         for (i, line) in lines.enumerated() {
             let newline = i < lines.count - 1 ? "\n" : ""
@@ -142,7 +142,7 @@ public enum ObsidianImport {
                 out += inlineAware(plain.joined(separator: "\n"), transform)
                 plain = []
                 fence = opens
-            } else if line.trimmingCharacters(in: .whitespaces).hasPrefix(fence!) {
+            } else if fence!.isClosed(by: line) {
                 fence = nil
                 out += line + newline
                 continue
@@ -153,10 +153,7 @@ public enum ObsidianImport {
         return out
     }
 
-    private static func fenceMarker(_ line: String) -> String? {
-        let t = line.trimmingCharacters(in: .whitespaces)
-        return t.hasPrefix("```") || t.hasPrefix("~~~") ? String(t.prefix(3)) : nil
-    }
+    private static func fenceMarker(_ line: String) -> MarkdownFence? { MarkdownFence.opening(line) }
 
     /// Inline `code` spans are kept, the rest is transformed.
     private static func inlineAware(_ text: String, _ transform: (String) -> String) -> String {
@@ -180,9 +177,12 @@ public enum ObsidianImport {
         for m in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
             out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
             let target = ns.substring(with: m.range(at: 1)).trimmingCharacters(in: .whitespaces)
+            // `![[Version 1.2]]` is a note when the vault has `Version 1.2.md` (#351).
             let isNote = (target as NSString).pathExtension.isEmpty || target.lowercased().hasSuffix(".md")
+                || notePaths.contains(target.lowercased()) || files[target.lowercased()] == nil && notePaths.contains((target as NSString).lastPathComponent.lowercased())
             if isNote {
-                out += "[[\((target as NSString).deletingPathExtension.components(separatedBy: "/").last ?? target)]]"
+                let name = target.lowercased().hasSuffix(".md") ? String(target.dropLast(3)) : target
+                out += "[[\(name.components(separatedBy: "/").last ?? name)]]"
             } else if let rel = files[target.lowercased()] ?? files[(target as NSString).lastPathComponent.lowercased()] {
                 let path = rel.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? rel
                 out += "\n![\((target as NSString).lastPathComponent)](\(path))\n"

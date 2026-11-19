@@ -61,13 +61,13 @@ final class WidgetFeed {
             guard parsed.total > 0 else { continue }
             checklists.append(.init(noteID: ref.id, title: ref.meta.title, done: parsed.done, total: parsed.total,
                                     items: show ? parsed.items : []))
-            if checklists.count == 30 { break }
+            if checklists.count == 200 { break }
         }
         var snapshot = WidgetSnapshot(generated: now, libraryName: store.rootURL.lastPathComponent, libraryAvailable: available,
                                       showsContent: show,
                                       pinned: byDate.filter(\.meta.pinned).prefix(10).map(note),
                                       recent: byDate.prefix(10).map(note),
-                                      notes: byDate.prefix(200).map(note),
+                                      notes: byDate.prefix(1000).map(note),
                                       checklists: checklists)
         snapshot.featuredNoteID = UUID(uuidString: settings.widgetNote)
         snapshot.featuredChecklistID = UUID(uuidString: settings.widgetChecklist)
