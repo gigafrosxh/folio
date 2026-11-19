@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.7.1] – 2026-11-19
+
 ### Behoben
 - **iPad: kleiner Text** (#258): Text aus Mac-Notizen erscheint auf dem iPad in normaler Lesegröße; gespeichert wird weiter mit den Schriftgrößen des Macs.
 
