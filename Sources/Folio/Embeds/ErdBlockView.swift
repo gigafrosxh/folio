@@ -67,7 +67,14 @@ struct ErdBlockView: View {
     @State private var editingCopy: URL?
 
     private var view: ErduDocument.View { ErduDocument.View(rawValue: block.mode) ?? .er }
-    private var watchedFile: URL? { block.linkedFile.map { URL(fileURLWithPath: $0) } ?? editingCopy }
+    /// The file ERD-Ultra edits: the copy handed to it when there is one (the original may be missing), else the original.
+    private var watchedFile: URL? { editingCopy ?? block.linkedFile.map { URL(fileURLWithPath: $0) } }
+
+    /// Fixed name inside the block's own cache folder: the caption comes from the note and never becomes a path (#261).
+    private var copyURL: URL {
+        AttachmentSync.cacheRoot.appendingPathComponent(doc.id.uuidString, isDirectory: true)
+            .appendingPathComponent(block.id.uuidString, isDirectory: true).appendingPathComponent("Diagramm.erdu")
+    }
 
     var body: some View {
         EmbedCard(title: title, icon: "point.3.filled.connected.trianglepath.dotted",
@@ -163,7 +170,7 @@ struct ErdBlockView: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(800))
             let now = ErdBlocks.modificationDate(url)
-            fileMissing = now == nil && block.linkedFile != nil
+            fileMissing = block.linkedFile.map { !FileManager.default.fileExists(atPath: $0) } ?? false
             guard let now, now != last else { continue }
             last = now
             if let note = ErdBlocks.pull(url, into: block, doc: doc) { message = note }
@@ -178,23 +185,29 @@ struct ErdBlockView: View {
 
     private func openInErdUltra() {
         guard let app = ErdBlocks.appURL else { return }
-        var url = watchedFile
-        if url == nil || !FileManager.default.fileExists(atPath: url!.path) {
-            // No original: hand ERD-Ultra a copy and follow it.
-            let folder = AttachmentSync.cacheRoot.appendingPathComponent(doc.id.uuidString).appendingPathComponent(block.id.uuidString)
-            let copy = folder.appendingPathComponent((block.caption.isEmpty ? "Diagramm" : block.caption) + ".erdu")
-            do {
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                try Data(block.storage.string.utf8).write(to: copy, options: .atomic)
-            } catch {
-                message = "Kopie konnte nicht angelegt werden: \(error.localizedDescription)"
-                return
+        let original = block.linkedFile.map { URL(fileURLWithPath: $0) }
+        var url: URL
+        if let original, FileManager.default.fileExists(atPath: original.path) {
+            url = original
+            editingCopy = nil
+        } else {
+            // No original: hand ERD-Ultra a copy and follow it. An existing copy may hold edits not yet taken in;
+            // it is read first and never overwritten with the older block content (#261).
+            url = copyURL
+            if FileManager.default.fileExists(atPath: url.path) {
+                if let note = ErdBlocks.pull(url, into: block, doc: doc) { message = note }
+            } else {
+                do {
+                    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try Data(block.storage.string.utf8).write(to: url, options: .atomic)
+                } catch {
+                    message = "Kopie konnte nicht angelegt werden: \(error.localizedDescription)"
+                    return
+                }
             }
-            if block.linkedFile == nil { editingCopy = copy }
-            url = copy
+            editingCopy = url
         }
-        let config = NSWorkspace.OpenConfiguration()
-        NSWorkspace.shared.open([url!], withApplicationAt: app, configuration: config)
+        NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
     }
 
     // MARK: Export

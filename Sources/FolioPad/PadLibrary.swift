@@ -21,12 +21,16 @@ final class PadLibrary: ObservableObject {
     @Published private(set) var notes: [Entry] = []
     @Published private(set) var unreadable = 0
     @Published var selectedFolder: URL?
-    @Published var selectedNote: URL? { didSet { if oldValue != selectedNote { open(selectedNote) } } }
+    @Published var selectedNote: URL? { didSet { if oldValue != selectedNote && !reverting { switchNote(from: oldValue) } } }
     @Published private(set) var document: PadDocument?
     @Published var message: String?
     @Published var focusSearch = false
 
+    enum SaveResult: Equatable { case saved, failed, copied(URL) }
+
     private let scanner = LibraryScanner()
+    /// Set while the selection is put back without opening anything.
+    private var reverting = false
     private var saveTask: Task<Void, Never>?
 
     init(root: URL? = nil) {
@@ -63,8 +67,23 @@ final class PadLibrary: ObservableObject {
 
     // MARK: Open, edit, save
 
+    /// Opening another note first saves the open one. If that fails, the selection goes back and the unsaved edits
+    /// stay open; nothing is replaced (#260).
+    private func switchNote(from old: URL?) {
+        if saveNow(selectCopy: false) == .failed {
+            setSelection(old)
+            return
+        }
+        open(selectedNote)
+    }
+
+    private func setSelection(_ url: URL?) {
+        reverting = true
+        selectedNote = url
+        reverting = false
+    }
+
     private func open(_ url: URL?) {
-        saveNow()
         guard let url else { document = nil; return }
         do {
             document = try PadDocument(url: url)
@@ -84,20 +103,28 @@ final class PadLibrary: ObservableObject {
         }
     }
 
-    func saveNow() {
+    /// Saves the open note. A note changed elsewhere is kept and the edits go to a copy; with `selectCopy` (a plain
+    /// save, not a switch to another note) the copy is opened, so selection and editor always show the same note.
+    @discardableResult
+    func saveNow(selectCopy: Bool = true) -> SaveResult {
         saveTask?.cancel()
-        guard let doc = document, doc.isDirty else { return }
+        guard let doc = document, doc.isDirty else { return .saved }
         do {
             let outcome = try doc.save(history: NoteHistory(library: root))
             if case .savedAsCopy(let copy) = outcome {
                 message = "Die Notiz wurde inzwischen anderswo geändert. Deine Fassung liegt als „\(copy.deletingPathExtension().lastPathComponent)“ daneben."
                 reload()
-                selectedNote = copy
-                return
+                if selectCopy {
+                    setSelection(copy)
+                    open(copy)
+                }
+                return .copied(copy)
             }
             if let i = notes.firstIndex(where: { $0.url == doc.url }) { notes[i].meta = doc.file.meta }
+            return .saved
         } catch {
-            message = "Sichern fehlgeschlagen: \(error.localizedDescription)"
+            message = "Sichern fehlgeschlagen: \(error.localizedDescription) Die Änderungen bleiben offen."
+            return .failed
         }
     }
 
@@ -120,7 +147,8 @@ final class PadLibrary: ObservableObject {
 
     func trashSelected() {
         guard let url = selectedNote else { return }
-        saveNow()
+        // Not after a failed save or a conflict copy: the user should see first what is where.
+        guard saveNow() == .saved, selectedNote == url else { return }
         do {
             _ = try LibraryTrash(library: root).moveToTrash(url, title: document?.file.meta.title)
             document = nil

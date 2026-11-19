@@ -603,8 +603,8 @@ struct CodeBlockView: View {
     @ViewBuilder private var fileItems: some View {
         Button(block.linkedFile == nil ? "Als Datei exportieren …" : "Als andere Datei exportieren …") { CodeFileLink.export(block, in: doc) }
         if let path = block.linkedFile {
-            Button("In „\(URL(fileURLWithPath: path).lastPathComponent)“ schreiben") {
-                CodeFileLink.write(block, to: URL(fileURLWithPath: path), in: doc)
+            Button("In „\(URL(fileURLWithPath: path).lastPathComponent)“ schreiben …") {
+                CodeFileLink.confirmAndWrite(block, to: URL(fileURLWithPath: path), in: doc)
             }
             Button("Mit verknüpfter Datei vergleichen …") { showDiff = true }
             Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }

@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **iPad: Sichern, Wechseln und Konflikte** (#260): Scheitert das Sichern, bleibt die Notiz mit allen Änderungen offen und die Auswahl springt zurück. Bei einer Konfliktkopie zeigen Auswahl und Editor immer dieselbe Notiz, die Kopie bekommt neue Block- und Anhang-IDs. Ohne gesicherte Vorversion wird keine Notiz überschrieben. Ein zweites Fenster übernimmt Änderungen aus dem ersten, bevor man darin weitertippt. Der iPad-Selbsttest läuft nur noch mit einer Testbibliothek.
+- **Verknüpfte Dateien** (#261): Die Arbeitskopie für ERD-Ultra heißt immer „Diagramm.erdu“ im eigenen Cache-Ordner des Blocks (die Beschriftung wird kein Pfad mehr). Folio beobachtet die tatsächlich geöffnete Kopie und überschreibt sie nicht mit einem älteren Stand. „In Datei schreiben“ zeigt vorher den vollständigen Pfad und fragt nach; der Vergleich schreibt nur, wenn die Datei noch so ist wie angezeigt.
+
 ## [1.7.1] – 2026-11-19
 
 ### Behoben

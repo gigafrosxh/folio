@@ -12,6 +12,8 @@ final class PadDocument: ObservableObject, Identifiable {
     let url: URL
     @Published private(set) var file: NoteFile
     @Published private(set) var isDirty = false
+    /// Counts edits, so a second window can tell that its editor shows an older state (#260).
+    @Published private(set) var revision = 0
     /// Modification date of the file when it was read; a different date at save time means someone else changed it.
     private var diskDate: Date?
 
@@ -73,6 +75,7 @@ final class PadDocument: ObservableObject, Identifiable {
 
     private func markChanged() {
         isDirty = true
+        revision += 1
         objectWillChange.send()
     }
 
@@ -87,13 +90,13 @@ final class PadDocument: ObservableObject, Identifiable {
         if fm.fileExists(atPath: url.path), Self.modificationDate(url) != diskDate {
             // Changed elsewhere since it was opened: keep both.
             let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
-            var mine = file
-            mine.meta.id = UUID()
-            try mine.encoded().write(to: copy, options: .atomic)
+            // New ids for note, blocks and attachments: both files may be open on the Mac at once (#260).
+            try NoteIdentity.renewed(file).encoded().write(to: copy, options: .atomic)
             isDirty = false
             return .savedAsCopy(copy)
         }
-        if let old = try? Data(contentsOf: url) { try? history.record(old, noteID: file.meta.id, force: true) }
+        // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
+        if fm.fileExists(atPath: url.path) { try history.record(try Data(contentsOf: url), noteID: file.meta.id, force: true) }
         try data.write(to: url, options: .atomic)
         diskDate = Self.modificationDate(url)
         isDirty = false

@@ -195,13 +195,20 @@ struct PadTextView: UIViewRepresentable {
         v.backgroundColor = .clear
         v.textContainerInset = .zero
         v.textContainer.lineFragmentPadding = 0
-        v.attributedText = Self.scaled(Self.adapted(text), by: Self.displayScale)
+        context.coordinator.show(text, in: v)
         v.delegate = context.coordinator
         v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return v
     }
 
-    func updateUIView(_ v: UITextView, context: Context) { context.coordinator.onChange = onChange }
+    /// Another window may have changed the block: shown at once when not typing here, else before the next edit (#260).
+    func updateUIView(_ v: UITextView, context: Context) {
+        let c = context.coordinator
+        c.onChange = onChange
+        guard !text.isEqual(to: c.model) else { return }
+        c.model = text
+        if v.isFirstResponder { c.stale = true } else { c.show(text, in: v) }
+    }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
         let width = proposal.width ?? 600
@@ -236,9 +243,28 @@ struct PadTextView: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextViewDelegate {
         var onChange: (NSAttributedString) -> Void
+        /// The model text last shown, and the scale it was shown with (saved back with the same factor).
+        var model = NSAttributedString()
+        var factor: CGFloat = 1
+        var stale = false
         init(onChange: @escaping (NSAttributedString) -> Void) { self.onChange = onChange }
+
+        func show(_ text: NSAttributedString, in v: UITextView) {
+            model = text
+            factor = PadTextView.displayScale
+            stale = false
+            v.attributedText = PadTextView.scaled(PadTextView.adapted(text), by: factor)
+        }
+
+        func textViewShouldBeginEditing(_ v: UITextView) -> Bool {
+            if stale { show(model, in: v) }
+            return true
+        }
+
         func textViewDidChange(_ v: UITextView) {
-            onChange(PadTextView.scaled(v.attributedText, by: 1 / PadTextView.displayScale))
+            let saved = PadTextView.scaled(v.attributedText, by: 1 / factor)
+            model = saved
+            onChange(saved)
             v.invalidateIntrinsicContentSize()
         }
     }
@@ -256,6 +282,7 @@ struct PadCodeView: View {
     var block: BlockRecord
     var onChange: (String) -> Void
     @State private var code = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -273,6 +300,7 @@ struct PadCodeView: View {
                 .scrollDisabled(true)
                 .frame(minHeight: 60)
                 .padding(8)
+                .focused($focused)
             if let output = block.output, !output.isEmpty {
                 Divider()
                 Text(output).font(.system(.caption, design: .monospaced))
@@ -282,6 +310,8 @@ struct PadCodeView: View {
         }
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
         .onAppear { code = block.code ?? "" }
+        // Edited in another window: taken over when not typing here (#260).
+        .onChange(of: block.code) { if !focused, let c = block.code, c != code { code = c } }
         .onChange(of: code) { onChange(code) }
     }
 }

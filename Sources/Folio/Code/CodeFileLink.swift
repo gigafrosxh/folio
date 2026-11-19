@@ -19,6 +19,19 @@ enum CodeFileLink {
         return write(block, to: url, in: doc)
     }
 
+    /// Writes to the linked file only after the full path was shown: the path comes from the note, which may have been
+    /// imported from elsewhere (#261). Returns a status message, or nil when cancelled.
+    static func confirmAndWrite(_ block: BlockModel, to url: URL, in doc: NoteDocument) -> String? {
+        if case .same = CodeExport.compare(code: block.storage.string, fileAt: url) { return "Datei und Block sind schon gleich." }
+        let alert = NSAlert()
+        alert.messageText = "Datei mit dem Code-Block überschreiben?"
+        alert.informativeText = "\(url.path)\n\nDer bisherige Inhalt der Datei wird ersetzt."
+        alert.addButton(withTitle: "Überschreiben")
+        alert.addButton(withTitle: "Abbrechen")
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return write(block, to: url, in: doc)
+    }
+
     /// Writes the block to `url` (atomically) and links it. Returns a status message.
     @discardableResult
     static func write(_ block: BlockModel, to url: URL, in doc: NoteDocument) -> String {
@@ -186,11 +199,24 @@ struct CodeDiffView: View {
             Button("Aus Datei übernehmen") { if let url { message = CodeFileLink.adopt(block, from: url, in: doc); reload() } }
                 .disabled(state != .differs)
                 .help("Ersetzt den Code des Blocks durch den Inhalt der Datei (rückgängig machbar)")
-            Button("In Datei schreiben") { if let url { message = CodeFileLink.write(block, to: url, in: doc); reload() } }
+            Button("In Datei schreiben") { writeToFile() }
                 .disabled(state == .same || { if case .unreadable = state { return true }; return false }())
                 .help("Überschreibt die Datei mit dem Code des Blocks")
             Button("Fertig") { dismiss() }.keyboardShortcut(.defaultAction)
         }
+    }
+
+    /// Only if the file still holds what the comparison shows; otherwise the new state is shown first (#261).
+    private func writeToFile() {
+        guard let url else { return }
+        let current = (try? Data(contentsOf: url)).flatMap { String(data: $0, encoding: .utf8) }?.replacingOccurrences(of: "\r\n", with: "\n")
+        guard current == fileText else {
+            reload()
+            message = "Die Datei wurde inzwischen geändert – bitte den neuen Stand prüfen."
+            return
+        }
+        message = CodeFileLink.confirmAndWrite(block, to: url, in: doc) ?? message
+        reload()
     }
 
     private func reload() {

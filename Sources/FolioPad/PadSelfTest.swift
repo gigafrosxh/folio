@@ -7,27 +7,59 @@ import FolioCore
 /// `FOLIO_PAD_SELFTEST=1` edits, saves, detects conflicts and trashes in `FOLIO_LIBRARY` and prints `PAD ok|FAIL …`;
 /// `FOLIO_PAD_OPEN=<Titel>` opens that note at launch (for screenshots).
 @MainActor
-enum PadSelfTest {
+final class PadSelfTest {
+    private let library: PadLibrary
+    private var failures = 0
+
+    private init(_ library: PadLibrary) { self.library = library }
+
     static func run(_ library: PadLibrary) {
         let env = ProcessInfo.processInfo.environment
         if let title = env["FOLIO_PAD_OPEN"], let entry = library.notes.first(where: { $0.meta.title == title }) {
             library.selectedNote = entry.url
         }
         guard env["FOLIO_PAD_SELFTEST"] != nil else { return }
-        var failures = 0
-        func check(_ ok: Bool, _ what: String) {
-            print("PAD", ok ? "ok" : "FAIL", what)
-            if !ok { failures += 1 }
-        }
+        let test = PadSelfTest(library)
+        // It edits and trashes notes: only ever in a test library (#260).
+        guard env["FOLIO_LIBRARY"] != nil else { test.check(false, "FOLIO_PAD_SELFTEST braucht FOLIO_LIBRARY"); return test.finish() }
+        test.runAll()
+    }
 
-        // New note: title from the first line, saved to disk.
+    private func check(_ ok: Bool, _ what: String) {
+        print("PAD", ok ? "ok" : "FAIL", what)
+        if !ok { failures += 1 }
+    }
+
+    private func finish() {
+        print("PAD done", failures == 0 ? "ok" : "\(failures) FAIL")
+        fflush(stdout)
+    }
+
+    private func runAll() {
+        guard let url = newNote() else { return finish() }
+        editAndSave(url)
+        displayScale()
+        otherBlocksStay(except: url)
+        conflict(url)
+        conflictWhileSwitching(url)
+        failedSave(url)
+        trash(url)
+        finish()
+    }
+
+    /// New note: title from the first line, saved to disk.
+    private func newNote() -> URL? {
         library.createNote(text: "Pad-Selbsttest\nzweite Zeile #ipad")
-        guard let url = library.selectedNote, let doc = library.document else { check(false, "neue Notiz geöffnet"); return finish(failures) }
+        guard let url = library.selectedNote, library.document != nil else { check(false, "neue Notiz geöffnet"); return nil }
         let file = try? NoteFile.read(from: url)
         check(file?.meta.title == "Pad-Selbsttest", "neue Notiz: Titel aus erster Zeile")
         check(file?.meta.tags == ["ipad"], "neue Notiz: Tag erkannt")
+        return url
+    }
 
-        // Edit text and code, save: content and history version.
+    /// Edit text and code, save: content, formatting and a history version.
+    private func editAndSave(_ url: URL) {
+        guard let doc = library.document else { return check(false, "Dokument offen") }
         let text = NSAttributedString(string: "Pad-Selbsttest geändert\nmit Text", attributes: [.font: UIFont.boldSystemFont(ofSize: 15)])
         doc.setText(text, of: doc.blocks[0].id)
         doc.appendCodeBlock()
@@ -40,56 +72,96 @@ enum PadSelfTest {
         let bold = saved.flatMap { PadDocument(file: $0).attributedText(of: $0.body.blocks[0]) }
         let font = bold?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
         check(font?.fontDescriptor.symbolicTraits.contains(.traitBold) == true, "Formatierung (fett) bleibt erhalten")
+    }
 
-        // Shown larger, saved at the Mac's size (#258).
+    /// Shown larger, saved at the Mac's size (#258).
+    private func displayScale() {
+        let size = { (s: NSAttributedString) in (s.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0 }
         let mac = NSAttributedString(string: "x", attributes: [.font: UIFont.systemFont(ofSize: 13)])
         let shown = PadTextView.scaled(mac, by: PadTextView.displayScale)
         let back = PadTextView.scaled(shown, by: 1 / PadTextView.displayScale)
-        let shownSize = (shown.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0
-        let backSize = (back.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0
-        check(shownSize > 13 && abs(backSize - 13) < 0.11, "Schrift größer angezeigt (\(shownSize) pt), mit 13 pt gesichert")
+        check(size(shown) > 13 && abs(size(back) - 13) < 0.11, "Schrift größer angezeigt (\(size(shown)) pt), mit 13 pt gesichert")
+    }
 
-        // Blocks the iPad cannot edit stay byte for byte.
-        if let other = library.notes.first(where: { ($0.meta.kinds ?? []).contains { $0 != "text" } && $0.url != url }),
-           let before = try? NoteFile.read(from: other.url) {
-            library.selectedNote = other.url
-            if let d = library.document, let textBlock = d.blocks.first(where: { $0.kind == .text }) {
-                d.setText(NSAttributedString(string: "Vom iPad geändert"), of: textBlock.id)
-                library.saveNow()
-                let after = try? NoteFile.read(from: other.url)
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = .sortedKeys
-                let keep = { (f: NoteFile?) in f?.body.blocks.filter { $0.kind != .text }.map { try? encoder.encode($0) } ?? [] }
-                check(keep(before) == keep(after), "andere Blöcke unverändert (\(other.meta.title))")
-                check(Set(before.attachments.map(\.id)) == Set(after?.attachments.map(\.id) ?? []), "Anhänge unverändert")
-            }
-        }
+    /// Blocks the iPad cannot edit stay byte for byte.
+    private func otherBlocksStay(except url: URL) {
+        guard let other = library.notes.first(where: { ($0.meta.kinds ?? []).contains { $0 != "text" } && $0.url != url }),
+              let before = try? NoteFile.read(from: other.url) else { return }
+        library.selectedNote = other.url
+        guard let d = library.document, let textBlock = d.blocks.first(where: { $0.kind == .text }) else { return }
+        d.setText(NSAttributedString(string: "Vom iPad geändert"), of: textBlock.id)
+        library.saveNow()
+        let after = try? NoteFile.read(from: other.url)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let keep = { (f: NoteFile?) in f?.body.blocks.filter { $0.kind != .text }.map { try? encoder.encode($0) } ?? [] }
+        check(keep(before) == keep(after), "andere Blöcke unverändert (\(other.meta.title))")
+        check(Set(before.attachments.map(\.id)) == Set(after?.attachments.map(\.id) ?? []), "Anhänge unverändert")
+    }
 
-        // Changed elsewhere: never overwritten, saved as a copy.
+    private func changeOnDisk(_ url: URL, to text: String) {
+        guard var foreign = try? NoteFile.read(from: url) else { return check(false, "Datei lesbar") }
+        foreign.body.blocks[0] = PadDocument.textRecord(text)
+        Thread.sleep(forTimeInterval: 1.1)
+        try? foreign.write(to: url)
+    }
+
+    /// Changed elsewhere: never overwritten, saved as a copy with new ids.
+    private func conflict(_ url: URL) {
         library.selectedNote = url
-        if let d = library.document {
-            guard var foreign = try? NoteFile.read(from: url) else { check(false, "Konflikt: Datei lesbar"); return finish(failures) }
-            foreign.body.blocks[0] = PadDocument.textRecord("Vom Mac geändert")
-            Thread.sleep(forTimeInterval: 1.1)
-            try? foreign.write(to: url)
-            d.setText(NSAttributedString(string: "Vom iPad geändert"), of: d.blocks[0].id)
-            library.saveNow()
-            let onDisk = try? NoteFile.read(from: url)
-            check(onDisk.map { PadDocument.plainText($0.body.blocks[0]) } == "Vom Mac geändert", "Konflikt: fremde Änderung bleibt")
-            check(library.notes.contains { $0.url.lastPathComponent.contains("(iPad)") }, "Konflikt: eigene Fassung als Kopie")
+        guard let d = library.document else { return check(false, "Konflikt: Dokument offen") }
+        changeOnDisk(url, to: "Vom Mac geändert")
+        d.setText(NSAttributedString(string: "Vom iPad geändert"), of: d.blocks[0].id)
+        library.saveNow()
+        let onDisk = try? NoteFile.read(from: url)
+        check(onDisk.map { PadDocument.plainText($0.body.blocks[0]) } == "Vom Mac geändert", "Konflikt: fremde Änderung bleibt")
+        let copy = library.notes.first { $0.url.lastPathComponent.contains("(iPad)") }
+        check(copy != nil, "Konflikt: eigene Fassung als Kopie")
+        if let copy, let copyFile = try? NoteFile.read(from: copy.url), let onDisk {
+            check(Set(copyFile.body.blocks.map(\.id)).isDisjoint(with: onDisk.body.blocks.map(\.id)), "Konfliktkopie mit neuen Block-IDs")
         }
+    }
 
-        // Trash instead of delete.
+    /// Switching during a conflict keeps selection and editor together (#260).
+    private func conflictWhileSwitching(_ url: URL) {
+        library.selectedNote = url
+        guard let d = library.document,
+              let target = library.notes.first(where: { $0.url != url && !$0.url.lastPathComponent.contains("(iPad)") }) else { return }
+        changeOnDisk(url, to: "Wieder vom Mac geändert")
+        d.setText(NSAttributedString(string: "Wieder vom iPad"), of: d.blocks[0].id)
+        library.selectedNote = target.url
+        check(library.selectedNote == target.url && library.document?.url == target.url, "Konflikt beim Wechsel: Auswahl und Editor zeigen dieselbe Notiz")
+    }
+
+    /// A failed save keeps the edits open and the selection where it was (#260).
+    private func failedSave(_ url: URL) {
+        library.selectedNote = url
+        let history = LibraryData.folder(library.root, "history")
+        guard let d = library.document, let target = library.notes.first(where: { $0.url != url }) else { return }
+        try? FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
+        let folders = [history] + ((try? FileManager.default.contentsOfDirectory(at: history, includingPropertiesForKeys: nil)) ?? [])
+        setPermissions(0o500, folders)
+        d.setText(NSAttributedString(string: "Ungesichert"), of: d.blocks[0].id)
+        library.selectedNote = target.url
+        check(library.selectedNote == url && library.document === d && d.isDirty, "Sichern fehlgeschlagen: Änderungen bleiben offen")
+        let onDisk = try? NoteFile.read(from: url)
+        check(onDisk.map { PadDocument.plainText($0.body.blocks[0]) } != "Ungesichert", "Sichern fehlgeschlagen: Datei ohne Vorversion nicht überschrieben")
+        setPermissions(0o755, folders)
+        library.message = nil
+        library.saveNow()
+        check(!d.isDirty, "Nach Freigabe gesichert")
+    }
+
+    private func setPermissions(_ mode: Int, _ folders: [URL]) {
+        for f in folders { try? FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: f.path) }
+    }
+
+    /// Trash instead of delete.
+    private func trash(_ url: URL) {
         library.selectedNote = url
         library.trashSelected()
         check(!FileManager.default.fileExists(atPath: url.path), "Papierkorb: Datei aus der Bibliothek")
         check(!LibraryTrash(library: library.root).items().isEmpty, "Papierkorb: Eintrag vorhanden")
-        finish(failures)
-    }
-
-    private static func finish(_ failures: Int) {
-        print("PAD done", failures == 0 ? "ok" : "\(failures) FAIL")
-        fflush(stdout)
     }
 }
 #endif
