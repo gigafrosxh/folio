@@ -21,7 +21,10 @@ enum ObsidianImporter {
         panel.message = "Obsidian-Vault (Ordner) wählen – er wird nur gelesen"
         panel.prompt = "Importieren"
         guard panel.runModal() == .OK, let vault = panel.url else { return }
-        let report = importVault(vault, into: NoteStore.shared.rootURL)
+        Task { show(await importVault(vault, into: NoteStore.shared.rootURL), vault: vault) }
+    }
+
+    private static func show(_ report: Report, vault: URL) {
         let alert = NSAlert()
         alert.messageText = "\(report.notes) Notiz\(report.notes == 1 ? "" : "en") aus „\(vault.lastPathComponent)“ importiert"
         var lines: [String] = []
@@ -33,9 +36,11 @@ enum ObsidianImporter {
     }
 
     /// Imports into a new folder below `library`; returns what happened.
-    static func importVault(_ vault: URL, into library: URL) -> Report {
+    /// Imports into a new folder below `library`. Scanning and reading run off the main thread, and the main thread gets a
+    /// break after every note, so a large vault does not freeze Folio (#350).
+    static func importVault(_ vault: URL, into library: URL) async -> Report {
         var report = Report()
-        let (notes, files) = ObsidianImport.scan(vault)
+        let (notes, files) = await Task.detached(priority: .userInitiated) { ObsidianImport.scan(vault) }.value
         guard !notes.isEmpty else {
             report.failures.append("Im Ordner liegen keine Markdown-Notizen.")
             return report
@@ -44,23 +49,29 @@ enum ObsidianImporter {
         report.folder = folder
         for rel in notes {
             do {
-                try importNote(rel, vault: vault, files: files, into: folder, report: &report)
+                let text = try await Task.detached(priority: .userInitiated) { try readText(vault.appendingPathComponent(rel)) }.value
+                try importNote(rel, text: text, vault: vault, files: files, into: folder, report: &report)
             } catch {
                 report.failures.append("\(rel): \(error.localizedDescription)")
             }
+            await Task.yield()
         }
         NoteStore.shared.reload()
         return report
     }
 
-    private static func importNote(_ rel: String, vault: URL, files: [String: String], into folder: URL, report: inout Report) throws {
-        let source = vault.appendingPathComponent(rel)
-        let data = try Data(contentsOf: source)
+    nonisolated private static func readText(_ url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
+        return text
+    }
+
+    private static func importNote(_ rel: String, text: String, vault: URL, files: [String: String], into folder: URL, report: inout Report) throws {
+        let source = vault.appendingPathComponent(rel)
         let title = (rel as NSString).lastPathComponent.replacingOccurrences(of: ".md", with: "", options: [.caseInsensitive, .anchored, .backwards])
-        let prepared = ObsidianImport.prepare(text, title: title, files: files)
+        let prepared = ObsidianImport.prepare(text, title: title, files: files, noteFolder: (rel as NSString).deletingLastPathComponent)
         report.missing += prepared.missing
         var file = MarkdownTransfer.note(fromMarkdown: prepared.markdown, title: title, baseURL: vault)
         if !prepared.properties.isEmpty {

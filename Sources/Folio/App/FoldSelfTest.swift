@@ -68,6 +68,20 @@ enum FoldSelfTest {
         doc.revealSelection(in: doc.blocks[0].id, range: NSRange(location: ns.range(of: "Mehr").location, length: 4))
         check(doc.collapsedHeadings.isEmpty && doc.hiddenBlockIDs.isEmpty, "Falten: Sprung in den Abschnitt klappt aus")
 
+        // Cursor at the end of a block whose last paragraph is folded (#350).
+        let tail = NSMutableAttributedString(string: "Kapitel C\n", attributes: TextStyle.heading.attributes(theme: theme))
+        tail.append(NSAttributedString(string: "Text in C", attributes: theme.bodyAttributes))
+        let last = BlockModel.text(tail)
+        doc.insert(last, after: doc.blocks.last?.id)
+        doc.markDirty()
+        if let c = doc.outline.sections.first(where: { $0.heading.title == "Kapitel C" }) {
+            doc.toggleFold(c.heading)
+            check(!doc.hiddenRanges(in: last.id).isEmpty, "Falten: letzter Absatz eines Blocks eingeklappt")
+            doc.revealSelection(in: last.id, range: NSRange(location: last.storage.length, length: 0))
+            check(!doc.collapsedHeadings.contains(c.heading), "Falten: Cursor am Blockende klappt auf")
+        } else {
+            check(false, "Falten: Kapitel C erkannt")
+        }
         doc.foldAll(true)
         check(doc.collapsedHeadings.count >= 2, "Falten: Alle einklappen")
         doc.prepareEdit(in: doc.blocks[0].id, range: NSRange(location: ns.range(of: "Kapitel A").location, length: 3))

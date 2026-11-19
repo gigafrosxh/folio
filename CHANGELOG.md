@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Review-Funde 1.8/1.9** (#350):
+  - Suchen klappt eingeklappte Abschnitte auf, damit Treffer sichtbar sind und Ersetzen rückgängig gemacht werden kann; ein Cursor am Ende eines eingeklappten letzten Absatzes klappt ihn auf.
+  - Dateien über 1 GB werden beim Ablegen und Einfügen abgelehnt, statt eine Notiz zu erzeugen, die sich nicht mehr öffnen lässt.
+  - iPad/iPhone: Ein Ordner wird erst nach geprüftem Zugriff zur Bibliothek, ein veralteter Bookmark wird erneuert; die Bibliothek wird im Hintergrund statt auf dem Hauptthread abgeglichen.
+  - Obsidian-Import: läuft ohne die Oberfläche einzufrieren; leeres Front Matter verschluckt keinen Text mehr; normale Bildpfade gelten relativ zur Notiz.
+  - Developer-ID-Releases signieren auch die Teilen-Erweiterung (Notarisierung).
+
 ## [1.9.2] – 2026-11-19
 
 ### Behoben

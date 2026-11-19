@@ -27,6 +27,11 @@ enum DropCapture {
         var problems: [String] = groups.skipped.map { "„\($0.lastPathComponent)“ ist ein Ordner und wurde nicht übernommen." }
         for note in groups.notes { openNote(note, problems: &problems) }
         let images = groups.images.compactMap { url -> Data? in
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber
+            guard (size?.uint64Value ?? 0) <= ArchiveLimits.maxSection else {
+                problems.append("„\(url.lastPathComponent)“ ist größer als 1 GB.")
+                return nil
+            }
             guard let data = try? Data(contentsOf: url), NSImage(data: data) != nil else {
                 problems.append("„\(url.lastPathComponent)“ ist kein lesbares Bild.")
                 return nil

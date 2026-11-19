@@ -32,6 +32,9 @@ if [[ "$IDENTITY" != "-" ]]; then
     # Hardened runtime, secure timestamp and only the entitlements Folio needs; the widget extension first.
     codesign --force --options runtime --timestamp --entitlements "$ROOT/Resources/Widgets/FolioWidgets.entitlements" \
         --sign "$IDENTITY" "$APP/Contents/PlugIns/FolioWidgets.appex"
+    # The share extension too (#50, #350): every nested bundle needs Developer ID, hardened runtime and a timestamp.
+    codesign --force --options runtime --timestamp --entitlements "$ROOT/Resources/Share/FolioShare.entitlements" \
+        --sign "$IDENTITY" "$APP/Contents/PlugIns/FolioShare.appex"
     codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP"
     codesign --verify --strict --deep "$APP"
 fi

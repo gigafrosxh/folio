@@ -91,8 +91,12 @@ enum AttachmentSync {
 
     enum ImportError: LocalizedError {
         case unreadable(String)
+        case tooLarge(String)
         var errorDescription: String? {
-            switch self { case .unreadable(let n): return "„\(n)“ konnte nicht gelesen werden." }
+            switch self {
+            case .unreadable(let n): return "„\(n)“ konnte nicht gelesen werden."
+            case .tooLarge(let n): return "„\(n)“ ist größer als 1 GB und kann nicht in eine Notiz übernommen werden."
+            }
         }
     }
 
@@ -100,6 +104,11 @@ enum AttachmentSync {
     static func makeBlock(for url: URL, in doc: NoteDocument) throws -> BlockModel {
         // ERD-Ultra projects become ER blocks (#204); a broken file says why instead of becoming a plain file.
         if url.pathExtension.lowercased() == ErduDocument.fileExtension { return try ErdBlocks.makeBlock(from: url) }
+        // A note keeps every attachment in one archive section; larger files could never be opened again (#350).
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber,
+           size.uint64Value > ArchiveLimits.maxSection {
+            throw ImportError.tooLarge(url.lastPathComponent)
+        }
         guard let content = read(url) else { throw ImportError.unreadable(url.lastPathComponent) }
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
         let kind: BlockKind

@@ -44,11 +44,11 @@ public enum ObsidianImport {
         return (notes.sorted(), files)
     }
 
-    public static func prepare(_ markdown: String, title: String, files: [String: String], notePaths: Set<String> = []) -> Prepared {
+    public static func prepare(_ markdown: String, title: String, files: [String: String], notePaths: Set<String> = [], noteFolder: String = "") -> Prepared {
         var (body, tags, properties) = frontMatter(markdown.replacingOccurrences(of: "\r\n", with: "\n"))
         var missing: [String] = []
         // Code stays exactly as written; only the text around it is rewritten (#346).
-        body = outsideCode(body) { cleanLinks(rewriteEmbeds($0, files: files, notePaths: notePaths, missing: &missing)) }
+        body = outsideCode(body) { cleanLinks(rewriteEmbeds(relativeImages($0, noteFolder: noteFolder), files: files, notePaths: notePaths, missing: &missing)) }
         // Obsidian's title is the file name; Folio's is the first line.
         let firstLine = body.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
         let plainFirst = firstLine.replacingOccurrences(of: #"^#+\s*"#, with: "", options: .regularExpression)
@@ -63,7 +63,12 @@ public enum ObsidianImport {
     // MARK: Front matter
 
     static func frontMatter(_ text: String) -> (body: String, tags: [String], properties: [(String, String)]) {
-        guard text.hasPrefix("---\n"), let end = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 4)..<text.endIndex) else {
+        guard text.hasPrefix("---\n") else { return (text, [], []) }
+        // Empty front matter: the closing line follows right away (#350).
+        if text.dropFirst(4).hasPrefix("---\n") || text.dropFirst(4) == "---" {
+            return (String(text.dropFirst(8)), [], [])
+        }
+        guard let end = text.range(of: "\n---", range: text.index(text.startIndex, offsetBy: 4)..<text.endIndex) else {
             return (text, [], [])
         }
         let yaml = String(text[text.index(text.startIndex, offsetBy: 4)..<end.lowerBound])
@@ -189,6 +194,36 @@ public enum ObsidianImport {
         }
         out += ns.substring(from: last)
         return out
+    }
+
+    /// `![alt](bild.png)` in `Projekt/Plan.md` means `Projekt/bild.png`: paths become relative to the vault, which is
+    /// where the importer looks (and the limit it never leaves) (#350). Web addresses and absolute paths stay.
+    static func relativeImages(_ text: String, noteFolder: String) -> String {
+        guard !noteFolder.isEmpty else { return text }
+        let regex = try! NSRegularExpression(pattern: #"(!\[[^\]]*\]\()([^)\s]+)(\))"#)
+        let ns = text as NSString
+        var out = ""
+        var last = 0
+        for m in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            let path = ns.substring(with: m.range(at: 2))
+            let isRelative = !path.contains(":") && !path.hasPrefix("/")
+            let joined = isRelative ? resolve(noteFolder, path.removingPercentEncoding ?? path) : nil
+            let encoded = joined.map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 } ?? path
+            out += ns.substring(with: m.range(at: 1)) + encoded + ns.substring(with: m.range(at: 3))
+            last = m.range.location + m.range.length
+        }
+        return out + ns.substring(from: last)
+    }
+
+    /// `folder` + `path` with `.` and `..` worked out; leaving the vault keeps the `..` (the importer then refuses it).
+    static func resolve(_ folder: String, _ path: String) -> String {
+        var parts: [String] = folder.split(separator: "/").map(String.init)
+        for c in path.split(separator: "/").map(String.init) {
+            if c == "." || c.isEmpty { continue }
+            if c == "..", let last = parts.last, last != ".." { parts.removeLast() } else { parts.append(c) }
+        }
+        return parts.joined(separator: "/")
     }
 
     /// `[[Notiz#Abschnitt|Text]]` → `[[Notiz|Text]]`, `[[Ordner/Notiz]]` → `[[Notiz]]`: Folio links by title.

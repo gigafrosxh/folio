@@ -336,6 +336,8 @@ struct NoteEditorView: View {
         guard isActive else { return }
         if let selected = formatting.selectedText, !selected.contains("\n"), !selected.isEmpty { find.query = selected }
         find.showReplace = showReplace ?? find.showReplace
+        // Hits inside folded sections must be visible and replaceable with undo (#350).
+        doc.foldAll(false)
         find.attach(doc)
         withAnimation(Motion.quick) { showFind = true }
     }

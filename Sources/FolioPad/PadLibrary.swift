@@ -21,7 +21,7 @@ final class PadLibrary: ObservableObject {
     /// The folder came from the document picker; access has to be started and stopped.
     private var scoped = false
     private static let bookmarkKey = "libraryBookmark"
-    var isCustomLibrary: Bool { scoped }
+    var isCustomLibrary: Bool { root != Self.defaultRoot && ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] == nil }
     @Published private(set) var folders: [LibraryScanner.Folder] = []
     @Published private(set) var notes: [Entry] = []
     @Published private(set) var unreadable = 0
@@ -61,20 +61,36 @@ final class PadLibrary: ObservableObject {
     private static func restoredBookmark() -> URL? {
         guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
         var stale = false
-        return try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale)
+        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return nil }
+        // A moved or renamed folder gives a stale bookmark; renew it so the next start finds the folder too (#350).
+        if stale, url.startAccessingSecurityScopedResource() {
+            if let fresh = try? url.bookmarkData() { UserDefaults.standard.set(fresh, forKey: bookmarkKey) }
+            url.stopAccessingSecurityScopedResource()
+        }
+        return url
     }
 
     /// Uses another folder as the library, e.g. the Mac's library in iCloud Drive or a shared folder (#213).
     /// The open note is saved first; nothing in either folder is moved or changed.
     func useLibrary(_ url: URL?) {
         guard saveNow() == .saved else { return }
-        if scoped { root.stopAccessingSecurityScopedResource() }
-        scoped = false
         if let url {
-            scoped = url.startAccessingSecurityScopedResource()
-            if let data = try? url.bookmarkData() { UserDefaults.standard.set(data, forKey: Self.bookmarkKey) }
+            // Check access, readability and the bookmark first; only then leave the current library (#350).
+            let access = url.startAccessingSecurityScopedResource()
+            let readable = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) != nil
+            let bookmark = try? url.bookmarkData()
+            guard readable, let bookmark else {
+                if access { url.stopAccessingSecurityScopedResource() }
+                message = "Der Ordner „\(url.lastPathComponent)“ lässt sich nicht als Bibliothek verwenden (kein Zugriff). Die bisherige Bibliothek bleibt."
+                return
+            }
+            if scoped { root.stopAccessingSecurityScopedResource() }
+            scoped = access
+            UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
             root = url
         } else {
+            if scoped { root.stopAccessingSecurityScopedResource() }
+            scoped = false
             UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
             root = Self.defaultRoot
             try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -88,8 +104,24 @@ final class PadLibrary: ObservableObject {
 
     /// Picks up changes made elsewhere (the Mac through a shared folder): the list, and the open note when it has no
     /// unsaved edits here. With unsaved edits the next save notices the change and keeps both versions (#213).
-    func refreshFromDisk() {
-        reload()
+    @discardableResult
+    func refreshFromDisk() -> Task<Void, Never>? {
+        // The scan runs off the main thread; a slow file provider never blocks typing (#350).
+        guard !scanning else { return nil }
+        scanning = true
+        let root = self.root, scanner = self.scanner
+        return Task {
+            let result = await Task.detached(priority: .utility) { scanner.scan(root) }.value
+            scanning = false
+            guard root == self.root else { return }
+            apply(result)
+            reopenIfChangedElsewhere()
+        }
+    }
+
+    private var scanning = false
+
+    private func reopenIfChangedElsewhere() {
         guard let doc = document, !doc.isDirty, doc.changedOnDisk else { return }
         if FileManager.default.fileExists(atPath: doc.url.path) {
             open(doc.url)
@@ -101,7 +133,10 @@ final class PadLibrary: ObservableObject {
     }
 
     func reload() {
-        let result = scanner.scan(root)
+        apply(scanner.scan(root))
+    }
+
+    private func apply(_ result: LibraryScanner.Result) {
         folders = result.folders
         unreadable = result.unreadable.count
         notes = result.notes.map { Entry(url: $0.url, meta: $0.meta) }

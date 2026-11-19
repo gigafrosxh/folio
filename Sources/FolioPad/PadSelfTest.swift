@@ -41,7 +41,7 @@ final class PadSelfTest {
         guard let url = newNote() else { return finish() }
         editAndSave(url)
         await autosave(url)
-        macChangeArrives(url)
+        await macChangeArrives(url)
         switchLibrary()
         displayScale()
         otherBlocksStay(except: url)
@@ -95,11 +95,16 @@ final class PadSelfTest {
     }
 
     /// A change made on the Mac (shared folder) shows up in the open note when it has no edits here (#213).
-    private func macChangeArrives(_ url: URL) {
+    private func macChangeArrives(_ url: URL) async {
         library.selectedNote = url
         guard library.document?.isDirty == false else { return check(false, "Mac-Änderung: Dokument ungeändert offen") }
         changeOnDisk(url, to: "Auf dem Mac geschrieben")
-        library.refreshFromDisk()
+        var refresh = library.refreshFromDisk()
+        while refresh == nil {   // the 3-second refresh may be running
+            try? await Task.sleep(for: .milliseconds(200))
+            refresh = library.refreshFromDisk()
+        }
+        await refresh?.value
         let shown = library.document.map { PadDocument.plainText($0.blocks[0]) }
         check(shown == "Auf dem Mac geschrieben", "Änderung vom Mac erscheint in der offenen Notiz")
         check(library.notes.contains { $0.url == url && $0.meta.title == "Auf dem Mac geschrieben" }, "Änderung vom Mac erscheint in der Liste")

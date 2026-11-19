@@ -68,3 +68,18 @@ final class ObsidianCodeSplitTests: XCTestCase {
         }
     }
 }
+
+final class ObsidianP1Tests: XCTestCase {
+    func testEmptyFrontMatterKeepsText() {
+        let p = ObsidianImport.prepare("---\n---\nErster Absatz\n\n---\n\nZweiter", title: "T", files: [:])
+        XCTAssertTrue(p.markdown.contains("Erster Absatz"), p.markdown)
+        XCTAssertTrue(p.markdown.contains("Zweiter"))
+    }
+
+    func testImagePathsRelativeToNote() {
+        let p = ObsidianImport.prepare("![Bild](bild%201.png) und ![w](https://x.org/a.png) ![u](../oben.png)", title: "Plan", files: [:], noteFolder: "Projekt/Unter")
+        XCTAssertTrue(p.markdown.contains("![Bild](Projekt/Unter/bild%201.png)"), p.markdown)
+        XCTAssertTrue(p.markdown.contains("![w](https://x.org/a.png)"))
+        XCTAssertTrue(p.markdown.contains("![u](Projekt/oben.png)"))
+    }
+}

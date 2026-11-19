@@ -9,7 +9,7 @@ enum ObsidianSelfTest {
         fflush(stdout)
     }
 
-    static func run(store: NoteStore) {
+    static func run(store: NoteStore) async {
         let fm = FileManager.default
         let vault = fm.temporaryDirectory.appendingPathComponent("Mein Vault \(UUID().uuidString.prefix(6))", isDirectory: true)
         try? fm.createDirectory(at: vault.appendingPathComponent(".obsidian"), withIntermediateDirectories: true)
@@ -21,7 +21,7 @@ enum ObsidianSelfTest {
         let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
         try? png.write(to: vault.appendingPathComponent("Projekte/Anhänge/Logo.png"))
         let before = store.notes.count
-        let report = ObsidianImporter.importVault(vault, into: store.rootURL)
+        let report = await ObsidianImporter.importVault(vault, into: store.rootURL)
         check(report.notes == 2 && store.notes.count == before + 2, "Obsidian: zwei Notizen importiert")
         check(report.missing == ["weg.pdf"], "Obsidian: fehlender Anhang gemeldet")
         guard let start = store.notes.first(where: { $0.meta.title == "Start" }), let file = try? NoteFile.read(from: start.url) else {
@@ -34,7 +34,7 @@ enum ObsidianSelfTest {
         check(file.body.blocks.contains { $0.kind == .image } && file.attachments.contains { $0.header.filename == "Logo.png" }, "Obsidian: eingebettetes Bild aus anderem Ordner")
         check(store.linkIndex.resolve("Plan") != nil && file.meta.wikiLinks?.contains("Plan") == true, "Obsidian: [[Link]] zeigt auf die importierte Notiz")
         check(fm.fileExists(atPath: vault.appendingPathComponent("Start.md").path), "Obsidian: Vault bleibt unverändert")
-        let again = ObsidianImporter.importVault(vault, into: store.rootURL)
+        let again = await ObsidianImporter.importVault(vault, into: store.rootURL)
         check(again.folder?.lastPathComponent.hasSuffix(" 2") == true, "Obsidian: zweiter Import in neuen Ordner, nichts überschrieben")
     }
 }

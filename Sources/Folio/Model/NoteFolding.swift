@@ -162,7 +162,10 @@ extension NoteDocument {
     func revealSelection(in blockID: UUID, range: NSRange) {
         guard !collapsedHeadings.isEmpty else { return }
         let hidden = hiddenRanges(in: blockID)
-        if hidden.contains(where: { NSLocationInRange(range.location, $0) || NSIntersectionRange($0, range).length > 0 }) {
+        let length = block(blockID)?.storage.length ?? -1
+        // The end of a block whose last paragraph is folded counts as inside: text typed there must be visible (#350).
+        let atFoldedEnd = range.length == 0 && range.location == length && hidden.contains { NSMaxRange($0) == length }
+        if atFoldedEnd || hidden.contains(where: { NSLocationInRange(range.location, $0) || NSIntersectionRange($0, range).length > 0 }) {
             expandFolds(at: blockID, range: range)
         }
     }
