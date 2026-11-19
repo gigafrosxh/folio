@@ -185,8 +185,10 @@ final class FolioTextView: NSTextView {
         }
         if tc.containerSize.width != w { tc.containerSize = NSSize(width: w, height: .greatestFiniteMagnitude) }
         lm.ensureLayout(for: tc)
-        var h = lm.usedRect(for: tc).height
-        if lm.extraLineFragmentTextContainer != nil { h = max(h, lm.extraLineFragmentRect.maxY) }
+        var h = foldLayout.hidden.isEmpty ? lm.usedRect(for: tc).height : foldedHeight(lm, tc)
+        // A note that ends inside a folded section gets no empty last line for it (#205).
+        let endsFolded = foldLayout.hidden.contains { NSMaxRange($0) == (textStorage?.length ?? -1) }
+        if lm.extraLineFragmentTextContainer != nil, !endsFolded { h = max(h, lm.extraLineFragmentRect.maxY) }
         // Extra room below the last line so descenders of large headings never touch the next block.
         let lastFont = (textStorage?.length ?? 0) > 0 ? textStorage?.attribute(.font, at: textStorage!.length - 1, effectiveRange: nil) as? NSFont : typingFont
         let descent = abs(lastFont?.descender ?? 4)

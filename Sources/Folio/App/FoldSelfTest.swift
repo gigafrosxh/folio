@@ -36,6 +36,13 @@ enum FoldSelfTest {
         if let tv, let heightBefore {
             let after = tv.contentHeight(forWidth: max(tv.bounds.width, 400))
             check(after < heightBefore - 20, "Falten: Textansicht wird niedriger (\(Int(heightBefore)) → \(Int(after)) pt)")
+            if let lm = tv.layoutManager, let storage = tv.textStorage {
+                let all = NSRange(location: 0, length: storage.length)
+                lm.invalidateGlyphs(forCharacterRange: all, changeInLength: 0, actualCharacterRange: nil)
+                lm.invalidateLayout(forCharacterRange: all, actualCharacterRange: nil)
+                let full = tv.contentHeight(forWidth: max(tv.bounds.width, 400))
+                check(abs(full - after) < 0.5, "Falten: Teil-Neulayout wie volles Neulayout (\(Int(after)) / \(Int(full)) pt)")
+            }
         } else {
             print("EDIT skip Falten: Textansicht nicht erzeugt (Hintergrundlauf)")
         }
