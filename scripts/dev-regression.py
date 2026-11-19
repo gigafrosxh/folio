@@ -14,7 +14,7 @@ print(f"Test libraries and logs: {RUN}", flush=True)
 failed = False
 # FOLIO_BACKGROUND=1 shows no window and takes no focus; the keyboard test needs the focus and is left out.
 BACKGROUND = "FOLIO_BACKGROUND" in os.environ
-for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("LINK", "LINK"), ("A11Y", "A11Y")]
+for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("LINK", "LINK"), ("AUTO", "AUTO"), ("A11Y", "A11Y")]
                      if not (BACKGROUND and f == "KEY")]:
     library = RUN / flag
     library.mkdir()

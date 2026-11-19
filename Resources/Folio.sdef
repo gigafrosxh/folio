@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<!-- AppleScript for Folio (#70): create, search, open and append. -->
+<dictionary title="Folio">
+  <suite name="Standard Suite" code="????" description="Allgemeine Befehle.">
+    <command name="quit" code="aevtquit" description="Folio beenden."/>
+  </suite>
+  <suite name="Folio" code="Foli" description="Notizen anlegen, suchen und öffnen.">
+    <command name="create note" code="FolicrNt" description="Legt eine neue Notiz an und gibt ihre ID zurück.">
+      <cocoa class="FolioCreateNoteCommand"/>
+      <direct-parameter type="text" description="Titel der Notiz (erste Zeile)."/>
+      <parameter name="with text" code="FTxt" type="text" optional="yes" description="Weiterer Text."><cocoa key="FTxt"/></parameter>
+      <result type="text" description="ID der neuen Notiz."/>
+    </command>
+    <command name="search notes" code="FolisrNt" description="Sucht Notizen, die alle Wörter enthalten, und gibt ihre Titel zurück.">
+      <cocoa class="FolioSearchNotesCommand"/>
+      <direct-parameter type="text" description="Suchbegriff."/>
+      <parameter name="returning ids" code="FIds" type="boolean" optional="yes" description="IDs statt Titel zurückgeben."><cocoa key="FIds"/></parameter>
+      <result description="Titel (oder IDs) der Treffer."><type type="text" list="yes"/></result>
+    </command>
+    <command name="open note" code="FoliopNt" description="Öffnet eine Notiz (ID, Titel oder Suchbegriff).">
+      <cocoa class="FolioOpenNoteCommand"/>
+      <direct-parameter type="text"/>
+      <result type="text" description="ID der geöffneten Notiz."/>
+    </command>
+    <command name="append to note" code="FoliapNt" description="Hängt Text mit Datumszeile ans Ende einer Notiz an.">
+      <cocoa class="FolioAppendCommand"/>
+      <direct-parameter type="text" description="ID, Titel oder Suchbegriff der Notiz."/>
+      <parameter name="with text" code="FTxt" type="text" description="Der Text."><cocoa key="FTxt"/></parameter>
+    </command>
+  </suite>
+</dictionary>

@@ -39,6 +39,8 @@ cp "$BIN_DIR/Folio" "$APP/Contents/MacOS/Folio"
 chmod +x "$APP/Contents/MacOS/Folio"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# AppleScript dictionary (#70).
+cp Resources/Folio.sdef "$APP/Contents/Resources/Folio.sdef"
 # KaTeX, Mermaid and the page that renders formulas and diagrams offline.
 /usr/bin/ditto Resources/Web "$APP/Contents/Resources/Web"
 shopt -s nullglob
@@ -52,12 +54,14 @@ cp "$BIN_DIR/FolioWidgets" "$APPEX/Contents/MacOS/FolioWidgets"
 # Extensions must start in NSExtensionMain; with Swift's own main WidgetKit kills them at launch (#123).
 nm -u "$APPEX/Contents/MacOS/FolioWidgets" | grep -q _NSExtensionMain || { echo "FolioWidgets ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
 # „Widget bearbeiten“ (#122): App Intents metadata for the configurable widgets.
-scripts/widget-intents-metadata.sh "$BIN_DIR" "$APPEX/Contents/Resources"
+scripts/intents-metadata.sh "$BIN_DIR" "$APPEX/Contents/Resources"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
 sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Widgets/Info.plist >"$APPEX/Contents/Info.plist"
 /usr/bin/plutil -lint "$APPEX/Contents/Info.plist" >/dev/null
 codesign --force --sign - --entitlements Resources/Widgets/FolioWidgets.entitlements "$APPEX"
+# Shortcuts actions of the app (#70).
+scripts/intents-metadata.sh "$BIN_DIR" "$APP/Contents/Resources" Folio 5 CreateNoteIntent
 codesign --force --sign - "$APP"
 
 if "$INSTALL"; then

@@ -80,6 +80,10 @@
 	<string>Folio zeigt Webseiten aus deinem lokalen Netzwerk (z. B. localhost oder Entwicklungsserver) in Notizen an.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Folio nimmt mit dem Mikrofon Audio auf und speichert es in deiner Notiz.</string>
+	<key>NSAppleScriptEnabled</key>
+	<true/>
+	<key>OSAScriptingDefinition</key>
+	<string>Folio.sdef</string>
 	<key>NSServices</key>
 	<array>
 		<dict>

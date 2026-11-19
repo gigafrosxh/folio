@@ -285,7 +285,7 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
   Zeilenhöhe 0), `FoldTriangles.swift`. Selbsttest im EDITOR-Lauf (`FoldSelfTest`).
 - Dienste/Dock (#90, #91): `DropCapture.swift`, `DropClassifier` (Kern), `NSServices` und eine Dokumenttyp-Rolle „Viewer/Alternate“
   in `Info.plist`. Selbsttest im QUICK-Lauf.
-- Widget-Konfiguration (#122): `Sources/FolioWidgets/WidgetIntents.swift`; `scripts/widget-intents-metadata.sh` erzeugt
+- Widget-Konfiguration (#122): `Sources/FolioWidgets/WidgetIntents.swift`; `scripts/intents-metadata.sh` erzeugt
   `Metadata.appintents` (swiftc `-emit-const-values-path` + `appintentsmetadataprocessor`) und wird von `build-app.sh` aufgerufen.
 
 ### KI ab 1.6.0

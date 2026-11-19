@@ -174,7 +174,7 @@ enum LayoutDebug {
         let tests: [(String, @MainActor () async -> Void)] = [
             ("FOLIO_SAFETY_TEST", SafetySelfTest.run), ("FOLIO_DEV_TEST", DevSelfTest.run), ("FOLIO_EDITOR_TEST", EditorSelfTest.run),
             ("FOLIO_AI_TEST", AISelfTest.run), ("FOLIO_LINK_TEST", LinkSelfTest.run), ("FOLIO_KEY_TEST", KeyboardSelfTest.run),
-            ("FOLIO_ORG_TEST", OrganizationSelfTest.run),
+            ("FOLIO_ORG_TEST", OrganizationSelfTest.run), ("FOLIO_AUTO_TEST", AutomationSelfTest.run),
         ]
         for (key, run) in tests where env[key] != nil { Task { @MainActor in await run() } }
         if env["FOLIO_QUICK_TEST"] != nil, env["FOLIO_CAPTURE_QUEUE"] != nil { Task { @MainActor in await QuickAccessSelfTest.run() } }
