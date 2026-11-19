@@ -94,3 +94,12 @@ temporären Ordner, manche führen dabei aber Build-Skripte aus. Schutz vor Vers
 ## Sicherheitslücken melden
 
 Siehe [SECURITY.md](../SECURITY.md).
+
+## Teilen-Menü, Kurzbefehle, AppleScript (ab 1.9)
+
+- **Teilen › Folio** (Safari und andere Apps, #50): Die Erweiterung läuft in der App-Sandbox, liest keine Dateien und
+  sendet nichts ins Netz. Sie übergibt Titel, Adresse und markierten Text als `folio://capture`-Link an Folio; gespeichert
+  wird erst, wenn du in der Schnellerfassung bestätigst.
+- **Kurzbefehle und AppleScript** (#70) laufen lokal auf dem Mac und können Notizen anlegen, suchen, öffnen und Text
+  anhängen, aber nichts löschen oder überschreiben. macOS fragt beim ersten Steuern durch eine andere App um Erlaubnis.
+- **Obsidian-Import** (#71) liest den gewählten Vault nur und legt Kopien in einem neuen Ordner der Bibliothek an.

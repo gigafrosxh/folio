@@ -124,3 +124,16 @@ final class QuickAccessTests: XCTestCase {
         XCTAssertEqual(SwitcherEntry.rank(entries, query: "").count, 4)
     }
 }
+
+final class WebClipTests: XCTestCase {
+    func testClipText() {
+        let t = WebClip.text(title: " Artikel ", url: URL(string: "https://example.com/a?b=1"), excerpt: "Zeile 1\nZeile 2")
+        XCTAssertEqual(t, "Artikel\nhttps://example.com/a?b=1\n> Zeile 1\n> Zeile 2")
+        XCTAssertEqual(WebClip.text(title: nil, url: URL(string: "file:///etc/passwd"), excerpt: nil), "", "only web addresses")
+        XCTAssertNil(WebClip.captureLink(title: "", url: nil, excerpt: " "))
+        let link = WebClip.captureLink(title: "A & B", url: URL(string: "https://x.org"), excerpt: nil)!
+        guard case .success(.capture(let text, _)) = FolioURL.parse(link) else { return XCTFail("parse") }
+        XCTAssertEqual(text, "A & B\nhttps://x.org")
+        XCTAssertTrue(WebClip.text(title: nil, url: nil, excerpt: String(repeating: "x", count: 5000)).hasSuffix(" …"))
+    }
+}

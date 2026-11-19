@@ -380,3 +380,25 @@ public enum DropClassifier {
         return g
     }
 }
+
+/// Safari's share menu (#50): the page as text for the quick capture, title first, then the address and the excerpt.
+public enum WebClip {
+    public static let maxExcerpt = 4_000
+
+    public static func text(title: String?, url: URL?, excerpt: String?) -> String {
+        var parts: [String] = []
+        if let t = title?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty { parts.append(t) }
+        if let url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") { parts.append(url.absoluteString) }
+        if var e = excerpt?.trimmingCharacters(in: .whitespacesAndNewlines), !e.isEmpty {
+            if e.count > maxExcerpt { e = String(e.prefix(maxExcerpt)) + " …" }
+            parts.append(e.components(separatedBy: "\n").map { "> " + $0 }.joined(separator: "\n"))
+        }
+        return parts.joined(separator: "\n")
+    }
+
+    /// The link that opens Folio's quick capture with the clip, or nil when there is nothing to keep.
+    public static func captureLink(title: String?, url: URL?, excerpt: String?) -> URL? {
+        let t = text(title: title, url: url, excerpt: excerpt)
+        return t.isEmpty ? nil : FolioURL.capture(text: t)
+    }
+}

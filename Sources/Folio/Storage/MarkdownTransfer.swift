@@ -136,55 +136,10 @@ enum MarkdownTransfer {
         var blocks: [BlockRecord] = []
         var attachments: [FolioArchive.Attachment] = []
         for piece in MarkdownStructure.pieces(markdown) {
-            switch piece {
-            case .text(let text):
-                var b = BlockRecord(kind: .text)
-                b.rtf = RichTextCodec.rtfData(from: attributed(fromMarkdown: text))
+            if case .image(let alt, let path) = piece {
+                blocks.append(embeddedBlock(alt: alt, path: path, baseURL: baseURL, attachments: &attachments))
+            } else if let b = sourceBlock(piece) {
                 blocks.append(b)
-            case .code("erdu", let code) where (try? ErduDocument.summary(of: code)) != nil:
-                var b = BlockRecord(kind: .erd)
-                b.code = code
-                blocks.append(b)
-            case .code(let lang, let code):
-                var b = BlockRecord(kind: .code)
-                b.code = code
-                b.language = Languages.all.first { $0.id == lang || $0.name.lowercased() == lang }?.id ?? (lang.isEmpty ? "plain" : lang)
-                blocks.append(b)
-            case .mermaid(let source):
-                var b = BlockRecord(kind: .diagram)
-                b.code = source
-                blocks.append(b)
-            case .math(let source):
-                var b = BlockRecord(kind: .math)
-                b.code = source
-                blocks.append(b)
-            case .image(let alt, let path):
-                let decoded = path.removingPercentEncoding ?? path
-                // Only pictures next to the Markdown file: a path like ../../.ssh/id_rsa must not pull other files in (#161).
-                if let base = baseURL, let file = LinkSafety.fileInside(base, relativePath: decoded),
-                   let data = try? Data(contentsOf: file) {
-                    let name = (decoded as NSString).lastPathComponent
-                    let a = FolioArchive.Attachment(filename: name, typeIdentifier: UTType(filenameExtension: (name as NSString).pathExtension)?.identifier ?? "public.image", data: data)
-                    attachments.append(a)
-                    // Not only pictures: PDFs, audio and other files embedded this way (Obsidian, #71) keep their kind.
-                    let type = UTType(filenameExtension: (name as NSString).pathExtension) ?? .data
-                    let kind: BlockKind = type.conforms(to: .image) ? .image : type.conforms(to: .pdf) ? .pdf : type.conforms(to: .audio) ? .audio : .file
-                    var b = BlockRecord(kind: kind)
-                    b.attachmentID = a.id
-                    b.width = 1
-                    if kind == .pdf { b.height = 520 } else if kind == .file { b.height = 420 }
-                    if !alt.isEmpty && kind == .image { b.caption = alt }
-                    blocks.append(b)
-                } else if decoded.hasPrefix("http") {
-                    var b = BlockRecord(kind: .web)
-                    b.url = decoded
-                    b.mode = "preview"
-                    blocks.append(b)
-                } else {
-                    var b = BlockRecord(kind: .text)
-                    b.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: "[Bild fehlt: \(path)]", attributes: ThemeManager.shared.bodyAttributes))
-                    blocks.append(b)
-                }
             }
         }
         var meta = NoteMetadata(title: MarkdownStructure.title(of: markdown, fallback: title))
@@ -192,6 +147,61 @@ enum MarkdownTransfer {
         // Titles, tags, kinds and links are refreshed exactly like for notes written in Folio.
         let doc = NoteDocument(file: NoteFile(meta: meta, body: NoteBody(blocks: blocks), attachments: attachments), url: URL(fileURLWithPath: "/dev/null"))
         return doc.makeFile()
+    }
+
+    /// Text, code, Mermaid, formulas and ERD-Ultra blocks.
+    private static func sourceBlock(_ piece: MarkdownPiece) -> BlockRecord? {
+        var b: BlockRecord
+        switch piece {
+        case .text(let text):
+            b = BlockRecord(kind: .text)
+            b.rtf = RichTextCodec.rtfData(from: attributed(fromMarkdown: text))
+        case .code("erdu", let code) where (try? ErduDocument.summary(of: code)) != nil:
+            b = BlockRecord(kind: .erd)
+            b.code = code
+        case .code(let lang, let code):
+            b = BlockRecord(kind: .code)
+            b.code = code
+            b.language = Languages.all.first { $0.id == lang || $0.name.lowercased() == lang }?.id ?? (lang.isEmpty ? "plain" : lang)
+        case .mermaid(let source):
+            b = BlockRecord(kind: .diagram)
+            b.code = source
+        case .math(let source):
+            b = BlockRecord(kind: .math)
+            b.code = source
+        case .image:
+            return nil
+        }
+        return b
+    }
+
+    /// `![alt](path)`: a file next to the Markdown becomes a block of its kind, a web address a link preview.
+    private static func embeddedBlock(alt: String, path: String, baseURL: URL?, attachments: inout [FolioArchive.Attachment]) -> BlockRecord {
+        let decoded = path.removingPercentEncoding ?? path
+        // Only files next to the Markdown file: a path like ../../.ssh/id_rsa must not pull other files in (#161).
+        if let base = baseURL, let file = LinkSafety.fileInside(base, relativePath: decoded), let data = try? Data(contentsOf: file) {
+            let name = (decoded as NSString).lastPathComponent
+            let type = UTType(filenameExtension: (name as NSString).pathExtension) ?? .data
+            let a = FolioArchive.Attachment(filename: name, typeIdentifier: type.identifier, data: data)
+            attachments.append(a)
+            // Not only pictures: PDFs, audio and other files embedded this way (Obsidian, #71) keep their kind.
+            let kind: BlockKind = type.conforms(to: .image) ? .image : type.conforms(to: .pdf) ? .pdf : type.conforms(to: .audio) ? .audio : .file
+            var b = BlockRecord(kind: kind)
+            b.attachmentID = a.id
+            b.width = 1
+            b.height = kind == .pdf ? 520 : kind == .file ? 420 : nil
+            if !alt.isEmpty && kind == .image { b.caption = alt }
+            return b
+        }
+        if decoded.hasPrefix("http") {
+            var b = BlockRecord(kind: .web)
+            b.url = decoded
+            b.mode = "preview"
+            return b
+        }
+        var b = BlockRecord(kind: .text)
+        b.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: "[Bild fehlt: \(path)]", attributes: ThemeManager.shared.bodyAttributes))
+        return b
     }
 
     static func uniqueURL(_ url: URL) -> URL {

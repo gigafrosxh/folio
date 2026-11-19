@@ -69,38 +69,49 @@ public enum ObsidianImport {
         let yaml = String(text[text.index(text.startIndex, offsetBy: 4)..<end.lowerBound])
         var rest = String(text[end.upperBound...])
         if rest.hasPrefix("\n") { rest.removeFirst() }
+        var state = YAMLState()
+        for line in yaml.components(separatedBy: "\n") { state.read(line) }
+        var tags = state.tags
+        let properties = state.properties
+        tags = tags.map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }.filter { !$0.isEmpty }
+        return (rest, tags, properties)
+    }
+
+    /// The few YAML shapes Obsidian writes: `key: value`, `key: [a, b]` and lists of `- item` lines.
+    private struct YAMLState {
         var tags: [String] = []
         var properties: [(String, String)] = []
         var listKey: String?
-        for line in yaml.components(separatedBy: "\n") {
+
+        mutating func read(_ line: String) {
             if line.hasPrefix("  - ") || line.hasPrefix("- "), let key = listKey {
-                let value = unquote(line.drop { $0 == " " || $0 == "-" }.trimmingCharacters(in: .whitespaces))
-                if key == "tags" { tags.append(value) } else if !ignored.contains(key.lowercased()) { append(value, to: key, in: &properties) }
-                continue
+                addListItem(unquote(line.drop { $0 == " " || $0 == "-" }.trimmingCharacters(in: .whitespaces)), to: key)
+                return
             }
-            guard let colon = line.firstIndex(of: ":") else { continue }
+            guard let colon = line.firstIndex(of: ":") else { return }
             let key = line[..<colon].trimmingCharacters(in: .whitespaces)
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-            listKey = value.isEmpty ? key.lowercased() == "tags" || key.lowercased() == "tag" ? "tags" : key : nil
-            guard !value.isEmpty else { continue }
-            if ["tags", "tag"].contains(key.lowercased()) {
+            let isTags = ["tags", "tag"].contains(key.lowercased())
+            listKey = value.isEmpty ? (isTags ? "tags" : key) : nil
+            guard !value.isEmpty else { return }
+            if isTags {
                 tags += value.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).split(whereSeparator: { $0 == "," || $0 == " " }).map { unquote(String($0)) }
             } else if !ignored.contains(key.lowercased()) {
                 properties.append((key, unquote(value)))
             }
         }
-        tags = tags.map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }.filter { !$0.isEmpty }
-        return (rest, tags, properties)
+
+        private mutating func addListItem(_ value: String, to key: String) {
+            if key == "tags" { tags.append(value); return }
+            guard !ignored.contains(key.lowercased()) else { return }
+            if let i = properties.firstIndex(where: { $0.0 == key }) { properties[i].1 += ", " + value } else { properties.append((key, value)) }
+        }
     }
 
     /// Obsidian's own keys; they mean nothing in Folio.
     private static let ignored: Set<String> = ["aliases", "alias", "cssclass", "cssclasses", "publish"]
 
-    private static func append(_ value: String, to key: String, in properties: inout [(String, String)]) {
-        if let i = properties.firstIndex(where: { $0.0 == key }) { properties[i].1 += ", " + value } else { properties.append((key, value)) }
-    }
-
-    private static func unquote(_ s: String) -> String {
+    fileprivate static func unquote(_ s: String) -> String {
         var t = s
         if t.count >= 2, let f = t.first, f == t.last, f == "\"" || f == "'" { t = String(t.dropFirst().dropLast()) }
         return t

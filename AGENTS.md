@@ -288,6 +288,15 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
 - Widget-Konfiguration (#122): `Sources/FolioWidgets/WidgetIntents.swift`; `scripts/intents-metadata.sh` erzeugt
   `Metadata.appintents` (swiftc `-emit-const-values-path` + `appintentsmetadataprocessor`) und wird von `build-app.sh` aufgerufen.
 
+### Ab 1.9.0
+
+- Obsidian (#71): Kern `ObsidianImport` (Scan, Front Matter, Embeds, Links), App `Import/ObsidianImporter.swift`; Selbsttest im ORG-Lauf.
+- Automation (#70): `Automation/NoteAutomation.swift` (gemeinsame Logik), `FolioAppIntents.swift` (Kurzbefehle),
+  `AppleScriptCommands.swift` + `Resources/Folio.sdef`. `scripts/intents-metadata.sh` erzeugt die App-Intents-Daten für
+  App (Modul Folio) und Widgets. Selbsttest `FOLIO_AUTO_TEST` (AppleScript nur in einer Testkopie mit App-Paket).
+- Teilen (#50): Ziel `FolioShare` (Share-Extension, `Resources/Share/`), öffnet nur `folio://capture`-Links (`WebClip` im Kern).
+  Nicht im echten Teilen-Menü geprüft (dafür müsste die App installiert sein).
+
 ### KI ab 1.6.0
 
 - Ollama-Erreichbarkeit: `OllamaStatus` (App) prüft beim Öffnen des Chats und vor jeder Frage; `AIAvailability` meldet dann `.ollamaDown`, und der Chat zeigt Fundstellen.

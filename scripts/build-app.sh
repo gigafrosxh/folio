@@ -25,6 +25,7 @@ ARCH_ARGS=()
 if [[ -n "${ARCH:-}" ]]; then ARCH_ARGS=(--arch "$ARCH"); fi
 swift build -c "$CONFIG" --product Folio ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
 swift build -c "$CONFIG" --product FolioWidgets ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
+swift build -c "$CONFIG" --product FolioShare ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
 BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"} --show-bin-path)"
 if [[ ! -f Resources/AppIcon.icns ]]; then
     swift scripts/make-icon.swift Resources
@@ -60,6 +61,14 @@ BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plis
 sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Widgets/Info.plist >"$APPEX/Contents/Info.plist"
 /usr/bin/plutil -lint "$APPEX/Contents/Info.plist" >/dev/null
 codesign --force --sign - --entitlements Resources/Widgets/FolioWidgets.entitlements "$APPEX"
+# Safari share menu (#50): a share extension; it only opens folio://capture links.
+SHAREX="$APP/Contents/PlugIns/FolioShare.appex"
+mkdir -p "$SHAREX/Contents/MacOS"
+cp "$BIN_DIR/FolioShare" "$SHAREX/Contents/MacOS/FolioShare"
+nm -u "$SHAREX/Contents/MacOS/FolioShare" | grep -q _NSExtensionMain || { echo "FolioShare ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
+sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Share/Info.plist >"$SHAREX/Contents/Info.plist"
+/usr/bin/plutil -lint "$SHAREX/Contents/Info.plist" >/dev/null
+codesign --force --sign - --entitlements Resources/Share/FolioShare.entitlements "$SHAREX"
 # Shortcuts actions of the app (#70).
 scripts/intents-metadata.sh "$BIN_DIR" "$APP/Contents/Resources" Folio 5 CreateNoteIntent
 codesign --force --sign - "$APP"

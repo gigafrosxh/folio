@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "Folio", targets: ["Folio"]),
         .executable(name: "FolioWidgets", targets: ["FolioWidgets"]),
+        .executable(name: "FolioShare", targets: ["FolioShare"]),
         .library(name: "FolioCore", targets: ["FolioCore"]),
     ],
     targets: [
@@ -44,6 +45,14 @@ let package = Package(
             dependencies: ["FolioCore"],
             path: "Sources/FolioPad",
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        // Safari share menu (#50): an app extension, packed by scripts/build-app.sh like the widgets.
+        .executableTarget(
+            name: "FolioShare",
+            dependencies: ["FolioCore"],
+            path: "Sources/FolioShare",
+            swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
         // Command-line inspector for .folio files.
         .executableTarget(
