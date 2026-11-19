@@ -2,7 +2,8 @@ import AppKit
 import FolioCore
 
 extension BlockModel {
-    func outlineParagraphs(theme: ThemeManager) -> [NoteOutline.Paragraph] {
+    func outlineParagraphs(theme: ThemeManager, headingSizes: [(CGFloat, NoteOutline.Level)]? = nil) -> [NoteOutline.Paragraph] {
+        let sizes = headingSizes ?? BlockModel.headingSizes(theme: theme)
         let text = storage.string as NSString
         let empty = NSRange(location: 0, length: 0)
         guard kind == .text, text.length > 0 else { return [.init(blockID: id, kind: kind, range: empty)] }
@@ -12,7 +13,7 @@ extension BlockModel {
             var end = 0, contentEnd = 0
             text.getParagraphStart(nil, end: &end, contentsEnd: &contentEnd, for: NSRange(location: start, length: 0))
             let range = NSRange(location: start, length: end - start)
-            let level = contentEnd > start ? headingLevel(at: start, theme: theme) : nil
+            let level = contentEnd > start ? headingLevel(at: start, sizes: sizes) : nil
             let title = level == nil ? "" : text.substring(with: NSRange(location: start, length: contentEnd - start))
             result.append(.init(blockID: id, kind: kind, range: range, level: level, title: title))
             start = end
@@ -23,14 +24,18 @@ extension BlockModel {
         return result
     }
 
-    private func headingLevel(at offset: Int, theme: ThemeManager) -> NoteOutline.Level? {
+    /// Point sizes of title, heading and subheading, computed once per outline instead of per paragraph.
+    static func headingSizes(theme: ThemeManager) -> [(CGFloat, NoteOutline.Level)] {
+        [(TextStyle.title.font(theme: theme).pointSize, .title), (TextStyle.heading.font(theme: theme).pointSize, .heading),
+         (TextStyle.subheading.font(theme: theme).pointSize, .subheading)]
+    }
+
+    private func headingLevel(at offset: Int, sizes: [(CGFloat, NoteOutline.Level)]) -> NoteOutline.Level? {
         let attrs = storage.attributes(at: offset, effectiveRange: nil)
         if let p = attrs[.paragraphStyle] as? NSParagraphStyle, let level = NoteOutline.Level(rawValue: p.headerLevel) { return level }
         // Existing RTF notes use font presets. RTF rounds point sizes during serialization.
         guard let font = attrs[.font] as? NSFont, NSFontManager.shared.traits(of: font).contains(.boldFontMask) else { return nil }
-        for (style, level) in [(TextStyle.title, NoteOutline.Level.title), (.heading, .heading), (.subheading, .subheading)] {
-            if abs(style.font(theme: theme).pointSize - font.pointSize) <= 0.5 { return level }
-        }
+        for (size, level) in sizes where abs(size - font.pointSize) <= 0.5 { return level }
         return nil
     }
 }
@@ -38,7 +43,8 @@ extension BlockModel {
 extension NoteDocument {
     var outline: NoteOutline {
         if let cachedOutline { return cachedOutline }
-        let result = NoteOutline(blocks.flatMap { $0.outlineParagraphs(theme: .shared) })
+        let sizes = BlockModel.headingSizes(theme: .shared)
+        let result = NoteOutline(blocks.flatMap { $0.outlineParagraphs(theme: .shared, headingSizes: sizes) })
         cachedOutline = result
         return result
     }

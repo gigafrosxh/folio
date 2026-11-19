@@ -5,10 +5,14 @@ import AppKit
 final class FoldLayout: NSObject, NSLayoutManagerDelegate {
     private(set) var hidden: [NSRange] = []
 
-    func set(_ ranges: [NSRange]) -> Bool {
-        guard ranges != hidden else { return false }
+    /// New hidden ranges; returns the part of the text whose layout changed (nil: nothing changed).
+    func set(_ ranges: [NSRange]) -> NSRange? {
+        guard ranges != hidden else { return nil }
+        let changed = Set(ranges.map { [$0.location, $0.length] }).symmetricDifference(hidden.map { [$0.location, $0.length] })
         hidden = ranges
-        return true
+        let start = changed.map { $0[0] }.min() ?? 0
+        let end = changed.map { $0[0] + $0[1] }.max() ?? 0
+        return NSRange(location: start, length: max(end - start, 0))
     }
 
     private func isHidden(_ index: Int) -> Bool { hidden.contains { NSLocationInRange(index, $0) } }
@@ -19,7 +23,8 @@ final class FoldLayout: NSObject, NSLayoutManagerDelegate {
         guard !hidden.isEmpty else { return 0 }
         var changed = false
         let newProps = (0..<glyphRange.length).map { i -> NSLayoutManager.GlyphProperty in
-            guard isHidden(charIndexes[i]) else { return props[i] }
+            // Line breaks stay, so every hidden paragraph keeps its own (zero-height) line.
+            guard isHidden(charIndexes[i]), !props[i].contains(.controlCharacter) else { return props[i] }
             changed = true
             return .null
         }
@@ -39,22 +44,30 @@ final class FoldLayout: NSObject, NSLayoutManagerDelegate {
         baselineOffset.pointee = 0
         return true
     }
-
-    func layoutManager(_ lm: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction, forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
-        isHidden(charIndex) ? .zeroAdvancement : action
-    }
 }
 
 extension FolioTextView {
     /// New hidden ranges from the note's folds; relayouts and reports the new height.
     func setHiddenRanges(_ ranges: [NSRange]) {
-        guard foldLayout.set(ranges), let lm = layoutManager, let storage = textStorage else { return }
-        let all = NSRange(location: 0, length: storage.length)
-        lm.invalidateGlyphs(forCharacterRange: all, changeInLength: 0, actualCharacterRange: nil)
-        lm.invalidateLayout(forCharacterRange: all, actualCharacterRange: nil)
+        guard let changed = foldLayout.set(ranges), let lm = layoutManager, let storage = textStorage else { return }
+        // Only the paragraphs whose visibility changed are laid out again; a whole long note per keystroke was too slow.
+        // Start one paragraph earlier: the line before a hidden part ends where it begins.
+        let clipped = NSIntersectionRange(changed, NSRange(location: 0, length: storage.length))
+        let from = max(clipped.location - 1, 0)
+        let range = (storage.string as NSString).paragraphRange(for: NSRange(location: from, length: NSMaxRange(clipped) - from))
+        guard range.length > 0 else { return }
+        lm.invalidateGlyphs(forCharacterRange: range, changeInLength: 0, actualCharacterRange: nil)
+        lm.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
         needsDisplay = true
         reportHeight()
         invalidateIntrinsicContentSize()
+    }
+
+    /// With folded paragraphs the used rect can keep room for hidden lines; the line fragments themselves are exact.
+    func foldedHeight(_ lm: NSLayoutManager, _ tc: NSTextContainer) -> CGFloat {
+        var bottom: CGFloat = 0
+        lm.enumerateLineFragments(forGlyphRange: lm.glyphRange(for: tc)) { rect, _, _, _, _ in bottom = max(bottom, rect.maxY) }
+        return bottom
     }
 
     /// Top of a paragraph in view coordinates (for the fold triangles in the margin).

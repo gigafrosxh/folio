@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Tippen mit eingeklappten Abschnitten** (#344): In langen Notizen mit eingeklappten Abschnitten stockte jeder Tastenanschlag (rund 180 ms bei 2000 Absätzen). Jetzt wird nur noch neu gesetzt, was sich an den ausgeblendeten Absätzen ändert (unter 10 ms).
+
 ## [1.8.1] – 2026-11-19
 
 ### Behoben
