@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.9.2] – 2026-11-19
+
 ### Behoben
 - **Automation trifft die richtige Notiz** (#347): AppleScript und Kurzbefehle lehnen leere, unbekannte und mehrdeutige Ziele ab, statt die zuletzt bearbeitete oder irgendeine passende Notiz zu ändern; eine ID wird nur als ID verstanden. „Notiz erstellen“ legt die Notiz an, ohne Auswahl, Editor oder Tastatureingabe umzuschalten.
 - **iPad/iPhone: Mac-Änderung bleibt erhalten** (#348): Wird eine Notiz nach einer Änderung auf dem Mac neu geladen, bekommt sie frische Editoren; ein fokussierter Editor schreibt den alten Text nicht mehr hinein.
