@@ -33,7 +33,11 @@ final class PDFStructureImportTests: XCTestCase {
                 switch piece {
                 case .text(let s, let size, let bold): y = draw(s, size: size, bold: bold, at: y)
                 case .picture(let height):
-                    let image = NSImage(size: NSSize(width: 200, height: height), flipped: false) { r in NSColor.systemTeal.setFill(); r.fill(); return true }
+                    let image = NSImage(size: NSSize(width: 200, height: height), flipped: false) { r in
+                        NSColor.systemTeal.setFill()
+                        r.fill()
+                        return true
+                    }
                     let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil)!
                     ctx.draw(cg, in: CGRect(x: 30, y: y - height, width: 200, height: height))
                     y -= height + 6
@@ -47,7 +51,8 @@ final class PDFStructureImportTests: XCTestCase {
         return url
     }
 
-    private let longText = "Dieser Absatz ist lang genug, dass er im PDF über mehrere Zeilen umbricht, und genau diese Zeilen soll der Import wieder zu einem einzigen Absatz zusammenfügen, ohne etwas zu verlieren."
+    private let longText =
+        "Dieser Absatz ist lang genug, dass er im PDF über mehrere Zeilen umbricht, und genau diese Zeilen soll der Import wieder zu einem einzigen Absatz zusammenfügen, ohne etwas zu verlieren."
 
     private func structure(_ url: URL) -> [PDFStructure.Element] {
         PDFStructure.elements(of: PDFStructure.pages(of: PDFDocument(url: url)!))
@@ -55,9 +60,11 @@ final class PDFStructureImportTests: XCTestCase {
 
     func testHeadingsParagraphsListsAndPictures() throws {
         let url = try writePDF([
-            [.text("Schwingungen", 26, bold: true), .text(longText, 12, bold: false), .text("Beispiele", 18, bold: true),
-             .text("• Ein Pendel\n• Eine Saite", 12, bold: false), .picture(80), .text("Nach dem Bild", 12, bold: false)],
-            [.text("Arten", 15, bold: true), .text("f = 1 / T\nT = 1 / f", 12, bold: false)],
+            [
+                .text("Schwingungen", 26, bold: true), .text(longText, 12, bold: false), .text("Beispiele", 18, bold: true),
+                .text("• Ein Pendel\n• Eine Saite", 12, bold: false), .picture(80), .text("Nach dem Bild", 12, bold: false)
+            ],
+            [.text("Arten", 15, bold: true), .text("f = 1 / T\nT = 1 / f", 12, bold: false)]
         ])
         defer { try? FileManager.default.removeItem(at: url) }
         let elements = structure(url)
@@ -70,8 +77,12 @@ final class PDFStructureImportTests: XCTestCase {
             case .blankLine: return "leer"
             }
         }
-        XCTAssertEqual(kinds, ["h1 Schwingungen", "p " + longText, "h2 Beispiele", "li • Ein Pendel", "li • Eine Saite", "bild",
-                               "p Nach dem Bild", "h3 Arten", "p f = 1 / T", "p T = 1 / f"], "\(kinds)")
+        XCTAssertEqual(
+            kinds,
+            [
+                "h1 Schwingungen", "p " + longText, "h2 Beispiele", "li • Ein Pendel", "li • Eine Saite", "bild",
+                "p Nach dem Bild", "h3 Arten", "p f = 1 / T", "p T = 1 / f"
+            ], "\(kinds)")
         guard case .heading(_, let runs) = elements[0] else { return XCTFail() }
         XCTAssertTrue(runs[0].bold)
     }
@@ -85,7 +96,9 @@ final class PDFStructureImportTests: XCTestCase {
     }
 
     func testNoteGetsBlocksInOrderAndKeepsThePDF() throws {
-        let url = try writePDF([[.text("Titel", 26, bold: true), .text("Vorher steht ein ganzer Satz.", 12, bold: false), .picture(80), .text("Nachher folgt noch ein Satz.", 12, bold: false)]])
+        let url = try writePDF([
+            [.text("Titel", 26, bold: true), .text("Vorher steht ein ganzer Satz.", 12, bold: false), .picture(80), .text("Nachher folgt noch ein Satz.", 12, bold: false)]
+        ])
         defer { try? FileManager.default.removeItem(at: url) }
         let file = try PDFImport.note(fromPDFAt: url)
         XCTAssertEqual(file.meta.title, "Titel")

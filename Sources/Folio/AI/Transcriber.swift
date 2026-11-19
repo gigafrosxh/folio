@@ -48,8 +48,9 @@ enum Transcriber {
         guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
             throw TranscriptionError.unsupportedLanguage(name(of: locale))
         }
-        let transcriber = SpeechTranscriber(locale: supported, transcriptionOptions: [], reportingOptions: [],
-                                            attributeOptions: [.audioTimeRange])
+        let transcriber = SpeechTranscriber(
+            locale: supported, transcriptionOptions: [], reportingOptions: [],
+            attributeOptions: [.audioTimeRange])
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             status("Lade das Sprachmodell für \(name(of: supported)) …")
             try await request.downloadAndInstall()

@@ -36,9 +36,18 @@ struct MarkdownView: View {
 
         mutating func add(_ raw: String) {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("```") { toggleCode(); return }
-            if code != nil { code?.append(raw); return }
-            if line.isEmpty { flush(); return }
+            if line.hasPrefix("```") {
+                toggleCode()
+                return
+            }
+            if code != nil {
+                code?.append(raw)
+                return
+            }
+            if line.isEmpty {
+                flush()
+                return
+            }
             if let block = MarkdownView.block(for: line, indent: raw.prefix { $0 == " " }.count / 2) {
                 flush()
                 out.append(block)

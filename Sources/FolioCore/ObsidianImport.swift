@@ -34,7 +34,9 @@ public enum ObsidianImport {
             guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
             let rel = String(url.standardizedFileURL.path.dropFirst(root.count + 1))
             guard !isSkipped(rel) else { continue }
-            if url.pathExtension.lowercased() == "md" { notes.append(rel) } else {
+            if url.pathExtension.lowercased() == "md" {
+                notes.append(rel)
+            } else {
                 // Obsidian finds embeds by file name anywhere in the vault; the shortest path wins, like Obsidian.
                 let key = url.lastPathComponent.lowercased()
                 if files[key].map({ $0.count > rel.count }) ?? true { files[key] = rel }
@@ -107,7 +109,10 @@ public enum ObsidianImport {
         }
 
         private mutating func addListItem(_ value: String, to key: String) {
-            if key == "tags" { tags.append(value); return }
+            if key == "tags" {
+                tags.append(value)
+                return
+            }
             guard !ignored.contains(key.lowercased()) else { return }
             if let i = properties.firstIndex(where: { $0.0 == key }) { properties[i].1 += ", " + value } else { properties.append((key, value)) }
         }
@@ -178,7 +183,8 @@ public enum ObsidianImport {
             out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
             let target = ns.substring(with: m.range(at: 1)).trimmingCharacters(in: .whitespaces)
             // `![[Version 1.2]]` is a note when the vault has `Version 1.2.md` (#351).
-            let isNote = (target as NSString).pathExtension.isEmpty || target.lowercased().hasSuffix(".md")
+            let isNote =
+                (target as NSString).pathExtension.isEmpty || target.lowercased().hasSuffix(".md")
                 || notePaths.contains(target.lowercased()) || files[target.lowercased()] == nil && notePaths.contains((target as NSString).lastPathComponent.lowercased())
             if isNote {
                 let name = target.lowercased().hasSuffix(".md") ? String(target.dropLast(3)) : target

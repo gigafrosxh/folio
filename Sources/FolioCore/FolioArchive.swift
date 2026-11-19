@@ -58,7 +58,7 @@ public struct FolioArchive: Sendable {
         var w = ByteWriter()
         w.append(FolioArchive.magic)
         w.append(UInt16(FolioArchive.currentVersion))
-        w.append(UInt16(1)) // LZFSE
+        w.append(UInt16(1))  // LZFSE
         try w.appendSection(meta)
         try w.appendSection(body)
         w.append(UInt32(attachments.count))
@@ -155,8 +155,9 @@ private enum Codec {
         var out = Data(count: size + 1)
         let written = out.withUnsafeMutableBytes { dst in
             data.withUnsafeBytes { src in
-                compression_decode_buffer(dst.bindMemory(to: UInt8.self).baseAddress!, size + 1,
-                                          src.bindMemory(to: UInt8.self).baseAddress!, data.count, nil, COMPRESSION_LZFSE)
+                compression_decode_buffer(
+                    dst.bindMemory(to: UInt8.self).baseAddress!, size + 1,
+                    src.bindMemory(to: UInt8.self).baseAddress!, data.count, nil, COMPRESSION_LZFSE)
             }
         }
         guard written == size else { throw FolioFormatError.compressionFailed }
@@ -211,7 +212,8 @@ struct ByteReader {
         let storedLength: UInt64 = try read()
         guard storedLength <= UInt64(Int.max) else { throw FolioFormatError.truncated }
         guard !compressed || ArchiveLimits.allows(raw: rawLength, stored: storedLength),
-              rawLength <= ArchiveLimits.maxTotal - unpacked else { throw FolioFormatError.tooLarge }
+            rawLength <= ArchiveLimits.maxTotal - unpacked
+        else { throw FolioFormatError.tooLarge }
         unpacked += rawLength
         let stored = Data(try readBytes(Int(storedLength)))
         let raw = compressed ? try Codec.decompress(stored, size: Int(rawLength)) : stored

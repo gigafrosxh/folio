@@ -241,8 +241,10 @@ private struct DiagnosticScan {
         }
         let reason = lines.first { $0.range(of: #"^\w*Error:"#, options: .regularExpression) != nil }
         // Node also prints the failing line first ("/path/main.js:3"), followed by the source line.
-        if found.isEmpty, let m = try? NSRegularExpression(pattern: "^\(names):(\\d+)$", options: .anchorsMatchLines)
-            .firstMatch(in: output, range: NSRange(location: 0, length: (output as NSString).length)) {
+        if found.isEmpty,
+            let m = try? NSRegularExpression(pattern: "^\(names):(\\d+)$", options: .anchorsMatchLines)
+                .firstMatch(in: output, range: NSRange(location: 0, length: (output as NSString).length))
+        {
             add(Self.number(m, 1, output), nil, reason ?? "", .error)
         } else if let reason {
             for i in found.indices where found[i].message.isEmpty { found[i].message = reason }
@@ -253,7 +255,8 @@ private struct DiagnosticScan {
 // MARK: - Terminal output (#23)
 
 public enum TerminalText {
-    private static let csi = try! NSRegularExpression(pattern: "\u{1B}\\[[0-9;?]*[ -/]*[@-~]|\u{1B}\\][^\u{07}\u{1B}]*(?:\u{07}|\u{1B}\\\\)|\u{1B}[()][A-Za-z0-9]|\u{1B}[=>78cDEHMNOZ]")
+    private static let csi = try! NSRegularExpression(
+        pattern: "\u{1B}\\[[0-9;?]*[ -/]*[@-~]|\u{1B}\\][^\u{07}\u{1B}]*(?:\u{07}|\u{1B}\\\\)|\u{1B}[()][A-Za-z0-9]|\u{1B}[=>78cDEHMNOZ]")
 
     /// Removes colors, cursor movements and window titles, and applies backspaces and carriage returns
     /// well enough for a plain text view.
@@ -267,7 +270,9 @@ public enum TerminalText {
             switch ch {
             case "\u{08}": if !line.isEmpty { line.removeLast() }
             case "\r": line = ""
-            case "\n": out += line + "\n"; line = ""
+            case "\n":
+                out += line + "\n"
+                line = ""
             case "\u{07}": break
             default: line.append(ch)
             }

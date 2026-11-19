@@ -14,9 +14,12 @@ struct SettingsView: View {
 
     private let accents = ["#E5A50A", "#E86A33", "#D64959", "#C64B91", "#8956CF", "#3478D4", "#269B9B", "#459D54"]
     private static let fontFamilies = NSFontManager.shared.availableFontFamilies.sorted()
-    private static let codeFamilies = Array(Set(fontFamilies.filter {
-        NSFont(name: $0, size: 13)?.isFixedPitch == true
-    } + ["SF Mono", "Menlo"])).sorted()
+    private static let codeFamilies = Array(
+        Set(
+            fontFamilies.filter {
+                NSFont(name: $0, size: 13)?.isFixedPitch == true
+            } + ["SF Mono", "Menlo"])
+    ).sorted()
 
     /// "Folio 0.5.1 (7)" from the app bundle; "Folio (Entwicklung)" when run outside the .app.
     static var versionString: String {
@@ -31,17 +34,17 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-        TabView(selection: $tab) {
-            general.tabItem { Label("Allgemein", systemImage: "gearshape") }.tag("general")
-            editor.tabItem { Label("Editor", systemImage: "textformat") }.tag("editor")
-            code.tabItem { Label("Code", systemImage: "chevron.left.forwardslash.chevron.right") }.tag("code")
-            execution.tabItem { Label("Ausführung", systemImage: "play.circle") }.tag("execution")
-            appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }.tag("appearance")
-            SafetySettingsView().tabItem { Label("Sicherheit", systemImage: "lock.shield") }.tag("safety")
-            QuickAccessSettingsView().tabItem { Label("Schnellzugriff", systemImage: "bolt") }.tag("quick")
-            shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }.tag("shortcuts")
-            feedback.tabItem { Label("Feedback", systemImage: "bubble.left.and.exclamationmark.bubble.right") }.tag("feedback")
-        }
+            TabView(selection: $tab) {
+                general.tabItem { Label("Allgemein", systemImage: "gearshape") }.tag("general")
+                editor.tabItem { Label("Editor", systemImage: "textformat") }.tag("editor")
+                code.tabItem { Label("Code", systemImage: "chevron.left.forwardslash.chevron.right") }.tag("code")
+                execution.tabItem { Label("Ausführung", systemImage: "play.circle") }.tag("execution")
+                appearance.tabItem { Label("Darstellung", systemImage: "square.on.square") }.tag("appearance")
+                SafetySettingsView().tabItem { Label("Sicherheit", systemImage: "lock.shield") }.tag("safety")
+                QuickAccessSettingsView().tabItem { Label("Schnellzugriff", systemImage: "bolt") }.tag("quick")
+                shortcuts.tabItem { Label("Tastenkürzel", systemImage: "keyboard") }.tag("shortcuts")
+                feedback.tabItem { Label("Feedback", systemImage: "bubble.left.and.exclamationmark.bubble.right") }.tag("feedback")
+            }
             Divider()
             Text(Self.versionString)
                 .font(.caption)
@@ -108,8 +111,12 @@ struct SettingsView: View {
                     Text("Keine").tag("")
                     ForEach(store.templates, id: \.id) { t in Text(t.meta.title.isEmpty ? "Ohne Titel" : t.meta.title).tag(t.id.uuidString) }
                 }
-            } header: { Text("Tagesnotizen") } footer: {
-                Text("„Ablage › Tagesnotiz“ (⌃⌘D) öffnet die Notiz von heute, z. B. „\(DailyNote.title(for: Date()))“, und legt sie bei Bedarf an. In Vorlagen setzen {{datum}}, {{wochentag}}, {{titel}} und {{cursor}} Werte ein.")
+            } header: {
+                Text("Tagesnotizen")
+            } footer: {
+                Text(
+                    "„Ablage › Tagesnotiz“ (⌃⌘D) öffnet die Notiz von heute, z. B. „\(DailyNote.title(for: Date()))“, und legt sie bei Bedarf an. In Vorlagen setzen {{datum}}, {{wochentag}}, {{titel}} und {{cursor}} Werte ein."
+                )
             }
             Section {
                 Picker("Erscheinungsbild", selection: $theme.settings.appearance) {
@@ -118,7 +125,9 @@ struct SettingsView: View {
                 ColorPicker("Akzentfarbe", selection: $theme.settings.accentHex.asColor(), supportsOpacity: false)
                 HStack(spacing: 12) {
                     ForEach(accents, id: \.self) { hex in
-                        Button { theme.settings.accentHex = hex } label: {
+                        Button {
+                            theme.settings.accentHex = hex
+                        } label: {
                             Circle().fill(Color(nsColor: NSColor(hex: hex) ?? .gray))
                                 .frame(width: 24, height: 24)
                                 .overlay {
@@ -147,7 +156,9 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Nach dem Titel mit einer Überschrift weiterschreiben", isOn: $theme.settings.headingAfterTitle)
-            } header: { Text("Absätze") } footer: {
+            } header: {
+                Text("Absätze")
+            } footer: {
                 Text("↩ nach dem Titel beginnt eine Überschrift, ↩ nach einer Überschrift normalen Text – wie in Apple Notizen. Listen setzen sich mit ↩ fort, ⇥ rückt ein.")
             }
             Section("Schrift") {
@@ -282,8 +293,10 @@ struct SettingsView: View {
             } header: {
                 Text("Grenzen")
             } footer: {
-                Text("Gelten für jeden Lauf eines Code-Blocks. Bei zu viel Ausgabe bleiben Anfang und Ende erhalten. Erkannte Server laufen weiter, bis du sie stoppst. Zeitlimit, Interpreter, Arbeitsverzeichnis und Variablen lassen sich pro Notiz festlegen (Terminal-Symbol › Ausführungsumgebung).")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "Gelten für jeden Lauf eines Code-Blocks. Bei zu viel Ausgabe bleiben Anfang und Ende erhalten. Erkannte Server laufen weiter, bis du sie stoppst. Zeitlimit, Interpreter, Arbeitsverzeichnis und Variablen lassen sich pro Notiz festlegen (Terminal-Symbol › Ausführungsumgebung)."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 ForEach(Languages.runnable) { language in
@@ -382,8 +395,7 @@ struct SettingsView: View {
         copy.name = "Eigenes Theme \(number)"
         copy.isDark = previewDark
         theme.settings.customCodeThemes.append(copy)
-        if previewDark { theme.settings.codeThemeDark = copy.id }
-        else { theme.settings.codeThemeLight = copy.id }
+        if previewDark { theme.settings.codeThemeDark = copy.id } else { theme.settings.codeThemeLight = copy.id }
     }
 
     private func deleteTheme(_ id: String) {
@@ -393,9 +405,11 @@ struct SettingsView: View {
     }
 
     private func interpreterBinding(_ id: String) -> Binding<String> {
-        Binding(get: { theme.settings.interpreterOverrides[id] ?? "" }, set: { value in
-            theme.settings.interpreterOverrides[id] = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
-        })
+        Binding(
+            get: { theme.settings.interpreterOverrides[id] ?? "" },
+            set: { value in
+                theme.settings.interpreterOverrides[id] = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
+            })
     }
 
     private func commandPlaceholder(_ language: LanguageSpec) -> String {

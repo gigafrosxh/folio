@@ -44,12 +44,17 @@ struct EmbedCard<Content: View, Actions: View>: View {
                     .frame(maxWidth: .infinity, minHeight: 12)
                     .contentShape(Rectangle())
                     .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
-                    .gesture(DragGesture(minimumDistance: 1)
-                        .onChanged { v in
-                            if dragStart == nil { dragStart = height }
-                            height = min(max((dragStart ?? height) + v.translation.height, 120), 1600)
-                        }
-                        .onEnded { _ in dragStart = nil; onCommit() })
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { v in
+                                if dragStart == nil { dragStart = height }
+                                height = min(max((dragStart ?? height) + v.translation.height, 120), 1600)
+                            }
+                            .onEnded { _ in
+                                dragStart = nil
+                                onCommit()
+                            }
+                    )
                     .help("Höhe ändern")
             }
         }
@@ -95,7 +100,8 @@ final class PDFAnnotationController: ObservableObject {
         guard let view, let page = view.currentSelection?.pages.first ?? view.currentPage else { return false }
         let anchor = view.currentSelection.map { $0.bounds(for: page) }
         let pageBox = page.bounds(for: .cropBox)
-        let origin = anchor.map { CGPoint(x: min($0.maxX + 4, pageBox.maxX - 24), y: $0.maxY - 20) }
+        let origin =
+            anchor.map { CGPoint(x: min($0.maxX + 4, pageBox.maxX - 24), y: $0.maxY - 20) }
             ?? CGPoint(x: pageBox.minX + 24, y: pageBox.maxY - 48)
         let note = PDFAnnotation(bounds: CGRect(origin: origin, size: CGSize(width: 20, height: 20)), forType: .text, withProperties: nil)
         note.contents = text
@@ -108,11 +114,14 @@ final class PDFAnnotationController: ObservableObject {
     func removeAnnotations() -> Int {
         guard let view else { return 0 }
         var removed = 0
-        let targets: [(PDFPage, CGRect?)] = view.currentSelection.map { sel in sel.pages.map { ($0, sel.bounds(for: $0)) } }
+        let targets: [(PDFPage, CGRect?)] =
+            view.currentSelection.map { sel in sel.pages.map { ($0, sel.bounds(for: $0)) } }
             ?? (view.currentPage.map { [($0, nil)] } ?? [])
         for (page, rect) in targets {
-            for a in page.annotations where [PDFAnnotationSubtype.highlight.rawValue, PDFAnnotationSubtype.text.rawValue].contains(a.type ?? "")
-                || a.type == "Highlight" || a.type == "Text" {
+            for a in page.annotations
+            where [PDFAnnotationSubtype.highlight.rawValue, PDFAnnotationSubtype.text.rawValue].contains(a.type ?? "")
+                || a.type == "Highlight" || a.type == "Text"
+            {
                 if let rect, !a.bounds.intersects(rect) { continue }
                 page.removeAnnotation(a)
                 removed += 1
@@ -148,8 +157,9 @@ struct PDFKitView: NSViewRepresentable {
         v.backgroundColor = .clear
         controller?.view = v
         context.coordinator.controller = controller
-        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.selectionChanged(_:)),
-                                               name: .PDFViewSelectionChanged, object: v)
+        NotificationCenter.default.addObserver(
+            context.coordinator, selector: #selector(Coordinator.selectionChanged(_:)),
+            name: .PDFViewSelectionChanged, object: v)
         return v
     }
 
@@ -172,15 +182,32 @@ struct PDFBlockView: View {
     var body: some View {
         let att = block.attachmentID.flatMap { doc.attachments[$0] }
         EmbedCard(title: att?.header.filename ?? "PDF", icon: "doc.richtext", height: $block.height, onCommit: { doc.markDirty() }) {
-            Button { if annotations.highlightSelection() { store() } } label: { Label("Markieren", systemImage: "highlighter") }
-                .disabled(!annotations.hasSelection)
-                .helpLabel("Ausgewählten Text gelb markieren")
-            Button { comment = ""; commenting = true } label: { Label("Kommentar", systemImage: "text.bubble") }
-                .helpLabel("Kommentar an die Auswahl oder die sichtbare Seite heften")
-            Button { if annotations.removeAnnotations() > 0 { store() } } label: { Label("Entfernen", systemImage: "eraser") }
-                .helpLabel("Markierungen und Kommentare der Auswahl entfernen (ohne Auswahl: der sichtbaren Seite)")
-            Button { AttachmentSync.open(block, in: doc) } label: { Label("In Vorschau öffnen", systemImage: "arrow.up.forward.app") }
-                .help("Im Standardprogramm öffnen")
+            Button {
+                if annotations.highlightSelection() { store() }
+            } label: {
+                Label("Markieren", systemImage: "highlighter")
+            }
+            .disabled(!annotations.hasSelection)
+            .helpLabel("Ausgewählten Text gelb markieren")
+            Button {
+                comment = ""
+                commenting = true
+            } label: {
+                Label("Kommentar", systemImage: "text.bubble")
+            }
+            .helpLabel("Kommentar an die Auswahl oder die sichtbare Seite heften")
+            Button {
+                if annotations.removeAnnotations() > 0 { store() }
+            } label: {
+                Label("Entfernen", systemImage: "eraser")
+            }
+            .helpLabel("Markierungen und Kommentare der Auswahl entfernen (ohne Auswahl: der sichtbaren Seite)")
+            Button {
+                AttachmentSync.open(block, in: doc)
+            } label: {
+                Label("In Vorschau öffnen", systemImage: "arrow.up.forward.app")
+            }
+            .help("Im Standardprogramm öffnen")
         } content: {
             if let att {
                 VStack(spacing: 0) {
@@ -214,7 +241,10 @@ struct QuickLookView: NSViewRepresentable {
     var url: URL
     var revision: Int
 
-    final class Coordinator { var revision = -1; var url: URL? }
+    final class Coordinator {
+        var revision = -1
+        var url: URL?
+    }
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> QLPreviewView {
@@ -250,18 +280,29 @@ struct FileBlockView: View {
     var body: some View {
         let att = block.attachmentID.flatMap { doc.attachments[$0] }
         let url = att.flatMap { AttachmentSync.materialize($0, noteID: doc.id) }
-        EmbedCard(title: att?.header.filename ?? "Dokument", icon: isTable ? "tablecells" : "doc.text",
-                  height: $block.height, onCommit: { doc.markDirty() }) {
+        EmbedCard(
+            title: att?.header.filename ?? "Dokument", icon: isTable ? "tablecells" : "doc.text",
+            height: $block.height, onCommit: { doc.markDirty() }
+        ) {
             if isTable {
-                Button { AttachmentSync.open(block, in: doc, withApp: "com.apple.iWork.Numbers") } label: {
+                Button {
+                    AttachmentSync.open(block, in: doc, withApp: "com.apple.iWork.Numbers")
+                } label: {
                     Label("In Numbers bearbeiten", systemImage: "pencil")
                 }
                 .help("In Numbers bearbeiten – Änderungen erscheinen hier, sobald du zu Folio zurückkehrst")
             } else {
-                Button { AttachmentSync.open(block, in: doc) } label: { Label("Öffnen", systemImage: "arrow.up.forward.app") }
-                    .help("Im Standardprogramm öffnen")
+                Button {
+                    AttachmentSync.open(block, in: doc)
+                } label: {
+                    Label("Öffnen", systemImage: "arrow.up.forward.app")
+                }
+                .help("Im Standardprogramm öffnen")
             }
-            Button { AttachmentSync.syncExternalEdits(in: doc); block.revision += 1 } label: {
+            Button {
+                AttachmentSync.syncExternalEdits(in: doc)
+                block.revision += 1
+            } label: {
                 Label("Aktualisieren", systemImage: "arrow.clockwise")
             }
             .help("Änderungen aus der Datei übernehmen")
@@ -401,18 +442,18 @@ struct ImageSheets: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-        .sheet(isPresented: $cropping) {
-            if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
-                CropSheet(data: att.data, key: block.id.uuidString, edit: block.imageEdit ?? ImageEdit()) { edit in
-                    doc.changeBlock(block, "Bild zuschneiden") { block.imageEdit = edit.isIdentity ? nil : edit }
+            .sheet(isPresented: $cropping) {
+                if let att = block.attachmentID.flatMap({ doc.attachments[$0] }) {
+                    CropSheet(data: att.data, key: block.id.uuidString, edit: block.imageEdit ?? ImageEdit()) { edit in
+                        doc.changeBlock(block, "Bild zuschneiden") { block.imageEdit = edit.isIdentity ? nil : edit }
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $editingAlt) {
-            AltTextSheet(text: block.altText) { text in
-                doc.changeBlock(block, "Alternativtext ändern") { block.altText = text }
+            .sheet(isPresented: $editingAlt) {
+                AltTextSheet(text: block.altText) { text in
+                    doc.changeBlock(block, "Alternativtext ändern") { block.altText = text }
+                }
             }
-        }
     }
 }
 
@@ -420,7 +461,9 @@ extension ImageBlockView {
     /// Shows that the picture has a description; a click edits it.
     @ViewBuilder private var altBadge: some View {
         if !block.altText.isEmpty || hovering {
-            Button { editingAlt = true } label: {
+            Button {
+                editingAlt = true
+            } label: {
                 Text(block.altText.isEmpty ? "+ ALT" : "ALT")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .padding(.horizontal, 6).padding(.vertical, 3)
@@ -440,15 +483,31 @@ extension ImageBlockView {
 
     private var controls: some View {
         HStack(spacing: 4) {
-            Button { rotate(clockwise: false) } label: { Image(systemName: "rotate.left") }
-                .buttonStyle(.borderless).helpLabel("Nach links drehen")
-            Button { rotate(clockwise: true) } label: { Image(systemName: "rotate.right") }
-                .buttonStyle(.borderless).helpLabel("Nach rechts drehen")
-            Button { cropping = true } label: { Image(systemName: "crop") }
-                .buttonStyle(.borderless).helpLabel("Zuschneiden …")
+            Button {
+                rotate(clockwise: false)
+            } label: {
+                Image(systemName: "rotate.left")
+            }
+            .buttonStyle(.borderless).helpLabel("Nach links drehen")
+            Button {
+                rotate(clockwise: true)
+            } label: {
+                Image(systemName: "rotate.right")
+            }
+            .buttonStyle(.borderless).helpLabel("Nach rechts drehen")
+            Button {
+                cropping = true
+            } label: {
+                Image(systemName: "crop")
+            }
+            .buttonStyle(.borderless).helpLabel("Zuschneiden …")
             if block.imageEdit != nil {
-                Button { doc.changeBlock(block, "Original wiederherstellen") { block.imageEdit = nil } } label: { Image(systemName: "arrow.uturn.backward") }
-                    .buttonStyle(.borderless).helpLabel("Original zeigen (Zuschnitt und Drehung zurücksetzen)")
+                Button {
+                    doc.changeBlock(block, "Original wiederherstellen") { block.imageEdit = nil }
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .buttonStyle(.borderless).helpLabel("Original zeigen (Zuschnitt und Drehung zurücksetzen)")
             }
             Divider().frame(height: 14)
             ForEach([(0.5, "S"), (0.75, "M"), (1.0, "L")], id: \.0) { size, label in
@@ -458,9 +517,13 @@ extension ImageBlockView {
                     .frame(width: 22)
             }
             Divider().frame(height: 14)
-            Button { AttachmentSync.open(block, in: doc) } label: { Image(systemName: "arrow.up.forward.app") }
-                .buttonStyle(.borderless)
-                .help("Im Standardprogramm öffnen")
+            Button {
+                AttachmentSync.open(block, in: doc)
+            } label: {
+                Image(systemName: "arrow.up.forward.app")
+            }
+            .buttonStyle(.borderless)
+            .help("Im Standardprogramm öffnen")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -471,7 +534,8 @@ extension ImageBlockView {
 // MARK: - Web
 
 enum WebLoadState: Equatable {
-    case loading, loaded, failed(String)
+    case loading, loaded
+    case failed(String)
 }
 
 struct WebPageView: NSViewRepresentable {
@@ -502,8 +566,10 @@ struct WebPageView: NSViewRepresentable {
         }
 
         /// Links that want a new window (logins, SSO) open inside the embed instead of being dropped.
-        func webView(_ w: WKWebView, createWebViewWith c: WKWebViewConfiguration, for a: WKNavigationAction,
-                     windowFeatures f: WKWindowFeatures) -> WKWebView? {
+        func webView(
+            _ w: WKWebView, createWebViewWith c: WKWebViewConfiguration, for a: WKNavigationAction,
+            windowFeatures f: WKWindowFeatures
+        ) -> WKWebView? {
             if let url = a.request.url { w.load(URLRequest(url: url)) }
             return nil
         }
@@ -572,8 +638,10 @@ struct WebBlockView: View {
     var body: some View {
         if let url {
             if isPage {
-                EmbedCard(title: remotePDF != nil ? url.lastPathComponent : (url.host() ?? block.url),
-                          icon: remotePDF != nil ? "doc.richtext" : "globe", height: $block.height, onCommit: { doc.markDirty() }) {
+                EmbedCard(
+                    title: remotePDF != nil ? url.lastPathComponent : (url.host() ?? block.url),
+                    icon: remotePDF != nil ? "doc.richtext" : "globe", height: $block.height, onCommit: { doc.markDirty() }
+                ) {
                     actions(url)
                 } content: {
                     if let remotePDF {
@@ -613,8 +681,16 @@ struct WebBlockView: View {
                 Text("Die Seite konnte nicht geladen werden").font(.headline)
                 Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 HStack {
-                    Button("Erneut versuchen") { loadState = .loading; reload += 1 }
-                    if !isLocal { Button("Als Vorschau") { block.mode = "preview"; doc.markDirty() } }
+                    Button("Erneut versuchen") {
+                        loadState = .loading
+                        reload += 1
+                    }
+                    if !isLocal {
+                        Button("Als Vorschau") {
+                            block.mode = "preview"
+                            doc.markDirty()
+                        }
+                    }
                     Button("Im Browser öffnen") { NSWorkspace.shared.open(url) }
                 }
             }
@@ -636,10 +712,18 @@ struct WebBlockView: View {
             .help(isPage ? "Als kompakte Link-Vorschau anzeigen" : "Webseite direkt in der Notiz anzeigen")
         }
         if isPage {
-            Button { reload += 1 } label: { Label("Neu laden", systemImage: "arrow.clockwise") }.help("Neu laden")
+            Button {
+                reload += 1
+            } label: {
+                Label("Neu laden", systemImage: "arrow.clockwise")
+            }.help("Neu laden")
         }
-        Button { NSWorkspace.shared.open(url) } label: { Label("Im Browser öffnen", systemImage: "safari") }
-            .help("Im Browser öffnen")
+        Button {
+            NSWorkspace.shared.open(url)
+        } label: {
+            Label("Im Browser öffnen", systemImage: "safari")
+        }
+        .help("Im Browser öffnen")
     }
 }
 
@@ -651,11 +735,12 @@ enum RemotePDF {
         let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
         var request = URLRequest(url: url)
         request.setValue(WebPageView.userAgent, forHTTPHeaderField: "User-Agent")
-        let header = HTTPCookie.requestHeaderFields(with: cookies.filter { cookie in
-            guard let host = url.host() else { return false }
-            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
-            return host == domain || host.hasSuffix("." + domain)
-        })
+        let header = HTTPCookie.requestHeaderFields(
+            with: cookies.filter { cookie in
+                guard let host = url.host() else { return false }
+                let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+                return host == domain || host.hasSuffix("." + domain)
+            })
         for (k, v) in header { request.setValue(v, forHTTPHeaderField: k) }
         guard let (data, _) = try? await URLSession.shared.data(for: request), data.starts(with: Array("%PDF".utf8)) else { return nil }
         return data

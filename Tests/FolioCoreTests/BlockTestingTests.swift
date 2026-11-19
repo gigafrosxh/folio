@@ -29,8 +29,9 @@ final class BlockTestingTests: XCTestCase {
 
     func testRegexWithCatastrophicBacktrackingRunsIntoTimeLimit() {
         let start = Date()
-        let outcome = BlockTestEvaluator.evaluate(BlockTest(expectedOutput: "^(a+)+b$", match: .regex),
-                                                  result: result(String(repeating: "a", count: 32)), regexTimeout: 0.2)
+        let outcome = BlockTestEvaluator.evaluate(
+            BlockTest(expectedOutput: "^(a+)+b$", match: .regex),
+            result: result(String(repeating: "a", count: 32)), regexTimeout: 0.2)
         XCTAssertEqual(outcome.status, .failed)
         XCTAssertTrue(outcome.messages.contains { $0.contains("Zeitlimit") }, "\(outcome.messages)")
         XCTAssertLessThan(Date().timeIntervalSince(start), 5)
@@ -55,7 +56,7 @@ final class BlockTestingTests: XCTestCase {
             BlockTestPlan.Item(id: ids[2], hasTest: false, session: "python"),
             BlockTestPlan.Item(id: ids[3], hasTest: false),
             BlockTestPlan.Item(id: ids[4], hasTest: true, interactive: true),
-            BlockTestPlan.Item(id: ids[5], hasTest: false, session: "node"),
+            BlockTestPlan.Item(id: ids[5], hasTest: false, session: "node")
         ]
         let steps = BlockTestPlan.steps(for: items)
         XCTAssertEqual(steps.map(\.id), [ids[0], ids[1], ids[4]])

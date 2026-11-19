@@ -14,8 +14,9 @@ struct FoldTriangles: View {
         ForEach(doc.foldHeadings(in: block.id)) { h in
             // The view must show this very block: a copy of the note can have the same block ids (#349).
             if let tv = FormattingController.shared.textView(for: block.id), tv.textStorage === block.storage,
-               h.section.start.range.location < block.storage.length,
-               let y = tv.top(ofCharacterAt: h.section.start.range.location), hovering || h.collapsed {
+                h.section.start.range.location < block.storage.length,
+                let y = tv.top(ofCharacterAt: h.section.start.range.location), hovering || h.collapsed
+            {
                 triangle(h, lineHeight: lineHeight(h, in: tv))
                     .offset(x: 14, y: y)
             }

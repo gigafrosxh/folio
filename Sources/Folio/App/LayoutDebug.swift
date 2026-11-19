@@ -10,7 +10,10 @@ enum LayoutDebug {
 
     @MainActor static func runIfRequested() {
         if env["FOLIO_UPDATE_TEST"] != nil { runUpdateCheck() }
-        if env["FOLIO_LAYOUT_DUMP"] != nil { print("LAYOUT start", NSApp.windows.count); fflush(stdout) }
+        if env["FOLIO_LAYOUT_DUMP"] != nil {
+            print("LAYOUT start", NSApp.windows.count)
+            fflush(stdout)
+        }
         runMediaScenarios()
         startSelfTests()
         runWindowScenarios()
@@ -28,22 +31,35 @@ enum LayoutDebug {
         updates.check()
         func poll() {
             switch updates.state {
-            case .available(let r): print("UPDATE available", r.version); fflush(stdout); updates.install(r)
-            case .upToDate: print("UPDATE up to date"); fflush(stdout)
-            case .failed(let m): print("UPDATE failed", m); fflush(stdout)
-            default: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll() } }
+            case .available(let r):
+                print("UPDATE available", r.version)
+                fflush(stdout)
+                updates.install(r)
+            case .upToDate:
+                print("UPDATE up to date")
+                fflush(stdout)
+            case .failed(let m):
+                print("UPDATE failed", m)
+                fflush(stdout)
+            default:
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll() } }
                 return
             }
             if case .installing = updates.state { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated { poll2() } } }
         }
         func poll2() {
             switch updates.state {
-            case .failed(let m): print("UPDATE failed", m); fflush(stdout)
+            case .failed(let m):
+                print("UPDATE failed", m)
+                fflush(stdout)
             case .installing(let p):
-                print("UPDATE progress", Int(p.fraction * 100), p.step, p.detail); fflush(stdout)
+                print("UPDATE progress", Int(p.fraction * 100), p.step, p.detail)
+                fflush(stdout)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated { poll2() } }
             case .available: DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { poll2() } }
-            default: print("UPDATE state", updates.state); fflush(stdout)
+            default:
+                print("UPDATE state", updates.state)
+                fflush(stdout)
             }
         }
         poll()
@@ -69,7 +85,7 @@ enum LayoutDebug {
             ("math", .math, RenderSamples.math, .init()), ("diagram", .diagram, RenderSamples.diagram, .init()),
             ("sequence", .diagram, "sequenceDiagram\n  Alice->>Bob: Hallo\n  Bob-->>Alice: Hi", .init()),
             ("broken", .diagram, "flowchart LR\n  A --> ", .init()), ("brokenmath", .math, "\\frac{1}{", .init()),
-            ("erd-broken", .erd, #"{"format":"erd-ultra","version":9}"#, .init()),
+            ("erd-broken", .erd, #"{"format":"erd-ultra","version":9}"#, .init())
         ]
         // FOLIO_RENDER_ERDU=<datei.erdu>: also every view of that ERD-Ultra file, light and dark (#204).
         guard let path = env["FOLIO_RENDER_ERDU"], let text = try? String(contentsOfFile: path, encoding: .utf8) else { return cases }
@@ -103,7 +119,8 @@ enum LayoutDebug {
         Task { @MainActor in
             do {
                 let text = try await Transcriber.transcribe(URL(fileURLWithPath: path), locale: Locale(identifier: env["FOLIO_LOCALE"] ?? "de-DE")) {
-                    print("TRANSCRIBE status", $0); fflush(stdout)
+                    print("TRANSCRIBE status", $0)
+                    fflush(stdout)
                 }
                 print("TRANSCRIBE ok", text)
             } catch {
@@ -116,16 +133,21 @@ enum LayoutDebug {
     @MainActor private static func openNote(at path: String) {
         let store = NoteStore.shared
         let wanted = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
-        if let ref = store.notes.first(where: { $0.url.resolvingSymlinksInPath().path == wanted }) { store.selectedNoteID = ref.id }
-        else { print("LAYOUT open failed:", path, store.notes.map(\.url.path)) }
+        if let ref = store.notes.first(where: { $0.url.resolvingSymlinksInPath().path == wanted }) {
+            store.selectedNoteID = ref.id
+        } else {
+            print("LAYOUT open failed:", path, store.notes.map(\.url.path))
+        }
     }
 
     @MainActor private static func createSampleNote(audio: String) {
         guard let ref = NoteStore.shared.createNote(), let doc = NoteStore.shared.currentDocument, doc.id == ref.id else { return }
         let body = ThemeManager.shared.bodyAttributes
-        doc.blocks[0].storage.setAttributedString(NSAttributedString(
-            string: "Medien-Test\nEine Notiz mit Formel, Diagramm, Code, Bild und Audio. #test\n" + String(repeating: "Fülltext für den Seitenumbruch. ", count: env["FOLIO_SAMPLE_SHORT"] == nil ? 60 : 0),
-            attributes: body))
+        doc.blocks[0].storage.setAttributedString(
+            NSAttributedString(
+                string: "Medien-Test\nEine Notiz mit Formel, Diagramm, Code, Bild und Audio. #test\n"
+                    + String(repeating: "Fülltext für den Seitenumbruch. ", count: env["FOLIO_SAMPLE_SHORT"] == nil ? 60 : 0),
+                attributes: body))
         let code = BlockModel(kind: .code)
         code.storage.setAttributedString(NSAttributedString(string: "for i in range(3):\n    print(f\"Zeile {i}\")"))
         code.output = "Zeile 0\nZeile 1\nZeile 2"
@@ -134,7 +156,9 @@ enum LayoutDebug {
         let diagram = BlockModel(kind: .diagram)
         diagram.storage.setAttributedString(NSAttributedString(string: "sequenceDiagram\n  Folio->>Mac: Aufnahme\n  Mac-->>Folio: Transkript"))
         let image = NSImage(size: NSSize(width: 400, height: 220), flipped: false) { r in
-            NSColor.systemTeal.setFill(); NSBezierPath(roundedRect: r, xRadius: 30, yRadius: 30).fill(); return true
+            NSColor.systemTeal.setFill()
+            NSBezierPath(roundedRect: r, xRadius: 30, yRadius: 30).fill()
+            return true
         }
         let imageBlock = AttachmentSync.makeImageBlock(data: NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!, in: doc)
         var blocks: [BlockModel] = [code, math, diagram, imageBlock]
@@ -144,20 +168,28 @@ enum LayoutDebug {
             blocks.append(audioBlock)
         }
         var anchor = doc.blocks[0].id
-        for b in blocks { doc.insert(b, after: anchor); anchor = b.id }
+        for b in blocks {
+            doc.insert(b, after: anchor)
+            anchor = b.id
+        }
         doc.markDirty()
         doc.saveNow()
-        print("SAMPLE note", doc.url.path); fflush(stdout)
+        print("SAMPLE note", doc.url.path)
+        fflush(stdout)
     }
 
     @MainActor private static func exportPDF(to pdf: String) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             MainActor.assumeIsolated {
-                guard let doc = NoteStore.shared.currentDocument else { print("EXPORT no note"); return }
+                guard let doc = NoteStore.shared.currentDocument else {
+                    print("EXPORT no note")
+                    return
+                }
                 Task { @MainActor in
                     do {
-                        try await NotePDFExporter.export(doc, to: URL(fileURLWithPath: pdf),
-                                                         options: .init(includeOutputs: env["FOLIO_EXPORT_NO_OUTPUT"] == nil))
+                        try await NotePDFExporter.export(
+                            doc, to: URL(fileURLWithPath: pdf),
+                            options: .init(includeOutputs: env["FOLIO_EXPORT_NO_OUTPUT"] == nil))
                         print("EXPORT ok", pdf)
                     } catch {
                         print("EXPORT error", error.localizedDescription)
@@ -174,7 +206,7 @@ enum LayoutDebug {
         let tests: [(String, @MainActor () async -> Void)] = [
             ("FOLIO_SAFETY_TEST", SafetySelfTest.run), ("FOLIO_DEV_TEST", DevSelfTest.run), ("FOLIO_EDITOR_TEST", EditorSelfTest.run),
             ("FOLIO_AI_TEST", AISelfTest.run), ("FOLIO_LINK_TEST", LinkSelfTest.run), ("FOLIO_KEY_TEST", KeyboardSelfTest.run),
-            ("FOLIO_ORG_TEST", OrganizationSelfTest.run), ("FOLIO_AUTO_TEST", AutomationSelfTest.run),
+            ("FOLIO_ORG_TEST", OrganizationSelfTest.run), ("FOLIO_AUTO_TEST", AutomationSelfTest.run)
         ]
         for (key, run) in tests where env[key] != nil { Task { @MainActor in await run() } }
         if env["FOLIO_QUICK_TEST"] != nil, env["FOLIO_CAPTURE_QUEUE"] != nil { Task { @MainActor in await QuickAccessSelfTest.run() } }
@@ -217,7 +249,10 @@ enum LayoutDebug {
     @MainActor private static func openSettingsAndReport() {
         // The app menu's „Einstellungen …“ item, as a click would.
         if let appMenu = NSApp.mainMenu?.items.first?.submenu,
-           let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," }) { appMenu.performActionForItem(at: i) }
+            let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," })
+        {
+            appMenu.performActionForItem(at: i)
+        }
         after(1.5) {
             for w in NSApp.windows where w.isVisible && w.toolbar != nil && w.identifier?.rawValue.hasPrefix("main") != true { reportSettings(w) }
             fflush(stdout)
@@ -234,13 +269,19 @@ enum LayoutDebug {
         if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
         after(1) {
             guard let view = w.contentView?.superview ?? w.contentView else { return }
-            if savePNG(of: view, to: path) { print("SETTINGS snapshot", path); fflush(stdout) }
+            if savePNG(of: view, to: path) {
+                print("SETTINGS snapshot", path)
+                fflush(stdout)
+            }
         }
     }
 
     @MainActor private static func perform(_ action: ShortcutAction, named tool: String) {
         ShortcutCenter.shared.perform(action)
-        after(1) { print("PERFORM", tool, NoteStore.shared.currentDocument?.blocks.map(\.kind.rawValue) ?? []); fflush(stdout) }
+        after(1) {
+            print("PERFORM", tool, NoteStore.shared.currentDocument?.blocks.map(\.kind.rawValue) ?? [])
+            fflush(stdout)
+        }
     }
 
     /// Runs on the main thread after a delay.
@@ -287,7 +328,7 @@ enum LayoutDebug {
         (.exact("menu-paste"), .onText { _, _ in menuPaste() }),
         (.prefix("paste-text:"), .onText { typed, tv in pasteText(typed, tv) }),
         (.prefix("paste-image:"), .onText { typed, tv in pasteAttachment(typed, tv) }),
-        (.prefix("paste-file:"), .onText { typed, tv in pasteAttachment(typed, tv) }),
+        (.prefix("paste-file:"), .onText { typed, tv in pasteAttachment(typed, tv) })
     ]
 
     @MainActor private static func firstFilledTextView(in view: NSView) -> FolioTextView? {
@@ -297,15 +338,23 @@ enum LayoutDebug {
 
     @MainActor private static func runTypedScenario(_ typed: String) {
         guard let root = NSApp.windows.first(where: { $0.isVisible })?.contentView else { return }
-        guard let tv = firstFilledTextView(in: root) else { print("LAYOUT no text view"); return }
+        guard let tv = firstFilledTextView(in: root) else {
+            print("LAYOUT no text view")
+            return
+        }
         tv.window?.makeFirstResponder(tv)
         tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
         let doc = NoteStore.shared.currentDocument
         for (match, scenario) in scenarios where match.accepts(typed) {
             switch scenario {
-            case .onText(let run): run(typed, tv); return
+            case .onText(let run):
+                run(typed, tv)
+                return
             case .onNote(let run):
-                if let doc { run(typed, tv, doc); return }
+                if let doc {
+                    run(typed, tv, doc)
+                    return
+                }
             }
         }
         typeSentence(typed, tv)
@@ -333,20 +382,24 @@ enum LayoutDebug {
         a.storage.setAttributedString(NSAttributedString(string: "x = 1"))
         b.storage.setAttributedString(NSAttributedString(string: "y = 2"))
         c.storage.setAttributedString(NSAttributedString(string: "print(y)\nprint('x' in globals())"))
-        doc.insert(a, after: doc.blocks.first?.id); doc.insert(b, after: a.id); doc.insert(c, after: b.id)
+        doc.insert(a, after: doc.blocks.first?.id)
+        doc.insert(b, after: a.id)
+        doc.insert(c, after: b.id)
         Task { @MainActor in
             await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
             await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
             doc.remove(a.id)
             try? await Task.sleep(for: .milliseconds(1500))
             await RunManager.shared.start(block: c, doc: doc, theme: .shared)?.value
-            print("LAYOUT delete-test2: \((c.output ?? "-").debugDescription)"); fflush(stdout)
+            print("LAYOUT delete-test2: \((c.output ?? "-").debugDescription)")
+            fflush(stdout)
         }
     }
 
     @MainActor private static func deleteTest(_ doc: NoteDocument) {
         let a = BlockModel(kind: .code), b = BlockModel(kind: .code)
-        a.language = "python"; b.language = "python"
+        a.language = "python"
+        b.language = "python"
         a.storage.setAttributedString(NSAttributedString(string: "geheim = 42\nprint('A lief')"))
         b.storage.setAttributedString(NSAttributedString(string: "print(geheim)"))
         doc.insert(a, after: doc.blocks.first?.id)
@@ -366,13 +419,16 @@ enum LayoutDebug {
     /// Real key events through the event queue: ⌃C inserts a code block, typing lands in it, ⇧↩ runs it.
     @MainActor private static func keysTest(_ tv: FolioTextView, _ doc: NoteDocument) {
         func key(_ chars: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags) {
-            guard let w = tv.window, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
-                                                              windowNumber: w.windowNumber, context: nil, characters: chars,
-                                                              charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
+            guard let w = tv.window,
+                let e = NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                    windowNumber: w.windowNumber, context: nil, characters: chars,
+                    charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
+            else { return }
             NSApp.postEvent(e, atStart: false)
         }
         let before = doc.blocks.filter { $0.kind == .code }.count
-        key("\u{3}", 8, .control)   // ⌃C
+        key("\u{3}", 8, .control)  // ⌃C
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             let fr = tv.window?.firstResponder
             print("LAYOUT keys: code blocks \(before) -> \(doc.blocks.filter { $0.kind == .code }.count), focus: \(fr.map { String(describing: type(of: $0)) } ?? "nil")")
@@ -391,7 +447,8 @@ enum LayoutDebug {
 
     @MainActor private static func linkedRun(_ doc: NoteDocument) {
         let a = BlockModel(kind: .code), b = BlockModel(kind: .code)
-        a.language = "python"; b.language = "python"
+        a.language = "python"
+        b.language = "python"
         a.storage.setAttributedString(NSAttributedString(string: "a = 10\nnamen = ['Ada', 'Linus']"))
         b.storage.setAttributedString(NSAttributedString(string: "print(a)\nlen(namen) * a"))
         doc.insert(a, after: doc.blocks.first?.id)
@@ -399,7 +456,8 @@ enum LayoutDebug {
         Task { @MainActor in
             await RunManager.shared.start(block: a, doc: doc, theme: .shared)?.value
             await RunManager.shared.start(block: b, doc: doc, theme: .shared)?.value
-            print("LAYOUT linked-run:", b.output ?? "-"); fflush(stdout)
+            print("LAYOUT linked-run:", b.output ?? "-")
+            fflush(stdout)
         }
     }
 
@@ -410,7 +468,10 @@ enum LayoutDebug {
             let chat = AIChatModel.forNote(doc.id)
             chat.send(String(typed.dropFirst("chat:".count)))
             @MainActor func poll() {
-                if chat.isResponding { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { MainActor.assumeIsolated { poll() } }; return }
+                if chat.isResponding {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { MainActor.assumeIsolated { poll() } }
+                    return
+                }
                 print("LAYOUT chat answer after \(Int(Date().timeIntervalSince(started) * 1000)) ms:", chat.messages.last?.text.prefix(300) ?? "-", chat.errorText ?? "")
                 fflush(stdout)
             }
@@ -440,7 +501,10 @@ enum LayoutDebug {
         for (i, chunk) in chunks.enumerated() {
             after(Double(i) * 2.5) {
                 typeChunk(chunk, into: code)
-                if i == chunks.count - 1 { print("LAYOUT code:", code.string.debugDescription); fflush(stdout) }
+                if i == chunks.count - 1 {
+                    print("LAYOUT code:", code.string.debugDescription)
+                    fflush(stdout)
+                }
             }
         }
         if env["FOLIO_COMPLETE"] != nil { code.triggerCompletion(manual: true) }
@@ -448,9 +512,13 @@ enum LayoutDebug {
 
     @MainActor private static func typeChunk(_ chunk: String, into code: CodeTextView) {
         for ch in chunk {
-            if ch == "\n" { code.insertNewline(nil) }
-            else if ch == "\u{8}" { code.deleteBackward(nil) }
-            else { code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0)) }
+            if ch == "\n" {
+                code.insertNewline(nil)
+            } else if ch == "\u{8}" {
+                code.deleteBackward(nil)
+            } else {
+                code.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
         }
     }
 
@@ -472,14 +540,17 @@ enum LayoutDebug {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([NSImage(contentsOfFile: String(typed.dropFirst("list-paste-image:".count)))!])
         }
-        print("LAYOUT list paste target:", NSApp.target(forAction: #selector(NSText.paste(_:))).map { String(describing: type(of: $0)) } ?? "nil", "fr:", tv.window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")
+        print(
+            "LAYOUT list paste target:", NSApp.target(forAction: #selector(NSText.paste(_:))).map { String(describing: type(of: $0)) } ?? "nil", "fr:",
+            tv.window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")
         print("LAYOUT list paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil))
     }
 
     @MainActor private static func menuPaste() {
         // Real ⌘V path: Edit › Paste through the responder chain with the general pasteboard.
-        print("LAYOUT menu paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil),
-              NSPasteboard.general.types ?? [])
+        print(
+            "LAYOUT menu paste sent:", NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil),
+            NSPasteboard.general.types ?? [])
     }
 
     @MainActor private static func pasteText(_ typed: String, _ tv: FolioTextView) {
@@ -518,8 +589,11 @@ enum LayoutDebug {
     // MARK: Layout dump
 
     @MainActor private static func dumpLayout() {
-        print("LAYOUT windows", NSApp.windows.map { "\(type(of: $0)) visible=\($0.isVisible) \($0.frame)" }); fflush(stdout)
-        guard let root = (NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.windows.first(where: { $0.contentView != nil && $0.frame.width > 400 }))?.contentView else { return }
+        print("LAYOUT windows", NSApp.windows.map { "\(type(of: $0)) visible=\($0.isVisible) \($0.frame)" })
+        fflush(stdout)
+        guard let root = (NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.windows.first(where: { $0.contentView != nil && $0.frame.width > 400 }))?.contentView else {
+            return
+        }
         printFrames(of: root)
         if env["FOLIO_MENU_DUMP"] != nil, let menu = NSApp.mainMenu { dumpMenu(menu) }
         if let out = env["FOLIO_SNAPSHOT"] { snapshot(root, to: out) }
@@ -539,7 +613,9 @@ enum LayoutDebug {
     @MainActor private static func dumpMenu(_ menu: NSMenu) {
         for top in menu.items {
             for item in top.submenu?.items ?? [] where !item.keyEquivalent.isEmpty || env["FOLIO_MENU_DUMP"] == "all" {
-                print("MENU", top.title, "|", item.title, "|", item.keyEquivalent, item.keyEquivalentModifierMask.rawValue, "|", item.action.map(NSStringFromSelector) ?? "nil", "| target:", item.target.map { String(describing: type(of: $0)) } ?? "nil")
+                print(
+                    "MENU", top.title, "|", item.title, "|", item.keyEquivalent, item.keyEquivalentModifierMask.rawValue, "|", item.action.map(NSStringFromSelector) ?? "nil",
+                    "| target:", item.target.map { String(describing: type(of: $0)) } ?? "nil")
             }
         }
         let fr = NSApp.keyWindow?.firstResponder

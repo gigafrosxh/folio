@@ -15,7 +15,7 @@ public struct Token: Sendable, Equatable {
 /// `"// not a comment"` a string and `# "not a string"` a comment.
 public enum SyntaxHighlighter {
     private final class Compiled: @unchecked Sendable {
-        let base: [(NSRegularExpression, TokenKind, Int)]   // regex, kind, capture group
+        let base: [(NSRegularExpression, TokenKind, Int)]  // regex, kind, capture group
         let stringsAndComments: NSRegularExpression?
         let commentGroupCount: Int
         let late: [(NSRegularExpression, TokenKind)]
@@ -83,7 +83,8 @@ public enum SyntaxHighlighter {
     private static let lock = NSLock()
 
     private static func compiled(for spec: LanguageSpec) -> Compiled {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if let c = cache[spec.id] { return c }
         let c = Compiled(spec)
         cache[spec.id] = c
@@ -129,9 +130,14 @@ public enum HighlightDiff {
         // Old tokens moved into new coordinates; tokens that touched the edit are dropped (they count as changed).
         var moved = Set<TokenKey>()
         for t in oldTokens {
-            if NSMaxRange(t.range) <= prefix { moved.insert(TokenKey(t.range, t.kind)) }
-            else if t.range.location >= oldLen - suffix { moved.insert(TokenKey(NSRange(location: t.range.location + delta, length: t.range.length), t.kind)) }
-            else { lower = min(lower, t.range.location); upper = max(upper, min(NSMaxRange(t.range) + max(delta, 0), newLen)) }
+            if NSMaxRange(t.range) <= prefix {
+                moved.insert(TokenKey(t.range, t.kind))
+            } else if t.range.location >= oldLen - suffix {
+                moved.insert(TokenKey(NSRange(location: t.range.location + delta, length: t.range.length), t.kind))
+            } else {
+                lower = min(lower, t.range.location)
+                upper = max(upper, min(NSMaxRange(t.range) + max(delta, 0), newLen))
+            }
         }
         let fresh = Set(newTokens.map { TokenKey($0.range, $0.kind) })
         for k in fresh.symmetricDifference(moved) {
@@ -146,6 +152,10 @@ public enum HighlightDiff {
 
     private struct TokenKey: Hashable {
         var location: Int, length: Int, kind: TokenKind
-        init(_ r: NSRange, _ kind: TokenKind) { location = r.location; length = r.length; self.kind = kind }
+        init(_ r: NSRange, _ kind: TokenKind) {
+            location = r.location
+            length = r.length
+            self.kind = kind
+        }
     }
 }

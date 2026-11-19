@@ -44,21 +44,24 @@ enum AccessibilityAudit {
             for c in children { visit(c, depth: depth + 1) }
         }
         visit(root, depth: 0)
-        print("A11Y visited \(seen.count) elements"); fflush(stdout)
+        print("A11Y visited \(seen.count) elements")
+        fflush(stdout)
         return (checked, findings)
     }
 
     /// Reads a text attribute without assuming its type (some elements answer with attributed strings).
     static func text(of element: Any, _ selector: String) -> String {
         guard let obj = element as? NSObject, obj.responds(to: NSSelectorFromString(selector)),
-              let value = obj.perform(NSSelectorFromString(selector))?.takeUnretainedValue() else { return "" }
+            let value = obj.perform(NSSelectorFromString(selector))?.takeUnretainedValue()
+        else { return "" }
         if let s = value as? NSString { return s as String }
         if let a = value as? NSAttributedString { return a.string }
         return ""
     }
 
     static func run() {
-        print("A11Y start"); fflush(stdout)
+        print("A11Y start")
+        fflush(stdout)
         var total = 0, missing = 0
         // SwiftUI builds its accessibility tree only for assistive apps; this tells it one is listening.
         NSApp.setValue(true, forKey: "accessibilityEnhancedUserInterface")
@@ -66,8 +69,12 @@ enum AccessibilityAudit {
             let r = audit(w.contentView as Any)
             total += r.checked
             missing += r.findings.count
-            for f in r.findings { print("A11Y", f); fflush(stdout) }
+            for f in r.findings {
+                print("A11Y", f)
+                fflush(stdout)
+            }
         }
-        print("A11Y checked \(total) controls, \(missing) without name"); fflush(stdout)
+        print("A11Y checked \(total) controls, \(missing) without name")
+        fflush(stdout)
     }
 }

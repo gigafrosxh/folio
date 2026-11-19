@@ -35,12 +35,14 @@ enum WebResources {
 
         func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
             guard let url = task.request.url, let dir = WebResources.directory else {
-                task.didFailWithError(URLError(.fileDoesNotExist)); return
+                task.didFailWithError(URLError(.fileDoesNotExist))
+                return
             }
             let file = dir.appendingPathComponent(url.path).standardizedFileURL
             // Never serve anything outside the Web folder.
             guard file.path.hasPrefix(dir.standardizedFileURL.path), let data = try? Data(contentsOf: file) else {
-                task.didFailWithError(URLError(.fileDoesNotExist)); return
+                task.didFailWithError(URLError(.fileDoesNotExist))
+                return
             }
             let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
             task.didReceive(URLResponse(url: url, mimeType: mime, expectedContentLength: data.count, textEncodingName: nil))
@@ -119,7 +121,8 @@ struct RenderPreview: NSViewRepresentable {
         func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let result = RenderScript.Result(message: message.body) else { return }
             if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil {
-                print("LAYOUT render", result.ready ? "ready" : "result", result.ok, result.pageHeight, result.error ?? ""); fflush(stdout)
+                print("LAYOUT render", result.ready ? "ready" : "result", result.ok, result.pageHeight, result.error ?? "")
+                fflush(stdout)
             }
             if result.ready {
                 ready = true
@@ -149,7 +152,10 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
 
     enum RenderError: LocalizedError {
         case failed(String)
-        var errorDescription: String? { if case .failed(let m) = self { return m }; return nil }
+        var errorDescription: String? {
+            if case .failed(let m) = self { return m }
+            return nil
+        }
     }
 
     private var web: WKWebView!
@@ -158,8 +164,10 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
     private var readyContinuation: CheckedContinuation<Void, Never>?
     private var isReady = false
 
-    static func render(_ kind: RenderScript.Kind, source: String, width: CGFloat = 760,
-                       options: RenderScript.Options = RenderScript.Options(dark: false)) async throws -> Output {
+    static func render(
+        _ kind: RenderScript.Kind, source: String, width: CGFloat = 760,
+        options: RenderScript.Options = RenderScript.Options(dark: false)
+    ) async throws -> Output {
         let r = OffscreenRenderer()
         return try await r.run(kind, source: source, width: width, options: options)
     }
@@ -246,9 +254,12 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
     static func png(from output: Output, scale: CGFloat = 3) -> Data? {
         guard let rep = NSPDFImageRep(data: output.pdf) else { return nil }
         let size = NSSize(width: rep.bounds.width * scale, height: rep.bounds.height * scale)
-        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
-                                            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        guard
+            let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
         NSColor.white.setFill()
@@ -278,8 +289,10 @@ struct RenderedBlockView: View {
     private var isMath: Bool { kind == .math }
 
     var body: some View {
-        EmbedCard(title: title, icon: isMath ? "function" : "point.3.connected.trianglepath.dotted",
-                  height: .constant(0), resizable: false, onCommit: {}) {
+        EmbedCard(
+            title: title, icon: isMath ? "function" : "point.3.connected.trianglepath.dotted",
+            height: .constant(0), resizable: false, onCommit: {}
+        ) {
             actionButtons
         } content: {
             VStack(alignment: .leading, spacing: 0) {
@@ -329,12 +342,17 @@ struct RenderedBlockView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .onKeyPress(.escape) { editing = false; return .handled }
+            .onKeyPress(.escape) {
+                editing = false
+                return .handled
+            }
     }
 
     private var preview: some View {
-        RenderPreview(kind: kind, source: source,
-                      options: RenderScript.Options(dark: colorScheme == .dark, fontSize: isMath ? 20 : 14)) { r in
+        RenderPreview(
+            kind: kind, source: source,
+            options: RenderScript.Options(dark: colorScheme == .dark, fontSize: isMath ? 20 : 14)
+        ) { r in
             result = r
             if r.ok { previewHeight = max(CGFloat(r.pageHeight), 30) }
         }
@@ -342,14 +360,20 @@ struct RenderedBlockView: View {
         .frame(maxWidth: .infinity)
         .opacity(result?.ok == false ? 0.35 : 1)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { editing = true; editorFocused = true }
+        .onTapGesture(count: 2) {
+            editing = true
+            editorFocused = true
+        }
         .help(editing ? "" : "Doppelklick zum Bearbeiten")
         .padding(.vertical, 4)
     }
 
     @ViewBuilder
     private var actionButtons: some View {
-        Button { editing.toggle(); editorFocused = editing } label: {
+        Button {
+            editing.toggle()
+            editorFocused = editing
+        } label: {
             Label(editing ? "Fertig" : "Bearbeiten", systemImage: editing ? "checkmark" : "pencil")
         }
         .help(editing ? "Quelltext ausblenden (Esc)" : "Quelltext bearbeiten")
@@ -386,8 +410,9 @@ struct RenderedBlockView: View {
     private func render() async -> OffscreenRenderer.Output? {
         do {
             message = nil
-            return try await OffscreenRenderer.render(kind, source: source,
-                                                      options: RenderScript.Options(dark: false, fontSize: isMath ? 20 : 14))
+            return try await OffscreenRenderer.render(
+                kind, source: source,
+                options: RenderScript.Options(dark: false, fontSize: isMath ? 20 : 14))
         } catch {
             message = "Export nicht möglich: \(error.localizedDescription)"
             return nil
@@ -407,7 +432,10 @@ struct RenderedBlockView: View {
     private func export(svg: Bool) async {
         guard let out = await render() else { return }
         let data: Data? = svg ? out.svg.map { Data($0.utf8) } : OffscreenRenderer.png(from: out)
-        guard let data else { message = "Export nicht möglich."; return }
+        guard let data else {
+            message = "Export nicht möglich."
+            return
+        }
         save(data, type: svg ? .svg : .png)
     }
 

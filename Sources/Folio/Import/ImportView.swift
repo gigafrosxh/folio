@@ -86,7 +86,10 @@ struct ImportView: View {
 
     @MainActor
     private func runImport() async {
-        defer { isImporting = false; isReading = false }
+        defer {
+            isImporting = false
+            isReading = false
+        }
         do {
             let report = try await AppleNotesImporter.fetch()
             let notes = report.notes

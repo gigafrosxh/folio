@@ -33,8 +33,9 @@ final class OrganizationStoreTests: XCTestCase {
 
     @discardableResult
     private func note(_ title: String, text: String = "", modified: TimeInterval, pinned: Bool = false, in dir: URL? = nil) throws -> UUID {
-        var meta = NoteMetadata(title: title, created: Date(timeIntervalSince1970: 2_000_000 - modified),
-                                modified: Date(timeIntervalSince1970: modified), pinned: pinned, searchText: title + "\n" + text)
+        var meta = NoteMetadata(
+            title: title, created: Date(timeIntervalSince1970: 2_000_000 - modified),
+            modified: Date(timeIntervalSince1970: modified), pinned: pinned, searchText: title + "\n" + text)
         meta.kinds = ["text"]
         try NoteFile(meta: meta, body: NoteBody()).write(to: store.uniqueURL(in: dir ?? folder, base: title))
         return meta.id
@@ -188,8 +189,9 @@ final class OrganizationStoreTests: XCTestCase {
         store.stepNote(ids["B treffer"]!, by: -1)
         store.searchText = ""
         XCTAssertEqual(shown(), ["E", "A", "B treffer", "C", "D treffer"])
-        XCTAssertEqual(Set(store.organization.noteOrder[store.orderKey(for: .folder(folder))!] ?? []), Set(ids.values),
-                       "only this folder's notes are in its order")
+        XCTAssertEqual(
+            Set(store.organization.noteOrder[store.orderKey(for: .folder(folder))!] ?? []), Set(ids.values),
+            "only this folder's notes are in its order")
     }
 
     func testSmartViewRemembersWhereTheSearchRan() throws {
@@ -363,10 +365,12 @@ final class OrganizationStoreTests: XCTestCase {
         var code = BlockRecord(kind: .code)
         code.code = "VON AUSSEN"
         theirs.body.blocks.append(code)
-        try await Task.sleep(for: .milliseconds(1100))   // a new modification date on volumes with 1 s resolution
+        try await Task.sleep(for: .milliseconds(1100))  // a new modification date on volumes with 1 s resolution
         try theirs.write(to: ref.url)
         let text = NSAttributedString(string: "MEINE ÄNDERUNG")
-        if let block = doc.blocks.first(where: { $0.kind == .text }) { block.storage.setAttributedString(text) } else {
+        if let block = doc.blocks.first(where: { $0.kind == .text }) {
+            block.storage.setAttributedString(text)
+        } else {
             let block = BlockModel(kind: .text)
             block.storage.setAttributedString(text)
             doc.blocks.append(block)

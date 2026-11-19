@@ -10,7 +10,7 @@ public struct SemVer: Comparable, Sendable, CustomStringConvertible {
     public init?(_ text: String) {
         var t = text.trimmingCharacters(in: .whitespaces)
         if t.hasPrefix("v") || t.hasPrefix("V") { t.removeFirst() }
-        t = String(t.split(separator: "+", maxSplits: 1).first ?? "")   // build metadata does not count
+        t = String(t.split(separator: "+", maxSplits: 1).first ?? "")  // build metadata does not count
         let parts0 = t.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         let core = parts0.first ?? t
         let parts = core.split(separator: ".").map { Int($0) }
@@ -31,7 +31,7 @@ public struct SemVer: Comparable, Sendable, CustomStringConvertible {
         for (x, y) in zip(a.prerelease, b.prerelease) where x != y {
             switch (Int(x), Int(y)) {
             case let (i?, j?): return i < j
-            case (.some, nil): return true          // numbers sort before words
+            case (.some, nil): return true  // numbers sort before words
             case (nil, .some): return false
             default: return x < y
             }
@@ -76,17 +76,20 @@ public enum UpdateChecker {
     /// Reads GitHub's "latest release" JSON; picks the arm64 disk image.
     public static func parse(_ data: Data) throws -> ReleaseInfo {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String,
-              let page = (json["html_url"] as? String).flatMap(URL.init(string:)) else { throw UpdateError.badResponse }
+            let tag = json["tag_name"] as? String,
+            let page = (json["html_url"] as? String).flatMap(URL.init(string:))
+        else { throw UpdateError.badResponse }
         let assets = json["assets"] as? [[String: Any]] ?? []
-        let dmg = assets.first { ($0["name"] as? String)?.hasSuffix("-arm64.dmg") == true }
+        let dmg =
+            assets.first { ($0["name"] as? String)?.hasSuffix("-arm64.dmg") == true }
             ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
         let formatter = ISO8601DateFormatter()
-        return ReleaseInfo(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag,
-                           notes: stripFooter(json["body"] as? String ?? ""),
-                           pageURL: page,
-                           dmgURL: (dmg?["browser_download_url"] as? String).flatMap(URL.init(string:)),
-                           published: (json["published_at"] as? String).flatMap(formatter.date(from:)))
+        return ReleaseInfo(
+            version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag,
+            notes: stripFooter(json["body"] as? String ?? ""),
+            pageURL: page,
+            dmgURL: (dmg?["browser_download_url"] as? String).flatMap(URL.init(string:)),
+            published: (json["published_at"] as? String).flatMap(formatter.date(from:)))
     }
 
     public static func latestRelease(session: URLSession = .shared) async throws -> ReleaseInfo {
@@ -114,9 +117,10 @@ public enum UpdateChecker {
         let tag = final.lastPathComponent
         let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         guard SemVer(version) != nil else { throw UpdateError.badResponse }
-        return ReleaseInfo(version: version, notes: "", pageURL: final,
-                           dmgURL: URL(string: "https://github.com/\(repository)/releases/download/\(tag)/Folio-\(version)-arm64.dmg"),
-                           published: nil)
+        return ReleaseInfo(
+            version: version, notes: "", pageURL: final,
+            dmgURL: URL(string: "https://github.com/\(repository)/releases/download/\(tag)/Folio-\(version)-arm64.dmg"),
+            published: nil)
     }
 
     /// The changes of every version newer than `current`, newest first, taken from CHANGELOG.md on GitHub
@@ -124,7 +128,8 @@ public enum UpdateChecker {
     public static func changelog(since current: String, session: URLSession = .shared) async -> String? {
         let url = URL(string: "https://raw.githubusercontent.com/\(repository)/main/CHANGELOG.md")!
         guard let (data, response) = try? await session.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            (response as? HTTPURLResponse)?.statusCode == 200
+        else { return nil }
         return changelogSections(String(decoding: data, as: UTF8.self), newerThan: current)
     }
 
@@ -137,7 +142,7 @@ public enum UpdateChecker {
                     let date = line.components(separatedBy: "] ").dropFirst().joined(separator: "] ").trimmingCharacters(in: CharacterSet(charactersIn: "–- "))
                     sections.append((v, date, []))
                 } else {
-                    sections.append((SemVer("0.0.0")!, "", []))   // [Unreleased]: skipped below
+                    sections.append((SemVer("0.0.0")!, "", []))  // [Unreleased]: skipped below
                 }
                 continue
             }

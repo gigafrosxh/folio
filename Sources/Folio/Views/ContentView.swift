@@ -33,7 +33,11 @@ struct ContentView: View {
             }
             mainArea
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            rowWidth = $0
+        }
     }
 
     /// Two editors side by side need room: in a narrow window the note list steps aside while the split is
@@ -51,7 +55,10 @@ struct ContentView: View {
             TrashView(sidebarVisible: $sidebarVisible).fullPanel(theme: theme)
         case .graph:
             // Opening a note from the graph goes back to the notes with that note selected.
-            GraphView(onOpen: { id in store.sidebarSelection = .all; store.open(noteID: id) }).fullPanel(theme: theme)
+            GraphView(onOpen: { id in
+                store.sidebarSelection = .all
+                store.open(noteID: id)
+            }).fullPanel(theme: theme)
         case .damaged:
             DamagedListView(sidebarVisible: $sidebarVisible).fullPanel(theme: theme)
         default:
@@ -91,7 +98,9 @@ struct ContentView: View {
 
     @ViewBuilder private var focusExitButton: some View {
         if focusMode {
-            Button { focusMode = false } label: {
+            Button {
+                focusMode = false
+            } label: {
                 Label("Fokusmodus beenden", systemImage: "arrow.down.right.and.arrow.up.left")
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 12).padding(.vertical, 7)
@@ -121,7 +130,10 @@ struct ContentView: View {
     private func withNotifications<V: View>(_ view: V) -> some View {
         view
             .onExitCommand { if focusMode { focusMode = false } }
-            .onAppear { focusMode = false; QuickAccessSettings.opener = openWindow }
+            .onAppear {
+                focusMode = false
+                QuickAccessSettings.opener = openWindow
+            }
             .onReceive(NotificationCenter.default.publisher(for: .folioToggleFocus)) { _ in focusMode.toggle() }
             .onReceive(NotificationCenter.default.publisher(for: .folioToggleSidebar)) { _ in sidebarVisible.toggle() }
             .onReceive(NotificationCenter.default.publisher(for: .folioShowUpdates)) { _ in showUpdates = true }
@@ -174,13 +186,17 @@ struct ContentView: View {
     private func pane(_ id: UUID?, isSplit: Bool) -> some View {
         let focused = store.splitNoteID != nil && store.focusedNoteID == id
         paneContent(id, isSplit: isSplit)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .top) {
-            // In the split view, a thin accent line marks the editor that menus and shortcuts act on.
-            if store.splitNoteID != nil { Rectangle().fill(focused ? theme.accent : .clear).frame(height: 2) }
-        }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if isSplit { splitPaneWidth = $0 } }
-        .overlay(alignment: .bottomLeading) { if isSplit { splitCloseButton } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .top) {
+                // In the split view, a thin accent line marks the editor that menus and shortcuts act on.
+                if store.splitNoteID != nil { Rectangle().fill(focused ? theme.accent : .clear).frame(height: 2) }
+            }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.width
+            } action: {
+                if isSplit { splitPaneWidth = $0 }
+            }
+            .overlay(alignment: .bottomLeading) { if isSplit { splitCloseButton } }
     }
 
     @ViewBuilder private func paneContent(_ id: UUID?, isSplit: Bool) -> some View {
@@ -197,38 +213,40 @@ struct ContentView: View {
     }
 
     private var splitCloseButton: some View {
-        Button { store.splitNoteID = nil } label: {
-                    // Only the symbol in a narrow pane, so it does not sit on the word count (#250).
-                    Label("Teilung schließen", systemImage: "rectangle.righthalf.inset.filled.arrow.right")
-                        .labelStyle(SplitCloseLabelStyle(iconOnly: splitPaneWidth < 480))
-                        .font(.system(size: 11.5, weight: .medium))
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .floatingCapsule()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Teilung schließen")
-                .padding(14)
+        Button {
+            store.splitNoteID = nil
+        } label: {
+            // Only the symbol in a narrow pane, so it does not sit on the word count (#250).
+            Label("Teilung schließen", systemImage: "rectangle.righthalf.inset.filled.arrow.right")
+                .labelStyle(SplitCloseLabelStyle(iconOnly: splitPaneWidth < 480))
+                .font(.system(size: 11.5, weight: .medium))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .floatingCapsule()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Teilung schließen")
+        .padding(14)
     }
 
     private var emptyState: some View {
-            ZStack {
-                VStack(spacing: 14) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 40, weight: .light))
-                        .foregroundStyle(.tertiary)
-                    Text("Keine Notiz ausgewählt").font(.title3.weight(.semibold))
-                    Text("Wähle eine Notiz oder lege eine neue an.").foregroundStyle(.secondary)
-                    Button {
-                        store.createNote(initialTag: currentTag)
-                    } label: {
-                        Label("Neue Notiz", systemImage: "plus").padding(.horizontal, 6)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+        ZStack {
+            VStack(spacing: 14) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(.tertiary)
+                Text("Keine Notiz ausgewählt").font(.title3.weight(.semibold))
+                Text("Wähle eine Notiz oder lege eine neue an.").foregroundStyle(.secondary)
+                Button {
+                    store.createNote(initialTag: currentTag)
+                } label: {
+                    Label("Neue Notiz", systemImage: "plus").padding(.horizontal, 6)
                 }
-                .padding(32)
-                .floating()
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
+            .padding(32)
+            .floating()
+        }
     }
 
     private var currentTag: String? {
@@ -248,12 +266,13 @@ struct ColumnResizer: View {
             .frame(width: 12)
             .contentShape(Rectangle())
             .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .gesture(DragGesture(minimumDistance: 1)
-                .onChanged { v in
-                    if start == nil { start = width }
-                    width = min(max((start ?? width) + v.translation.width, range.lowerBound), range.upperBound)
-                }
-                .onEnded { _ in start = nil })
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { v in
+                        if start == nil { start = width }
+                        width = min(max((start ?? width) + v.translation.width, range.lowerBound), range.upperBound)
+                    }
+                    .onEnded { _ in start = nil })
     }
 }
 
@@ -268,7 +287,8 @@ extension View {
     func panel(theme: ThemeManager, fill: Color? = nil) -> some View {
         let radius = CGFloat(theme.settings.cornerRadius) + 4
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        return self
+        return
+            self
             .background(fill ?? Color(nsColor: .windowBackgroundColor).opacity(0.92), in: shape)
             .clipShape(shape)
             .overlay(shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 1))

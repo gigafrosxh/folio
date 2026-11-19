@@ -56,10 +56,11 @@ public struct LibraryTrash: Sendable {
         guard fm.fileExists(atPath: source.path, isDirectory: &isDir) else { throw TrashError.missing(source.lastPathComponent) }
         let notes = isDir.boolValue ? Self.noteFiles(in: source) : [source]
         let ids = notes.compactMap { try? NoteFile.readMetadata(at: $0).id }
-        let item = TrashItem(id: UUID(), originalPath: String(source.path.dropFirst(root.count)), deletedAt: date,
-                             isFolder: isDir.boolValue,
-                             title: title ?? source.deletingPathExtension().lastPathComponent,
-                             noteCount: notes.count, noteIDs: ids)
+        let item = TrashItem(
+            id: UUID(), originalPath: String(source.path.dropFirst(root.count)), deletedAt: date,
+            isFolder: isDir.boolValue,
+            title: title ?? source.deletingPathExtension().lastPathComponent,
+            noteCount: notes.count, noteIDs: ids)
         let holder = directory.appendingPathComponent(item.id.uuidString, isDirectory: true)
         try fm.createDirectory(at: holder, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
@@ -81,8 +82,9 @@ public struct LibraryTrash: Sendable {
         let dirs = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return dirs.compactMap { dir in
             guard let data = try? Data(contentsOf: dir.appendingPathComponent("info.json")),
-                  let item = try? decoder.decode(TrashItem.self, from: data),
-                  FileManager.default.fileExists(atPath: contentURL(of: item).path) else { return nil }
+                let item = try? decoder.decode(TrashItem.self, from: data),
+                FileManager.default.fileExists(atPath: contentURL(of: item).path)
+            else { return nil }
             return item
         }.sorted { $0.deletedAt > $1.deletedAt }
     }

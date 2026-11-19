@@ -70,7 +70,7 @@ final class LibraryScannerTests: XCTestCase {
         let scanner = LibraryScanner()
         XCTAssertEqual(scanner.scan(library).cacheHits, 0)
         XCTAssertEqual(scanner.scan(library).cacheHits, 20)
-        Thread.sleep(forTimeInterval: 1.1)   // modification dates have 1 s resolution on some volumes
+        Thread.sleep(forTimeInterval: 1.1)  // modification dates have 1 s resolution on some volumes
         try note("Notizen/N3.folio", title: "Neu")
         let r = scanner.scan(library)
         XCTAssertEqual(r.cacheHits, 19)

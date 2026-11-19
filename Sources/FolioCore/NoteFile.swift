@@ -23,8 +23,10 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
     /// Structured properties such as Status or Fällig (#121); nil = none.
     public var properties: [NoteProperty]?
 
-    public init(id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
-                created: Date = Date(), modified: Date = Date(), pinned: Bool = false, searchText: String = "") {
+    public init(
+        id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
+        created: Date = Date(), modified: Date = Date(), pinned: Bool = false, searchText: String = ""
+    ) {
         self.id = id
         self.title = title
         self.preview = preview
@@ -199,15 +201,16 @@ public struct NoteFile: Sendable {
     // Dates are stored as Double seconds (full precision), which also keeps decoding fast.
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
-        e.outputFormatting = .sortedKeys   // the same note always encodes to the same bytes (#98)
+        e.outputFormatting = .sortedKeys  // the same note always encodes to the same bytes (#98)
         return e
     }()
     private static let decoder = JSONDecoder()
 
     public func encoded() throws -> Data {
-        let archive = FolioArchive(meta: try Self.encoder.encode(meta),
-                                   body: try Self.encoder.encode(body),
-                                   attachments: attachments)
+        let archive = FolioArchive(
+            meta: try Self.encoder.encode(meta),
+            body: try Self.encoder.encode(body),
+            attachments: attachments)
         return try archive.encoded()
     }
 
@@ -254,4 +257,3 @@ public struct NoteFile: Sendable {
         try encoded().write(to: url, options: .atomic)
     }
 }
-

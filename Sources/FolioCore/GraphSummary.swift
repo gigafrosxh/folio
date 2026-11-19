@@ -22,8 +22,10 @@ public struct GraphSummary: Equatable, Sendable {
     }
 
     private var counts: [String] {
-        [GermanCount.format(notes, "Notiz", "Notizen"), GermanCount.format(folders, "Ordner", "Ordner"),
-         GermanCount.format(links, "Verknüpfung", "Verknüpfungen")]
+        [
+            GermanCount.format(notes, "Notiz", "Notizen"), GermanCount.format(folders, "Ordner", "Ordner"),
+            GermanCount.format(links, "Verknüpfung", "Verknüpfungen")
+        ]
     }
 
     /// "2 Notizen · 1 Ordner · 1 Verknüpfung · 1 verwaist"

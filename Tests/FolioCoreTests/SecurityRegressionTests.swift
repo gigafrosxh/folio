@@ -50,7 +50,7 @@ final class SecurityRegressionTests: XCTestCase {
             XCTAssertThrowsError(try FolioArchive.decode(forged(raw: raw, stored: Data([1, 2, 3]))))
         }
         var uncompressed = forged(raw: .max, stored: Data([1]))
-        uncompressed[6] = 0   // flags: not compressed
+        uncompressed[6] = 0  // flags: not compressed
         XCTAssertThrowsError(try FolioArchive.decode(uncompressed))
     }
 
@@ -63,8 +63,9 @@ final class SecurityRegressionTests: XCTestCase {
     func testLargeRealAttachmentStillWorks() throws {
         var random = Data(count: 8 * 1024 * 1024)
         random.withUnsafeMutableBytes { arc4random_buf($0.baseAddress!, $0.count) }
-        let file = NoteFile(meta: NoteMetadata(title: "Groß"), body: NoteBody(),
-                            attachments: [FolioArchive.Attachment(filename: "a.bin", typeIdentifier: "public.data", data: random)])
+        let file = NoteFile(
+            meta: NoteMetadata(title: "Groß"), body: NoteBody(),
+            attachments: [FolioArchive.Attachment(filename: "a.bin", typeIdentifier: "public.data", data: random)])
         XCTAssertEqual(try NoteFile.decode(file.encoded()).attachments.first?.data, random)
         XCTAssertTrue(ArchiveLimits.allows(raw: 10_000, stored: 5), "small sections are always allowed")
         XCTAssertTrue(ArchiveLimits.allows(raw: 1_000, stored: .max), "a huge stored length does not overflow")
@@ -86,8 +87,10 @@ final class SecurityRegressionTests: XCTestCase {
     }
 
     func testHostileFolioLinksAreRejected() {
-        let bad = ["folio://note/..%2F..%2Fetc%2Fpasswd", "folio://note/%00", "folio://delete", "folio://capture?target=../../x",
-                   "javascript://folio/alert(1)", "folio://search?q=" + String(repeating: "a", count: 100_001)]
+        let bad = [
+            "folio://note/..%2F..%2Fetc%2Fpasswd", "folio://note/%00", "folio://delete", "folio://capture?target=../../x",
+            "javascript://folio/alert(1)", "folio://search?q=" + String(repeating: "a", count: 100_001)
+        ]
         for link in bad {
             guard let url = URL(string: link) else { continue }
             if case .success(let action) = FolioURL.parse(url) { XCTFail("\(link) → \(action)") }

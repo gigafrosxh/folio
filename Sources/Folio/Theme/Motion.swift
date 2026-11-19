@@ -17,8 +17,9 @@ enum Motion {
     /// Blocks and cards appear with a slight lift and fade, and leave by fading out.
     static var blockTransition: AnyTransition {
         enabled
-            ? .asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top)).combined(with: .offset(y: 6)),
-                          removal: .opacity.combined(with: .scale(scale: 0.98)))
+            ? .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top)).combined(with: .offset(y: 6)),
+                removal: .opacity.combined(with: .scale(scale: 0.98)))
             : .identity
     }
 
@@ -26,8 +27,9 @@ enum Motion {
     static var popup: Animation? { enabled ? .spring(response: 0.36, dampingFraction: 0.72) : nil }
     static var popupTransition: AnyTransition {
         enabled
-            ? .asymmetric(insertion: .scale(scale: 0.15, anchor: .topTrailing).combined(with: .opacity),
-                          removal: .scale(scale: 0.3, anchor: .topTrailing).combined(with: .opacity))
+            ? .asymmetric(
+                insertion: .scale(scale: 0.15, anchor: .topTrailing).combined(with: .opacity),
+                removal: .scale(scale: 0.3, anchor: .topTrailing).combined(with: .opacity))
             : .identity
     }
 

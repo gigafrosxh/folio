@@ -35,8 +35,9 @@ final class FormatRoundtripTests: XCTestCase {
             b.outputCollapsed = true
             blocks.append(b)
         }
-        var meta = NoteMetadata(title: "Alle Blöcke 🧪", preview: "…", tags: ["ä/ö", "emoji😀"], created: Date(timeIntervalSince1970: 1),
-                                modified: Date(timeIntervalSince1970: 2.5), pinned: true, searchText: String(repeating: "Ünïcödé ", count: 10_000))
+        var meta = NoteMetadata(
+            title: "Alle Blöcke 🧪", preview: "…", tags: ["ä/ö", "emoji😀"], created: Date(timeIntervalSince1970: 1),
+            modified: Date(timeIntervalSince1970: 2.5), pinned: true, searchText: String(repeating: "Ünïcödé ", count: 10_000))
         meta.links = [UUID(), UUID()]
         meta.kinds = BlockKind.allCases.map(\.rawValue)
         meta.environment = RunEnvironment(interpreters: ["python": "python3.12 {file}"], workingDirectory: "~/x", variables: ["A": "ü"], timeout: 12)
@@ -96,8 +97,9 @@ final class MigrationTests: XCTestCase {
     static let versions = ["0.1.0", "0.5.0", "0.9.0", "0.12.4", "0.14.0", "0.17.0"]
 
     private func fixture(_ version: String) throws -> Data {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "note-\(version)", withExtension: "folio", subdirectory: "Fixtures"),
-                                "fixture for \(version) missing")
+        let url = try XCTUnwrap(
+            Bundle.module.url(forResource: "note-\(version)", withExtension: "folio", subdirectory: "Fixtures"),
+            "fixture for \(version) missing")
         return try Data(contentsOf: url)
     }
 

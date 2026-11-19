@@ -32,6 +32,10 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
+      - name: Format (#215)
+        # Style from .swift-format (4 spaces, 180 columns); fix locally with: swift format -i -r Sources Tests
+        run: swift format lint --strict -r Sources Tests
+
       - name: Build
         run: swift build
 

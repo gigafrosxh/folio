@@ -15,11 +15,12 @@ final class SettingsMigrationTests: XCTestCase {
 
     func testOldSettingsKeepTheirValues() throws {
         // Shape of 0.12: no backups, quick access or resource limits yet; the old update opt-in key.
-        let old = try decode("""
-        {"appearance":"dark","accentHex":"#FF0000","editorFontSize":17,"codeThemeDark":"monokai",
-         "runTimeout":60,"interpreterOverrides":{"python":"/opt/homebrew/bin/python3"},
-         "libraryPath":"/Users/x/Notizen","checkUpdatesOnLaunch":false,"shortcuts":{"code":"ctrl+k"}}
-        """)
+        let old = try decode(
+            """
+            {"appearance":"dark","accentHex":"#FF0000","editorFontSize":17,"codeThemeDark":"monokai",
+             "runTimeout":60,"interpreterOverrides":{"python":"/opt/homebrew/bin/python3"},
+             "libraryPath":"/Users/x/Notizen","checkUpdatesOnLaunch":false,"shortcuts":{"code":"ctrl+k"}}
+            """)
         XCTAssertEqual(old.appearance, .dark)
         XCTAssertEqual(old.accentHex, "#FF0000")
         XCTAssertEqual(old.editorFontSize, 17)

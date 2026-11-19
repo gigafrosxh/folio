@@ -91,7 +91,11 @@ struct DatabaseBlockView: View {
             content
             resizeHandle
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { blockWidth = $0 }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            blockWidth = $0
+        }
         .background {
             RoundedRectangle(cornerRadius: CGFloat(theme.settings.cornerRadius), style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -110,8 +114,7 @@ struct DatabaseBlockView: View {
             .environmentObject(theme)
         }
         .onAppear {
-            if block.connection == nil { editingConnection = true }
-            else if state.schema.isEmpty { state.loadSchema(block.connection!) }
+            if block.connection == nil { editingConnection = true } else if state.schema.isEmpty { state.loadSchema(block.connection!) }
         }
     }
 
@@ -136,13 +139,15 @@ struct DatabaseBlockView: View {
 
     private var editorAndResults: some View {
         VStack(spacing: 0) {
-            CodeEditorView(block: block, height: $editorHeight, codeTheme: codeTheme, font: theme.codeFont(),
-                           showLineNumbers: theme.settings.showLineNumbers,
-                           onChange: { doc.markDirty() }, onRun: run,
-                           onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
-                           linkedPrelude: { state.completionWords })
-                .frame(height: max(editorHeight, 44))
-                .background(Color(nsColor: codeTheme.backgroundColor))
+            CodeEditorView(
+                block: block, height: $editorHeight, codeTheme: codeTheme, font: theme.codeFont(),
+                showLineNumbers: theme.settings.showLineNumbers,
+                onChange: { doc.markDirty() }, onRun: run,
+                onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
+                linkedPrelude: { state.completionWords }
+            )
+            .frame(height: max(editorHeight, 44))
+            .background(Color(nsColor: codeTheme.backgroundColor))
             Divider()
             results
                 .frame(height: CGFloat(block.height))
@@ -155,7 +160,12 @@ struct DatabaseBlockView: View {
         ViewThatFits(in: .horizontal) {
             headerRow(compact: false)
             headerRow(compact: true)
-            HStack(spacing: 8) { connectionIcon; Spacer(minLength: 4); toolsMenu; runButton(iconOnly: true) }
+            HStack(spacing: 8) {
+                connectionIcon
+                Spacer(minLength: 4)
+                toolsMenu
+                runButton(iconOnly: true)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -258,8 +268,12 @@ struct DatabaseBlockView: View {
                 HStack {
                     Text("Tabellen").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                     Spacer()
-                    Button { block.connection.map(state.loadSchema) } label: { Image(systemName: "arrow.clockwise").font(.system(size: 10)) }
-                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Schema neu laden")
+                    Button {
+                        block.connection.map(state.loadSchema)
+                    } label: {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary).help("Schema neu laden")
                 }
                 .padding(.bottom, 4)
                 if let err = state.schemaError {
@@ -320,13 +334,17 @@ struct DatabaseBlockView: View {
             .frame(maxWidth: .infinity, minHeight: 12)
             .contentShape(Rectangle())
             .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
-            .gesture(DragGesture(minimumDistance: 1)
-                .onChanged { v in block.height = min(max(block.height + v.translation.height / 8, 120), 1200) }
-                .onEnded { _ in doc.markDirty() })
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { v in block.height = min(max(block.height + v.translation.height / 8, 120), 1200) }
+                    .onEnded { _ in doc.markDirty() })
     }
 
     private func run() {
-        guard let c = block.connection else { editingConnection = true; return }
+        guard let c = block.connection else {
+            editingConnection = true
+            return
+        }
         state.run(block.storage.string, on: c)
     }
 

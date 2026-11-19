@@ -194,10 +194,18 @@ final class DrawingCanvasNSView: NSView {
             let path = NSBezierPath()
             path.lineWidth = 0.5
             var y = spacing
-            while y < bounds.height { path.move(to: NSPoint(x: 0, y: y)); path.line(to: NSPoint(x: bounds.width, y: y)); y += spacing }
+            while y < bounds.height {
+                path.move(to: NSPoint(x: 0, y: y))
+                path.line(to: NSPoint(x: bounds.width, y: y))
+                y += spacing
+            }
             if paper == .grid {
                 var x = spacing
-                while x < bounds.width { path.move(to: NSPoint(x: x, y: 0)); path.line(to: NSPoint(x: x, y: bounds.height)); x += spacing }
+                while x < bounds.width {
+                    path.move(to: NSPoint(x: x, y: 0))
+                    path.line(to: NSPoint(x: x, y: bounds.height))
+                    x += spacing
+                }
             }
             path.stroke()
         }
@@ -228,14 +236,20 @@ final class DrawingCanvasNSView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        if model?.tool == .eraser { erase(at: p); return }
+        if model?.tool == .eraser {
+            erase(at: p)
+            return
+        }
         if let last = points.last?.0, hypot(p.x - last.x, p.y - last.y) < 1.2 { return }
         points.append((p, event.timestamp - startTime, pressure(event)))
         needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { points = []; needsDisplay = true }
+        defer {
+            points = []
+            needsDisplay = true
+        }
         guard let model, model.tool != .eraser, !points.isEmpty else { return }
         if points.count == 1 { points.append((CGPoint(x: points[0].0.x + 0.5, y: points[0].0.y + 0.5), 0.01, points[0].2)) }
         let ink = PKInk(model.tool.inkType, color: model.resolvedColor)
@@ -243,8 +257,9 @@ final class DrawingCanvasNSView: NSView {
         var strokes: [PKStroke] = []
         for segment in strokeSegments(model) {
             let controlPoints = segment.map { p in
-                PKStrokePoint(location: p.0, timeOffset: p.1, size: CGSize(width: size * (0.6 + 0.8 * p.2), height: size * (0.6 + 0.8 * p.2)),
-                              opacity: 1, force: p.2, azimuth: 0, altitude: .pi / 2)
+                PKStrokePoint(
+                    location: p.0, timeOffset: p.1, size: CGSize(width: size * (0.6 + 0.8 * p.2), height: size * (0.6 + 0.8 * p.2)),
+                    opacity: 1, force: p.2, azimuth: 0, altitude: .pi / 2)
             }
             strokes.append(PKStroke(ink: ink, path: PKStrokePath(controlPoints: controlPoints, creationDate: Date())))
         }
@@ -352,8 +367,10 @@ struct DrawingBlockView: View {
     private var paper: PaperStyle { PaperStyle(rawValue: block.mode) ?? .dots }
 
     var body: some View {
-        EmbedCard(title: block.caption.isEmpty ? "Zeichnung" : block.caption, icon: "scribble.variable",
-                  height: $block.height, onCommit: { doc.markDirty() }) {
+        EmbedCard(
+            title: block.caption.isEmpty ? "Zeichnung" : block.caption, icon: "scribble.variable",
+            height: $block.height, onCommit: { doc.markDirty() }
+        ) {
             Menu {
                 Picker("Papier", selection: Binding(get: { paper }, set: { v in doc.changeBlock(block, "Papier ändern") { block.mode = v.rawValue } })) {
                     ForEach(PaperStyle.allCases) { Text($0.label).tag($0) }
@@ -379,9 +396,19 @@ struct DrawingBlockView: View {
     /// One row when the block is wide enough, otherwise two or three rows, so no tool leaves the block (#249).
     private var toolbar: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 4) { toolsRow; divider; paletteRow; divider; strokeRow }
+            HStack(spacing: 4) {
+                toolsRow
+                divider
+                paletteRow
+                divider
+                strokeRow
+            }
             VStack(spacing: 4) {
-                HStack(spacing: 4) { toolsRow; divider; strokeRow }
+                HStack(spacing: 4) {
+                    toolsRow
+                    divider
+                    strokeRow
+                }
                 HStack(spacing: 4) { paletteRow }
             }
             VStack(spacing: 4) {
@@ -406,7 +433,11 @@ struct DrawingBlockView: View {
         divider
         Menu {
             ForEach(DrawShape.allCases) { shape in
-                Button { model.shape = shape } label: { Label(shape.label, systemImage: shape.icon) }
+                Button {
+                    model.shape = shape
+                } label: {
+                    Label(shape.label, systemImage: shape.icon)
+                }
             }
         } label: {
             Image(systemName: model.shape.icon).frame(width: 26, height: 24)
@@ -419,7 +450,10 @@ struct DrawingBlockView: View {
 
     @ViewBuilder private var paletteRow: some View {
         ForEach(Self.palette, id: \.self) { color in
-            Button { model.color = color; if model.tool == .eraser { model.tool = .pen } } label: {
+            Button {
+                model.color = color
+                if model.tool == .eraser { model.tool = .pen }
+            } label: {
                 Circle()
                     .fill(Color(nsColor: color))
                     .frame(width: 15, height: 15)
@@ -427,7 +461,9 @@ struct DrawingBlockView: View {
             }
             .buttonStyle(.plain)
         }
-        Button { openColorPanel() } label: {
+        Button {
+            openColorPanel()
+        } label: {
             Circle()
                 .fill(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center))
                 .frame(width: 15, height: 15)
@@ -440,7 +476,9 @@ struct DrawingBlockView: View {
     @ViewBuilder private var strokeRow: some View {
         Menu {
             ForEach([1.5, 3, 5, 8, 12] as [CGFloat], id: \.self) { w in
-                Button { model.width = w } label: {
+                Button {
+                    model.width = w
+                } label: {
                     Text(w == model.width ? "● \(Int(w * 2)) pt" : "   \(Int(w * 2)) pt")
                 }
             }

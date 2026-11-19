@@ -53,13 +53,16 @@ struct AIChatView: View {
             inputFocused = true
         }
         // Citations are folio:// links: open the note and show the cited passage (#35).
-        .environment(\.openURL, OpenURLAction { url in
-            if let id = NoteLink.id(from: url) {
-                reveal(id, passage: NoteLink.passageIndex(from: url))
-                return .handled
+        .environment(
+            \.openURL,
+            OpenURLAction { url in
+                if let id = NoteLink.id(from: url) {
+                    reveal(id, passage: NoteLink.passageIndex(from: url))
+                    return .handled
+                }
+                return .systemAction
             }
-            return .systemAction
-        })
+        )
         .id(availabilityTick)
     }
 
@@ -98,9 +101,14 @@ struct AIChatView: View {
                 .helpLabel("Chat schließen")
             }
             if let onScope {
-                Picker("", selection: Binding(get: { isLibrary }, set: { lib in
-                    onScope(lib ? .library : .note(store.currentDocument?.id ?? UUID()))
-                })) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { isLibrary },
+                        set: { lib in
+                            onScope(lib ? .library : .note(store.currentDocument?.id ?? UUID()))
+                        })
+                ) {
                     Text("Diese Notiz").tag(false)
                     Text("Ganze Bibliothek").tag(true)
                 }
@@ -144,7 +152,9 @@ struct AIChatView: View {
         let fraction = min(Double(used) / Double(ContextBuilder.sourceBudget), 1)
         return VStack(alignment: .leading, spacing: 8) {
             if !isLibrary { notesRow }
-            Button { withAnimation(Motion.quick) { showContext.toggle() } } label: {
+            Button {
+                withAnimation(Motion.quick) { showContext.toggle() }
+            } label: {
                 HStack(spacing: 8) {
                     Gauge(value: fraction) { EmptyView() }
                         .gaugeStyle(.accessoryLinearCapacity)
@@ -181,8 +191,10 @@ struct AIChatView: View {
 
     private func contextDetails(_ sources: [Passage], omitted: Int) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Das Modell sieht \(sources.isEmpty ? "keine Ausschnitte" : "diese Ausschnitte"). Es kann insgesamt \(ContextBuilder.modelContext) Token verarbeiten; \(ContextBuilder.sourceBudget) davon sind für Notizinhalte reserviert, der Rest für Anweisungen, Verlauf, Frage und Antwort.")
-                .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(
+                "Das Modell sieht \(sources.isEmpty ? "keine Ausschnitte" : "diese Ausschnitte"). Es kann insgesamt \(ContextBuilder.modelContext) Token verarbeiten; \(ContextBuilder.sourceBudget) davon sind für Notizinhalte reserviert, der Rest für Anweisungen, Verlauf, Frage und Antwort."
+            )
+            .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if omitted > 0 {
                 Label("\(omitted) weitere Abschnitte passten nicht mehr hinein. Eine genauere Frage holt die passenden nach vorn.", systemImage: "scissors")
                     .font(.system(size: 10.5)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -257,8 +269,7 @@ struct AIChatView: View {
             .frame(maxHeight: .infinity)
             .onAppear { proxy.scrollTo(bottomID, anchor: .bottom) }
             .onChange(of: chat.messages) {
-                if let a = Motion.quick { withAnimation(a) { proxy.scrollTo(bottomID, anchor: .bottom) } }
-                else { proxy.scrollTo(bottomID, anchor: .bottom) }
+                if let a = Motion.quick { withAnimation(a) { proxy.scrollTo(bottomID, anchor: .bottom) } } else { proxy.scrollTo(bottomID, anchor: .bottom) }
             }
             .animation(Motion.standard, value: chat.messages.count)
         }
@@ -269,17 +280,24 @@ struct AIChatView: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(isLibrary ? "Frag deine ganze Bibliothek …" : chat.extraNotes.isEmpty ? "Frag etwas zu dieser Notiz …" : "Frag etwas zu diesen Notizen …")
                     .font(.system(size: 15, weight: .semibold))
-                Text(isLibrary ? "Folio sucht die passenden Stellen in allen Notizen; die Antwort nennt ihre Quellen." :
-                        "Lass dir Inhalte erklären, zusammenfassen oder vergleichen. Antworten verweisen auf die Stellen in der Notiz.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    isLibrary
+                        ? "Folio sucht die passenden Stellen in allen Notizen; die Antwort nennt ihre Quellen."
+                        : "Lass dir Inhalte erklären, zusammenfassen oder vergleichen. Antworten verweisen auf die Stellen in der Notiz."
+                )
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 8) {
-                let actions = isLibrary ? AIChatModel.libraryActions
+                let actions =
+                    isLibrary
+                    ? AIChatModel.libraryActions
                     : (chat.extraNotes.isEmpty ? [] : [AIChatModel.compareAction]) + AIChatModel.quickActions
                 ForEach(actions) { action in
-                    Button { chat.send(action.prompt) } label: {
+                    Button {
+                        chat.send(action.prompt)
+                    } label: {
                         Label(action.title, systemImage: action.icon)
                             .font(.system(size: 12, weight: .medium))
                             .padding(.horizontal, 12)
@@ -337,7 +355,9 @@ struct AIChatView: View {
                 if !isUser && !message.isStreaming && !message.text.isEmpty {
                     citedSources(message)
                     HStack(spacing: 12) {
-                        Button { onInsert(stripCitations(message.text)) } label: {
+                        Button {
+                            onInsert(stripCitations(message.text))
+                        } label: {
                             Label("In Notiz einfügen", systemImage: "text.insert")
                         }
                         Button {
@@ -375,7 +395,9 @@ struct AIChatView: View {
     }
 
     private func sourceRow(_ n: Int, _ p: Passage) -> some View {
-        Button { reveal(p.noteID, passage: p.index, text: p.text) } label: {
+        Button {
+            reveal(p.noteID, passage: p.index, text: p.text)
+        } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("[\(n)]").font(.system(size: 10.5, weight: .bold, design: .monospaced)).foregroundStyle(theme.accent)
                 VStack(alignment: .leading, spacing: 1) {
@@ -423,19 +445,21 @@ struct AIChatView: View {
                 .overlay(Capsule().strokeBorder(chat.includeSelection ? theme.accent.opacity(0.4) : Color.primary.opacity(0.1)))
             }
             HStack(alignment: .bottom, spacing: 8) {
-                TextField(isLibrary ? "Frage an alle Notizen …" : (availability.isAvailable ? "Frage zur Notiz …" : "Suchbegriffe …"),
-                          text: $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .lineLimit(1...5)
-                    .focused($inputFocused)
-                    .onSubmit(sendDraft)
-                    .onKeyPress(.return, phases: .down) { press in
-                        if press.modifiers.contains(.shift) { return .ignored }
-                        sendDraft()
-                        return .handled
-                    }
-                    .padding(.vertical, 5)
+                TextField(
+                    isLibrary ? "Frage an alle Notizen …" : (availability.isAvailable ? "Frage zur Notiz …" : "Suchbegriffe …"),
+                    text: $draft, axis: .vertical
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .lineLimit(1...5)
+                .focused($inputFocused)
+                .onSubmit(sendDraft)
+                .onKeyPress(.return, phases: .down) { press in
+                    if press.modifiers.contains(.shift) { return .ignored }
+                    sendDraft()
+                    return .handled
+                }
+                .padding(.vertical, 5)
                 Button {
                     if chat.isResponding { chat.stop() } else { sendDraft() }
                 } label: {
@@ -493,8 +517,11 @@ private struct AIChatThinkingIndicator: View {
                     .fill(.secondary)
                     .frame(width: 4, height: 4)
                     .opacity(reduceMotion || pulsing ? 1 : 0.25)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.6)
-                        .repeatForever(autoreverses: true).delay(Double(index) * 0.18), value: pulsing)
+                    .animation(
+                        reduceMotion
+                            ? nil
+                            : .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true).delay(Double(index) * 0.18), value: pulsing)
             }
             Text("denkt nach…")
                 .font(.caption)

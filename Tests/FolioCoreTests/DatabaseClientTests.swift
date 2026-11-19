@@ -72,12 +72,14 @@ final class DatabaseClientTests: XCTestCase {
         env["LC_ALL"] = "en_US.UTF-8"
         process.environment = env
         process.standardInput = FileHandle.nullDevice
-        process.standardOutput = handle; process.standardError = handle
+        process.standardOutput = handle
+        process.standardError = handle
         try process.run()
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.02) }
         if process.isRunning {
-            ServerDetector.terminateTree(process.processIdentifier); process.waitUntilExit()
+            ServerDetector.terminateTree(process.processIdentifier)
+            process.waitUntilExit()
             throw DatabaseError.timeout
         }
         process.waitUntilExit()
@@ -91,11 +93,14 @@ final class DatabaseClientTests: XCTestCase {
         let literal: String
         if connection.driver == .mysql {
             literal = "CONVERT(0x" + special.utf8.map { String(format: "%02x", $0) }.joined() + " USING utf8mb4)"
-        } else { literal = "'" + special.replacingOccurrences(of: "'", with: "''") + "'" }
-        let created = try await DatabaseClient.run("""
-        CREATE TABLE folio_sample (id INTEGER PRIMARY KEY, title TEXT, score REAL);
-        INSERT INTO folio_sample VALUES (1, \(literal), 1.5), (2, NULL, 2.25), (3, '', 3.5);
-        """, on: connection, password: nil)
+        } else {
+            literal = "'" + special.replacingOccurrences(of: "'", with: "''") + "'"
+        }
+        let created = try await DatabaseClient.run(
+            """
+            CREATE TABLE folio_sample (id INTEGER PRIMARY KEY, title TEXT, score REAL);
+            INSERT INTO folio_sample VALUES (1, \(literal), 1.5), (2, NULL, 2.25), (3, '', 3.5);
+            """, on: connection, password: nil)
         XCTAssertNotNil(created.message)
         let result = try await DatabaseClient.run("SELECT title, id, score FROM folio_sample ORDER BY id;", on: connection, password: nil)
         XCTAssertEqual(result.columns, ["title", "id", "score"])
@@ -104,9 +109,11 @@ final class DatabaseClientTests: XCTestCase {
         XCTAssertEqual(multiple.columns, ["title", "id"])
         XCTAssertEqual(multiple.rows, [[nil, "2"]])
         let limited = try await DatabaseClient.run("SELECT id FROM folio_sample ORDER BY id", on: connection, password: nil, rowLimit: 2)
-        XCTAssertEqual(limited.rows, [["1"], ["2"]]); XCTAssertTrue(limited.truncated)
+        XCTAssertEqual(limited.rows, [["1"], ["2"]])
+        XCTAssertTrue(limited.truncated)
         let zero = try await DatabaseClient.run("SELECT id FROM folio_sample", on: connection, password: nil, rowLimit: 0)
-        XCTAssertTrue(zero.rows.isEmpty); XCTAssertTrue(zero.truncated)
+        XCTAssertTrue(zero.rows.isEmpty)
+        XCTAssertTrue(zero.truncated)
         do {
             _ = try await DatabaseClient.run("SELEC broken syntax", on: connection, password: nil)
             XCTFail("Syntaxfehler wurde nicht erkannt.")
@@ -142,7 +149,7 @@ final class DatabaseClientTests: XCTestCase {
         do {
             _ = try await DatabaseClient.run("WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n) SELECT sum(x) FROM n;", on: connection, password: nil, timeout: 0.05)
             XCTFail("Zeitlimit wurde nicht erkannt.")
-        } catch DatabaseError.timeout { }
+        } catch DatabaseError.timeout {}
     }
 
     func testPostgreSQLRoundTrip() async throws {
@@ -151,8 +158,9 @@ final class DatabaseClientTests: XCTestCase {
         let directory = try temporaryDirectory()
         let data = directory.appendingPathComponent("data").path
         let port = try freePort()
-        do { try command(initdb, ["-D", data, "-A", "trust", "-U", "folio", "--encoding=UTF8", "--no-locale"]) }
-        catch DatabaseError.queryFailed(let message) where message.contains("Operation not permitted") && message.contains("shared memory") {
+        do { try command(initdb, ["-D", data, "-A", "trust", "-U", "folio", "--encoding=UTF8", "--no-locale"]) } catch DatabaseError.queryFailed(let message)
+            where message.contains("Operation not permitted") && message.contains("shared memory")
+        {
             throw XCTSkip("Die Umgebung erlaubt PostgreSQL keinen gemeinsamen Speicher.")
         }
         postgres = (ctl, data)
@@ -166,20 +174,29 @@ final class DatabaseClientTests: XCTestCase {
         let directory = try temporaryDirectory()
         let data = directory.appendingPathComponent("data").path
         let port = try freePort()
-        do { try command(mysqld, ["--no-defaults", "--initialize-insecure", "--datadir=\(data)"], timeout: 30) }
-        catch { throw XCTSkip("MySQL konnte nicht initialisiert werden: \(error)") }
+        do { try command(mysqld, ["--no-defaults", "--initialize-insecure", "--datadir=\(data)"], timeout: 30) } catch {
+            throw XCTSkip("MySQL konnte nicht initialisiert werden: \(error)")
+        }
         let server = Process()
         server.executableURL = URL(fileURLWithPath: mysqld)
-        server.arguments = ["--no-defaults", "--datadir=\(data)", "--port=\(port)", "--socket=\(directory.path)/sock",
-                            "--mysqlx=OFF", "--skip-networking=0", "--bind-address=127.0.0.1",
-                            "--pid-file=\(directory.path)/server.pid", "--log-error=\(directory.path)/server.log"]
-        server.standardInput = FileHandle.nullDevice; server.standardOutput = FileHandle.nullDevice; server.standardError = FileHandle.nullDevice
-        try server.run(); servers.append(server)
+        server.arguments = [
+            "--no-defaults", "--datadir=\(data)", "--port=\(port)", "--socket=\(directory.path)/sock",
+            "--mysqlx=OFF", "--skip-networking=0", "--bind-address=127.0.0.1",
+            "--pid-file=\(directory.path)/server.pid", "--log-error=\(directory.path)/server.log"
+        ]
+        server.standardInput = FileHandle.nullDevice
+        server.standardOutput = FileHandle.nullDevice
+        server.standardError = FileHandle.nullDevice
+        try server.run()
+        servers.append(server)
         var connection = DatabaseConnection(driver: .mysql, host: "127.0.0.1", port: port, user: "root")
         let deadline = Date().addingTimeInterval(30)
         var ready = false
         while server.isRunning && Date() < deadline {
-            if (try? await DatabaseClient.run("SELECT 1", on: connection, password: nil, timeout: 2)) != nil { ready = true; break }
+            if (try? await DatabaseClient.run("SELECT 1", on: connection, password: nil, timeout: 2)) != nil {
+                ready = true
+                break
+            }
             try await Task.sleep(nanoseconds: 200_000_000)
         }
         guard ready else { throw XCTSkip("MySQL wurde nicht innerhalb von 30 Sekunden bereit.") }
@@ -198,23 +215,32 @@ final class DatabaseClientTests: XCTestCase {
 
     func testSQLServerRoundTrip() async throws {
         let docker = try binary("docker")
-        do { try command(docker, ["info"], timeout: 10) }
-        catch { throw XCTSkip("Docker ist nicht verfügbar.") }
+        do { try command(docker, ["info"], timeout: 10) } catch { throw XCTSkip("Docker ist nicht verfügbar.") }
         let container = "folio-sql-" + UUID().uuidString.lowercased()
         let password = "Folio!9a" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
         previousSQLCMD = DatabaseClient.clientOverrides[.mssql]
         sqlServer = (docker, container)
         do {
-            try command(docker, ["run", "-d", "--platform", "linux/amd64", "--name", container,
-                                 "-p", "127.0.0.1::1433", "-e", "ACCEPT_EULA=Y", "-e", "MSSQL_SA_PASSWORD=" + password,
-                                 "mcr.microsoft.com/mssql/server:2022-latest"], timeout: 30)
+            try command(
+                docker,
+                [
+                    "run", "-d", "--platform", "linux/amd64", "--name", container,
+                    "-p", "127.0.0.1::1433", "-e", "ACCEPT_EULA=Y", "-e", "MSSQL_SA_PASSWORD=" + password,
+                    "mcr.microsoft.com/mssql/server:2022-latest"
+                ], timeout: 30)
         } catch { throw XCTSkip("SQL-Server-Container konnte nicht gestartet werden: \(error)") }
         let deadline = Date().addingTimeInterval(180)
         var ready = false
         while Date() < deadline {
-            if (try? command(docker, ["exec", container, "/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost",
-                                      "-U", "sa", "-P", password, "-l", "2", "-Q", "SELECT 1"], timeout: min(10, max(1, deadline.timeIntervalSinceNow)))) != nil {
-                ready = true; break
+            if (try? command(
+                docker,
+                [
+                    "exec", container, "/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost",
+                    "-U", "sa", "-P", password, "-l", "2", "-Q", "SELECT 1"
+                ], timeout: min(10, max(1, deadline.timeIntervalSinceNow)))) != nil
+            {
+                ready = true
+                break
             }
             try await Task.sleep(nanoseconds: 1_000_000_000)
         }
@@ -225,32 +251,34 @@ final class DatabaseClientTests: XCTestCase {
         func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         // The wrapper removes -i and redirects that host file to docker exec's stdin.
         let script = """
-        #!/bin/bash
-        args=()
-        input=""
-        while (( $# )); do
-          case "$1" in
-            -S) args+=("-S" "tcp:localhost,1433"); shift 2 ;;
-            -i) input="$2"; shift 2 ;;
-            *) args+=("$1"); shift ;;
-          esac
-        done
-        exec \(quote(docker)) exec -i -e SQLCMDPASSWORD \(quote(container)) /opt/mssql-tools18/bin/sqlcmd "${args[@]}" < "$input"
-        """
+            #!/bin/bash
+            args=()
+            input=""
+            while (( $# )); do
+              case "$1" in
+                -S) args+=("-S" "tcp:localhost,1433"); shift 2 ;;
+                -i) input="$2"; shift 2 ;;
+                *) args+=("$1"); shift ;;
+              esac
+            done
+            exec \(quote(docker)) exec -i -e SQLCMDPASSWORD \(quote(container)) /opt/mssql-tools18/bin/sqlcmd "${args[@]}" < "$input"
+            """
         try script.write(to: wrapper, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
         DatabaseClient.clientOverrides[.mssql] = wrapper.path
         let connection = DatabaseConnection(driver: .mssql, host: "127.0.0.1", port: port, database: "master", user: "sa")
         let special = "Tab\tZeile\nKomma, ä 🎉 Ende"
-        let created = try await DatabaseClient.run("""
-        CREATE TABLE dbo.folio_sample (id INT PRIMARY KEY, title NVARCHAR(200), score DECIMAL(10,2));
-        INSERT INTO dbo.folio_sample VALUES (1, N'\(special)', 1.50), (2, NULL, 2.25), (3, N'', 3.50);
-        """, on: connection, password: password)
+        let created = try await DatabaseClient.run(
+            """
+            CREATE TABLE dbo.folio_sample (id INT PRIMARY KEY, title NVARCHAR(200), score DECIMAL(10,2));
+            INSERT INTO dbo.folio_sample VALUES (1, N'\(special)', 1.50), (2, NULL, 2.25), (3, N'', 3.50);
+            """, on: connection, password: password)
         XCTAssertEqual(created.message, "3 Zeilen geändert")
         let result = try await DatabaseClient.run("SELECT title, id, score FROM dbo.folio_sample ORDER BY id", on: connection, password: password)
         XCTAssertEqual(result.columns, ["title", "id", "score"])
         XCTAssertEqual(result.rows, [[special, "1", "1.50"], [nil, "2", "2.25"], ["", "3", "3.50"]])
-        let multiple = try await DatabaseClient.run("SELECT id FROM dbo.folio_sample; SELECT title, id FROM dbo.folio_sample WHERE id=2; SELECT id FROM dbo.folio_sample WHERE 1=0;", on: connection, password: password)
+        let multiple = try await DatabaseClient.run(
+            "SELECT id FROM dbo.folio_sample; SELECT title, id FROM dbo.folio_sample WHERE id=2; SELECT id FROM dbo.folio_sample WHERE 1=0;", on: connection, password: password)
         XCTAssertEqual(multiple.columns, ["title", "id"])
         XCTAssertEqual(multiple.rows, [[nil, "2"]])
         let changed = try await DatabaseClient.run("UPDATE dbo.folio_sample SET score=4 WHERE id=1", on: connection, password: password)
@@ -283,19 +311,20 @@ final class DatabaseClientTests: XCTestCase {
     }
 
     func testMySQLXMLResultBoundariesAndNull() throws {
-        let result = try DatabaseClient.parseMySQLXML("""
-        <?xml version="1.0"?>
-        <resultset statement="SELECT 1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-        <row><field name="old">1</field></row></resultset>
-        <?xml version="1.0"?>
-        <resultset statement="SELECT title, id" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-        <row><field name="title">ä 🎉\tZeile\n,&amp;&lt;\\</field><field name="id">1</field></row>
-        <row><field name="title" xsi:nil="true"/><field name="id">2</field></row>
-        <row><field name="title"></field><field name="id">3</field></row>
-        <row><field name="title">NULL</field><field name="id">4</field></row>
-        </resultset>
-        <resultset statement="SELECT 1 WHERE 0"/>
-        """)
+        let result = try DatabaseClient.parseMySQLXML(
+            """
+            <?xml version="1.0"?>
+            <resultset statement="SELECT 1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <row><field name="old">1</field></row></resultset>
+            <?xml version="1.0"?>
+            <resultset statement="SELECT title, id" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <row><field name="title">ä 🎉\tZeile\n,&amp;&lt;\\</field><field name="id">1</field></row>
+            <row><field name="title" xsi:nil="true"/><field name="id">2</field></row>
+            <row><field name="title"></field><field name="id">3</field></row>
+            <row><field name="title">NULL</field><field name="id">4</field></row>
+            </resultset>
+            <resultset statement="SELECT 1 WHERE 0"/>
+            """)
         XCTAssertEqual(result.columns, ["title", "id"])
         XCTAssertEqual(result.rows, [["ä 🎉\tZeile\n,&<\\", "1"], [nil, "2"], ["", "3"], ["NULL", "4"]])
     }

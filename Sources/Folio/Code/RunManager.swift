@@ -34,7 +34,10 @@ final class RunManager: ObservableObject {
     /// Whether the running block takes typed input (interactive runs as their own process).
     func acceptsInput(_ id: UUID) -> Bool { runs[id]?.kernel == nil && runs[id]?.runner.acceptsInput == true }
     func send(_ text: String, to id: UUID) { runs[id]?.runner.send(text) }
-    func endInput(_ id: UUID) { objectWillChange.send(); runs[id]?.runner.closeInput() }
+    func endInput(_ id: UUID) {
+        objectWillChange.send()
+        runs[id]?.runner.closeInput()
+    }
     func server(_ id: UUID) -> URL? { runs[id]?.server }
 
     /// Runs a block. Linked blocks of a language with a shared session run in the note's kernel, so they
@@ -117,17 +120,21 @@ final class RunManager: ObservableObject {
         block.testOutcome = nil
     }
 
-    private func makeContext(block: BlockModel, doc: NoteDocument, theme: ThemeManager, language: LanguageSpec, runner: CodeRun, kernel: Kernel?, stamp: CodeRunStamp) -> RunContext {
+    private func makeContext(block: BlockModel, doc: NoteDocument, theme: ThemeManager, language: LanguageSpec, runner: CodeRun, kernel: Kernel?, stamp: CodeRunStamp) -> RunContext
+    {
         let env = doc.meta.environment
         let noteOverride = env?.interpreters[language.id].flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let timeout = env?.timeout ?? theme.settings.runTimeout
-        let limits = ResourceLimits(timeout: timeout, maxOutputBytes: Int(theme.settings.maxOutputKB * 1024),
-                                    maxMemoryMB: Int(theme.settings.maxMemoryMB), killOrphans: theme.settings.killOrphans)
-        let options = RunOptions(stdin: preparedInput(of: block), interactive: block.interactive, workingDirectory: env?.workingDirectoryURL,
-                                 environment: env?.variables ?? [:], limits: limits)
-        return RunContext(stamp: stamp, block: block, doc: doc, language: language, runner: runner, kernel: kernel, code: block.storage.string,
-                          override: noteOverride ?? theme.settings.interpreterOverrides[language.id], timeout: timeout, limits: limits, options: options,
-                          onOutput: outputHandler(for: block, runner: runner, limit: limits.maxOutputBytes), onServer: serverHandler(for: block.id))
+        let limits = ResourceLimits(
+            timeout: timeout, maxOutputBytes: Int(theme.settings.maxOutputKB * 1024),
+            maxMemoryMB: Int(theme.settings.maxMemoryMB), killOrphans: theme.settings.killOrphans)
+        let options = RunOptions(
+            stdin: preparedInput(of: block), interactive: block.interactive, workingDirectory: env?.workingDirectoryURL,
+            environment: env?.variables ?? [:], limits: limits)
+        return RunContext(
+            stamp: stamp, block: block, doc: doc, language: language, runner: runner, kernel: kernel, code: block.storage.string,
+            override: noteOverride ?? theme.settings.interpreterOverrides[language.id], timeout: timeout, limits: limits, options: options,
+            onOutput: outputHandler(for: block, runner: runner, limit: limits.maxOutputBytes), onServer: serverHandler(for: block.id))
     }
 
     /// Coalesces output so a chatty server doesn't redraw the note for every line.
@@ -159,7 +166,10 @@ final class RunManager: ObservableObject {
     private func announceInputWhenReady(_ id: UUID, runner: CodeRun) {
         Task {
             while self.runs[id]?.runner === runner {
-                if runner.acceptsInput { self.objectWillChange.send(); break }
+                if runner.acceptsInput {
+                    self.objectWillChange.send()
+                    break
+                }
                 try? await Task.sleep(for: .milliseconds(50))
             }
         }
@@ -203,7 +213,8 @@ final class RunManager: ObservableObject {
             block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
             block.startedServer = r.serverURL != nil
         }
-        info[block.id] = c.kernel != nil
+        info[block.id] =
+            c.kernel != nil
             ? String(format: "%@ · %.2f s", r.succeeded ? "verknüpft" : "Fehler", r.duration)
             : String(format: "%@ · Exit %d · %.2f s", r.command, r.exitCode, r.duration)
     }
@@ -245,9 +256,10 @@ final class RunManager: ObservableObject {
     }
 
     private func testPlanItem(_ b: BlockModel) -> BlockTestPlan.Item {
-        BlockTestPlan.Item(id: b.id, hasTest: b.test != nil,
-                           session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
-                           interactive: b.interactive, startsServer: b.startedServer)
+        BlockTestPlan.Item(
+            id: b.id, hasTest: b.test != nil,
+            session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
+            interactive: b.interactive, startsServer: b.startedServer)
     }
 
     private func perform(_ action: BlockTestPlan.Action, on block: BlockModel, doc: NoteDocument, theme: ThemeManager) async {
@@ -274,7 +286,10 @@ final class RunManager: ObservableObject {
     func clearInfo(_ id: UUID) { info[id] = nil }
 
     func stopAll() {
-        for run in runs.values { run.kernel?.interrupt(); run.runner.cancel() }
+        for run in runs.values {
+            run.kernel?.interrupt()
+            run.runner.cancel()
+        }
     }
 }
 
@@ -287,7 +302,8 @@ private final class OutputBuffer: @unchecked Sendable {
     init(limit: Int) { limiter = OutputLimiter(limit: limit) }
 
     func append(_ chunk: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         limiter.append(Data(chunk.utf8))
         if pending { return false }
         pending = true
@@ -295,7 +311,8 @@ private final class OutputBuffer: @unchecked Sendable {
     }
 
     func flush() -> String {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         pending = false
         return limiter.text
     }

@@ -20,7 +20,10 @@ struct UpdateView: View {
                     Text("Zuletzt geprüft \(d.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
                 }
             case .checking:
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Suche auf GitHub …") }
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Suche auf GitHub …")
+                }
             case .upToDate:
                 Label("Du hast die neueste Version.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             case .available(let release):
@@ -80,7 +83,10 @@ struct UpdateSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Software-Update", systemImage: "arrow.triangle.2.circlepath").font(.title3.bold())
             UpdateView(compact: true)
-            HStack { Spacer(); Button("Schließen") { dismiss() }.keyboardShortcut(.cancelAction) }
+            HStack {
+                Spacer()
+                Button("Schließen") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
         }
         .padding(22)
         .frame(width: 540)

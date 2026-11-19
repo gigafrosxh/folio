@@ -14,7 +14,8 @@ enum AIAssistSelfTest {
         menuChecks()
         await ollamaChecks()
         guard let ref = store.createNote(titled: "KI-Probe", body: "Waschmaschine kaputt"),
-              let doc = await opened(ref.id, store: store) else { return check(false, "KI-Notiz angelegt") }
+            let doc = await opened(ref.id, store: store)
+        else { return check(false, "KI-Notiz angelegt") }
         doc.undoManager?.beginUndoGrouping()
         doc.appendTag("haushalt")
         doc.insertAnswerBlocks("Plan:\n```py\nprint(1)\n```\n| A | B |\n|---|---|\n| 1 | 2 |", after: doc.blocks.first?.id, theme: ThemeManager.shared)

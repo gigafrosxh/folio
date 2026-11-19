@@ -36,7 +36,11 @@ public final class LibraryScanner: @unchecked Sendable {
     public init() {}
 
     /// Forgets cached metadata (e.g. when another library is opened).
-    public func clearCache() { lock.lock(); cache.removeAll(); lock.unlock() }
+    public func clearCache() {
+        lock.lock()
+        cache.removeAll()
+        lock.unlock()
+    }
 
     public func scan(_ root: URL) -> Result {
         let walk = LibraryWalk(root: root)
@@ -70,12 +74,17 @@ public final class LibraryScanner: @unchecked Sendable {
 
     private func metadata(of url: URL) -> (NoteMetadata?, cached: Bool) {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let key = CacheKey(path: url.path, size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
-                           modified: attrs?[.modificationDate] as? Date ?? .distantPast)
-        lock.lock(); let cached = cache[key]; lock.unlock()
+        let key = CacheKey(
+            path: url.path, size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
+            modified: attrs?[.modificationDate] as? Date ?? .distantPast)
+        lock.lock()
+        let cached = cache[key]
+        lock.unlock()
         if let cached { return (cached, true) }
         guard let meta = try? NoteFile.readMetadata(at: url) else { return (nil, false) }
-        lock.lock(); cache[key] = meta; lock.unlock()
+        lock.lock()
+        cache[key] = meta
+        lock.unlock()
         return (meta, false)
     }
 }
@@ -105,7 +114,8 @@ private final class LibraryWalk {
     /// Every real folder is visited once; a folder that cannot be read counts as empty.
     func folders(in dir: URL) -> [LibraryScanner.Folder] {
         guard visited.insert(Self.realPath(dir)).inserted,
-              let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: Self.keys, options: [.skipsHiddenFiles]) else { return [] }
+            let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: Self.keys, options: [.skipsHiddenFiles])
+        else { return [] }
         var folders: [LibraryScanner.Folder] = []
         for item in items.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
             switch classify(item) {

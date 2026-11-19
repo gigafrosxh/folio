@@ -49,7 +49,7 @@ final class ParagraphFlowTests: XCTestCase {
         let tv = makeView()
         type(tv, "Liste\n\n- eins\nzwei")
         XCTAssertEqual(tv.string, "Liste\n\n• eins\n• zwei")
-        type(tv, "\n\n[] offen")   // Return on an empty bullet ends the list
+        type(tv, "\n\n[] offen")  // Return on an empty bullet ends the list
         XCTAssertTrue(tv.string.hasSuffix("\n☐ offen"))
         let ns = tv.string as NSString
         let style = tv.textStorage?.attribute(.paragraphStyle, at: ns.range(of: "• eins").location, effectiveRange: nil) as? NSParagraphStyle

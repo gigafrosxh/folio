@@ -37,7 +37,10 @@ final class CaptureService: ObservableObject {
             lastMessage = nil
             // In an open note that could not be written yet the text is safe in the editor, not on disk (#207).
             guard saved else {
-                return (true, "In die offene Notiz übernommen, aber noch nicht gesichert (\(NoteStore.shared.lastError ?? "Speichern fehlgeschlagen")). Folio versucht es bei der nächsten Änderung erneut; die Notiz bleibt offen.")
+                return (
+                    true,
+                    "In die offene Notiz übernommen, aber noch nicht gesichert (\(NoteStore.shared.lastError ?? "Speichern fehlgeschlagen")). Folio versucht es bei der nächsten Änderung erneut; die Notiz bleibt offen."
+                )
             }
             return (true, item.target == .inbox ? "In der Inbox gespeichert." : "In der Notiz gespeichert.")
         } catch let error as CaptureError where error.isTemporary {
@@ -56,7 +59,10 @@ final class CaptureService: ObservableObject {
     }
 
     func retryPending() {
-        guard !queue.items().isEmpty else { refresh(); return }
+        guard !queue.items().isEmpty else {
+            refresh()
+            return
+        }
         let done = queue.retry { _ = try self.deliver($0) }
         refresh()
         if done > 0 { lastMessage = "\(done) wartende Erfassung\(done == 1 ? "" : "en") gespeichert." }

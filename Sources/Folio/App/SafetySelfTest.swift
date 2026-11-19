@@ -14,25 +14,34 @@ enum SafetySelfTest {
     static func run() async {
         let store = NoteStore.shared
         await wait(1)
-        guard let ref = store.createNote(), let doc = store.currentDocument else { check(false, "Notiz anlegen"); return }
+        guard let ref = store.createNote(), let doc = store.currentDocument else {
+            check(false, "Notiz anlegen")
+            return
+        }
         let body = ThemeManager.shared.bodyAttributes
         await versionChecks(store: store, ref: ref, doc: doc, body: body)
-        guard let current = store.currentDocument else { check(false, "Notiz offen"); return }
+        guard let current = store.currentDocument else {
+            check(false, "Notiz offen")
+            return
+        }
         await conflictChecks(store: store, current: current, body: body)
         await externalChangeCheck(store: store)
         trashChecks(store: store, ref: ref)
         await backupChecks(store: store)
-        print("SAFETY done"); fflush(stdout)
+        print("SAFETY done")
+        fflush(stdout)
     }
 
     private static func versionChecks(store: NoteStore, ref: NoteRef, doc: NoteDocument, body: [NSAttributedString.Key: Any]) async {
         // Versions: the opened state plus one after editing (forced, since the 5-minute interval applies).
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nErster Stand", attributes: body))
-        doc.markDirty(); doc.saveNow()
+        doc.markDirty()
+        doc.saveNow()
         await wait(0.5)
         _ = try? store.history.record(Data(contentsOf: doc.url), noteID: doc.id, force: true)
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nZweiter Stand", attributes: body))
-        doc.markDirty(); doc.saveNow()
+        doc.markDirty()
+        doc.saveNow()
         await wait(0.5)
         let versions = store.history.versions(of: doc.id)
         check(versions.count >= 2, "Versionen angelegt (\(versions.count))")
@@ -41,8 +50,9 @@ enum SafetySelfTest {
             await wait(0.5)
             let restored = store.currentDocument.map { $0.blocks.map(\.storage.string).joined() } ?? ""
             check(restored.contains("Erster Stand"), "Version wiederhergestellt")
-            check(store.history.versions(of: ref.id).contains { (try? store.history.read($0)).map { NoteText.of($0).contains("Zweiter Stand") } ?? false },
-                  "vorheriger Stand blieb als Version erhalten")
+            check(
+                store.history.versions(of: ref.id).contains { (try? store.history.read($0)).map { NoteText.of($0).contains("Zweiter Stand") } ?? false },
+                "vorheriger Stand blieb als Version erhalten")
         } else {
             check(false, "erste Version gefunden")
         }
@@ -76,7 +86,12 @@ enum SafetySelfTest {
     private static func externalChangeCheck(store: NoteStore) async {
         // External change without local edits is simply loaded.
         if let doc2 = store.currentDocument, var other = try? NoteFile.read(from: doc2.url) {
-            other.body.blocks.append({ var b = BlockRecord(kind: .code); b.code = "zweite externe Änderung"; return b }())
+            other.body.blocks.append(
+                {
+                    var b = BlockRecord(kind: .code)
+                    b.code = "zweite externe Änderung"
+                    return b
+                }())
             try? other.write(to: doc2.url)
             store.checkExternalChange()
             await wait(0.3)
@@ -104,8 +119,9 @@ enum SafetySelfTest {
         // Backups
         BackupManager.shared.backupNow()
         for _ in 0..<60 where BackupManager.shared.isRunning { await wait(0.5) }
-        check(BackupManager.shared.lastError == nil && BackupManager.shared.backups.count == 1,
-              "Backup erstellt und geprüft: \(BackupManager.shared.status ?? BackupManager.shared.lastError ?? "-")")
+        check(
+            BackupManager.shared.lastError == nil && BackupManager.shared.backups.count == 1,
+            "Backup erstellt und geprüft: \(BackupManager.shared.status ?? BackupManager.shared.lastError ?? "-")")
         if let b = BackupManager.shared.backups.first {
             BackupManager.shared.restore(b)
             check(store.allFolderURLs.contains { $0.lastPathComponent.hasPrefix("Wiederhergestellt") }, "Backup als Ordner wiederhergestellt")

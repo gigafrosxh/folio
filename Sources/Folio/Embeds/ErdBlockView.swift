@@ -103,8 +103,10 @@ struct ErdBlockView: View {
     }
 
     var body: some View {
-        EmbedCard(title: title, icon: "point.3.filled.connected.trianglepath.dotted",
-                  height: .constant(0), resizable: false, onCommit: {}) {
+        EmbedCard(
+            title: title, icon: "point.3.filled.connected.trianglepath.dotted",
+            height: .constant(0), resizable: false, onCommit: {}
+        ) {
             actions
         } content: {
             VStack(alignment: .leading, spacing: 0) {
@@ -122,9 +124,14 @@ struct ErdBlockView: View {
     }
 
     private var viewPicker: some View {
-        Picker("Ansicht", selection: Binding(get: { view }, set: { v in
-            doc.changeBlock(block, "Ansicht ändern") { block.mode = v.rawValue }
-        })) {
+        Picker(
+            "Ansicht",
+            selection: Binding(
+                get: { view },
+                set: { v in
+                    doc.changeBlock(block, "Ansicht ändern") { block.mode = v.rawValue }
+                })
+        ) {
             ForEach(ErduDocument.View.allCases, id: \.self) { Text($0.title).tag($0) }
         }
         .pickerStyle(.segmented)
@@ -135,8 +142,10 @@ struct ErdBlockView: View {
     }
 
     private var preview: some View {
-        RenderPreview(kind: .erd, source: block.storage.string,
-                      options: RenderScript.Options(dark: colorScheme == .dark, fontSize: 13, view: view.rawValue)) { r in
+        RenderPreview(
+            kind: .erd, source: block.storage.string,
+            options: RenderScript.Options(dark: colorScheme == .dark, fontSize: 13, view: view.rawValue)
+        ) { r in
             result = r
             if r.ok { previewHeight = max(CGFloat(r.pageHeight), 40) }
         }
@@ -156,7 +165,10 @@ struct ErdBlockView: View {
             HStack(spacing: 8) {
                 Label("Verknüpft mit \(path) – auf diesem Mac noch nicht freigegeben.", systemImage: "link.badge.plus")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                Button("Der Datei folgen") { ErdBlocks.approve(block); approvedHere = true }.controlSize(.small)
+                Button("Der Datei folgen") {
+                    ErdBlocks.approve(block)
+                    approvedHere = true
+                }.controlSize(.small)
             }
             .padding(.horizontal, 12).padding(.bottom, 6)
         }
@@ -170,9 +182,15 @@ struct ErdBlockView: View {
     }
 
     @ViewBuilder private var actions: some View {
-        Button { openInErdUltra() } label: { Label("In ERD-Ultra öffnen", systemImage: "arrow.up.forward.app") }
-            .disabled(ErdBlocks.appURL == nil)
-            .help(ErdBlocks.appURL == nil ? "ERD-Ultra ist nicht installiert (github.com/gigafrosxh/erd-ultra/releases)" : "In ERD-Ultra bearbeiten; gespeicherte Änderungen erscheinen hier")
+        Button {
+            openInErdUltra()
+        } label: {
+            Label("In ERD-Ultra öffnen", systemImage: "arrow.up.forward.app")
+        }
+        .disabled(ErdBlocks.appURL == nil)
+        .help(
+            ErdBlocks.appURL == nil
+                ? "ERD-Ultra ist nicht installiert (github.com/gigafrosxh/erd-ultra/releases)" : "In ERD-Ultra bearbeiten; gespeicherte Änderungen erscheinen hier")
         Menu {
             Button("Bild kopieren") { Task { await copyImage() } }
             Button("SQL kopieren") { Task { await copySQL() } }
@@ -184,7 +202,10 @@ struct ErdBlockView: View {
             Button(block.linkedFile == nil ? "Mit .erdu-Datei verknüpfen …" : "Andere .erdu-Datei verknüpfen …") { relink() }
             if let path = block.linkedFile {
                 Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
-                Button("Verknüpfung lösen") { doc.changeBlock(block, "Verknüpfung lösen") { block.linkedFile = nil }; fileMissing = false }
+                Button("Verknüpfung lösen") {
+                    doc.changeBlock(block, "Verknüpfung lösen") { block.linkedFile = nil }
+                    fileMissing = false
+                }
             }
         } label: {
             Label("Mehr", systemImage: "ellipsis.circle")
@@ -198,7 +219,10 @@ struct ErdBlockView: View {
 
     /// Checks the file about once a second (ERD-Ultra rewrites it in place); never steals focus.
     private func follow() async {
-        guard let url = watchedFile else { fileMissing = false; return }
+        guard let url = watchedFile else {
+            fileMissing = false
+            return
+        }
         var last = ErdBlocks.modificationDate(url)
         if let last, block.linkedFile != nil, last > (doc.meta.modified) { message = ErdBlocks.pull(url, into: block, doc: doc) }
         while !Task.isCancelled {
@@ -226,7 +250,7 @@ struct ErdBlockView: View {
         if let original, FileManager.default.fileExists(atPath: original.path) {
             url = original
             editingCopy = nil
-            ErdBlocks.approve(block)   // opening it here is the user's own choice
+            ErdBlocks.approve(block)  // opening it here is the user's own choice
             approvedHere = true
         } else {
             // No original: hand ERD-Ultra a copy and follow it. An existing copy may hold edits not yet taken in;
@@ -253,8 +277,9 @@ struct ErdBlockView: View {
     private func render(_ v: ErduDocument.View) async -> OffscreenRenderer.Output? {
         do {
             message = nil
-            return try await OffscreenRenderer.render(.erd, source: block.storage.string, width: 1100,
-                                                      options: RenderScript.Options(dark: false, fontSize: 13, view: v.rawValue))
+            return try await OffscreenRenderer.render(
+                .erd, source: block.storage.string, width: 1100,
+                options: RenderScript.Options(dark: false, fontSize: 13, view: v.rawValue))
         } catch {
             message = "Export nicht möglich: \(error.localizedDescription)"
             return nil
@@ -273,8 +298,12 @@ struct ErdBlockView: View {
 
     private func copySQL() async {
         if view == .sql, let sql = result?.sql { return putString(sql) }
-        guard let sql = try? await OffscreenRenderer.renderResult(.erd, source: block.storage.string,
-                                                                   options: RenderScript.Options(view: "sql")).sql else {
+        guard
+            let sql = try? await OffscreenRenderer.renderResult(
+                .erd, source: block.storage.string,
+                options: RenderScript.Options(view: "sql")
+            ).sql
+        else {
             message = "SQL konnte nicht erzeugt werden."
             return
         }
@@ -289,12 +318,16 @@ struct ErdBlockView: View {
 
     private func export(_ type: UTType) async {
         guard let out = await render(view) else { return }
-        let data: Data? = switch type {
-        case .svg: out.svg.map { Data($0.utf8) }
-        case .png: OffscreenRenderer.png(from: out)
-        default: out.pdf
+        let data: Data? =
+            switch type {
+            case .svg: out.svg.map { Data($0.utf8) }
+            case .png: OffscreenRenderer.png(from: out)
+            default: out.pdf
+            }
+        guard let data else {
+            message = "Export nicht möglich."
+            return
         }
-        guard let data else { message = "Export nicht möglich."; return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [type]
         panel.nameFieldStringValue = (block.caption.isEmpty ? "ER-Diagramm" : block.caption) + "." + (type.preferredFilenameExtension ?? "dat")

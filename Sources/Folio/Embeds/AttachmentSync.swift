@@ -45,7 +45,8 @@ enum AttachmentSync {
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return nil }
         if isDir.boolValue {
             guard let wrapper = try? FileWrapper(url: url, options: .immediate),
-                  let data = wrapper.serializedRepresentation else { return nil }
+                let data = wrapper.serializedRepresentation
+            else { return nil }
             return (data, true)
         }
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -67,7 +68,7 @@ enum AttachmentSync {
             guard mod.timeIntervalSince(reference) > 1, let fresh = read(url), fresh.data != att.data else { continue }
             doc.attachments[id]?.data = fresh.data
             doc.attachments[id]?.header.isPackage = fresh.isPackage
-            block.pdfText = nil   // edited elsewhere: index the new text (#43)
+            block.pdfText = nil  // edited elsewhere: index the new text (#43)
             block.syncedAt = mod
             block.revision += 1
             changed = true
@@ -78,7 +79,8 @@ enum AttachmentSync {
     /// Opens an attachment in its default app (or a specific one) for editing.
     static func open(_ block: BlockModel, in doc: NoteDocument, withApp app: String? = nil) {
         guard let id = block.attachmentID, let att = doc.attachments[id],
-              let url = materialize(att, noteID: doc.id) else { return }
+            let url = materialize(att, noteID: doc.id)
+        else { return }
         if block.syncedAt == nil { block.syncedAt = modificationDate(url) }
         if let app, let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app) {
             NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
@@ -106,18 +108,25 @@ enum AttachmentSync {
         if url.pathExtension.lowercased() == ErduDocument.fileExtension { return try ErdBlocks.makeBlock(from: url) }
         // A note keeps every attachment in one archive section; larger files could never be opened again (#350).
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber,
-           size.uint64Value > ArchiveLimits.maxSection {
+            size.uint64Value > ArchiveLimits.maxSection
+        {
             throw ImportError.tooLarge(url.lastPathComponent)
         }
         guard let content = read(url) else { throw ImportError.unreadable(url.lastPathComponent) }
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
         let kind: BlockKind
-        if type.conforms(to: .pdf) { kind = .pdf }
-        else if type.conforms(to: .image) && !content.isPackage { kind = .image }
-        else if type.conforms(to: .audio) && !content.isPackage { kind = .audio }
-        else { kind = .file }
-        let id = doc.addAttachment(filename: url.lastPathComponent, typeIdentifier: type.identifier,
-                                   data: content.data, isPackage: content.isPackage)
+        if type.conforms(to: .pdf) {
+            kind = .pdf
+        } else if type.conforms(to: .image) && !content.isPackage {
+            kind = .image
+        } else if type.conforms(to: .audio) && !content.isPackage {
+            kind = .audio
+        } else {
+            kind = .file
+        }
+        let id = doc.addAttachment(
+            filename: url.lastPathComponent, typeIdentifier: type.identifier,
+            data: content.data, isPackage: content.isPackage)
         let block = BlockModel(kind: kind)
         block.attachmentID = id
         if kind == .file, ["numbers", "xlsx", "xls", "csv"].contains(url.pathExtension.lowercased()) { block.mode = "table" }
@@ -151,22 +160,24 @@ enum AttachmentSync {
     /// Creates an empty Numbers document, opens it in Numbers for editing and returns a table block for it.
     static func createNumbersTable(in doc: NoteDocument, name: String = "Tabelle") async throws -> BlockModel {
         let attachmentID = UUID()
-        let placeholder = FolioArchive.Attachment(id: attachmentID, filename: "\(name).numbers", typeIdentifier: "com.apple.iwork.numbers.sffnumbers", isPackage: false, data: Data())
+        let placeholder = FolioArchive.Attachment(
+            id: attachmentID, filename: "\(name).numbers", typeIdentifier: "com.apple.iwork.numbers.sffnumbers", isPackage: false, data: Data())
         let url = cacheURL(noteID: doc.id, attachment: placeholder)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let path = url.path.replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
-        tell application "Numbers"
-            activate
-            set newDoc to make new document
-            save newDoc in POSIX file "\(path)"
-        end tell
-        """
+            tell application "Numbers"
+                activate
+                set newDoc to make new document
+                save newDoc in POSIX file "\(path)"
+            end tell
+            """
         try await runAppleScript(script)
         guard let content = read(url) else { throw NumbersError.script("Datei wurde nicht gespeichert.") }
         let type = UTType(filenameExtension: "numbers")?.identifier ?? "com.apple.iwork.numbers.sffnumbers"
-        doc.attachments[attachmentID] = FolioArchive.Attachment(id: attachmentID, filename: url.lastPathComponent, typeIdentifier: type,
-                                                                  isPackage: content.isPackage, data: content.data)
+        doc.attachments[attachmentID] = FolioArchive.Attachment(
+            id: attachmentID, filename: url.lastPathComponent, typeIdentifier: type,
+            isPackage: content.isPackage, data: content.data)
         let block = BlockModel(kind: .file)
         block.attachmentID = attachmentID
         block.mode = "table"

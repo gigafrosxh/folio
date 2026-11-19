@@ -75,7 +75,7 @@ final class DataSafetyTests: XCTestCase {
         file.body.blocks[0].code = "zwei"
         XCTAssertNil(try history.record(file.encoded(), noteID: id, date: t0.addingTimeInterval(60)), "within the interval")
         XCTAssertNotNil(try history.record(file.encoded(), noteID: id, date: t0.addingTimeInterval(60), force: true))
-        file.meta.modified = Date()   // only the metadata changed
+        file.meta.modified = Date()  // only the metadata changed
         XCTAssertNil(try history.record(file.encoded(), noteID: id, date: t0.addingTimeInterval(900), force: true), "same content")
         let versions = history.versions(of: id)
         XCTAssertEqual(versions.count, 2)
@@ -94,8 +94,9 @@ final class DataSafetyTests: XCTestCase {
         XCTAssertFalse(NoteHistory.sameContent(a, c))
         var file = note("A", text: "eins")
         file.meta.modified = Date()
-        XCTAssertEqual(try FolioArchive.decode(file.encoded()).body, try FolioArchive.decode(file.encoded()).body,
-                       "a note always encodes to the same bytes")
+        XCTAssertEqual(
+            try FolioArchive.decode(file.encoded()).body, try FolioArchive.decode(file.encoded()).body,
+            "a note always encodes to the same bytes")
     }
 
     // MARK: Trash
@@ -156,7 +157,7 @@ final class DataSafetyTests: XCTestCase {
 
     func testFlippedByteInAttachmentKeepsText() throws {
         var data = try note("Kaputt", text: "wichtiger Text", attachment: Data((0..<4000).map { UInt8($0 % 251) })).encoded()
-        data[data.count - 40] ^= 0xFF   // inside the attachment's compressed data
+        data[data.count - 40] ^= 0xFF  // inside the attachment's compressed data
         XCTAssertThrowsError(try NoteFile.decode(data))
         let report = FolioDiagnostics.diagnose(data)
         XCTAssertFalse(report.isHealthy)
@@ -198,7 +199,7 @@ final class DataSafetyTests: XCTestCase {
     func testBackupCreateVerifyRestorePrune() throws {
         try write(note("Eins"), "Notizen/Eins.folio")
         try write(note("Zwei", attachment: Data(repeating: 1, count: 300)), "Projekte/Zwei.folio")
-        try write(note("Versteckt"), ".folio/history/x/y.folio")   // Folio's own data is not backed up
+        try write(note("Versteckt"), ".folio/history/x/y.folio")  // Folio's own data is not backed up
         let dir = library.deletingLastPathComponent().appendingPathComponent("folio-backups-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
 

@@ -25,7 +25,8 @@ struct AIProviderSection: View {
         .task(id: theme.settings.aiProvider) { if usesOllama { await load() } }
     }
 
-    static let ollamaFooter = "Folio spricht nur mit einem Ollama auf diesem Mac; Notizen verlassen ihn nicht. Mit Ollama beantwortet der Chat Fragen, kann aber keine Notizen ändern. Textvorhersage bleibt bei Apple Intelligence."
+    static let ollamaFooter =
+        "Folio spricht nur mit einem Ollama auf diesem Mac; Notizen verlassen ihn nicht. Mit Ollama beantwortet der Chat Fragen, kann aber keine Notizen ändern. Textvorhersage bleibt bei Apple Intelligence."
     static let appleFooter = "Apple Intelligence läuft auf dem Mac. Ollama ist eine Alternative für Macs ohne Apple Intelligence oder für eigene Modelle."
 
     @ViewBuilder private var ollamaFields: some View {

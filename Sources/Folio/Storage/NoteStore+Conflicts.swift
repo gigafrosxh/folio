@@ -10,7 +10,7 @@ extension NoteStore {
         checkOrganizationChange()
         guard conflict == nil else { return }
         for doc in Array(documents.values) {
-            guard let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url) else { continue }   // moved/deleted: the next save recreates it
+            guard let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url) else { continue }  // moved/deleted: the next save recreates it
             guard current != expected else { continue }
             if doc.isDirty {
                 raiseConflict(doc)
@@ -73,7 +73,8 @@ extension NoteStore {
             guard saveAsNewNote(mine, in: doc.url.deletingLastPathComponent(), suffix: "(Konflikt \(stamp))") != nil else {
                 // The copy could not be written: keep the own changes in the editor and the conflict open.
                 self.conflict = conflict
-                lastError = (lastError ?? "Die Kopie konnte nicht gesichert werden.")
+                lastError =
+                    (lastError ?? "Die Kopie konnte nicht gesichert werden.")
                     + " Deine Änderungen sind weiter geöffnet und im Versionsverlauf gesichert; der Konflikt bleibt offen."
                 return
             }

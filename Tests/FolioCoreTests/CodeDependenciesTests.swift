@@ -9,15 +9,16 @@ final class CodeDependenciesTests: XCTestCase {
     }
 
     func testPythonDefinitionsAndUses() {
-        let s = SymbolScan.scan("""
-        import pandas as pd
-        from math import sqrt, pi as PI
-        df = pd.read_csv("x.csv")  # comment mentions total
-        a, b = 1, 2
-        def area(r): return PI * r * r
-        class Shape: pass
-        for i in range(3): print(i)
-        """, language: "python")
+        let s = SymbolScan.scan(
+            """
+            import pandas as pd
+            from math import sqrt, pi as PI
+            df = pd.read_csv("x.csv")  # comment mentions total
+            a, b = 1, 2
+            def area(r): return PI * r * r
+            class Shape: pass
+            for i in range(3): print(i)
+            """, language: "python")
         XCTAssertTrue(s.defines.isSuperset(of: ["pd", "sqrt", "PI", "df", "a", "b", "area", "Shape", "i"]))
         XCTAssertFalse(s.defines.contains("pandas"))
         XCTAssertTrue(s.uses.contains("pd"))

@@ -24,7 +24,8 @@ enum LibrarySweepTest {
 
     private static func fail(_ ref: NoteRef, _ what: String) {
         problems += 1
-        print("SWEEP FAIL", ref.url.lastPathComponent, "–", what); fflush(stdout)
+        print("SWEEP FAIL", ref.url.lastPathComponent, "–", what)
+        fflush(stdout)
     }
 
     static func run(out: URL) async {
@@ -32,14 +33,19 @@ enum LibrarySweepTest {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         try? await Task.sleep(for: .seconds(2))
         let refs = store.notes
-        print("SWEEP notes", refs.count); fflush(stdout)
+        print("SWEEP notes", refs.count)
+        fflush(stdout)
         for (i, ref) in refs.enumerated() { await check(ref, index: i, out: out) }
-        print("SWEEP done", refs.count, "Notizen,", problems, "Probleme"); fflush(stdout)
+        print("SWEEP done", refs.count, "Notizen,", problems, "Probleme")
+        fflush(stdout)
     }
 
     private static func check(_ ref: NoteRef, index i: Int, out: URL) async {
         let start = Date()
-        guard let original = try? NoteFile.read(from: ref.url) else { fail(ref, "nicht lesbar"); return }
+        guard let original = try? NoteFile.read(from: ref.url) else {
+            fail(ref, "nicht lesbar")
+            return
+        }
         let doc = NoteDocument(file: original, url: ref.url)
         let again = doc.makeFile()
         checkTitle(ref, index: i, original: original, again: again)
@@ -58,7 +64,8 @@ enum LibrarySweepTest {
     private static func checkTitle(_ ref: NoteRef, index i: Int, original: NoteFile, again: NoteFile) {
         if again.meta.title != original.meta.title {
             if isLegacyTitleNormalization(original.meta.title, again.meta.title) {
-                print("SWEEP INFO", i, "bekannte Titelnormalisierung eines älteren Imports"); fflush(stdout)
+                print("SWEEP INFO", i, "bekannte Titelnormalisierung eines älteren Imports")
+                fflush(stdout)
             } else {
                 fail(ref, "Titel ändert sich beim Speichern: „\(original.meta.title)“ → „\(again.meta.title)“")
             }
@@ -89,7 +96,9 @@ enum LibrarySweepTest {
             let words = Set(text(in: original).split { !$0.isLetter }.map { $0.lowercased() }.filter { $0.count > 3 })
             let backText = back.meta.searchText.lowercased()
             let lost = words.filter { !backText.contains($0) }
-            if !words.isEmpty, Double(lost.count) / Double(words.count) > 0.05 { fail(ref, "Markdown-Rundweg verliert \(lost.count) von \(words.count) Wörtern, z. B. \(Array(lost.prefix(5)))") }
+            if !words.isEmpty, Double(lost.count) / Double(words.count) > 0.05 {
+                fail(ref, "Markdown-Rundweg verliert \(lost.count) von \(words.count) Wörtern, z. B. \(Array(lost.prefix(5)))")
+            }
         } catch { fail(ref, "Markdown: \(error.localizedDescription)") }
     }
 

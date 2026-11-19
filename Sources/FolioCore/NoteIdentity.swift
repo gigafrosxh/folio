@@ -51,8 +51,9 @@ public enum NoteIdentity {
         copy.attachments = file.attachments.map { a in
             let newID = UUID()
             map[a.id] = newID
-            return FolioArchive.Attachment(id: newID, filename: a.header.filename, typeIdentifier: a.header.typeIdentifier,
-                                           isPackage: a.header.isPackage, data: a.data)
+            return FolioArchive.Attachment(
+                id: newID, filename: a.header.filename, typeIdentifier: a.header.typeIdentifier,
+                isPackage: a.header.isPackage, data: a.data)
         }
         for i in copy.body.blocks.indices {
             copy.body.blocks[i].id = UUID()

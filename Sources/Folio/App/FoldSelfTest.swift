@@ -19,7 +19,8 @@ enum FoldSelfTest {
         text.append(NSAttributedString(string: "Unterpunkt A.1\n", attributes: TextStyle.subheading.attributes(theme: theme)))
         text.append(NSAttributedString(string: "Mehr in A.1", attributes: theme.bodyAttributes))
         doc.blocks[0].storage.setAttributedString(text)
-        let image = AttachmentSync.makeImageBlock(data: Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!, in: doc)
+        let image = AttachmentSync.makeImageBlock(
+            data: Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!, in: doc)
         doc.insert(image, after: doc.blocks[0].id)
         let after = BlockModel.text(NSAttributedString(string: "Kapitel B\nText in B", attributes: TextStyle.heading.attributes(theme: theme)))
         doc.insert(after, after: image.id)
@@ -60,10 +61,13 @@ enum FoldSelfTest {
         // Return at the end of a collapsed heading: the new line comes after the section (#205).
         let blockCount = doc.blocks.count
         let headingEnd = ns.range(of: "Kapitel A").location + ("Kapitel A" as NSString).length
-        check(doc.insertAfterFold(blockID: doc.blocks[0].id, selection: NSRange(location: headingEnd, length: 0)), "Falten: Return am Ende einer eingeklappten Überschrift wird behandelt")
+        check(
+            doc.insertAfterFold(blockID: doc.blocks[0].id, selection: NSRange(location: headingEnd, length: 0)),
+            "Falten: Return am Ende einer eingeklappten Überschrift wird behandelt")
         let imageIndex = doc.blocks.firstIndex { $0.id == image.id } ?? -1
-        check(doc.blocks.count == blockCount + 1 && doc.blocks[safe: imageIndex + 1]?.kind == .text && doc.blocks[safe: imageIndex + 1]?.id != after.id,
-              "Falten: neue Zeile nach dem Abschnitt (nach dem Bild, vor Kapitel B)")
+        check(
+            doc.blocks.count == blockCount + 1 && doc.blocks[safe: imageIndex + 1]?.kind == .text && doc.blocks[safe: imageIndex + 1]?.id != after.id,
+            "Falten: neue Zeile nach dem Abschnitt (nach dem Bild, vor Kapitel B)")
         doc.toggleFold(a.heading)
         doc.revealSelection(in: doc.blocks[0].id, range: NSRange(location: ns.range(of: "Mehr").location, length: 4))
         check(doc.collapsedHeadings.isEmpty && doc.hiddenBlockIDs.isEmpty, "Falten: Sprung in den Abschnitt klappt aus")
@@ -118,4 +122,3 @@ enum FoldSelfTest {
 
     }
 }
-

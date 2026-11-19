@@ -42,11 +42,15 @@ enum KeyboardSelfTest {
         // Like a real keyboard: shift gives the capital letter, control gives a control character.
         let shifted = mods.contains(.shift) ? key.uppercased() : key
         let chars = mods.contains(.control) ? String(UnicodeScalar(UInt8(key.unicodeScalars.first!.value & 0x1F))) : shifted
-        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: mods, timestamp: ProcessInfo.processInfo.systemUptime,
-                                           windowNumber: window.windowNumber, context: nil, characters: chars,
-                                           charactersIgnoringModifiers: key, isARepeat: false, keyCode: codes[key] ?? 0) else { return }
+        guard
+            let event = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: mods, timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, characters: chars,
+                charactersIgnoringModifiers: key, isARepeat: false, keyCode: codes[key] ?? 0)
+        else { return }
         if mods.contains(.shift), key.first?.isLetter == true, key.count == 1, "äöü".contains(key) == false,
-           let (menu, index) = menuItem(key, mods) {
+            let (menu, index) = menuItem(key, mods)
+        {
             // Synthesized ⇧+letter events are matched by AppKit but SwiftUI does not run the action for them
             // (also for ⇧⌘N, which works with a real keyboard), so the menu item bound to the key runs directly.
             menu.performActionForItem(at: index)
@@ -60,9 +64,11 @@ enum KeyboardSelfTest {
     /// Esc in whatever window is key (a sheet), like closing it with the keyboard.
     private static func escapeInKeyWindow() async {
         guard let w = NSApp.keyWindow,
-              let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                       windowNumber: w.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
-                                       isARepeat: false, keyCode: 53) else { return }
+            let e = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: w.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                isARepeat: false, keyCode: 53)
+        else { return }
         NSApp.postEvent(e, atStart: false)
         await wait(0.5)
     }
@@ -73,7 +79,10 @@ enum KeyboardSelfTest {
             guard let m else { return nil }
             for (i, item) in m.items.enumerated() {
                 if item.keyEquivalent.lowercased() == key.lowercased(),
-                   item.keyEquivalentModifierMask == mods.intersection([.command, .shift, .option, .control]) { return (m, i) }
+                    item.keyEquivalentModifierMask == mods.intersection([.command, .shift, .option, .control])
+                {
+                    return (m, i)
+                }
                 if let f = find(item.submenu) { return f }
             }
             return nil
@@ -173,7 +182,8 @@ enum KeyboardSelfTest {
         await trashMenuCheck(store)
         await helpMenuCheck()
         if skipped > 0 { print("KEY FAIL Unvollständig: \(skipped) Prüfungen übersprungen") }
-        print("KEY done"); fflush(stdout)
+        print("KEY done")
+        fflush(stdout)
     }
 
     /// ⌘W closes a tab while several are open, and not the window (#107).
@@ -196,13 +206,17 @@ enum KeyboardSelfTest {
         }
         found.map { $0.0.performActionForItem(at: $0.1) }
         await wait(0.5)
-        check(found != nil && store.notes.count == count - 1 && !store.notes.contains { $0.id == id },
-              "Menü „Notiz in den Papierkorb legen“ legt die offene Notiz in den Papierkorb (#108)")
+        check(
+            found != nil && store.notes.count == count - 1 && !store.notes.contains { $0.id == id },
+            "Menü „Notiz in den Papierkorb legen“ legt die offene Notiz in den Papierkorb (#108)")
     }
 
     /// The Help menu has content and opens the shortcut settings (#106).
     private static func helpMenuCheck() async {
-        guard let help = NSApp.mainMenu?.items.last?.submenu else { check(false, "Hilfe-Menü"); return }
+        guard let help = NSApp.mainMenu?.items.last?.submenu else {
+            check(false, "Hilfe-Menü")
+            return
+        }
         let titles = help.items.map(\.title)
         check(titles.contains("Folio-Hilfe") && !titles.contains("Toggle Sidebar"), "Hilfe-Menü ohne englischen Resteintrag (#106: \(titles.filter { !$0.isEmpty }))")
         if let i = help.items.firstIndex(where: { $0.title == "Tastenkürzel …" }) { help.performActionForItem(at: i) }
@@ -217,9 +231,12 @@ enum KeyboardSelfTest {
         guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }) else { return }
         for ch in text {
             let s = String(ch)
-            guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                           windowNumber: window.windowNumber, context: nil, characters: s, charactersIgnoringModifiers: s,
-                                           isARepeat: false, keyCode: 0) else { continue }
+            guard
+                let e = NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                    windowNumber: window.windowNumber, context: nil, characters: s, charactersIgnoringModifiers: s,
+                    isARepeat: false, keyCode: 0)
+            else { continue }
             NSApp.postEvent(e, atStart: false)
         }
     }
@@ -238,19 +255,21 @@ enum KeyboardSelfTest {
         store.searchText = "zzzzkeinTreffer"
         await wait(0.3)
         await press("n", .command)
-        check(store.searchText.isEmpty && store.filteredNotes.contains { $0.id == store.selectedNoteID },
-              "Neue Notiz bei aktiver Suche ist in der Liste sichtbar (#102)")
+        check(
+            store.searchText.isEmpty && store.filteredNotes.contains { $0.id == store.selectedNoteID },
+            "Neue Notiz bei aktiver Suche ist in der Liste sichtbar (#102)")
 
         let before = store.notes.count
         let window = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("main") == true && $0.isVisible }
         if let window, let first = store.currentDocument?.blocks.first, let tv = FormattingController.shared.textView(for: first.id) {
-            window.makeFirstResponder(tv)   // typing goes somewhere else before ⌘N
+            window.makeFirstResponder(tv)  // typing goes somewhere else before ⌘N
         }
         await press("n", .command, settle: 0)
         typeNow("Schnell")
         await wait(1.5)
-        check(store.notes.count == before + 1 && noteText(store).hasPrefix("Schnell"),
-              "Direkt nach ⌘N Getipptes landet in der neuen Notiz (#100: „\(noteText(store).prefix(20))“)")
+        check(
+            store.notes.count == before + 1 && noteText(store).hasPrefix("Schnell"),
+            "Direkt nach ⌘N Getipptes landet in der neuen Notiz (#100: „\(noteText(store).prefix(20))“)")
 
         let text = noteText(store)
         if let first = store.currentDocument?.blocks.first { FormattingController.shared.focus(blockID: first.id) }
@@ -259,8 +278,9 @@ enum KeyboardSelfTest {
         typeNow("xyz")
         await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "xyz" }
         let responder = NSApp.keyWindow?.firstResponder as? NSTextView
-        check(noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "xyz",
-              "⌘P: Getipptes geht in den Schnellwechsel, nicht in die Notiz (#99: \"\(responder?.string ?? "-")\")")
+        check(
+            noteText(store) == text && responder?.isFieldEditor == true && responder?.string == "xyz",
+            "⌘P: Getipptes geht in den Schnellwechsel, nicht in die Notiz (#99: \"\(responder?.string ?? "-")\")")
         await press("\u{1b}", [])
         await quickOpenTimingChecks(store)
     }
@@ -286,8 +306,9 @@ enum KeyboardSelfTest {
         await waitUntil { (NSApp.keyWindow?.firstResponder as? NSTextView)?.string == "qrs" }
         let responder = NSApp.keyWindow?.firstResponder as? NSTextView
         let unchanged = noteText(store) == text
-        check(unchanged && responder?.isFieldEditor == true && responder?.string == "qrs",
-              "⌘P, Abstand \(gap) s, Runde \(round): Feld „\(responder?.string ?? "-")“, Notiz \(unchanged ? "unverändert" : "GEÄNDERT: \(noteText(store).suffix(12))")")
+        check(
+            unchanged && responder?.isFieldEditor == true && responder?.string == "qrs",
+            "⌘P, Abstand \(gap) s, Runde \(round): Feld „\(responder?.string ?? "-")“, Notiz \(unchanged ? "unverändert" : "GEÄNDERT: \(noteText(store).suffix(12))")")
         await press("\u{1b}", [])
     }
 }

@@ -33,8 +33,14 @@ struct MenuBarPanel: View {
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .onSubmit { if let r = results[safe: index] { open(r) } }
-                    .onKeyPress(.downArrow) { index = min(index + 1, max(results.count - 1, 0)); return .handled }
-                    .onKeyPress(.upArrow) { index = max(index - 1, 0); return .handled }
+                    .onKeyPress(.downArrow) {
+                        index = min(index + 1, max(results.count - 1, 0))
+                        return .handled
+                    }
+                    .onKeyPress(.upArrow) {
+                        index = max(index - 1, 0)
+                        return .handled
+                    }
             }
             .padding(8)
             .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
@@ -51,8 +57,10 @@ struct MenuBarPanel: View {
                 Button {
                     dismiss()
                     QuickCaptureController.shared.show()
-                } label: { Label("Schnellerfassung", systemImage: "square.and.pencil") }
-                    .helpLabel("Schnellerfassung (\(QuickAccessSettings.hotKeyDisplay))")
+                } label: {
+                    Label("Schnellerfassung", systemImage: "square.and.pencil")
+                }
+                .helpLabel("Schnellerfassung (\(QuickAccessSettings.hotKeyDisplay))")
                 Spacer()
                 Button("Folio öffnen") { showMain() }
             }
@@ -61,7 +69,12 @@ struct MenuBarPanel: View {
         .padding(12)
         .frame(width: 320)
         .tint(theme.accent)
-        .onAppear { focused = true; query = ""; index = 0; QuickAccessSettings.opener = openWindow }
+        .onAppear {
+            focused = true
+            query = ""
+            index = 0
+            QuickAccessSettings.opener = openWindow
+        }
         .onChange(of: query) { index = 0 }
     }
 
@@ -83,8 +96,10 @@ struct MenuBarPanel: View {
             Button {
                 showMain()
                 if store.createNote() == nil { NSSound.beep() }
-            } label: { Label("Neue Notiz", systemImage: "plus") }
-                .helpLabel("Neue Notiz im Hauptfenster")
+            } label: {
+                Label("Neue Notiz", systemImage: "plus")
+            }
+            .helpLabel("Neue Notiz im Hauptfenster")
             Spacer()
             Toggle(isOn: $focusMode) { Label("Fokusmodus", systemImage: "rectangle.center.inset.filled") }
                 .toggleStyle(.button)
@@ -98,7 +113,9 @@ struct MenuBarPanel: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(Array(notes.enumerated()), id: \.element.id) { i, ref in
-                Button { open(ref) } label: {
+                Button {
+                    open(ref)
+                } label: {
                     HStack {
                         Image(systemName: ref.meta.pinned ? "pin.fill" : "note.text").font(.system(size: 11)).foregroundStyle(.secondary)
                         Text(ref.meta.title.isEmpty ? "Ohne Titel" : ref.meta.title).lineLimit(1)

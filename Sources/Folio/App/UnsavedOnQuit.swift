@@ -9,7 +9,8 @@ enum UnsavedOnQuit {
         let alert = NSAlert()
         alert.alertStyle = .critical
         alert.messageText = docs.count == 1 ? "Eine Notiz konnte nicht gesichert werden" : "\(docs.count) Notizen konnten nicht gesichert werden"
-        alert.informativeText = "\(NoteStore.titles(docs)) hat Änderungen, die nicht gespeichert werden konnten "
+        alert.informativeText =
+            "\(NoteStore.titles(docs)) hat Änderungen, die nicht gespeichert werden konnten "
             + "(zum Beispiel weil der Ordner gesperrt oder der Datenträger voll ist). Wenn du jetzt beendest, gehen sie verloren."
         alert.addButton(withTitle: "Nicht beenden")
         alert.addButton(withTitle: "Erneut versuchen")

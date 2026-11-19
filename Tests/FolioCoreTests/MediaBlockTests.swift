@@ -102,7 +102,7 @@ final class MediaBlockTests: XCTestCase {
     func testTranscriptParagraphs() {
         let text = TranscriptFormatter.join([
             (" Hallo zusammen.", 0, 1.5), ("Heute geht es um Folio.", 1.6, 3), ("", 3, 3),
-            ("Nach der Pause.", 8, 9),
+            ("Nach der Pause.", 8, 9)
         ])
         XCTAssertEqual(text, "Hallo zusammen. Heute geht es um Folio.\n\nNach der Pause.")
     }

@@ -77,15 +77,21 @@ struct AIActionSheet: View {
 
     @ViewBuilder private var notes: some View {
         if let error {
-            Label { Text(Self.markdown(error)) } icon: { Image(systemName: "exclamationmark.triangle") }
-                .font(.callout).foregroundStyle(.orange)
+            Label {
+                Text(Self.markdown(error))
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+            }
+            .font(.callout).foregroundStyle(.orange)
             if !result.isEmpty {
                 Text("Die Antwort ist unvollständig und lässt sich nur kopieren.").font(.caption).foregroundStyle(.secondary)
             }
         } else if ready && request.action.replacesSelection && !canReplace() {
-            Label("Der markierte Text hat sich inzwischen geändert. Ersetzen geht nicht mehr, das Ergebnis lässt sich darunter einfügen.",
-                  systemImage: "info.circle")
-                .font(.callout).foregroundStyle(.secondary)
+            Label(
+                "Der markierte Text hat sich inzwischen geändert. Ersetzen geht nicht mehr, das Ergebnis lässt sich darunter einfügen.",
+                systemImage: "info.circle"
+            )
+            .font(.callout).foregroundStyle(.secondary)
         }
     }
 
@@ -181,7 +187,8 @@ struct TagSuggestionPopover: View {
         defer { aiRunning = false }
         let text = String(doc.makeFilePreview().meta.searchText.prefix(4_000))
         let known = libraryTags.prefix(40).map(\.tag).joined(separator: ", ")
-        let system = "Du schlägst Tags für eine Notiz vor. Antworte nur mit 3 bis 6 kurzen Tags in Kleinbuchstaben, durch Kommas getrennt, ohne #. Nutze bevorzugt vorhandene Tags, wenn sie passen."
+        let system =
+            "Du schlägst Tags für eine Notiz vor. Antworte nur mit 3 bis 6 kurzen Tags in Kleinbuchstaben, durch Kommas getrennt, ohne #. Nutze bevorzugt vorhandene Tags, wenn sie passen."
         do {
             let answer = try await AIProvider.complete(system: system, prompt: "Vorhandene Tags: \(known)\n\nNotiz:\n\(text)")
             let new = TagSuggester.parse(answer).filter { !doc.meta.tags.contains($0) && !suggestions.contains($0) }
@@ -201,7 +208,8 @@ extension NoteDocument {
         let lastLine = lines.last ?? ""
         let onTagLine = !lastLine.isEmpty && lastLine.split(separator: " ").allSatisfy { $0.hasPrefix("#") }
         let prefix = block.storage.length == 0 ? "" : (onTagLine ? " " : "\n")
-        let attrs: [NSAttributedString.Key: Any] = block.storage.length > 0
+        let attrs: [NSAttributedString.Key: Any] =
+            block.storage.length > 0
             ? block.storage.attributes(at: block.storage.length - 1, effectiveRange: nil) : ThemeManager.shared.bodyAttributes
         editText(of: block) { $0.append(NSAttributedString(string: prefix + "#" + tag, attributes: attrs)) }
     }
@@ -256,15 +264,17 @@ extension NoteDocument {
         let bold = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
         let widths = columnWidths(header: header, rows: rows, font: bold)
         let fits = widths.allSatisfy { $0 <= tableLimit.cell } && widths.reduce(0, +) <= tableLimit.total
-        return fits || rows.isEmpty ? tabTable(header: header, rows: rows, widths: widths, body: body, bold: bold)
-                    : recordTable(header: header, rows: rows, body: body, bold: bold)
+        return fits || rows.isEmpty
+            ? tabTable(header: header, rows: rows, widths: widths, body: body, bold: bold)
+            : recordTable(header: header, rows: rows, body: body, bold: bold)
     }
 
     static func columnWidths(header: [String], rows: [[String]], font: NSFont) -> [CGFloat] {
         let all = [header] + rows
         let columns = all.map(\.count).max() ?? 0
         return (0..<columns).map { c in
-            let widest = all.compactMap { $0.indices.contains(c) ? $0[c] : nil }
+            let widest =
+                all.compactMap { $0.indices.contains(c) ? $0[c] : nil }
                 .map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
             return max(widest + 24, 60)
         }
@@ -274,7 +284,10 @@ extension NoteDocument {
     private static func tabTable(header: [String], rows: [[String]], widths: [CGFloat], body: [NSAttributedString.Key: Any], bold: NSFont) -> NSAttributedString {
         let para = ((body[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
         var x: CGFloat = 0
-        para.tabStops = widths.dropLast().map { x += $0; return NSTextTab(textAlignment: .left, location: x) }
+        para.tabStops = widths.dropLast().map {
+            x += $0
+            return NSTextTab(textAlignment: .left, location: x)
+        }
         var attrs = body
         attrs[.paragraphStyle] = para
         var boldAttrs = attrs

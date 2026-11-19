@@ -12,7 +12,10 @@ struct FolioCommands: Commands {
     private var f: FormattingController { .shared }
 
     private func fold(_ collapse: Bool) {
-        guard let doc = store.currentDocument, let s = doc.headingAtCursor(), !s.content.isEmpty else { NSSound.beep(); return }
+        guard let doc = store.currentDocument, let s = doc.headingAtCursor(), !s.content.isEmpty else {
+            NSSound.beep()
+            return
+        }
         if doc.collapsedHeadings.contains(s.heading) != collapse { doc.toggleFold(s.heading) }
     }
 
@@ -34,8 +37,7 @@ struct FolioCommands: Commands {
             Button("In neuem Fenster öffnen") { if let id = store.currentDocument?.id { openWindow(id: "note", value: id) } }
                 .keyboardShortcut("o", modifiers: [.command, .option])
             Button(store.splitNoteID == nil ? "Rechts daneben öffnen" : "Teilung schließen") {
-                if store.splitNoteID != nil { store.splitNoteID = nil }
-                else if let id = store.selectedNoteID { store.openInSplit(id) }
+                if store.splitNoteID != nil { store.splitNoteID = nil } else if let id = store.selectedNoteID { store.openInSplit(id) }
             }
             .keyboardShortcut("\\", modifiers: [.command, .option])
             // ⌘W itself closes the tab while several are open (ShortcutCenter, #107); the menu's ⌘W item stays „Schließen“.
@@ -71,7 +73,10 @@ struct FolioCommands: Commands {
                 UserDefaults.standard.set("shortcuts", forKey: "folio.settingsTab")
                 // Through the app menu's „Einstellungen …“ item, which also works when no window is key.
                 if let appMenu = NSApp.mainMenu?.items.first?.submenu,
-                   let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," }) { appMenu.performActionForItem(at: i) }
+                    let i = appMenu.items.firstIndex(where: { $0.keyEquivalent == "," })
+                {
+                    appMenu.performActionForItem(at: i)
+                }
             }
             Button("Datenschutz und Sicherheit") { NSWorkspace.shared.open(Self.docs("docs/PRIVACY.md")) }
             Button("Änderungen in dieser Version") { NSWorkspace.shared.open(Self.docs("CHANGELOG.md")) }
@@ -103,8 +108,11 @@ struct FolioCommands: Commands {
         }
         // After "New": a .saveItem group disappears once the app has a second scene (note windows).
         CommandGroup(after: .newItem) {
-            Button("Sichern") { store.currentDocument?.markDirty(); store.currentDocument?.saveNow() }
-                .keyboardShortcut("s")
+            Button("Sichern") {
+                store.currentDocument?.markDirty()
+                store.currentDocument?.saveNow()
+            }
+            .keyboardShortcut("s")
             Button("Schnell öffnen …") { NotificationCenter.default.post(name: .folioQuickOpen, object: QuickOpenMode.open) }
                 .keyboardShortcut("p")
             Menu("Zuletzt geöffnet") {
@@ -119,7 +127,10 @@ struct FolioCommands: Commands {
                     Button(t.meta.title) { store.createNote(from: t) }
                 }
                 Divider()
-                Button("Vorlagen verwalten …") { store.ensureStarterTemplates(); store.sidebarSelection = .templates }
+                Button("Vorlagen verwalten …") {
+                    store.ensureStarterTemplates()
+                    store.sidebarSelection = .templates
+                }
             }
             Button("Als Vorlage sichern") {
                 if let doc = NoteStore.shared.currentDocument { NoteStore.shared.saveAsTemplate(doc) }

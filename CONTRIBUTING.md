@@ -59,3 +59,14 @@ Faustregeln:
 - Datenschutz: Neue Netzwerkzugriffe oder Speicherorte in `docs/PRIVACY.md` nachtragen.
 
 Releases macht der Maintainer mit `make release V=patch|minor|major` (siehe README).
+
+## Formatierung (#215)
+
+Swift-Code folgt `.swift-format` (4 Leerzeichen, Zeilen bis 180 Zeichen, Toolchain-`swift format`). Vor dem Commit:
+
+```sh
+swift format -i -r Sources Tests      # formatieren
+swift format lint --strict -r Sources Tests   # prüfen, wie die CI
+```
+
+Die CI bricht bei Abweichungen ab. `Resources/Web` (KaTeX, Mermaid, ERD-Ultra) und erzeugte Dateien sind ausgenommen.

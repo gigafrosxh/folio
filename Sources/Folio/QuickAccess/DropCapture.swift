@@ -51,7 +51,8 @@ enum DropCapture {
     private static func openNote(_ url: URL, problems: inout [String]) {
         let store = NoteStore.shared
         guard let ref = store.notes.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) else {
-            problems.append("„\(url.lastPathComponent)“ liegt nicht in deiner Folio-Bibliothek. Lege die Datei in den Bibliotheksordner (\(store.rootURL.path)), dann erscheint sie in Folio.")
+            problems.append(
+                "„\(url.lastPathComponent)“ liegt nicht in deiner Folio-Bibliothek. Lege die Datei in den Bibliotheksordner (\(store.rootURL.path)), dann erscheint sie in Folio.")
             return
         }
         QuickAccessSettings.showMainWindow(QuickAccessSettings.opener)

@@ -20,7 +20,8 @@ enum HighlightSelfTest {
     static func run(store: NoteStore) async {
         guard store.createNote() != nil, let doc = store.currentDocument else { return check(false, "Färbung: Notiz") }
         let code = BlockModel(kind: .code)
-        code.storage.setAttributedString(NSAttributedString(string: (0..<200).map { i in i % 10 == 0 ? "s = \"zeile \(i)\"  # kommentar" : "wert_\(i) = berechne(daten, \(i))" }.joined(separator: "\n")))
+        code.storage.setAttributedString(
+            NSAttributedString(string: (0..<200).map { i in i % 10 == 0 ? "s = \"zeile \(i)\"  # kommentar" : "wert_\(i) = berechne(daten, \(i))" }.joined(separator: "\n")))
         doc.insert(code, after: doc.blocks[0].id)
         doc.markDirty()
         try? await Task.sleep(for: .seconds(1.2))
@@ -31,7 +32,7 @@ enum HighlightSelfTest {
         }
         guard let ts = tv.textStorage else { return }
         let incremental = colours(ts)
-        code.revision += 1   // forces a full colouring pass in the view
+        code.revision += 1  // forces a full colouring pass in the view
         try? await Task.sleep(for: .seconds(0.6))
         check(colours(ts) == incremental, "Färbung nach dem Tippen wie bei vollem Durchlauf (\(incremental.count) Abschnitte)")
     }

@@ -45,11 +45,16 @@ enum TextStyle: String, CaseIterable, Identifiable {
     func paragraphStyle(theme: ThemeManager) -> NSParagraphStyle {
         let p = (theme.bodyParagraphStyle.mutableCopy() as! NSMutableParagraphStyle)
         switch self {
-        case .title: p.headerLevel = 1; p.paragraphSpacing = 6
+        case .title:
+            p.headerLevel = 1
+            p.paragraphSpacing = 6
         case .heading, .subheading:
             p.headerLevel = self == .heading ? 2 : 3
-            p.paragraphSpacingBefore = 6; p.paragraphSpacing = 4
-        case .quote: p.firstLineHeadIndent = 18; p.headIndent = 18
+            p.paragraphSpacingBefore = 6
+            p.paragraphSpacing = 4
+        case .quote:
+            p.firstLineHeadIndent = 18
+            p.headIndent = 18
         default: break
         }
         return p
@@ -57,8 +62,10 @@ enum TextStyle: String, CaseIterable, Identifiable {
 
     @MainActor
     func attributes(theme: ThemeManager) -> [NSAttributedString.Key: Any] {
-        [.font: font(theme: theme), .paragraphStyle: paragraphStyle(theme: theme),
-         .foregroundColor: self == .quote ? NSColor.secondaryLabelColor : NSColor.textColor]
+        [
+            .font: font(theme: theme), .paragraphStyle: paragraphStyle(theme: theme),
+            .foregroundColor: self == .quote ? NSColor.secondaryLabelColor : NSColor.textColor
+        ]
     }
 }
 
@@ -68,7 +75,10 @@ enum TextStyle: String, CaseIterable, Identifiable {
 final class FormattingController: ObservableObject {
     static let shared = FormattingController()
 
-    private final class WeakTextView { weak var view: FolioTextView?; init(_ v: FolioTextView) { view = v } }
+    private final class WeakTextView {
+        weak var view: FolioTextView?
+        init(_ v: FolioTextView) { view = v }
+    }
     private var registry: [UUID: WeakTextView] = [:]
 
     weak var activeTextView: FolioTextView?
@@ -87,7 +97,10 @@ final class FormattingController: ObservableObject {
 
     func textView(for id: UUID) -> FolioTextView? { registry[id]?.view }
 
-    private final class WeakCodeView { weak var view: CodeTextView?; init(_ v: CodeTextView) { view = v } }
+    private final class WeakCodeView {
+        weak var view: CodeTextView?
+        init(_ v: CodeTextView) { view = v }
+    }
     private var codeRegistry: [UUID: WeakCodeView] = [:]
 
     func codeView(for id: UUID) -> CodeTextView? { codeRegistry[id]?.view }
@@ -298,20 +311,36 @@ final class FormattingController: ObservableObject {
 
     func toggleUnderline() {
         let on = isUnderlined
-        applyCharacterAttribute { var a = $0; a[.underlineStyle] = on ? nil : NSUnderlineStyle.single.rawValue; return a }
+        applyCharacterAttribute {
+            var a = $0
+            a[.underlineStyle] = on ? nil : NSUnderlineStyle.single.rawValue
+            return a
+        }
     }
 
     func toggleStrikethrough() {
         let on = isStruck
-        applyCharacterAttribute { var a = $0; a[.strikethroughStyle] = on ? nil : NSUnderlineStyle.single.rawValue; return a }
+        applyCharacterAttribute {
+            var a = $0
+            a[.strikethroughStyle] = on ? nil : NSUnderlineStyle.single.rawValue
+            return a
+        }
     }
 
     func setTextColor(_ color: NSColor?) {
-        applyCharacterAttribute { var a = $0; a[.foregroundColor] = color ?? NSColor.textColor; return a }
+        applyCharacterAttribute {
+            var a = $0
+            a[.foregroundColor] = color ?? NSColor.textColor
+            return a
+        }
     }
 
     func setHighlight(_ color: NSColor?) {
-        applyCharacterAttribute { var a = $0; a[.backgroundColor] = color; return a }
+        applyCharacterAttribute {
+            var a = $0
+            a[.backgroundColor] = color
+            return a
+        }
     }
 
     func changeFontSize(by delta: CGFloat) {
@@ -351,7 +380,10 @@ final class FormattingController: ObservableObject {
     func clearFormatting() {
         guard let tv = activeTextView else { return }
         let sel = tv.selectedRange()
-        guard sel.length > 0 else { tv.typingAttributes = theme.bodyAttributes; return }
+        guard sel.length > 0 else {
+            tv.typingAttributes = theme.bodyAttributes
+            return
+        }
         edit(sel) { $0.setAttributes(theme.bodyAttributes, range: sel) }
     }
 
@@ -470,8 +502,9 @@ final class FormattingController: ObservableObject {
     func insertDivider() {
         guard let tv = activeTextView else { return }
         let line = "\n" + String(repeating: "─", count: 24) + "\n"
-        tv.insertText(NSAttributedString(string: line, attributes: [.font: theme.bodyFont(), .foregroundColor: NSColor.tertiaryLabelColor]),
-                      replacementRange: tv.selectedRange())
+        tv.insertText(
+            NSAttributedString(string: line, attributes: [.font: theme.bodyFont(), .foregroundColor: NSColor.tertiaryLabelColor]),
+            replacementRange: tv.selectedRange())
         tv.typingAttributes = theme.bodyAttributes
     }
 }

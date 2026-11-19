@@ -24,22 +24,24 @@ struct CodeBlockView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            CodeEditorView(block: block, height: $height, codeTheme: codeTheme, font: theme.codeFont(),
-                           showLineNumbers: theme.settings.showLineNumbers,
-                           onChange: {
-                               doc.markDirty()
-                               // Error markers belong to the code as it was run.
-                               if !block.diagnostics.isEmpty { block.diagnostics = [] }
-                               if block.testOutcome != nil { block.testOutcome = nil }
-                           }, onRun: run,
-                           onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
-                           onFormat: formatCode,
-                           linkedPrelude: linkedPrelude,
-                           liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: spec.id) : nil })
-                .frame(height: height)
-                .padding(.bottom, 2)
-                .onChange(of: block.diagnostics) { markDiagnostics() }
-                .onAppear { markDiagnostics() }
+            CodeEditorView(
+                block: block, height: $height, codeTheme: codeTheme, font: theme.codeFont(),
+                showLineNumbers: theme.settings.showLineNumbers,
+                onChange: {
+                    doc.markDirty()
+                    // Error markers belong to the code as it was run.
+                    if !block.diagnostics.isEmpty { block.diagnostics = [] }
+                    if block.testOutcome != nil { block.testOutcome = nil }
+                }, onRun: run,
+                onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
+                onFormat: formatCode,
+                linkedPrelude: linkedPrelude,
+                liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: spec.id) : nil }
+            )
+            .frame(height: height)
+            .padding(.bottom, 2)
+            .onChange(of: block.diagnostics) { markDiagnostics() }
+            .onAppear { markDiagnostics() }
             if showStdin || !(block.stdin ?? "").isEmpty {
                 stdinEditor
                     .transition(Motion.slideUp)
@@ -223,11 +225,11 @@ struct CodeBlockView: View {
             Group {
                 if title.isEmpty { Image(systemName: icon) } else { Label(title, systemImage: icon) }
             }
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 11)
-                .frame(height: 26)
-                .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -253,7 +255,10 @@ struct CodeBlockView: View {
                 .buttonStyle(.plain)
                 .help(block.outputCollapsed ? "Ausgabe aufklappen" : "Ausgabe einklappen")
                 Spacer()
-                Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(output, forType: .string) } label: {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(output, forType: .string)
+                } label: {
                     Image(systemName: "doc.on.doc")
                 }
                 .buttonStyle(.borderless)
@@ -264,10 +269,12 @@ struct CodeBlockView: View {
                     block.diagnostics = []
                     runs.clearInfo(block.id)
                     doc.markDirty()
-                } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.borderless)
-                    .font(.system(size: 9))
-                    .helpLabel("Ausgabe leeren")
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 9))
+                .helpLabel("Ausgabe leeren")
             }
             if !block.outputCollapsed {
                 if !block.diagnostics.isEmpty { diagnosticList }
@@ -290,7 +297,9 @@ struct CodeBlockView: View {
     private var diagnosticList: some View {
         VStack(alignment: .leading, spacing: 3) {
             ForEach(block.diagnostics, id: \.self) { d in
-                Button { jump(to: d) } label: {
+                Button {
+                    jump(to: d)
+                } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: d.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
                             .foregroundStyle(d.severity == .error ? Color.red : Color.orange)
@@ -310,7 +319,8 @@ struct CodeBlockView: View {
     /// Marks the lines with errors in the editor (red background, orange for warnings).
     private func markDiagnostics() {
         guard let tv = FormattingController.shared.codeView(for: block.id), tv.textStorage === block.storage,
-              let lm = tv.layoutManager else { return }
+            let lm = tv.layoutManager
+        else { return }
         let ns = tv.string as NSString
         lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: ns.length))
         lm.removeTemporaryAttribute(.toolTip, forCharacterRange: NSRange(location: 0, length: ns.length))
@@ -351,11 +361,18 @@ struct CodeBlockView: View {
                 Text(isLinked && block.language == "python" ? "input() liest diese Zeilen" : "wird beim Start eingegeben")
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }
-            TextEditor(text: Binding(get: { block.stdin ?? "" }, set: { block.stdin = $0; doc.markDirty() }))
-                .font(Font(theme.codeFont()))
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 44, maxHeight: 120)
-                .fixedSize(horizontal: false, vertical: true)
+            TextEditor(
+                text: Binding(
+                    get: { block.stdin ?? "" },
+                    set: {
+                        block.stdin = $0
+                        doc.markDirty()
+                    })
+            )
+            .font(Font(theme.codeFont()))
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 44, maxHeight: 120)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -385,22 +402,29 @@ struct CodeBlockView: View {
                 }
             }
             HStack(spacing: 10) {
-                Toggle("Exit-Code", isOn: Binding(
-                    get: { test.expectedExitCode != nil },
-                    set: { v in updateTest { $0.expectedExitCode = v ? 0 : nil } }))
+                Toggle(
+                    "Exit-Code",
+                    isOn: Binding(
+                        get: { test.expectedExitCode != nil },
+                        set: { v in updateTest { $0.expectedExitCode = v ? 0 : nil } }))
                 if let code = test.expectedExitCode {
-                    TextField("Exit-Code", text: Binding(
-                        get: { String(code) },
-                        set: { text in
-                            guard let value = Int32(text.trimmingCharacters(in: .whitespaces)) else { return }
-                            updateTest { $0.expectedExitCode = value }
-                        }))
-                        .labelsHidden()
-                        .frame(width: 46)
+                    TextField(
+                        "Exit-Code",
+                        text: Binding(
+                            get: { String(code) },
+                            set: { text in
+                                guard let value = Int32(text.trimmingCharacters(in: .whitespaces)) else { return }
+                                updateTest { $0.expectedExitCode = value }
+                            })
+                    )
+                    .labelsHidden()
+                    .frame(width: 46)
                 }
-                Toggle("Ausgabe", isOn: Binding(
-                    get: { test.expectedOutput != nil },
-                    set: { v in updateTest { $0.expectedOutput = v ? "" : nil } }))
+                Toggle(
+                    "Ausgabe",
+                    isOn: Binding(
+                        get: { test.expectedOutput != nil },
+                        set: { v in updateTest { $0.expectedOutput = v ? "" : nil } }))
                 if test.expectedOutput != nil {
                     Picker("Vergleich", selection: Binding(get: { test.match }, set: { v in updateTest { $0.match = v } })) {
                         ForEach(BlockTest.Match.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -410,9 +434,14 @@ struct CodeBlockView: View {
                 }
                 Spacer()
                 if let actual = block.testOutcome?.actualOutput, test.expectedOutput != nil, test.expectedOutput != actual {
-                    Button("Ausgabe übernehmen") { updateTest { $0.expectedOutput = actual; $0.match = .exact } }
-                        .buttonStyle(.borderless)
-                        .helpLabel("Die Ausgabe des letzten Laufs als Erwartung speichern")
+                    Button("Ausgabe übernehmen") {
+                        updateTest {
+                            $0.expectedOutput = actual
+                            $0.match = .exact
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .helpLabel("Die Ausgabe des letzten Laufs als Erwartung speichern")
                 }
             }
             .font(.system(size: 11))
@@ -527,7 +556,9 @@ struct CodeBlockView: View {
         let status = graph.status[block.id] ?? .notRun
         let upstream = graph.upstream(of: block.id)
         if status.isStale || !upstream.isEmpty {
-            Button { showDependencies = true } label: {
+            Button {
+                showDependencies = true
+            } label: {
                 HStack(spacing: 3) {
                     Image(systemName: status.isStale ? CodeDependencyStyle.symbol(status) : "arrow.turn.down.right")
                     Text(status.isStale ? "veraltet" : upstream.map { "Block \(graph.number(of: $0.from) ?? 0)" }.joined(separator: ", "))
@@ -566,9 +597,10 @@ struct CodeBlockView: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
         .background(Color.primary.opacity(0.06), in: Capsule())
-        .help(sessionRunning
-              ? "Läuft in der gemeinsamen \(spec.name)-Sitzung dieser Notiz: Variablen aus anderen Blöcken sind verfügbar."
-              : "Wird in der gemeinsamen \(spec.name)-Sitzung dieser Notiz ausgeführt, sobald du ihn startest.")
+        .help(
+            sessionRunning
+                ? "Läuft in der gemeinsamen \(spec.name)-Sitzung dieser Notiz: Variablen aus anderen Blöcken sind verfügbar."
+                : "Wird in der gemeinsamen \(spec.name)-Sitzung dieser Notiz ausgeführt, sobald du ihn startest.")
     }
 
     /// In narrow editors the copy/format/remove buttons live at the top of this menu (#240).
@@ -624,31 +656,39 @@ struct CodeBlockView: View {
         Button("Im Terminal ausführen") { runInTerminal() }
             .helpLabel("Interaktiv im Terminal-Panel der Notiz, mit Live-Ausgabe und Eingaben")
         Divider()
-        Toggle("Eingabe (stdin) vorgeben", isOn: Binding(
-            get: { showStdin || !(block.stdin ?? "").isEmpty },
-            set: { v in
-                showStdin = v
-                if !v, !(block.stdin ?? "").isEmpty { doc.changeBlock(block, "Eingabe entfernen") { block.stdin = nil } }
-            }))
-        Toggle("Während der Ausführung eingeben (interaktiv)", isOn: Binding(
-            get: { block.interactive },
-            set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
+        Toggle(
+            "Eingabe (stdin) vorgeben",
+            isOn: Binding(
+                get: { showStdin || !(block.stdin ?? "").isEmpty },
+                set: { v in
+                    showStdin = v
+                    if !v, !(block.stdin ?? "").isEmpty { doc.changeBlock(block, "Eingabe entfernen") { block.stdin = nil } }
+                }))
+        Toggle(
+            "Während der Ausführung eingeben (interaktiv)",
+            isOn: Binding(
+                get: { block.interactive },
+                set: { v in doc.changeBlock(block, "Interaktiv ändern") { block.interactive = v } }))
         Divider()
-        Toggle("Test für diesen Block", isOn: Binding(
-            get: { block.test != nil },
-            set: { v in
-                doc.changeBlock(block, v ? "Test hinzufügen" : "Test entfernen") {
-                    block.test = v ? BlockTest() : nil
-                    block.testOutcome = nil
-                }
-            }))
+        Toggle(
+            "Test für diesen Block",
+            isOn: Binding(
+                get: { block.test != nil },
+                set: { v in
+                    doc.changeBlock(block, v ? "Test hinzufügen" : "Test entfernen") {
+                        block.test = v ? BlockTest() : nil
+                        block.testOutcome = nil
+                    }
+                }))
     }
 
     @ViewBuilder private var kernelItems: some View {
         Divider()
-        Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
-            get: { block.mode != "isolated" },
-            set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
+        Toggle(
+            "Mit anderen \(spec.name)-Blöcken verknüpft",
+            isOn: Binding(
+                get: { block.mode != "isolated" },
+                set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
         Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: spec.id) }
             .disabled(!sessionRunning)
     }
@@ -692,7 +732,10 @@ struct CodeBlockView: View {
 
     private func connectionMenu(compact: Bool) -> some View {
         Menu {
-            Button { block.connection = nil; doc.markDirty() } label: {
+            Button {
+                block.connection = nil
+                doc.markDirty()
+            } label: {
                 Label("SQLite im Arbeitsspeicher (ohne Verbindung)", systemImage: block.connection == nil ? "checkmark" : "memorychip")
             }
             let connections = ConnectionLibrary.all(in: doc)
@@ -704,8 +747,9 @@ struct CodeBlockView: View {
                             doc.markDirty()
                             dbState.loadSchema(c)
                         } label: {
-                            Label("\(c.name.isEmpty ? c.driver.name : c.name) – \(c.driver.name)",
-                                  systemImage: block.connection?.id == c.id ? "checkmark" : "cylinder.split.1x2")
+                            Label(
+                                "\(c.name.isEmpty ? c.driver.name : c.name) – \(c.driver.name)",
+                                systemImage: block.connection?.id == c.id ? "checkmark" : "cylinder.split.1x2")
                         }
                     }
                 }

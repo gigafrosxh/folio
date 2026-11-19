@@ -23,7 +23,11 @@ final class PDFContentTests: XCTestCase {
     }
 
     private var png: Data {
-        let image = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in NSColor.blue.setFill(); rect.fill(); return true }
+        let image = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in
+            NSColor.blue.setFill()
+            rect.fill()
+            return true
+        }
         return NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
     }
 
@@ -39,7 +43,11 @@ final class PDFContentTests: XCTestCase {
     }
 
     func testCodeWithOutput() async {
-        let code = block(.code) { $0.language = "python"; $0.code = "print(1)"; $0.output = "1\n" }
+        let code = block(.code) {
+            $0.language = "python"
+            $0.code = "print(1)"
+            $0.output = "1\n"
+        }
         let shown = await content([code])
         XCTAssertEqual(shown.string, "⌘  Python\nprint(1)\n\n▸  Ausgabe\n1")
         let hidden = await content([code], includeOutputs: false)
@@ -47,12 +55,25 @@ final class PDFContentTests: XCTestCase {
     }
 
     func testCodeErrorIsLabelled() async {
-        let s = await content([block(.code) { $0.language = "python"; $0.code = "x"; $0.output = "Boom"; $0.outputIsError = true }])
+        let s = await content([
+            block(.code) {
+                $0.language = "python"
+                $0.code = "x"
+                $0.output = "Boom"
+                $0.outputIsError = true
+            }
+        ])
         XCTAssertTrue(s.string.contains("▸  Fehler\nBoom"), s.string)
     }
 
     func testDatabaseAndWeb() async {
-        let s = await content([block(.database) { $0.code = "select 1" }, block(.web) { $0.url = "https://e.example"; $0.caption = "Titel" }, block(.web)])
+        let s = await content([
+            block(.database) { $0.code = "select 1" },
+            block(.web) {
+                $0.url = "https://e.example"
+                $0.caption = "Titel"
+            }, block(.web)
+        ])
         XCTAssertEqual(s.string, "⛁  SQL\nselect 1\n\n🔗 https://e.example\nTitel")
         let link = s.attribute(.link, at: (s.string as NSString).range(of: "https").location, effectiveRange: nil) as? URL
         XCTAssertEqual(link?.absoluteString, "https://e.example")
@@ -60,8 +81,18 @@ final class PDFContentTests: XCTestCase {
 
     func testImageWithCaptionAndMissingImage() async {
         let attachment = FolioArchive.Attachment(filename: "a.png", typeIdentifier: "public.png", data: png)
-        let s = await content([block(.image) { $0.attachmentID = attachment.id; $0.caption = "Bild" }, block(.image) { $0.attachmentID = UUID(); $0.caption = "Fehlt" }],
-                              attachments: [attachment])
+        let s = await content(
+            [
+                block(.image) {
+                    $0.attachmentID = attachment.id
+                    $0.caption = "Bild"
+                },
+                block(.image) {
+                    $0.attachmentID = UUID()
+                    $0.caption = "Fehlt"
+                }
+            ],
+            attachments: [attachment])
         XCTAssertEqual(attachmentCount(s), 1)
         XCTAssertTrue(s.string.hasSuffix("Bild"), s.string)
         XCTAssertFalse(s.string.contains("Fehlt"))

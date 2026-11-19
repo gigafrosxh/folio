@@ -35,7 +35,8 @@ enum AutomationSelfTest {
         check((try? NoteAutomation.find("Doppelt")) == nil, "Mehrdeutiger Titel wird abgelehnt")
         await intentChecks()
         await appleScriptChecks()
-        print("AUTO done"); fflush(stdout)
+        print("AUTO done")
+        fflush(stdout)
     }
 
     private static func intentChecks() async {
@@ -51,17 +52,18 @@ enum AutomationSelfTest {
     /// Real Apple events to this process; needs the dictionary in the bundle (make-test-app copy).
     private static func appleScriptChecks() async {
         guard Bundle.main.url(forResource: "Folio", withExtension: "sdef") != nil, let id = Bundle.main.bundleIdentifier else {
-            print("AUTO skip AppleScript (kein App-Paket mit Folio.sdef)"); fflush(stdout)
+            print("AUTO skip AppleScript (kein App-Paket mit Folio.sdef)")
+            fflush(stdout)
             return
         }
         let script = """
-        tell application id "\(id)"
-            set newID to create note "Per AppleScript" with text "Okapi"
-            set hits to search notes "okapi"
-            append to note newID with text "Zweite Zeile"
-            return (item 1 of hits) & "|" & newID
-        end tell
-        """
+            tell application id "\(id)"
+                set newID to create note "Per AppleScript" with text "Okapi"
+                set hits to search notes "okapi"
+                append to note newID with text "Zweite Zeile"
+                return (item 1 of hits) & "|" & newID
+            end tell
+            """
         let result: String? = await Task.detached {
             var error: NSDictionary?
             let out = NSAppleScript(source: script)?.executeAndReturnError(&error)

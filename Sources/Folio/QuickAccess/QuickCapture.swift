@@ -16,9 +16,10 @@ final class QuickCaptureController {
         if let text { model.text = model.text.isEmpty ? text : model.text + "\n" + text }
         if let target { model.target = target }
         if panel == nil {
-            let p = CapturePanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 250),
-                                 styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
+            let p = CapturePanel(
+                contentRect: NSRect(x: 0, y: 0, width: 440, height: 250),
+                styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
+                backing: .buffered, defer: false)
             p.title = "Schnellerfassung"
             p.titlebarAppearsTransparent = true
             p.isFloatingPanel = true
@@ -26,9 +27,10 @@ final class QuickCaptureController {
             p.hidesOnDeactivate = false
             p.isReleasedWhenClosed = false
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            p.contentView = NSHostingView(rootView: QuickCaptureView(model: model) { [weak self] in self?.close() }
-                .environmentObject(ThemeManager.shared)
-                .environmentObject(NoteStore.shared))
+            p.contentView = NSHostingView(
+                rootView: QuickCaptureView(model: model) { [weak self] in self?.close() }
+                    .environmentObject(ThemeManager.shared)
+                    .environmentObject(NoteStore.shared))
             p.center()
             p.setFrameAutosaveName("FolioQuickCapture")
             panel = p
@@ -72,13 +74,19 @@ final class QuickCaptureModel: ObservableObject {
 
     func saveDraft() {
         let item = CaptureItem(text: text, images: images, target: target)
-        if item.isEmpty { UserDefaults.standard.removeObject(forKey: Self.draftKey); return }
+        if item.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.draftKey)
+            return
+        }
         if let d = try? JSONEncoder().encode(item) { UserDefaults.standard.set(d, forKey: Self.draftKey) }
     }
 
     func submit() -> Bool {
         let item = CaptureItem(text: text, images: images, target: target)
-        guard !item.isEmpty else { status = (false, "Nichts zu speichern."); return false }
+        guard !item.isEmpty else {
+            status = (false, "Nichts zu speichern.")
+            return false
+        }
         let result = CaptureService.shared.save(item)
         status = (result.ok, result.message)
         if result.ok {
@@ -153,8 +161,12 @@ struct QuickCaptureView: View {
                                 Image(nsImage: img).resizable().scaledToFit().frame(height: 46)
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
                                     .overlay(alignment: .topTrailing) {
-                                        Button { model.images.remove(at: i) } label: { Image(systemName: "xmark.circle.fill") }
-                                            .buttonStyle(.plain).helpLabel("Bild entfernen")
+                                        Button {
+                                            model.images.remove(at: i)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                        }
+                                        .buttonStyle(.plain).helpLabel("Bild entfernen")
                                     }
                             }
                         }
@@ -211,8 +223,14 @@ final class GlobalHotKey {
         unregister()
         problem = nil
         guard let combo else { return }
-        guard combo.command || combo.control || combo.option else { problem = "Ein globales Kürzel braucht ⌘, ⌃ oder ⌥."; return }
-        guard let code = Self.keyCode(combo.key) else { problem = "Diese Taste kann nicht global belegt werden."; return }
+        guard combo.command || combo.control || combo.option else {
+            problem = "Ein globales Kürzel braucht ⌘, ⌃ oder ⌥."
+            return
+        }
+        guard let code = Self.keyCode(combo.key) else {
+            problem = "Diese Taste kann nicht global belegt werden."
+            return
+        }
         var mods: UInt32 = 0
         if combo.command { mods |= UInt32(cmdKey) }
         if combo.option { mods |= UInt32(optionKey) }
@@ -220,16 +238,19 @@ final class GlobalHotKey {
         if combo.shift { mods |= UInt32(shiftKey) }
         if handler == nil {
             var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-            InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-                DispatchQueue.main.async { MainActor.assumeIsolated { QuickCaptureController.shared.show() } }
-                return noErr
-            }, 1, &spec, nil, &handler)
+            InstallEventHandler(
+                GetApplicationEventTarget(),
+                { _, _, _ in
+                    DispatchQueue.main.async { MainActor.assumeIsolated { QuickCaptureController.shared.show() } }
+                    return noErr
+                }, 1, &spec, nil, &handler)
         }
-        let id = EventHotKeyID(signature: OSType(0x464F4C49), id: 1)   // "FOLI"
+        let id = EventHotKeyID(signature: OSType(0x464F4C49), id: 1)  // "FOLI"
         let status = RegisterEventHotKey(code, mods, id, GetApplicationEventTarget(), 0, &ref)
         if status != noErr {
             ref = nil
-            problem = status == OSStatus(eventHotKeyExistsErr)
+            problem =
+                status == OSStatus(eventHotKeyExistsErr)
                 ? "\(combo.display) ist schon von einer anderen App belegt. Wähle ein anderes Kürzel."
                 : "Das Kürzel konnte nicht eingerichtet werden (Fehler \(status))."
         }

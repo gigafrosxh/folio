@@ -14,9 +14,13 @@ struct QuickAccessSettingsView: View {
         Form {
             Section {
                 Toggle("Folio in der Menüleiste zeigen", isOn: $theme.settings.menuBarIcon)
-                Text("Suche, angepinnte und zuletzt geöffnete Notizen und die Schnellerfassung, auch wenn das Hauptfenster geschlossen ist. Folio läuft dann weiter, wenn das letzte Fenster zu ist.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: { Text("Menüleiste") }
+                Text(
+                    "Suche, angepinnte und zuletzt geöffnete Notizen und die Schnellerfassung, auch wenn das Hauptfenster geschlossen ist. Folio läuft dann weiter, wenn das letzte Fenster zu ist."
+                )
+                .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Menüleiste")
+            }
 
             WidgetSettingsSection()
 
@@ -38,7 +42,9 @@ struct QuickAccessSettingsView: View {
                         .foregroundStyle(.green).font(.callout)
                 }
                 Button("Schnellerfassung jetzt öffnen") { QuickCaptureController.shared.show() }
-            } header: { Text("Globales Kürzel") } footer: {
+            } header: {
+                Text("Globales Kürzel")
+            } footer: {
                 Text("Das Erfassungsfenster speichert Text, Links und eingefügte Bilder in die Inbox oder eine gewählte Notiz (⌘↩). Esc schließt es, der Entwurf bleibt erhalten.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -63,20 +69,30 @@ struct QuickAccessSettingsView: View {
                     Button("Jetzt erneut versuchen") { service.retryPending() }
                 }
                 if let m = service.lastMessage { Text(m).font(.caption).foregroundStyle(.secondary) }
-            } header: { Text("Wartende Erfassungen") } footer: {
-                Text("Ist die Bibliothek gerade nicht erreichbar oder schreibgeschützt, bleiben Erfassungen sicher außerhalb der Bibliothek liegen und werden automatisch nachgetragen.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Wartende Erfassungen")
+            } footer: {
+                Text(
+                    "Ist die Bibliothek gerade nicht erreichbar oder schreibgeschützt, bleiben Erfassungen sicher außerhalb der Bibliothek liegen und werden automatisch nachgetragen."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(["folio://note/<Notiz-ID> – Notiz öffnen (Rechtsklick › Notizlink kopieren)",
-                             "folio://capture?text=…&target=inbox – Schnellerfassung, vorausgefüllt",
-                             "folio://search?q=… – Suche",
-                             "folio://new?title=…&text=… – neue Notiz",
-                             "folio://open – Folio nach vorne holen"], id: \.self) { Text($0).font(.system(size: 11.5, design: .monospaced)).textSelection(.enabled) }
+                    ForEach(
+                        [
+                            "folio://note/<Notiz-ID> – Notiz öffnen (Rechtsklick › Notizlink kopieren)",
+                            "folio://capture?text=…&target=inbox – Schnellerfassung, vorausgefüllt",
+                            "folio://search?q=… – Suche",
+                            "folio://new?title=…&text=… – neue Notiz",
+                            "folio://open – Folio nach vorne holen"
+                        ], id: \.self
+                    ) { Text($0).font(.system(size: 11.5, design: .monospaced)).textSelection(.enabled) }
                 }
-            } header: { Text("Links für Kurzbefehle und andere Apps") }
+            } header: {
+                Text("Links für Kurzbefehle und andere Apps")
+            }
         }
         .formStyle(.grouped)
         .onDisappear { stop() }
@@ -95,7 +111,11 @@ struct QuickAccessSettingsView: View {
         GlobalHotKey.shared.unregister()
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             MainActor.assumeIsolated {
-                if event.keyCode == 53 { stop(); QuickAccessSettings.apply(); return }
+                if event.keyCode == 53 {
+                    stop()
+                    QuickAccessSettings.apply()
+                    return
+                }
                 guard let combo = KeyCombo(event: event), combo.isUsable, GlobalHotKey.keyCode(combo.key) != nil else {
                     problem = "Bitte ⌘, ⌃ oder ⌥ zusammen mit einem Buchstaben, einer Ziffer oder der Leertaste drücken."
                     return
@@ -123,13 +143,17 @@ struct WidgetSettingsSection: View {
     var body: some View {
         Section {
             Toggle("Notizinhalte in Widgets zeigen", isOn: $theme.settings.widgetShowContent)
-            Text(theme.settings.widgetShowContent
-                 ? "Widgets zeigen Vorschauen und Checklisten-Punkte auf dem Schreibtisch. Bei gesperrtem Mac blendet macOS sie aus."
-                 : "Widgets zeigen nur Titel, Ordner, Datum und Fortschritt – keine Notizinhalte.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(
+                theme.settings.widgetShowContent
+                    ? "Widgets zeigen Vorschauen und Checklisten-Punkte auf dem Schreibtisch. Bei gesperrtem Mac blendet macOS sie aus."
+                    : "Widgets zeigen nur Titel, Ordner, Datum und Fortschritt – keine Notizinhalte."
+            )
+            .font(.caption).foregroundStyle(.secondary)
             choice("Notiz des Tages", id: theme.settings.widgetNote, automatic: "Jeden Tag eine andere") { theme.settings.widgetNote = "" }
             choice("Checkliste", id: theme.settings.widgetChecklist, automatic: "Zuletzt bearbeitete mit offenen Punkten") { theme.settings.widgetChecklist = "" }
-        } header: { Text("Widgets") } footer: {
+        } header: {
+            Text("Widgets")
+        } footer: {
             Text("Rechtsklick auf eine Notiz › „Im Widget zeigen“ wählt sie aus. Widgets fügst du über „Widgets bearbeiten“ im Kontextmenü des Schreibtischs hinzu.")
         }
     }

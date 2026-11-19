@@ -26,8 +26,10 @@ extension BlockModel {
 
     /// Point sizes of title, heading and subheading, computed once per outline instead of per paragraph.
     static func headingSizes(theme: ThemeManager) -> [(CGFloat, NoteOutline.Level)] {
-        [(TextStyle.title.font(theme: theme).pointSize, .title), (TextStyle.heading.font(theme: theme).pointSize, .heading),
-         (TextStyle.subheading.font(theme: theme).pointSize, .subheading)]
+        [
+            (TextStyle.title.font(theme: theme).pointSize, .title), (TextStyle.heading.font(theme: theme).pointSize, .heading),
+            (TextStyle.subheading.font(theme: theme).pointSize, .subheading)
+        ]
     }
 
     private func headingLevel(at offset: Int, sizes: [(CGFloat, NoteOutline.Level)]) -> NoteOutline.Level? {
@@ -109,15 +111,16 @@ extension NoteDocument {
         let outline = self.outline
         return outline.sections.compactMap { s in
             guard s.start.blockID == blockID, !s.content.isEmpty,
-                  let index = outline.paragraphs.firstIndex(where: { $0.blockID == blockID && $0.range == s.start.range }),
-                  !hidden.contains(index) else { return nil }
+                let index = outline.paragraphs.firstIndex(where: { $0.blockID == blockID && $0.range == s.start.range }),
+                !hidden.contains(index)
+            else { return nil }
             return FoldHeading(section: s, collapsed: collapsed.contains(s.heading), summary: Self.summary(of: s, in: outline))
         }
     }
 
     /// „3 Absätze, 1 Bild“ for the hint behind a collapsed heading.
     static func summary(of s: NoteOutline.Section, in outline: NoteOutline) -> String {
-        var counts: [Int] = [0, 0, 0, 0]   // paragraphs, subheadings, pictures, other blocks
+        var counts: [Int] = [0, 0, 0, 0]  // paragraphs, subheadings, pictures, other blocks
         for p in outline.paragraphs[s.content] { counts[category(p)] += p.kind == .text && p.level == nil && p.range.length <= 1 ? 0 : 1 }
         let names = [("Absatz", "Absätze"), ("Unterüberschrift", "Unterüberschriften"), ("Bild", "Bilder"), ("Block", "Blöcke")]
         let parts = zip(counts, names).filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1.0 : $0.1.1)" }
@@ -223,9 +226,10 @@ extension NoteDocument {
     /// insertion point, including one after a hidden attachment, is visible and editable.
     func insertAfterFold(blockID: UUID, selection: NSRange) -> Bool {
         guard selection.length == 0, !collapsedHeadings.isEmpty,
-              let section = section(at: blockID, offset: selection.location), collapsedHeadings.contains(section.heading),
-              selection.location == section.start.range.location + (section.start.title as NSString).length,
-              let target = block(section.end.blockID) else { return false }
+            let section = section(at: blockID, offset: selection.location), collapsedHeadings.contains(section.heading),
+            selection.location == section.start.range.location + (section.start.title as NSString).length,
+            let target = block(section.end.blockID)
+        else { return false }
         toggleFold(section.heading)
         let offset = NSMaxRange(section.end.range)
         expandFolds(at: target.id, range: section.end.range, includingHeading: true)
@@ -235,8 +239,8 @@ extension NoteDocument {
             FormattingController.shared.focus(blockID: paragraph.id, at: 0)
             return true
         }
-        insertBodyLine(in: target, at: offset, beforeNext: section.content.upperBound < outline.paragraphs.count &&
-                       outline.paragraphs[section.content.upperBound].blockID == target.id)
+        insertBodyLine(
+            in: target, at: offset, beforeNext: section.content.upperBound < outline.paragraphs.count && outline.paragraphs[section.content.upperBound].blockID == target.id)
         return true
     }
 

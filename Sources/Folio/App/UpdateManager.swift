@@ -64,7 +64,10 @@ final class UpdateManager: ObservableObject {
     // MARK: Installing
 
     func install(_ release: ReleaseInfo) {
-        guard let dmgURL = release.dmgURL else { state = .failed("Das Release enthält kein Installationsabbild."); return }
+        guard let dmgURL = release.dmgURL else {
+            state = .failed("Das Release enthält kein Installationsabbild.")
+            return
+        }
         guard let app = appBundleURL else {
             state = .failed("Folio läuft nicht aus einer App (z. B. über swift run) und kann sich nicht selbst ersetzen.")
             return
@@ -96,7 +99,8 @@ final class UpdateManager: ObservableObject {
                 // Checked again right before the app is replaced: the download takes a while (#197).
                 let stillUnsaved = NoteStore.shared.unsavedAfterSaving()
                 guard stillUnsaved.isEmpty else {
-                    state = .failed("Das Update wurde nicht installiert: \(NoteStore.titles(stillUnsaved)) konnte nicht gesichert werden. Sichere die Notiz und versuche es erneut.")
+                    state = .failed(
+                        "Das Update wurde nicht installiert: \(NoteStore.titles(stillUnsaved)) konnte nicht gesichert werden. Sichere die Notiz und versuche es erneut.")
                     return
                 }
                 let newApp = try await Task.detached {
@@ -118,9 +122,10 @@ final class UpdateManager: ObservableObject {
             Task { @MainActor in
                 let fraction = total > 0 ? Double(received) / Double(total) : 0
                 let mb = { (b: Int64) in String(format: "%.1f MB", Double(b) / 1_048_576) }
-                UpdateManager.shared.state = .installing(UpdateProgress(
-                    fraction: fraction * 0.8, step: "Lade Folio \(version) herunter …",
-                    detail: total > 0 ? "\(mb(received)) von \(mb(total)) · \(Int(fraction * 100)) %" : mb(received)))
+                UpdateManager.shared.state = .installing(
+                    UpdateProgress(
+                        fraction: fraction * 0.8, step: "Lade Folio \(version) herunter …",
+                        detail: total > 0 ? "\(mb(received)) von \(mb(total)) · \(Int(fraction * 100)) %" : mb(received)))
             }
         }
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
@@ -133,13 +138,18 @@ final class UpdateManager: ObservableObject {
 
     enum InstallError: Error, LocalizedError {
         case step(String)
-        var errorDescription: String? { if case .step(let m) = self { return m }; return nil }
+        var errorDescription: String? {
+            if case .step(let m) = self { return m }
+            return nil
+        }
     }
 
     /// Mounts the disk image, checks the new app, puts the old one in the Trash and moves the new one in.
-    nonisolated static func replace(app: URL, withAppIn dmg: URL, expectedVersion: String,
-                                    bundleID: String = Bundle.main.bundleIdentifier ?? "de.daniel.folio",
-                                    report: @Sendable (Double, String) -> Void = { _, _ in }) throws -> URL {
+    nonisolated static func replace(
+        app: URL, withAppIn dmg: URL, expectedVersion: String,
+        bundleID: String = Bundle.main.bundleIdentifier ?? "de.daniel.folio",
+        report: @Sendable (Double, String) -> Void = { _, _ in }
+    ) throws -> URL {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: dmg) }
         let mountPoint = fm.temporaryDirectory.appendingPathComponent("folio-update-mnt-\(UUID().uuidString.prefix(8))")
@@ -152,11 +162,13 @@ final class UpdateManager: ObservableObject {
         report(0.86, "Prüfe die neue Version …")
         let mounted = mountPoint.appendingPathComponent("Folio.app")
         guard let info = NSDictionary(contentsOf: mounted.appendingPathComponent("Contents/Info.plist")),
-              info["CFBundleIdentifier"] as? String == bundleID else {
+            info["CFBundleIdentifier"] as? String == bundleID
+        else {
             throw InstallError.step("Das heruntergeladene Abbild enthält keine gültige Folio-App.")
         }
-        try verifyVersion(info["CFBundleShortVersionString"] as? String, expected: expectedVersion,
-                          installed: NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String)
+        try verifyVersion(
+            info["CFBundleShortVersionString"] as? String, expected: expectedVersion,
+            installed: NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String)
         try verifySignature(of: mounted, matching: app)
         // Copy next to the old app first, so a failure never leaves the user without Folio.
         report(0.9, "Kopiere die neue Version …")
@@ -261,8 +273,10 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unc
         self.onProgress = onProgress
     }
 
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
+    ) {
         onProgress(totalBytesWritten, totalBytesExpectedToWrite)
     }
 

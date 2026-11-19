@@ -31,7 +31,7 @@ final class AIContextTests: XCTestCase {
         let index = PassageIndex([
             Passage(noteID: a, noteTitle: "Rezepte", index: 0, text: "Tomatensoße mit Basilikum und Knoblauch."),
             Passage(noteID: b, noteTitle: "Meeting Montag", index: 0, text: "Wir haben die Rezepten-App und das Budget besprochen."),
-            Passage(noteID: c, noteTitle: "Urlaub", index: 0, text: "Flug nach Lissabon am 3. Mai."),
+            Passage(noteID: c, noteTitle: "Urlaub", index: 0, text: "Flug nach Lissabon am 3. Mai.")
         ])
         let r = index.search("Welche Rezepte habe ich?")
         XCTAssertEqual(r.first?.passage.noteID, a, "title match ranks first")
@@ -57,8 +57,10 @@ final class AIContextTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: lib) }
         let archive = ChatArchive(library: lib)
         var t = ChatTranscript()
-        t.messages = [ChatRecord(role: .user, text: "Frage eins"),
-                      ChatRecord(role: .assistant, text: "Antwort [1]", sources: [Passage(noteID: id, noteTitle: "N", index: 0, text: "q")], usedTokens: 120)]
+        t.messages = [
+            ChatRecord(role: .user, text: "Frage eins"),
+            ChatRecord(role: .assistant, text: "Antwort [1]", sources: [Passage(noteID: id, noteTitle: "N", index: 0, text: "q")], usedTokens: 120)
+        ]
         t.extraNotes = [UUID()]
         let key = ChatArchive.key(note: id)
         try archive.save(t, key: key)

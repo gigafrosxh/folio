@@ -16,7 +16,7 @@ final class SearchLinkAudioGoldenTests: XCTestCase {
     private let queries = [
         "", "apfel", "tag:Rezept", "#rezept #2026", "#", "tag:", "ordner:Projekte/Alpha", "typ:code", "typ:Bild", "typ:unbekannt",
         "seit:heute", "seit:7", "seit:monat", "seit:jahr", "seit:gestern", "status:offen", "status:*", "https://e.example", "folio:x",
-        "Größe:groß", "a:b:c", ":x", "x:", "äpfel  birne", "tag:#rezept ordner:Küche seit:30 typ:code text",
+        "Größe:groß", "a:b:c", ":x", "x:", "äpfel  birne", "tag:#rezept ordner:Küche seit:30 typ:code text"
     ]
 
     private func describe(_ f: SearchFilter) -> String {
@@ -35,19 +35,23 @@ final class SearchLinkAudioGoldenTests: XCTestCase {
         }
         return [
             (note("Apfelkuchen", text: "Äpfel und Birne", tags: ["rezept", "2026"], daysOld: 0.1, kinds: ["text", "image"]), "Küche", []),
-            (note("Plan", text: "Code", tags: ["projekt/alpha"], daysOld: 10, kinds: ["code"],
-                  props: [NoteProperty(name: "Status", kind: .status, value: "Offen", options: ["Offen"])]), "Projekte/Alpha/Teil", []),
-            (note("Alt", text: "nichts", tags: [], daysOld: 400, kinds: []), "", ["code"]),
+            (
+                note(
+                    "Plan", text: "Code", tags: ["projekt/alpha"], daysOld: 10, kinds: ["code"],
+                    props: [NoteProperty(name: "Status", kind: .status, value: "Offen", options: ["Offen"])]), "Projekte/Alpha/Teil", []
+            ),
+            (note("Alt", text: "nichts", tags: [], daysOld: 400, kinds: []), "", ["code"])
         ]
     }
 
     func testSearchMatchesStoredResult() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let text = queries.map { q -> String in
-            let f = SearchFilter.parse(q)
-            let hits = notes.filter { f.matches($0.0, folderPath: $0.1, kinds: $0.2.isEmpty ? nil : $0.2, now: now) }.map(\.0.title)
-            return "\(q.isEmpty ? "(leer)" : q) → \(describe(f)) → \(hits)"
-        }.joined(separator: "\n") + "\n"
+        let text =
+            queries.map { q -> String in
+                let f = SearchFilter.parse(q)
+                let hits = notes.filter { f.matches($0.0, folderPath: $0.1, kinds: $0.2.isEmpty ? nil : $0.2, now: now) }.map(\.0.title)
+                return "\(q.isEmpty ? "(leer)" : q) → \(describe(f)) → \(hits)"
+            }.joined(separator: "\n") + "\n"
         try compare(text, with: "search-filters.txt")
     }
 
@@ -57,15 +61,16 @@ final class SearchLinkAudioGoldenTests: XCTestCase {
             "folio://note/", "folio://note/kein-uuid", "folio://capture", "folio://capture?text=Hallo%20W%C3%B6rld&target=INBOX",
             "folio://capture?target=00000000-0000-0000-0000-000000000002", "folio://capture?target=falsch", "folio://search?q=%20",
             "folio://search?Q=Apfel", "folio://new?title=T&text=", "folio://open", "folio:", "FOLIO://OPEN", "folio://nix",
-            "https://e.example", "folio://search?q=" + String(repeating: "x", count: 100_001),
+            "https://e.example", "folio://search?q=" + String(repeating: "x", count: 100_001)
         ]
-        let text = links.map { s -> String in
-            guard let url = URL(string: s) else { return "\(s.prefix(40)) → keine URL" }
-            switch FolioURL.parse(url) {
-            case .success(let action): return "\(s.prefix(70)) → \(action)"
-            case .failure(let error): return "\(s.prefix(70)) → \(error)"
-            }
-        }.joined(separator: "\n") + "\n"
+        let text =
+            links.map { s -> String in
+                guard let url = URL(string: s) else { return "\(s.prefix(40)) → keine URL" }
+                switch FolioURL.parse(url) {
+                case .success(let action): return "\(s.prefix(70)) → \(action)"
+                case .failure(let error): return "\(s.prefix(70)) → \(error)"
+                }
+            }.joined(separator: "\n") + "\n"
         try compare(text, with: "folio-links.txt")
     }
 
@@ -90,7 +95,7 @@ final class SearchLinkAudioGoldenTests: XCTestCase {
             ("stereo", 2, 4000, 6, { c, i in c == 0 ? 0.1 : (i > 2000 ? -0.6 : 0.2) }),
             ("übersteuert", 1, 1000, 4, { _, i in i % 2 == 0 ? 3 : -5 }),
             ("leise", 1, 800, 4, { _, i in Float(i % 100) * 0.000001 }),
-            ("keine buckets", 1, 100, 0, { _, _ in 0.5 }),
+            ("keine buckets", 1, 100, 0, { _, _ in 0.5 })
         ]
         var lines: [String] = []
         for (name, channels, frames, buckets, sample) in cases {

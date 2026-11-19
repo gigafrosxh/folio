@@ -51,7 +51,9 @@ final class LinkGraphTests: XCTestCase {
         // A → B → C → A (a cycle) and D alone; self links are ignored.
         var a = meta("A"), b = meta("B"), c = meta("C")
         let d = meta("D", text: "[[D]]")
-        a.searchText = "A [[B]] [[A]]"; b.searchText = "B [[C]]"; c.searchText = "C [[A]]"
+        a.searchText = "A [[B]] [[A]]"
+        b.searchText = "B [[C]]"
+        c.searchText = "C [[A]]"
         let index = LinkIndex([(a, ""), (b, ""), (c, ""), (d, "")])
         XCTAssertEqual(index.edges().count, 3)
         XCTAssertEqual(index.neighborhood(of: a.id, depth: 1), [a.id, b.id, c.id])
@@ -97,7 +99,8 @@ final class LinkGraphTests: XCTestCase {
         let date = DateComponents(calendar: .init(identifier: .gregorian), timeZone: .current, year: 2026, month: 10, day: 21, hour: 9, minute: 5).date!
         let ctx = TemplateVariables.Context(date: date, title: "Besprechung")
         let r = TemplateVariables.apply("# {{titel}}\nAm {{datum:yyyy-MM-dd}} ({{wochentag}}), {{uhrzeit}}\n{{cursor}}\n{{unbekannt}}", context: ctx)
-        XCTAssertEqual(TemplateVariables.apply("{{Datum}} KW {{kw}} {{monat}} {{jahr}}", context: ctx).text, "21.10.2026 KW 43 Oktober 2026", "the placeholders older templates use")
+        XCTAssertEqual(
+            TemplateVariables.apply("{{Datum}} KW {{kw}} {{monat}} {{jahr}}", context: ctx).text, "21.10.2026 KW 43 Oktober 2026", "the placeholders older templates use")
         XCTAssertEqual(r.text, "# Besprechung\nAm 2026-10-21 (Mittwoch), 09:05\n\n{{unbekannt}}")
         XCTAssertEqual(r.cursor, ("# Besprechung\nAm 2026-10-21 (Mittwoch), 09:05\n" as NSString).length)
         XCTAssertNil(TemplateVariables.apply("ohne", context: ctx).cursor)
@@ -120,8 +123,10 @@ final class LinkGraphTests: XCTestCase {
 
     func testPropertySearch() {
         var m = meta("Aufgabe")
-        m.properties = [NoteProperty(name: "Status", kind: .status, value: "In Arbeit", options: ["Offen", "In Arbeit"]),
-                        NoteProperty(name: "Fällig", kind: .date, value: "2026-10-30")]
+        m.properties = [
+            NoteProperty(name: "Status", kind: .status, value: "In Arbeit", options: ["Offen", "In Arbeit"]),
+            NoteProperty(name: "Fällig", kind: .date, value: "2026-10-30")
+        ]
         let f = SearchFilter.parse("status:arbeit bericht")
         XCTAssertEqual(f.properties, ["status": "arbeit"])
         XCTAssertEqual(f.text, "bericht")

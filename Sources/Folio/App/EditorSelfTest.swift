@@ -15,7 +15,10 @@ enum EditorSelfTest {
         let store = NoteStore.shared
         let body = ThemeManager.shared.bodyAttributes
         await wait(1.5)
-        guard let ref = store.createNote(), let doc = store.currentDocument else { check(false, "Notiz"); return }
+        guard let ref = store.createNote(), let doc = store.currentDocument else {
+            check(false, "Notiz")
+            return
+        }
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Erste Zeile mit Apfel\nZweite Zeile mit Apfel", attributes: body))
         doc.markDirty()
         await wait(1)
@@ -26,16 +29,23 @@ enum EditorSelfTest {
         reloadChecks(store: store, doc: doc, um: um)
         um.groupsByEvent = true
         await wait(0.8)
-        guard let reopened = store.document(for: ref.id) else { check(false, "Notiz nach Neuladen"); return }
+        guard let reopened = store.document(for: ref.id) else {
+            check(false, "Notiz nach Neuladen")
+            return
+        }
         findChecks(doc: reopened, um: um)
         noteLinkCheck(store: store, doc: reopened)
-        guard let other = store.notes.first(where: { $0.id != ref.id }) else { check(false, "zweite Notiz"); return }
+        guard let other = store.notes.first(where: { $0.id != ref.id }) else {
+            check(false, "zweite Notiz")
+            return
+        }
         tabChecks(store: store, ref: ref, other: other)
         duplicateChecks(store: store)
         await focusModeChecks()
         await FoldSelfTest.run(store: store)
         await HighlightSelfTest.run(store: store)
-        print("EDIT done"); fflush(stdout)
+        print("EDIT done")
+        fflush(stdout)
     }
 
     private static func undoChecks(doc: NoteDocument, um: UndoManager) {
@@ -44,38 +54,52 @@ enum EditorSelfTest {
         let code = BlockModel(kind: .code)
         code.storage.setAttributedString(NSAttributedString(string: "apfel = 1  # Apfel"))
         um.groupsByEvent = false
-        um.beginUndoGrouping(); doc.insert(code, after: doc.blocks[0].id, splitAt: 21); um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.insert(code, after: doc.blocks[0].id, splitAt: 21)
+        um.endUndoGrouping()
         let afterInsert = doc.blocks.count
         let splitText = doc.blocks[0].storage.string
         um.undo()
         check(doc.blocks.count == before && doc.blocks[0].storage.string.contains("Zweite Zeile"), "Einfügen rückgängig (Text wieder zusammengefügt)")
         um.redo()
         check(doc.blocks.count == afterInsert && doc.blocks[0].storage.string == splitText && doc.blocks.contains { $0 === code }, "Einfügen wiederholt")
-        um.beginUndoGrouping(); doc.remove(code.id); um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.remove(code.id)
+        um.endUndoGrouping()
         check(!doc.blocks.contains { $0 === code }, "Block gelöscht")
         um.undo()
         check(doc.blocks.contains { $0 === code } && code.storage.string.contains("apfel"), "Löschen rückgängig, Inhalt erhalten")
         let img = BlockModel(kind: .drawing)
-        um.beginUndoGrouping(); doc.insert(img, after: doc.blocks.last!.id); um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.insert(img, after: doc.blocks.last!.id)
+        um.endUndoGrouping()
         let order = doc.blocks.map(\.id)
-        um.beginUndoGrouping(); doc.move(img.id, by: -1); um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.move(img.id, by: -1)
+        um.endUndoGrouping()
         check(doc.blocks.map(\.id) != order, "Block verschoben")
         um.undo()
         check(doc.blocks.map(\.id) == order, "Verschieben rückgängig")
-        um.beginUndoGrouping(); doc.changeBlock(code, "Sprache ändern") { code.language = "ruby" }; um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.changeBlock(code, "Sprache ändern") { code.language = "ruby" }
+        um.endUndoGrouping()
         um.undo()
         check(code.language == "python", "Spracheinstellung rückgängig")
     }
 
     private static func reloadChecks(store: NoteStore, doc: NoteDocument, um: UndoManager) {
         // #77: after reloading the note, no undo step may point at the old document.
-        um.beginUndoGrouping(); doc.insert(BlockModel(kind: .drawing), after: doc.blocks[0].id); um.endUndoGrouping()
+        um.beginUndoGrouping()
+        doc.insert(BlockModel(kind: .drawing), after: doc.blocks[0].id)
+        um.endUndoGrouping()
         doc.saveNow()
         store.reloadDocument(doc.id)
         let reloaded = store.document(for: doc.id)
         check(!um.canUndo && reloaded !== doc && reloaded?.undoManager === um, "Nach Neuladen kein Undo auf die alte Fassung")
         if let reloaded {
-            um.beginUndoGrouping(); reloaded.insert(BlockModel(kind: .code), after: reloaded.blocks[0].id); um.endUndoGrouping()
+            um.beginUndoGrouping()
+            reloaded.insert(BlockModel(kind: .code), after: reloaded.blocks[0].id)
+            um.endUndoGrouping()
             let n = reloaded.blocks.count
             um.undo()
             check(reloaded.blocks.count < n, "Undo wirkt auf die neu geladene Notiz")
@@ -141,12 +165,14 @@ enum EditorSelfTest {
     private static func duplicateChecks(store: NoteStore) {
         // Duplicates (#16)
         if let withAttachment = store.notes.first(where: { (try? NoteFile.read(from: $0.url))?.attachments.isEmpty == false }),
-           let original = try? NoteFile.read(from: withAttachment.url), let copyRef = store.duplicate(withAttachment.id),
-           let copy = try? NoteFile.read(from: copyRef.url) {
+            let original = try? NoteFile.read(from: withAttachment.url), let copyRef = store.duplicate(withAttachment.id),
+            let copy = try? NoteFile.read(from: copyRef.url)
+        {
             check(copy.meta.id != original.meta.id && copy.meta.title.hasSuffix("Kopie"), "Duplikat mit neuer ID")
             check(Set(copy.body.blocks.map(\.id)).isDisjoint(with: original.body.blocks.map(\.id)), "Neue Block-IDs")
-            check(Set(copy.attachments.map(\.id)).isDisjoint(with: original.attachments.map(\.id))
-                  && copy.attachments.map(\.data) == original.attachments.map(\.data), "Anhänge kopiert mit neuen IDs")
+            check(
+                Set(copy.attachments.map(\.id)).isDisjoint(with: original.attachments.map(\.id))
+                    && copy.attachments.map(\.data) == original.attachments.map(\.data), "Anhänge kopiert mit neuen IDs")
             check(copy.body.blocks.compactMap(\.attachmentID).allSatisfy { id in copy.attachments.contains { $0.id == id } }, "Verweise auf Anhänge stimmen")
         } else {
             check(false, "Notiz mit Anhang duplizieren")

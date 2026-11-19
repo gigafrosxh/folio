@@ -4,8 +4,9 @@ import FolioCore
 extension NoteDocument {
     /// Counts over the note's text and code blocks (#19).
     var statistics: NoteStatistics {
-        NoteStatistics(texts: blocks.filter { $0.kind == .text }.map(\.storage.string),
-                       code: blocks.filter { $0.kind == .code }.map(\.storage.string))
+        NoteStatistics(
+            texts: blocks.filter { $0.kind == .text }.map(\.storage.string),
+            code: blocks.filter { $0.kind == .code }.map(\.storage.string))
     }
 }
 

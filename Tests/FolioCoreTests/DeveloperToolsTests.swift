@@ -11,14 +11,15 @@ final class DeveloperToolsTests: XCTestCase {
     // MARK: Environment (#25)
 
     func testVariablesParsing() {
-        let vars = RunEnvironment.parseVariables("""
-        # Kommentar
-        API_URL=http://localhost:3000
-        export TOKEN="geheim wert"
-        LEER=
-        1FALSCH=x
-        ohne_gleich
-        """)
+        let vars = RunEnvironment.parseVariables(
+            """
+            # Kommentar
+            API_URL=http://localhost:3000
+            export TOKEN="geheim wert"
+            LEER=
+            1FALSCH=x
+            ohne_gleich
+            """)
         XCTAssertEqual(vars, ["API_URL": "http://localhost:3000", "TOKEN": "geheim wert", "LEER": ""])
         XCTAssertEqual(RunEnvironment.formatVariables(["B": "2", "A": "1"]), "A=1\nB=2")
         XCTAssertTrue(RunEnvironment().isEmpty)
@@ -38,8 +39,9 @@ final class DeveloperToolsTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-cwd-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let r = try await CodeRun().run(code: "import os\nprint(os.getcwd())\nprint(os.environ['FOLIO_TEST'])", language: python,
-                                        options: RunOptions(workingDirectory: dir, environment: ["FOLIO_TEST": "hallo"]))
+        let r = try await CodeRun().run(
+            code: "import os\nprint(os.getcwd())\nprint(os.environ['FOLIO_TEST'])", language: python,
+            options: RunOptions(workingDirectory: dir, environment: ["FOLIO_TEST": "hallo"]))
         let lines = r.stdout.split(separator: "\n").map(String.init)
         XCTAssertEqual(lines.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }, dir.resolvingSymlinksInPath().path)
         XCTAssertEqual(lines.last, "hallo")
@@ -49,8 +51,9 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testPrefilledInput() async throws {
         try requirePython()
-        let r = try await CodeRun().run(code: "name = input('Name? ')\nprint('Hallo', name)\nimport sys\nprint(len(sys.stdin.read().split()))",
-                                        language: python, options: RunOptions(stdin: "Ada\neins zwei drei"))
+        let r = try await CodeRun().run(
+            code: "name = input('Name? ')\nprint('Hallo', name)\nimport sys\nprint(len(sys.stdin.read().split()))",
+            language: python, options: RunOptions(stdin: "Ada\neins zwei drei"))
         XCTAssertTrue(r.succeeded, r.stderr)
         XCTAssertTrue(r.stdout.contains("Hallo Ada"))
         XCTAssertTrue(r.stdout.hasSuffix("3\n"))
@@ -65,8 +68,11 @@ final class DeveloperToolsTests: XCTestCase {
     func testInteractiveInput() async throws {
         try requirePython()
         let run = CodeRun()
-        let task = Task { try await run.run(code: "a = input()\nb = input()\nprint(int(a) + int(b))", language: python,
-                                            options: RunOptions(interactive: true, limits: ResourceLimits(timeout: 10))) }
+        let task = Task {
+            try await run.run(
+                code: "a = input()\nb = input()\nprint(int(a) + int(b))", language: python,
+                options: RunOptions(interactive: true, limits: ResourceLimits(timeout: 10)))
+        }
         for _ in 0..<50 where !run.acceptsInput { try await Task.sleep(for: .milliseconds(50)) }
         XCTAssertTrue(run.acceptsInput)
         run.send("2\n")
@@ -119,8 +125,9 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testOutputLimitInRun() async throws {
         try requirePython()
-        let r = try await CodeRun().run(code: "for i in range(200000): print(i)", language: python,
-                                        options: RunOptions(limits: ResourceLimits(maxOutputBytes: 10_000)))
+        let r = try await CodeRun().run(
+            code: "for i in range(200000): print(i)", language: python,
+            options: RunOptions(limits: ResourceLimits(maxOutputBytes: 10_000)))
         XCTAssertTrue(r.succeeded)
         XCTAssertLessThan(r.stdout.utf8.count, 12_000)
         XCTAssertTrue(r.stdout.hasPrefix("0\n1\n"))
@@ -129,16 +136,18 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testTimeout() async throws {
         try requirePython()
-        let r = try await CodeRun().run(code: "import time\ntime.sleep(30)", language: python,
-                                        options: RunOptions(limits: ResourceLimits(timeout: 1)))
+        let r = try await CodeRun().run(
+            code: "import time\ntime.sleep(30)", language: python,
+            options: RunOptions(limits: ResourceLimits(timeout: 1)))
         XCTAssertTrue(r.timedOut)
         XCTAssertLessThan(r.duration, 5)
     }
 
     func testMemoryLimit() async throws {
         try requirePython()
-        let r = try await CodeRun().run(code: "import time\nx = bytearray(400 * 1024 * 1024)\nfor i in range(0, len(x), 4096): x[i] = 1\ntime.sleep(10)",
-                                        language: python, options: RunOptions(limits: ResourceLimits(timeout: 20, maxMemoryMB: 100)))
+        let r = try await CodeRun().run(
+            code: "import time\nx = bytearray(400 * 1024 * 1024)\nfor i in range(0, len(x), 4096): x[i] = 1\ntime.sleep(10)",
+            language: python, options: RunOptions(limits: ResourceLimits(timeout: 20, maxMemoryMB: 100)))
         XCTAssertTrue(r.memoryExceeded)
         XCTAssertFalse(r.succeeded)
         XCTAssertLessThan(r.duration, 8)
@@ -147,15 +156,18 @@ final class DeveloperToolsTests: XCTestCase {
     func testOrphansAreStopped() async throws {
         try requirePython()
         let marker = "folio-orphan-\(UUID().uuidString.prefix(8))"
-        let code = "import subprocess, time\nsubprocess.Popen(['/bin/sleep', '60', '\(marker)'] if False else ['/bin/sh', '-c', 'exec -a \(marker) sleep 60'])\ntime.sleep(1.5)\nprint('fertig')"
+        let code =
+            "import subprocess, time\nsubprocess.Popen(['/bin/sleep', '60', '\(marker)'] if False else ['/bin/sh', '-c', 'exec -a \(marker) sleep 60'])\ntime.sleep(1.5)\nprint('fertig')"
         let r = try await CodeRun().run(code: code, language: python, options: RunOptions())
         XCTAssertTrue(r.succeeded, r.stderr)
         try await Task.sleep(for: .milliseconds(500))
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
         p.arguments = ["-f", marker]
-        let pipe = Pipe(); p.standardOutput = pipe
-        try p.run(); p.waitUntilExit()
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        try p.run()
+        p.waitUntilExit()
         let left = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertEqual(left, "", "the background process must be gone")
     }
@@ -181,7 +193,8 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testLargeInputDoesNotPreventTimeout() async throws {
         try requirePython()
-        let r = try await CodeRun().run(code: "import time\ntime.sleep(30)", language: python,
+        let r = try await CodeRun().run(
+            code: "import time\ntime.sleep(30)", language: python,
             options: RunOptions(stdin: String(repeating: "x", count: 1_000_000), limits: ResourceLimits(timeout: 1)))
         XCTAssertTrue(r.timedOut)
         XCTAssertLessThan(r.duration, 6)
@@ -191,61 +204,65 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testPythonTraceback() {
         let out = """
-        Traceback (most recent call last):
-          File "/var/folders/x/folio-run-1/main.py", line 4, in <module>
-            f()
-          File "/var/folders/x/folio-run-1/main.py", line 2, in f
-            return 1 / 0
-        ZeroDivisionError: division by zero
-        """
-        XCTAssertEqual(DiagnosticParser.parse(out, fileName: "main.py"),
-                       [CodeDiagnostic(line: 2, message: "ZeroDivisionError: division by zero")])
+            Traceback (most recent call last):
+              File "/var/folders/x/folio-run-1/main.py", line 4, in <module>
+                f()
+              File "/var/folders/x/folio-run-1/main.py", line 2, in f
+                return 1 / 0
+            ZeroDivisionError: division by zero
+            """
+        XCTAssertEqual(
+            DiagnosticParser.parse(out, fileName: "main.py"),
+            [CodeDiagnostic(line: 2, message: "ZeroDivisionError: division by zero")])
         let session = """
-          File "<block>", line 3, in <module>
-        NameError: name 'y' is not defined
-        """
+              File "<block>", line 3, in <module>
+            NameError: name 'y' is not defined
+            """
         XCTAssertEqual(DiagnosticParser.parse(session, fileName: "<block>").map(\.line), [3])
         let syntax = """
-          File "/tmp/folio-run-2/main.py", line 5
-            if x
-                ^
-        SyntaxError: expected ':'
-        """
+              File "/tmp/folio-run-2/main.py", line 5
+                if x
+                    ^
+            SyntaxError: expected ':'
+            """
         XCTAssertEqual(DiagnosticParser.parse(syntax, fileName: "main.py"), [CodeDiagnostic(line: 5, message: "SyntaxError: expected ':'")])
     }
 
     func testCompilerDiagnostics() {
         let clang = """
-        /tmp/folio-run-3/main.c:3:5: error: use of undeclared identifier 'y'
-            y = 2;
-            ^
-        /tmp/folio-run-3/main.c:7:1: warning: non-void function does not return a value [-Wreturn-type]
-        1 error generated.
-        """
-        XCTAssertEqual(DiagnosticParser.parse(clang, fileName: "main.c"), [
-            CodeDiagnostic(line: 3, column: 5, message: "use of undeclared identifier 'y'"),
-            CodeDiagnostic(line: 7, column: 1, message: "non-void function does not return a value [-Wreturn-type]", severity: .warning),
-        ])
+            /tmp/folio-run-3/main.c:3:5: error: use of undeclared identifier 'y'
+                y = 2;
+                ^
+            /tmp/folio-run-3/main.c:7:1: warning: non-void function does not return a value [-Wreturn-type]
+            1 error generated.
+            """
+        XCTAssertEqual(
+            DiagnosticParser.parse(clang, fileName: "main.c"),
+            [
+                CodeDiagnostic(line: 3, column: 5, message: "use of undeclared identifier 'y'"),
+                CodeDiagnostic(line: 7, column: 1, message: "non-void function does not return a value [-Wreturn-type]", severity: .warning)
+            ])
         let swift = "/tmp/x/main.swift:2:7: error: cannot find 'foo' in scope"
         XCTAssertEqual(DiagnosticParser.parse(swift, fileName: "main.swift").first?.line, 2)
         let go = "# command-line-arguments\n./main.go:6:2: undefined: fmtt"
         XCTAssertEqual(DiagnosticParser.parse(go, fileName: "main.go").first?.message, "undefined: fmtt")
         let rust = """
-        error[E0425]: cannot find value `y` in this scope
-         --> /tmp/r/main.rs:2:20
-        """
-        XCTAssertEqual(DiagnosticParser.parse(rust, fileName: "main.rs"),
-                       [CodeDiagnostic(line: 2, column: 20, message: "cannot find value `y` in this scope")])
+            error[E0425]: cannot find value `y` in this scope
+             --> /tmp/r/main.rs:2:20
+            """
+        XCTAssertEqual(
+            DiagnosticParser.parse(rust, fileName: "main.rs"),
+            [CodeDiagnostic(line: 2, column: 20, message: "cannot find value `y` in this scope")])
         let bash = "/tmp/b/main.sh: line 4: nope: command not found"
         XCTAssertEqual(DiagnosticParser.parse(bash, fileName: "main.sh"), [CodeDiagnostic(line: 4, message: "nope: command not found")])
         let node = """
-        /tmp/n/main.js:3
-        undefinedFunction();
-        ^
+            /tmp/n/main.js:3
+            undefinedFunction();
+            ^
 
-        ReferenceError: undefinedFunction is not defined
-            at Object.<anonymous> (/tmp/n/main.js:3:1)
-        """
+            ReferenceError: undefinedFunction is not defined
+                at Object.<anonymous> (/tmp/n/main.js:3:1)
+            """
         XCTAssertEqual(DiagnosticParser.parse(node, fileName: "main.js").map(\.line), [3])
         XCTAssertTrue(DiagnosticParser.parse(node, fileName: "main.js").first?.message.contains("ReferenceError") == true)
         XCTAssertEqual(DiagnosticParser.parse("alles gut\n", fileName: "main.py"), [])
@@ -313,6 +330,14 @@ final class DeveloperToolsTests: XCTestCase {
 private final class LockedString: @unchecked Sendable {
     private let lock = NSLock()
     private var s = ""
-    func append(_ t: String) { lock.lock(); s += t; lock.unlock() }
-    var value: String { lock.lock(); defer { lock.unlock() }; return s }
+    func append(_ t: String) {
+        lock.lock()
+        s += t
+        lock.unlock()
+    }
+    var value: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return s
+    }
 }

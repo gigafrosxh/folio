@@ -8,21 +8,25 @@ import XCTest
 final class MediaEditTests: XCTestCase {
     /// A 4×2 picture: left half red, right half blue.
     private func picture() -> CGImage {
-        let ctx = CGContext(data: nil, width: 4, height: 2, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        let ctx = CGContext(
+            data: nil, width: 4, height: 2, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
         // (A crop test below needs to tell top from bottom: no other colour needed, the halves are left/right.)
-        ctx.setFillColor(red: 0, green: 0, blue: 1, alpha: 1); ctx.fill(CGRect(x: 2, y: 0, width: 2, height: 2))
+        ctx.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+        ctx.fill(CGRect(x: 2, y: 0, width: 2, height: 2))
         return ctx.makeImage()!
     }
 
     /// Red share of the pixel at (x, y) from the top left.
     private func isRed(_ image: CGImage, _ x: Int, _ y: Int) -> Bool {
-        let ctx = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let ctx = CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         let p = ctx.data!.assumingMemoryBound(to: UInt8.self)
-        let i = (y * image.width + x) * 4   // bitmap rows run from the top
+        let i = (y * image.width + x) * 4  // bitmap rows run from the top
         return p[i] > 200 && p[i + 2] < 60
     }
 
@@ -68,9 +72,11 @@ final class MediaEditTests: XCTestCase {
 
     func testFourTurnsKeepTheSameCrop() throws {
         // #203
-        let ctx = CGContext(data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        ctx.setFillColor(red: 0, green: 1, blue: 0, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        let ctx = CGContext(
+            data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 0, green: 1, blue: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
         let img = ctx.makeImage()!
         var edit = ImageEdit(crop: .init(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
         let before = try XCTUnwrap(edit.apply(to: img))
@@ -85,9 +91,11 @@ final class MediaEditTests: XCTestCase {
 
     func testCameraOrientationIsTheStartingPoint() throws {
         // #201: a 40×20 JPEG stored sideways (EXIF orientation 6) is shown 20×40.
-        let ctx = CGContext(data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        let ctx = CGContext(
+            data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
         let out = NSMutableData()
         let dest = CGImageDestinationCreateWithData(out, "public.jpeg" as CFString, 1, nil)!
         CGImageDestinationAddImage(dest, ctx.makeImage()!, [kCGImagePropertyOrientation: 6] as CFDictionary)

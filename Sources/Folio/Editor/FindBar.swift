@@ -142,7 +142,9 @@ struct FindBar: View {
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
-                Button { model.showReplace.toggle() } label: {
+                Button {
+                    model.showReplace.toggle()
+                } label: {
                     Image(systemName: model.showReplace ? "chevron.down" : "chevron.right").font(.system(size: 10, weight: .bold)).frame(width: 14)
                 }
                 .buttonStyle(.plain)
@@ -162,8 +164,16 @@ struct FindBar: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .helpLabel("Suchoptionen")
-                Button { model.previous() } label: { Image(systemName: "chevron.up") }.helpLabel("Vorheriger Treffer (⇧⌘G)")
-                Button { model.next() } label: { Image(systemName: "chevron.down") }.helpLabel("Nächster Treffer (⌘G)")
+                Button {
+                    model.previous()
+                } label: {
+                    Image(systemName: "chevron.up")
+                }.helpLabel("Vorheriger Treffer (⇧⌘G)")
+                Button {
+                    model.next()
+                } label: {
+                    Image(systemName: "chevron.down")
+                }.helpLabel("Nächster Treffer (⌘G)")
                 Button("Fertig", action: onClose).keyboardShortcut(.cancelAction).fixedSize()
             }
             if model.showReplace {
@@ -182,7 +192,10 @@ struct FindBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .solidBar()
-        .onAppear { focus = .query; model.search(keepPosition: false) }
+        .onAppear {
+            focus = .query
+            model.search(keepPosition: false)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .folioFindNext)) { n in
             guard model.doc === NoteStore.shared.currentDocument else { return }
             if (n.object as? Int) == -1 { model.previous() } else { model.next() }

@@ -63,7 +63,8 @@ final class LibraryOrganizationTests: XCTestCase {
         let lib = try library()
         let url = LibraryOrganization.file(in: lib)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(#"{"favorites":[],"sortMode":"spaeter-erfunden","smartViews":[{"id":"\#(UUID().uuidString)","name":"A","filter":{"period":"unbekannt"}}],"zukunft":1}"#.utf8).write(to: url)
+        try Data(#"{"favorites":[],"sortMode":"spaeter-erfunden","smartViews":[{"id":"\#(UUID().uuidString)","name":"A","filter":{"period":"unbekannt"}}],"zukunft":1}"#.utf8)
+            .write(to: url)
         guard case .loaded(let org) = LibraryOrganization.load(from: lib) else { return XCTFail("not loaded") }
         XCTAssertEqual(org.sortMode, .modified)
         XCTAssertEqual(org.smartViews.first?.filter, SearchFilter())
@@ -86,7 +87,8 @@ final class LibraryOrganizationTests: XCTestCase {
     func testFavoritesToggleAndPrune() {
         var org = LibraryOrganization()
         let a = UUID(), b = UUID()
-        org.toggleFavorite(a); org.toggleFavorite(b)
+        org.toggleFavorite(a)
+        org.toggleFavorite(b)
         XCTAssertEqual(org.favorites, [a, b])
         org.toggleFavorite(a)
         XCTAssertFalse(org.isFavorite(a))
@@ -128,9 +130,9 @@ final class LibraryOrganizationTests: XCTestCase {
         // #171
         let a = UUID(), b = UUID(), v = UUID()
         let json = """
-        {"favorites":["\(a)","\(b)","\(a)"],"noteOrder":{"all":["\(b)","\(b)","\(a)"]},"folderOrder":{"":["X","Y","X"]},
-         "smartViews":[{"id":"\(v)","name":"Eins","filter":{}},{"id":"\(v)","name":"Zwei","filter":{}}]}
-        """
+            {"favorites":["\(a)","\(b)","\(a)"],"noteOrder":{"all":["\(b)","\(b)","\(a)"]},"folderOrder":{"":["X","Y","X"]},
+             "smartViews":[{"id":"\(v)","name":"Eins","filter":{}},{"id":"\(v)","name":"Zwei","filter":{}}]}
+            """
         var org = try JSONDecoder().decode(LibraryOrganization.self, from: Data(json.utf8))
         XCTAssertEqual(org.favorites, [a, b])
         XCTAssertEqual(org.noteOrder["all"], [b, a])
@@ -171,15 +173,15 @@ final class LibraryOrganizationTests: XCTestCase {
         base.smartViews = [keep, gone]
         base.noteOrder = ["all": [a, b], "tag:x": [c]]
         var mine = base, theirs = base
-        mine.favorites.removeAll { $0 == a }               // removed here
-        mine.smartViews.removeAll { $0.id == gone.id }      // deleted here
-        mine.noteOrder["all"] = [b, a]                      // reordered here
-        theirs.favorites.removeAll { $0 == c }              // removed there
-        theirs.favorites.append(d)                          // added there
+        mine.favorites.removeAll { $0 == a }  // removed here
+        mine.smartViews.removeAll { $0.id == gone.id }  // deleted here
+        mine.noteOrder["all"] = [b, a]  // reordered here
+        theirs.favorites.removeAll { $0 == c }  // removed there
+        theirs.favorites.append(d)  // added there
         let added = SmartView(name: "Neu dort", filter: SearchFilter(text: "n"))
         theirs.smartViews.append(added)
         theirs.smartViews[0].name = "Umbenannt dort"
-        theirs.noteOrder["tag:x"] = nil                     // dropped there
+        theirs.noteOrder["tag:x"] = nil  // dropped there
         theirs.sortMode = .title
         let merged = mine.merging(theirs, base: base)
         XCTAssertEqual(merged.favorites, [b, d])
@@ -264,8 +266,10 @@ final class LibraryOrganizationTests: XCTestCase {
         let id = UUID()
         var block = BlockRecord(kind: .image)
         block.attachmentID = id
-        let atts = [FolioArchive.Attachment(id: id, filename: "a.txt", typeIdentifier: "public.plain-text", data: Data("A".utf8)),
-                    FolioArchive.Attachment(id: id, filename: "b.txt", typeIdentifier: "public.plain-text", data: Data("B".utf8))]
+        let atts = [
+            FolioArchive.Attachment(id: id, filename: "a.txt", typeIdentifier: "public.plain-text", data: Data("A".utf8)),
+            FolioArchive.Attachment(id: id, filename: "b.txt", typeIdentifier: "public.plain-text", data: Data("B".utf8))
+        ]
         let data = try NoteFile(meta: NoteMetadata(title: "Doppelt"), body: NoteBody(blocks: [block]), attachments: atts).encoded()
         let file = try NoteFile.decode(data)
         XCTAssertEqual(Set(file.attachments.map(\.id)).count, 2, "every attachment has its own id now")

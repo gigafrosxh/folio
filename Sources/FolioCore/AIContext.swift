@@ -160,7 +160,7 @@ public struct PassageIndex: Sendable {
         "zu", "zum", "zur", "mit", "von", "vom", "für", "auf", "an", "am", "aus", "bei", "den", "dem", "des", "es", "ich",
         "du", "wir", "sie", "er", "was", "wie", "wo", "wann", "welche", "welcher", "welches", "habe", "hat", "haben", "wird",
         "werden", "nicht", "auch", "noch", "nur", "so", "dass", "mein", "meine", "meinen", "meinem", "über", "the", "a",
-        "an", "and", "or", "of", "to", "is", "are", "was", "what", "which", "how", "my", "for", "on", "with", "do", "did",
+        "an", "and", "or", "of", "to", "is", "are", "was", "what", "which", "how", "my", "for", "on", "with", "do", "did"
     ]
 
     /// Lowercased word stems without accents; very short words and stopwords are skipped.

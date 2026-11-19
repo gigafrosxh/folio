@@ -164,7 +164,10 @@ extension NoteStore {
 
     /// Moves a note into Folio's trash (restorable; its versions are kept).
     func delete(_ id: UUID) {
-        if let t = templates.first(where: { $0.id == id }) { deleteTemplate(t); return }
+        if let t = templates.first(where: { $0.id == id }) {
+            deleteTemplate(t)
+            return
+        }
         // Saved before the path is read: a new title renames the file (#196).
         guard notes.contains(where: { $0.id == id }), savedBeforeDeleting(id), let ref = notes.first(where: { $0.id == id }) else { return }
         let wasSelected = selectedNoteID == id
@@ -236,8 +239,9 @@ extension NoteStore {
         copy.attachments = file.attachments.map { a in
             let newID = UUID()
             map[a.id] = newID
-            return FolioArchive.Attachment(id: newID, filename: a.header.filename, typeIdentifier: a.header.typeIdentifier,
-                                           isPackage: a.header.isPackage, data: a.data)
+            return FolioArchive.Attachment(
+                id: newID, filename: a.header.filename, typeIdentifier: a.header.typeIdentifier,
+                isPackage: a.header.isPackage, data: a.data)
         }
         for i in copy.body.blocks.indices {
             copy.body.blocks[i].id = UUID()
@@ -250,7 +254,8 @@ extension NoteStore {
         // Saved before the path is read: a new title renames the file (#196).
         documents[id]?.saveNow()
         guard let ref = notes.first(where: { $0.id == id }),
-              ref.folderURL.standardizedFileURL != folder.standardizedFileURL else { return }
+            ref.folderURL.standardizedFileURL != folder.standardizedFileURL
+        else { return }
         let target = uniqueURL(in: folder, base: ref.url.deletingPathExtension().lastPathComponent)
         do {
             try FileManager.default.moveItem(at: ref.url, to: target)

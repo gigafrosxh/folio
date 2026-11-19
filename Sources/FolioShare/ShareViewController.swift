@@ -33,12 +33,16 @@ final class ShareViewController: NSViewController {
             if NSWorkspace.shared.open(link) {
                 extensionContext?.completeRequest(returningItems: nil)
             } else {
-                extensionContext?.cancelRequest(withError: NSError(domain: "de.daniel.folio.share", code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Folio konnte nicht geöffnet werden. Ist Folio installiert?"]))
+                extensionContext?.cancelRequest(
+                    withError: NSError(
+                        domain: "de.daniel.folio.share", code: 2,
+                        userInfo: [NSLocalizedDescriptionKey: "Folio konnte nicht geöffnet werden. Ist Folio installiert?"]))
             }
         } else {
-            extensionContext?.cancelRequest(withError: NSError(domain: "de.daniel.folio.share", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Nichts zum Übernehmen: keine Webadresse und kein Text."]))
+            extensionContext?.cancelRequest(
+                withError: NSError(
+                    domain: "de.daniel.folio.share", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Nichts zum Übernehmen: keine Webadresse und kein Text."]))
         }
     }
 }

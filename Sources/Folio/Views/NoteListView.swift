@@ -34,26 +34,32 @@ struct NoteListView: View {
                                     .padding(.top, 10)
                                     .padding(.bottom, 4)
                             case .note(let note):
-                                NoteCard(note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected,
-                                         favorite: store.isFavorite(note.id))
-                                    .id(note.id)
-                                    .onTapGesture {
-                                        // ⌘-click opens the note in a new tab, ⌥-click on the right.
-                                        let mods = NSEvent.modifierFlags
-                                        if mods.contains(.command) { store.openInNewTab(note.id) }
-                                        else if mods.contains(.option) { store.openInSplit(note.id) }
-                                        else { store.selectedNoteID = note.id }
-                                        focused = true
+                                NoteCard(
+                                    note: note, selected: store.selectedNoteID == note.id, showFolder: !isFolderSelected,
+                                    favorite: store.isFavorite(note.id)
+                                )
+                                .id(note.id)
+                                .onTapGesture {
+                                    // ⌘-click opens the note in a new tab, ⌥-click on the right.
+                                    let mods = NSEvent.modifierFlags
+                                    if mods.contains(.command) {
+                                        store.openInNewTab(note.id)
+                                    } else if mods.contains(.option) {
+                                        store.openInSplit(note.id)
+                                    } else {
+                                        store.selectedNoteID = note.id
                                     }
-                                    .accessibilityElement(children: .combine)
-                                    .accessibilityAddTraits(store.selectedNoteID == note.id ? [.isButton, .isSelected] : .isButton)
-                                    .accessibilityAction { store.selectedNoteID = note.id }
-                                    .accessibilityAction(named: "In neuem Tab öffnen") { store.openInNewTab(note.id) }
-                                    .accessibilityAction(named: "Rechts daneben öffnen") { store.openInSplit(note.id) }
-                                    .draggable(note.id.uuidString)
-                                    // Dropping a note on another one puts it in front of it: the list keeps its own order (#13).
-                                    .dropDestination(for: String.self) { items, _ in drop(items, on: note, in: notes) }
-                                    .contextMenu { menu(for: note) }
+                                    focused = true
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(store.selectedNoteID == note.id ? [.isButton, .isSelected] : .isButton)
+                                .accessibilityAction { store.selectedNoteID = note.id }
+                                .accessibilityAction(named: "In neuem Tab öffnen") { store.openInNewTab(note.id) }
+                                .accessibilityAction(named: "Rechts daneben öffnen") { store.openInSplit(note.id) }
+                                .draggable(note.id.uuidString)
+                                // Dropping a note on another one puts it in front of it: the list keeps its own order (#13).
+                                .dropDestination(for: String.self) { items, _ in drop(items, on: note, in: notes) }
+                                .contextMenu { menu(for: note) }
                             }
                         }
                     }
@@ -65,8 +71,14 @@ struct NoteListView: View {
                 .focusable()
                 .focusEffectDisabled()
                 .focused($focused)
-                .onKeyPress(.downArrow) { step(1, in: notes, proxy: proxy); return .handled }
-                .onKeyPress(.upArrow) { step(-1, in: notes, proxy: proxy); return .handled }
+                .onKeyPress(.downArrow) {
+                    step(1, in: notes, proxy: proxy)
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    step(-1, in: notes, proxy: proxy)
+                    return .handled
+                }
                 .onDeleteCommand { if let id = store.selectedNoteID { store.delete(id) } }
             }
         }
@@ -91,7 +103,8 @@ struct NoteListView: View {
     /// A note dropped on another one goes in front of it.
     private func drop(_ items: [String], on note: NoteRef, in notes: [NoteRef]) -> Bool {
         guard store.canReorderNotes, let id = items.first.flatMap(UUID.init(uuidString:)),
-              id != note.id, notes.contains(where: { $0.id == id }) else { return false }
+            id != note.id, notes.contains(where: { $0.id == id })
+        else { return false }
         withAnimation(Motion.standard) { store.moveNote(id, before: note.id) }
         return true
     }
@@ -136,7 +149,10 @@ struct NoteListView: View {
                     Button("Leere Notiz") { store.createNote(initialTag: currentTag) }
                     Section("Aus Vorlage") {
                         ForEach(store.templates, id: \.id) { t in Button(t.meta.title) { store.createNote(from: t) } }
-                        Button("Vorlagen verwalten …") { store.ensureStarterTemplates(); store.sidebarSelection = .templates }
+                        Button("Vorlagen verwalten …") {
+                            store.ensureStarterTemplates()
+                            store.sidebarSelection = .templates
+                        }
                     }
                 } label: {
                     Image(systemName: "square.and.pencil")
@@ -159,9 +175,11 @@ struct NoteListView: View {
 
     /// Search filters; sorting and saving the search sit in their own slim row below the title.
     private var filterButton: some View {
-        iconButton(store.searchFilter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
-                   help: "Suchfilter: Tag, Ordner, Zeitraum, Inhalt") { showFilters.toggle() }
-            .popover(isPresented: $showFilters, arrowEdge: .bottom) { SearchFilterPopover().environmentObject(store) }
+        iconButton(
+            store.searchFilter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+            help: "Suchfilter: Tag, Ordner, Zeitraum, Inhalt"
+        ) { showFilters.toggle() }
+        .popover(isPresented: $showFilters, arrowEdge: .bottom) { SearchFilterPopover().environmentObject(store) }
     }
 
     /// Order of the list (#13) and „save this search as a view“ (#14).
@@ -189,8 +207,12 @@ struct NoteListView: View {
     /// Dragging a note also switches to the own order.
     private var sortMenu: some View {
         Menu {
-            Picker("Sortieren nach", selection: Binding(get: { store.organization.sortMode },
-                                                        set: { store.organization.sortMode = $0 })) {
+            Picker(
+                "Sortieren nach",
+                selection: Binding(
+                    get: { store.organization.sortMode },
+                    set: { store.organization.sortMode = $0 })
+            ) {
                 ForEach(NoteSortMode.allCases, id: \.self) { Text($0.label).tag($0) }
             }
             .pickerStyle(.inline)
@@ -239,8 +261,10 @@ struct NoteListView: View {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .medium))
                 .frame(width: 34, height: 34)
-                .background(prominent ? theme.accent.opacity(0.18) : Color.primary.opacity(0.06),
-                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(
+                    prominent ? theme.accent.opacity(0.18) : Color.primary.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
                 .foregroundStyle(prominent ? theme.accent : .primary)
         }
         .buttonStyle(.plain)
@@ -255,7 +279,10 @@ struct NoteListView: View {
         withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(notes[j].id) }
     }
 
-    private struct Group { var title: String; var notes: [NoteRef] }
+    private struct Group {
+        var title: String
+        var notes: [NoteRef]
+    }
 
     enum Row: Identifiable {
         case header(String)
@@ -285,17 +312,26 @@ struct NoteListView: View {
         }
         let cal = Calendar.current
         let now = Date()
-        var buckets: [(String, [NoteRef])] = [("Angepinnt", []), ("Heute", []), ("Gestern", []), ("Letzte 7 Tage", []),
-                                              ("Letzte 30 Tage", []), ("Älter", [])]
+        var buckets: [(String, [NoteRef])] = [
+            ("Angepinnt", []), ("Heute", []), ("Gestern", []), ("Letzte 7 Tage", []),
+            ("Letzte 30 Tage", []), ("Älter", [])
+        ]
         for n in notes {
             let d = mode == .created ? n.meta.created : n.meta.modified
             let idx: Int
-            if n.meta.pinned { idx = 0 }
-            else if cal.isDateInToday(d) { idx = 1 }
-            else if cal.isDateInYesterday(d) { idx = 2 }
-            else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 7 { idx = 3 }
-            else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 30 { idx = 4 }
-            else { idx = 5 }
+            if n.meta.pinned {
+                idx = 0
+            } else if cal.isDateInToday(d) {
+                idx = 1
+            } else if cal.isDateInYesterday(d) {
+                idx = 2
+            } else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 7 {
+                idx = 3
+            } else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 30 {
+                idx = 4
+            } else {
+                idx = 5
+            }
             buckets[idx].1.append(n)
         }
         return buckets.filter { !$0.1.isEmpty }.map { Group(title: $0.0, notes: $0.1) }

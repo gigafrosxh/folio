@@ -17,8 +17,9 @@ enum RichTextCodec {
 
     static func attributedString(from rtf: Data?) -> NSMutableAttributedString {
         guard let rtf, !rtf.isEmpty,
-              let s = try? NSMutableAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf],
-                                                     documentAttributes: nil)
+            let s = try? NSMutableAttributedString(
+                data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf],
+                documentAttributes: nil)
         else { return NSMutableAttributedString() }
         applyDefaultColor(s)
         return s

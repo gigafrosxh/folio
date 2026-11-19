@@ -53,8 +53,9 @@ struct GraphView: View {
     private var model: Model {
         let index = store.linkIndex
         var ids = Set(index.nodes.keys)
-        if let focus { ids = index.neighborhood(of: focus, depth: depth) }
-        else {
+        if let focus {
+            ids = index.neighborhood(of: focus, depth: depth)
+        } else {
             if !tagFilter.isEmpty { ids = ids.filter { index.nodes[$0]?.tags.contains(tagFilter) == true } }
             if !folderFilter.isEmpty { ids = ids.filter { index.nodes[$0]?.folder == folderFilter || index.nodes[$0]?.folder.hasPrefix(folderFilter + "/") == true } }
             // With a depth, only notes close to the open note (#113).
@@ -71,8 +72,9 @@ struct GraphView: View {
             folders = extra.folders
             edges += extra.edges
             nodes += extra.folders.map { id, path in
-                LinkIndex.Node(id: id, title: (path as NSString).lastPathComponent, folder: (path as NSString).deletingLastPathComponent,
-                               tags: [], modified: .distantPast)
+                LinkIndex.Node(
+                    id: id, title: (path as NSString).lastPathComponent, folder: (path as NSString).deletingLastPathComponent,
+                    tags: [], modified: .distantPast)
             }.sorted { $0.id.uuidString < $1.id.uuidString }
         }
         return Model(nodes: nodes, edges: edges, orphans: orphans, folders: folders)
@@ -112,7 +114,10 @@ struct GraphView: View {
                 GraphLayout.compute3D(nodes: nodes, edges: edges, previous: previous)
             }.value
             withAnimation(Motion.standard) { positions3D = result }
-            if layoutKey.isEmpty || !layoutKey.hasSuffix("true") { zoom = 1; pan = .zero }
+            if layoutKey.isEmpty || !layoutKey.hasSuffix("true") {
+                zoom = 1
+                pan = .zero
+            }
         } else {
             let previous = positions
             let result = await Task.detached(priority: .userInitiated) {
@@ -182,7 +187,12 @@ struct GraphView: View {
             }
             .gesture(SpatialTapGesture().modifiers(.option).onEnded { v in markPathEnd(at: v.location, m, proj) })
             .simultaneousGesture(SpatialTapGesture().onEnded { v in openNode(at: v.location, m, proj) })
-            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged(drag).onEnded { _ in dragStart = nil; rotateStart = nil })
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 3).onChanged(drag).onEnded { _ in
+                    dragStart = nil
+                    rotateStart = nil
+                }
+            )
             .simultaneousGesture(MagnifyGesture().onChanged { v in magnify(v.magnification) }.onEnded { _ in pinchStart = nil })
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(focus == nil ? "Graph aller Notizen" : "Lokaler Graph")
@@ -197,7 +207,10 @@ struct GraphView: View {
 
     /// ⌥-click two notes: the shortest path between them lights up (#114).
     private func markPathEnd(at location: CGPoint, _ m: Model, _ proj: GraphProjection) {
-        guard let id = node(at: location, m, proj), m.folders[id] == nil else { pathEnds = []; return }
+        guard let id = node(at: location, m, proj), m.folders[id] == nil else {
+            pathEnds = []
+            return
+        }
         pathEnds = pathEnds.count == 1 ? [pathEnds[0], id] : [id]
     }
 
@@ -273,14 +286,34 @@ struct GraphView: View {
     /// pushes the window layout wider than the window (#241).
     private func toolbar(_ m: Model) -> some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { searchField; filterPickers; toggles; Spacer(); zoomButtons }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) { searchField; Spacer(); zoomButtons }
-                HStack(spacing: 10) { filterPickers; toggles }
+            HStack(spacing: 10) {
+                searchField
+                filterPickers
+                toggles
+                Spacer()
+                zoomButtons
             }
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) { searchField; Spacer(); zoomButtons }
-                HStack(spacing: 10) { filterMenu; toggles }
+                HStack(spacing: 10) {
+                    searchField
+                    Spacer()
+                    zoomButtons
+                }
+                HStack(spacing: 10) {
+                    filterPickers
+                    toggles
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    searchField
+                    Spacer()
+                    zoomButtons
+                }
+                HStack(spacing: 10) {
+                    filterMenu
+                    toggles
+                }
             }
         }
         .padding(10)
@@ -365,17 +398,38 @@ struct GraphView: View {
     }
 
     @ViewBuilder private var zoomButtons: some View {
-        Button { zoom = max(zoom / 1.25, 0.15) } label: { Image(systemName: "minus.magnifyingglass") }.helpLabel("Verkleinern")
-        Button { zoom = min(zoom * 1.25, 4) } label: { Image(systemName: "plus.magnifyingglass") }.helpLabel("Vergrößern")
-        Button { if threeD { zoom = 1; pan = .zero; yaw = 0.6; pitch = -0.35 } else { fit(positions) } } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }.helpLabel("Alles zeigen")
+        Button {
+            zoom = max(zoom / 1.25, 0.15)
+        } label: {
+            Image(systemName: "minus.magnifyingglass")
+        }.helpLabel("Verkleinern")
+        Button {
+            zoom = min(zoom * 1.25, 4)
+        } label: {
+            Image(systemName: "plus.magnifyingglass")
+        }.helpLabel("Vergrößern")
+        Button {
+            if threeD {
+                zoom = 1
+                pan = .zero
+                yaw = 0.6
+                pitch = -0.35
+            } else {
+                fit(positions)
+            }
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+        }.helpLabel("Alles zeigen")
     }
 
     private func legend(_ m: Model) -> some View {
         HStack(spacing: 12) {
             Text(summary(m).legend)
             Spacer()
-            Text(threeD ? "Klick öffnet · Ziehen dreht · ⇧-Ziehen verschiebt · Zwei Finger zoomen"
-                        : "Klick öffnet · ⌥-Klick auf zwei Notizen zeigt den Weg · Ziehen verschiebt · Zwei Finger zoomen")
+            Text(
+                threeD
+                    ? "Klick öffnet · Ziehen dreht · ⇧-Ziehen verschiebt · Zwei Finger zoomen"
+                    : "Klick öffnet · ⌥-Klick auf zwei Notizen zeigt den Weg · Ziehen verschiebt · Zwei Finger zoomen")
         }
         .font(.caption).foregroundStyle(.secondary)
         .padding(.horizontal, 12).padding(.vertical, 6)

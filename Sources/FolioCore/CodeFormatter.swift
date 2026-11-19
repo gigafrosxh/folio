@@ -33,9 +33,11 @@ public enum CodeStyle {
     public static func reindent(_ text: String, baseIndent: String) -> String {
         let lines = text.components(separatedBy: "\n")
         guard lines.count > 1 else { return text }
-        return ([lines[0]] + lines.dropFirst().map { line in
-            line.trimmingCharacters(in: .whitespaces).isEmpty ? "" : baseIndent + line
-        }).joined(separator: "\n")
+        return
+            ([lines[0]]
+            + lines.dropFirst().map { line in
+                line.trimmingCharacters(in: .whitespaces).isEmpty ? "" : baseIndent + line
+            }).joined(separator: "\n")
     }
 
     /// Makes later lines of a completion relative to its first line's indentation.
@@ -76,7 +78,7 @@ public enum CodeFormatter {
         "lua": [["stylua", "{file}"]],
         "ruby": [["rubocop", "-a", "--stderr", "{file}"]],
         "php": [["php-cs-fixer", "fix", "{file}"]],
-        "sql": [["sqlfluff", "fix", "-f", "{file}"]],
+        "sql": [["sqlfluff", "fix", "-f", "{file}"]]
     ]
 
     public enum FormatError: Error, LocalizedError {
@@ -91,37 +93,38 @@ public enum CodeFormatter {
     }
 
     #if os(macOS)
-    /// Name of the formatter that would be used, if one is installed.
-    public static func available(for language: LanguageSpec, locator: InterpreterLocator = .shared) -> String? {
-        tools[language.id]?.first { locator.find($0[0]) != nil }?[0]
-    }
-
-    public static func format(_ code: String, language: LanguageSpec, locator: InterpreterLocator = .shared) throws -> String {
-        guard let command = tools[language.id]?.first(where: { locator.find($0[0]) != nil }),
-              let exe = locator.find(command[0]) else { throw FormatError.noFormatter(language.name) }
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-fmt-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appendingPathComponent("main.\(language.fileExtension)")
-        try code.write(to: file, atomically: true, encoding: .utf8)
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: exe)
-        p.arguments = command.dropFirst().map { $0.replacingOccurrences(of: "{file}", with: file.path) }
-        p.currentDirectoryURL = dir
-        p.environment = locator.environment
-        let err = Pipe()
-        p.standardError = err
-        p.standardOutput = FileHandle.nullDevice
-        try p.run()
-        let errData = err.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else {
-            throw FormatError.failed(String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        /// Name of the formatter that would be used, if one is installed.
+        public static func available(for language: LanguageSpec, locator: InterpreterLocator = .shared) -> String? {
+            tools[language.id]?.first { locator.find($0[0]) != nil }?[0]
         }
-        var result = try String(contentsOf: file, encoding: .utf8)
-        if !code.hasSuffix("\n"), result.hasSuffix("\n") { result.removeLast() }
-        return result
-    }
+
+        public static func format(_ code: String, language: LanguageSpec, locator: InterpreterLocator = .shared) throws -> String {
+            guard let command = tools[language.id]?.first(where: { locator.find($0[0]) != nil }),
+                let exe = locator.find(command[0])
+            else { throw FormatError.noFormatter(language.name) }
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-fmt-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let file = dir.appendingPathComponent("main.\(language.fileExtension)")
+            try code.write(to: file, atomically: true, encoding: .utf8)
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: exe)
+            p.arguments = command.dropFirst().map { $0.replacingOccurrences(of: "{file}", with: file.path) }
+            p.currentDirectoryURL = dir
+            p.environment = locator.environment
+            let err = Pipe()
+            p.standardError = err
+            p.standardOutput = FileHandle.nullDevice
+            try p.run()
+            let errData = err.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else {
+                throw FormatError.failed(String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            var result = try String(contentsOf: file, encoding: .utf8)
+            if !code.hasSuffix("\n"), result.hasSuffix("\n") { result.removeLast() }
+            return result
+        }
     #endif
 }
 

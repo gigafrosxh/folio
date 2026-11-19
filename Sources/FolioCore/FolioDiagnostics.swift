@@ -136,8 +136,11 @@ private struct DiagnosisReader {
     private mutating func readMetadata() -> Bool {
         do {
             let raw = try r.readSection(compressed: compressed)
-            if let meta = try? JSONDecoder().decode(NoteMetadata.self, from: raw) { report.meta = meta }
-            else { add(.warning, "Titel, Tags und Datum sind unlesbar; die Notiz bekommt neue Angaben.") }
+            if let meta = try? JSONDecoder().decode(NoteMetadata.self, from: raw) {
+                report.meta = meta
+            } else {
+                add(.warning, "Titel, Tags und Datum sind unlesbar; die Notiz bekommt neue Angaben.")
+            }
             return true
         } catch {
             add(.error, "Schon der Kopfbereich (Titel, Tags) ist beschädigt: \(FolioDiagnostics.reason(error)). Danach ist nichts mehr lesbar.")
@@ -166,8 +169,11 @@ private struct DiagnosisReader {
                 report.lostBlocks += 1
             }
         }
-        if list.isEmpty { add(.error, "Der Inhalt der Notiz ist unlesbar (kein gültiges Format).") }
-        else { add(.error, "\(report.lostBlocks) von \(list.count) Blöcken sind unlesbar; die übrigen wurden gerettet.") }
+        if list.isEmpty {
+            add(.error, "Der Inhalt der Notiz ist unlesbar (kein gültiges Format).")
+        } else {
+            add(.error, "\(report.lostBlocks) von \(list.count) Blöcken sind unlesbar; die übrigen wurden gerettet.")
+        }
     }
 
     private mutating func readAttachments() -> Bool {
@@ -267,9 +273,17 @@ public enum TextDiff {
         var out: [Line] = []
         var i = 0, j = 0
         while i < a.count && j < b.count {
-            if a[i] == b[j] { out.append(Line(kind: .same, text: a[i])); i += 1; j += 1 }
-            else if lcs[i + 1][j] >= lcs[i][j + 1] { out.append(Line(kind: .removed, text: a[i])); i += 1 }
-            else { out.append(Line(kind: .added, text: b[j])); j += 1 }
+            if a[i] == b[j] {
+                out.append(Line(kind: .same, text: a[i]))
+                i += 1
+                j += 1
+            } else if lcs[i + 1][j] >= lcs[i][j + 1] {
+                out.append(Line(kind: .removed, text: a[i]))
+                i += 1
+            } else {
+                out.append(Line(kind: .added, text: b[j]))
+                j += 1
+            }
         }
         out += a[i...].map { Line(kind: .removed, text: $0) } + b[j...].map { Line(kind: .added, text: $0) }
         return out

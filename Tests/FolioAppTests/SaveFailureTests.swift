@@ -18,7 +18,10 @@ final class SaveFailureTests: XCTestCase {
     override func tearDown() async throws {
         guard let folder else { return }
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
-        if let c = store.conflict { store.conflict = nil; store.closeDocument(c.doc.id) }
+        if let c = store.conflict {
+            store.conflict = nil
+            store.closeDocument(c.doc.id)
+        }
         for id in store.tabs { store.documents[id]?.saveNow() }
         store.selectedNoteID = nil
         try? FileManager.default.removeItem(at: folder)

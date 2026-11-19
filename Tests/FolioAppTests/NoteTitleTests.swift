@@ -38,8 +38,9 @@ final class NoteTitleTests: XCTestCase {
     func testNoteWithoutTextKeepsItsTitle() {
         var image = BlockRecord(kind: .image)
         image.attachmentID = UUID()
-        let doc = NoteDocument(file: NoteFile(meta: NoteMetadata(title: "1+1="), body: NoteBody(blocks: [BlockRecord(kind: .text), image])),
-                               url: URL(fileURLWithPath: "/dev/null"))
+        let doc = NoteDocument(
+            file: NoteFile(meta: NoteMetadata(title: "1+1="), body: NoteBody(blocks: [BlockRecord(kind: .text), image])),
+            url: URL(fileURLWithPath: "/dev/null"))
         XCTAssertEqual(doc.makeFile().meta.title, "1+1=")
         XCTAssertEqual(title(""), "Alt", "an empty note keeps its title too")
         XCTAssertEqual(title("Neu"), "Neu", "text still sets the title")
@@ -48,7 +49,9 @@ final class NoteTitleTests: XCTestCase {
     func testCaptureDateLineIsNoTitle() {
         XCTAssertEqual(title("— 20. Okt. 2026, 19:31 —\nIdee für das Projekt"), "Idee für das Projekt")
         XCTAssertEqual(title("Meine Notiz\n— 20. Okt. 2026, 19:31 —\nNeu"), "Meine Notiz")
-        XCTAssertEqual(title("— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —"), "— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —")
+        XCTAssertEqual(
+            title("— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —"),
+            "— Gedankenstrich am Anfang ist erlaubt, wenn die Zeile lang genug ist und weitergeht —")
     }
 
     func testListMarkersAreNotPartOfTheTitle() {

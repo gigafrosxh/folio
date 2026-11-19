@@ -23,9 +23,14 @@ final class GraphAndScanGoldenTests: XCTestCase {
         let star = (1..<8).map { (n[0], n[$0]) }
         let chain = (0..<5).map { (n[$0], n[$0 + 1]) } + [(n[2], n[2]), (n[3], UUID())]
         var big: [(UUID, UUID)] = []
-        for i in 0..<60 { big.append((n[i], n[(i * 7 + 3) % 60])); if i % 4 == 0 { big.append((n[i], n[(i + 11) % 60])) } }
-        return [("leer", [], []), ("eins", [n[0]], []), ("kreis", Array(n[0..<5]), cycle), ("stern", Array(n[0..<8]), star),
-                ("kette", Array(n[0..<6]), chain), ("gross", n, big)]
+        for i in 0..<60 {
+            big.append((n[i], n[(i * 7 + 3) % 60]))
+            if i % 4 == 0 { big.append((n[i], n[(i + 11) % 60])) }
+        }
+        return [
+            ("leer", [], []), ("eins", [n[0]], []), ("kreis", Array(n[0..<5]), cycle), ("stern", Array(n[0..<8]), star),
+            ("kette", Array(n[0..<6]), chain), ("gross", n, big)
+        ]
     }
 
     private func line(_ id: UUID, _ values: [Double]) -> String {
@@ -78,13 +83,14 @@ final class GraphAndScanGoldenTests: XCTestCase {
         let cases: [(String, Data)] = [
             ("gut", good), ("leer", Data()), ("fremd", Data("HALLO".utf8)), ("nur kennung", good.prefix(4)),
             ("neuer", newer), ("abgeschnitten kopf", good.prefix(12)), ("abgeschnitten mitte", good.prefix(good.count / 2)),
-            ("abgeschnitten ende", good.prefix(good.count - 20)), ("verfälscht", flipped), ("fehlender anhang", missing),
+            ("abgeschnitten ende", good.prefix(good.count - 20)), ("verfälscht", flipped), ("fehlender anhang", missing)
         ]
-        let text = cases.map { name, data in
-            let r = FolioDiagnostics.diagnose(data)
-            return "== \(name): blocks \(r.blocks.count) attachments \(r.attachments.count) lost \(r.lostBlocks)/\(r.lostAttachments)\n"
-                + r.problems.map { "\($0.severity) \($0.message)" }.joined(separator: "\n")
-        }.joined(separator: "\n") + "\n"
+        let text =
+            cases.map { name, data in
+                let r = FolioDiagnostics.diagnose(data)
+                return "== \(name): blocks \(r.blocks.count) attachments \(r.attachments.count) lost \(r.lostBlocks)/\(r.lostAttachments)\n"
+                    + r.problems.map { "\($0.severity) \($0.message)" }.joined(separator: "\n")
+            }.joined(separator: "\n") + "\n"
         try compare(text, with: "diagnosis.txt")
     }
 
@@ -132,8 +138,9 @@ final class LibraryScanEdgeCaseTests: XCTestCase {
         let r = LibraryScanner().scan(root)
         XCTAssertEqual(r.notes.map(\.meta.title).sorted(), ["Eins", "Zwei"], "die verlinkte Notiz zählt nur einmal")
         XCTAssertEqual(r.unreadable.map(\.lastPathComponent), ["Kaputt.folio"])
-        XCTAssertEqual(r.skippedLinks.map { "\($0.url.lastPathComponent): \($0.reason)" }.sorted(),
-                       ["Draußen: zeigt aus der Bibliothek heraus", "Weg: Ziel fehlt", "Zurück: Schleife (Ordner ist schon enthalten)"])
+        XCTAssertEqual(
+            r.skippedLinks.map { "\($0.url.lastPathComponent): \($0.reason)" }.sorted(),
+            ["Draußen: zeigt aus der Bibliothek heraus", "Weg: Ziel fehlt", "Zurück: Schleife (Ordner ist schon enthalten)"])
         XCTAssertEqual(r.folders.map(\.name), ["A"])
         XCTAssertEqual(r.folders.first?.children.map(\.name), ["B"])
         XCTAssertEqual(String(decoding: try Data(contentsOf: root.appendingPathComponent("A/Kaputt.folio")), as: UTF8.self), "kaputt", "nichts wird verändert")

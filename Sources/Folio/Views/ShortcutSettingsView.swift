@@ -54,8 +54,9 @@ struct ShortcutSettingsView: View {
                 Button {
                     startRecording(action)
                 } label: {
-                    keyCap(recording ? "Taste drücken …" : combo.key == "none" ? "–" : combo.display,
-                           recording: recording)
+                    keyCap(
+                        recording ? "Taste drücken …" : combo.key == "none" ? "–" : combo.display,
+                        recording: recording)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Tastenkürzel für \(action.title)")

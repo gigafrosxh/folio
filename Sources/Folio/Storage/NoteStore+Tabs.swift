@@ -6,9 +6,17 @@ extension NoteStore {
     // MARK: Tabs, split view, windows
 
     func openInNewTab(_ id: UUID) {
-        if tabs.contains(id) { selectedNoteID = id; return }
+        if tabs.contains(id) {
+            selectedNoteID = id
+            return
+        }
         nextSelectionInNewTab = true
-        if selectedNoteID == id { tabs.append(id); nextSelectionInNewTab = false } else { selectedNoteID = id }
+        if selectedNoteID == id {
+            tabs.append(id)
+            nextSelectionInNewTab = false
+        } else {
+            selectedNoteID = id
+        }
     }
 
     func createNoteInNewTab() {
@@ -90,7 +98,10 @@ extension NoteStore {
     func save(_ doc: NoteDocument) {
         // Never overwrite a change made outside Folio since the note was loaded or last saved.
         // Still unresolved: the own changes are not on disk, so the note stays unsaved for every guard (#206).
-        if conflict?.doc === doc { doc.markDirtyWithoutSaving(); return }
+        if conflict?.doc === doc {
+            doc.markDirtyWithoutSaving()
+            return
+        }
         if let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url), current != expected {
             raiseConflict(doc)
             return

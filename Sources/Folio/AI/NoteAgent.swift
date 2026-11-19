@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import FolioCore
 #if canImport(FoundationModels)
-import FoundationModels
+    import FoundationModels
 #endif
 
 /// What the assistant may do with notes when asked (#124): create, add text, link, tag, rename, move.
@@ -26,7 +26,10 @@ enum NoteAgent {
         // Only close matches („Portugal“ for „Urlaub Portugal“); a loose fuzzy hit could change the wrong note.
         let q = WikiLink.key(title)
         guard q.count >= 3 else { return nil }
-        let close = store.notes.filter { let t = WikiLink.key($0.meta.title); return t.contains(q) || (t.count >= 3 && q.contains(t)) }
+        let close = store.notes.filter {
+            let t = WikiLink.key($0.meta.title)
+            return t.contains(q) || (t.count >= 3 && q.contains(t))
+        }
         return close.count == 1 ? close[0] : close.max { $0.meta.modified < $1.meta.modified }
     }
 
@@ -44,11 +47,13 @@ enum NoteAgent {
     static func append(to title: String, text: String) -> String {
         guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
         guard let doc = document(ref) else { return "Fehler: „\(ref.meta.title)“ ist nicht lesbar." }
-        let target = doc.blocks.last(where: { $0.kind == .text }) ?? {
-            let b = BlockModel(kind: .text)
-            doc.insert(b, after: doc.blocks.last?.id)
-            return b
-        }()
+        let target =
+            doc.blocks.last(where: { $0.kind == .text })
+            ?? {
+                let b = BlockModel(kind: .text)
+                doc.insert(b, after: doc.blocks.last?.id)
+                return b
+            }()
         let body = ThemeManager.shared.bodyAttributes
         let prefix = target.storage.length == 0 || target.storage.string.hasSuffix("\n") ? "" : "\n"
         target.storage.append(NSAttributedString(string: prefix + text, attributes: body))
@@ -132,93 +137,93 @@ enum NoteAgent {
 }
 
 #if canImport(FoundationModels)
-@available(macOS 26.0, *)
-enum NoteAgentTools {
-    static var all: [any Tool] {
-        [CreateNote(), AppendText(), LinkNotes(), AddTag(), RenameNote(), MoveNote(), FindNotes()]
-    }
+    @available(macOS 26.0, *)
+    enum NoteAgentTools {
+        static var all: [any Tool] {
+            [CreateNote(), AppendText(), LinkNotes(), AddTag(), RenameNote(), MoveNote(), FindNotes()]
+        }
 
-    struct CreateNote: Tool {
-        let name = "notizAnlegen"
-        let description = "Legt eine neue Notiz an."
-        @Generable struct Arguments {
-            @Guide(description: "Titel der neuen Notiz") var titel: String
-            @Guide(description: "Inhalt der Notiz ohne Titel, darf leer sein") var text: String
+        struct CreateNote: Tool {
+            let name = "notizAnlegen"
+            let description = "Legt eine neue Notiz an."
+            @Generable struct Arguments {
+                @Guide(description: "Titel der neuen Notiz") var titel: String
+                @Guide(description: "Inhalt der Notiz ohne Titel, darf leer sein") var text: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.createNote(title: arguments.titel, text: arguments.text) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.createNote(title: arguments.titel, text: arguments.text) }
-        }
-    }
 
-    struct AppendText: Tool {
-        let name = "textAnfuegen"
-        let description = "Fügt Text am Ende einer bestehenden Notiz an."
-        @Generable struct Arguments {
-            @Guide(description: "Titel der Notiz") var notiz: String
-            @Guide(description: "Anzufügender Text") var text: String
+        struct AppendText: Tool {
+            let name = "textAnfuegen"
+            let description = "Fügt Text am Ende einer bestehenden Notiz an."
+            @Generable struct Arguments {
+                @Guide(description: "Titel der Notiz") var notiz: String
+                @Guide(description: "Anzufügender Text") var text: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.append(to: arguments.notiz, text: arguments.text) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.append(to: arguments.notiz, text: arguments.text) }
-        }
-    }
 
-    struct LinkNotes: Tool {
-        let name = "notizenVerknuepfen"
-        let description = "Verknüpft zwei Notizen: die erste verweist danach mit einem [[Link]] auf die zweite."
-        @Generable struct Arguments {
-            @Guide(description: "Titel der Notiz, die den Link bekommt") var von: String
-            @Guide(description: "Titel der Notiz, auf die verwiesen wird") var nach: String
+        struct LinkNotes: Tool {
+            let name = "notizenVerknuepfen"
+            let description = "Verknüpft zwei Notizen: die erste verweist danach mit einem [[Link]] auf die zweite."
+            @Generable struct Arguments {
+                @Guide(description: "Titel der Notiz, die den Link bekommt") var von: String
+                @Guide(description: "Titel der Notiz, auf die verwiesen wird") var nach: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.link(from: arguments.von, to: arguments.nach) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.link(from: arguments.von, to: arguments.nach) }
-        }
-    }
 
-    struct AddTag: Tool {
-        let name = "tagHinzufuegen"
-        let description = "Gibt einer Notiz einen #Tag."
-        @Generable struct Arguments {
-            @Guide(description: "Titel der Notiz") var notiz: String
-            @Guide(description: "Tag ohne #") var tag: String
+        struct AddTag: Tool {
+            let name = "tagHinzufuegen"
+            let description = "Gibt einer Notiz einen #Tag."
+            @Generable struct Arguments {
+                @Guide(description: "Titel der Notiz") var notiz: String
+                @Guide(description: "Tag ohne #") var tag: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.addTag(arguments.tag, to: arguments.notiz) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.addTag(arguments.tag, to: arguments.notiz) }
-        }
-    }
 
-    struct RenameNote: Tool {
-        let name = "notizUmbenennen"
-        let description = "Ändert den Titel einer Notiz."
-        @Generable struct Arguments {
-            @Guide(description: "Bisheriger Titel") var notiz: String
-            @Guide(description: "Neuer Titel") var neuerTitel: String
+        struct RenameNote: Tool {
+            let name = "notizUmbenennen"
+            let description = "Ändert den Titel einer Notiz."
+            @Generable struct Arguments {
+                @Guide(description: "Bisheriger Titel") var notiz: String
+                @Guide(description: "Neuer Titel") var neuerTitel: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.rename(arguments.notiz, to: arguments.neuerTitel) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.rename(arguments.notiz, to: arguments.neuerTitel) }
-        }
-    }
 
-    struct MoveNote: Tool {
-        let name = "notizVerschieben"
-        let description = "Verschiebt eine Notiz in einen Ordner der Bibliothek; fehlende Ordner werden angelegt."
-        @Generable struct Arguments {
-            @Guide(description: "Titel der Notiz") var notiz: String
-            @Guide(description: "Ordnerpfad, z. B. Projekte/Alt") var ordner: String
+        struct MoveNote: Tool {
+            let name = "notizVerschieben"
+            let description = "Verschiebt eine Notiz in einen Ordner der Bibliothek; fehlende Ordner werden angelegt."
+            @Generable struct Arguments {
+                @Guide(description: "Titel der Notiz") var notiz: String
+                @Guide(description: "Ordnerpfad, z. B. Projekte/Alt") var ordner: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.move(arguments.notiz, toFolder: arguments.ordner) }
+            }
         }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.move(arguments.notiz, toFolder: arguments.ordner) }
-        }
-    }
 
-    struct FindNotes: Tool {
-        let name = "notizenSuchen"
-        let description = "Sucht Notizen nach Titel oder Inhalt und liefert ihre genauen Titel."
-        @Generable struct Arguments {
-            @Guide(description: "Suchbegriff") var suche: String
-        }
-        func call(arguments: Arguments) async throws -> String {
-            await MainActor.run { NoteAgent.search(arguments.suche) }
+        struct FindNotes: Tool {
+            let name = "notizenSuchen"
+            let description = "Sucht Notizen nach Titel oder Inhalt und liefert ihre genauen Titel."
+            @Generable struct Arguments {
+                @Guide(description: "Suchbegriff") var suche: String
+            }
+            func call(arguments: Arguments) async throws -> String {
+                await MainActor.run { NoteAgent.search(arguments.suche) }
+            }
         }
     }
-}
 #endif

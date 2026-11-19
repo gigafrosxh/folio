@@ -11,15 +11,16 @@ enum AppTranslocation {
     static func originalURL(of url: URL) -> URL? {
         typealias Fn = @convention(c) (CFURL, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Unmanaged<CFURL>?
         guard let handle = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY),
-              let symbol = dlsym(handle, "SecTranslocateCreateOriginalPathForURL") else { return nil }
+            let symbol = dlsym(handle, "SecTranslocateCreateOriginalPathForURL")
+        else { return nil }
         let fn = unsafeBitCast(symbol, to: Fn.self)
         guard let original = fn(url as CFURL, nil)?.takeRetainedValue() as URL?, !isTranslocated(original) else { return nil }
         return original
     }
 
     static let advice = """
-    macOS startet Folio aus einem schreibgeschützten Zufallsordner, weil die App noch als Download markiert ist. \
-    Beende Folio, ziehe es im Finder einmal in den Ordner „Programme“ (oder führe im Terminal \
-    „xattr -dr com.apple.quarantine <Pfad>/Folio.app“ aus) und starte es neu. Danach funktioniert der Update-Knopf.
-    """
+        macOS startet Folio aus einem schreibgeschützten Zufallsordner, weil die App noch als Download markiert ist. \
+        Beende Folio, ziehe es im Finder einmal in den Ordner „Programme“ (oder führe im Terminal \
+        „xattr -dr com.apple.quarantine <Pfad>/Folio.app“ aus) und starte es neu. Danach funktioniert der Update-Knopf.
+        """
 }

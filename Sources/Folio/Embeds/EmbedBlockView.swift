@@ -51,13 +51,29 @@ struct EmbedBlockView: View {
 
     private func load() {
         problem = nil
-        guard !title.isEmpty else { problem = "Kein Notiztitel angegeben."; content = nil; return }
-        guard let target else { problem = "Die Notiz „\(title)“ gibt es nicht. „Notiz anlegen“ erstellt sie."; content = nil; return }
-        guard target.id != doc.id else { problem = "Eine Notiz kann sich nicht selbst einbetten."; content = nil; return }
+        guard !title.isEmpty else {
+            problem = "Kein Notiztitel angegeben."
+            content = nil
+            return
+        }
+        guard let target else {
+            problem = "Die Notiz „\(title)“ gibt es nicht. „Notiz anlegen“ erstellt sie."
+            content = nil
+            return
+        }
+        guard target.id != doc.id else {
+            problem = "Eine Notiz kann sich nicht selbst einbetten."
+            content = nil
+            return
+        }
         // The open (possibly unsaved) version of the source wins over the file.
         let file: NoteFile?
         if let open = store.document(for: target.id) { file = open.makeFilePreview() } else { file = try? NoteFile.read(from: target.url) }
-        guard let file else { problem = "„\(title)“ konnte nicht gelesen werden."; content = nil; return }
+        guard let file else {
+            problem = "„\(title)“ konnte nicht gelesen werden."
+            content = nil
+            return
+        }
         content = Self.render(file)
     }
 

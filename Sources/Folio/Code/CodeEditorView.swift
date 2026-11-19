@@ -146,7 +146,8 @@ final class CodeTextView: NSTextView {
     override func deleteBackward(_ sender: Any?) {
         let sel = selectedRange()
         if sel.length == 0, let prev = char(at: sel.location - 1), let next = char(at: sel.location),
-           CodeStyle.pairs[prev] == next {
+            CodeStyle.pairs[prev] == next
+        {
             // Remove an empty pair in one go.
             let range = NSRange(location: sel.location - 1, length: 2)
             if shouldChangeText(in: range, replacementString: "") {
@@ -186,7 +187,8 @@ final class CodeTextView: NSTextView {
         if let last = trimmed.last, "{[(:".contains(last) { inner += indentUnit }
         // Python: a block ends after return/pass/break/continue/raise.
         if language == "python", let word = trimmed.split(separator: " ").first,
-           ["return", "pass", "break", "continue", "raise"].contains(String(word)) {
+            ["return", "pass", "break", "continue", "raise"].contains(String(word))
+        {
             inner = String(inner.dropLast(min(indentUnit.count, inner.count)))
         }
         if let prev = char(at: loc - 1), let next = char(at: loc), CodeStyle.pairs[prev] == next, "{[(".contains(prev) {
@@ -204,32 +206,53 @@ final class CodeTextView: NSTextView {
         if acceptCompletion() { return }
         if acceptSuggestion() { return }
         let sel = selectedRange()
-        if sel.length > 0 { shiftLines(by: 1); return }
+        if sel.length > 0 {
+            shiftLines(by: 1)
+            return
+        }
         insertText(indentUnit, replacementRange: sel)
     }
 
     override func insertBacktab(_ sender: Any?) { shiftLines(by: -1) }
 
     override func cancelOperation(_ sender: Any?) {
-        if completion.isVisible { hideCompletion(); return }
-        if suggestion != nil { clearSuggestion(); return }
+        if completion.isVisible {
+            hideCompletion()
+            return
+        }
+        if suggestion != nil {
+            clearSuggestion()
+            return
+        }
         super.cancelOperation(sender)
     }
 
     /// Esc arrives as `complete(_:)` in NSTextView: close our list or suggestion, or open the list.
     override func complete(_ sender: Any?) {
-        if completion.isVisible { hideCompletion(); return }
-        if suggestion != nil { clearSuggestion(); return }
+        if completion.isVisible {
+            hideCompletion()
+            return
+        }
+        if suggestion != nil {
+            clearSuggestion()
+            return
+        }
         triggerCompletion(manual: true)
     }
 
     override func moveUp(_ sender: Any?) {
-        if completion.isVisible { completion.move(-1); return }
+        if completion.isVisible {
+            completion.move(-1)
+            return
+        }
         super.moveUp(sender)
     }
 
     override func moveDown(_ sender: Any?) {
-        if completion.isVisible { completion.move(1); return }
+        if completion.isVisible {
+            completion.move(1)
+            return
+        }
         super.moveDown(sender)
     }
 
@@ -242,7 +265,10 @@ final class CodeTextView: NSTextView {
             } else {
                 var l = Substring(line)
                 var removed = 0
-                while removed < indentUnit.count, l.first == " " { l = l.dropFirst(); removed += 1 }
+                while removed < indentUnit.count, l.first == " " {
+                    l = l.dropFirst()
+                    removed += 1
+                }
                 if removed == 0, l.first == "\t" { l = l.dropFirst() }
                 out.append(String(l))
             }
@@ -255,15 +281,15 @@ final class CodeTextView: NSTextView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command), event.keyCode == 36 { // ⌘↩
+        if event.modifierFlags.contains(.command), event.keyCode == 36 {  // ⌘↩
             onRun?()
             return true
         }
-        if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == " " { // ⌃Space
+        if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == " " {  // ⌃Space
             triggerCompletion(manual: true)
             return true
         }
-        if event.modifierFlags.contains([.option, .shift]), event.charactersIgnoringModifiers?.lowercased() == "f" { // ⌥⇧F
+        if event.modifierFlags.contains([.option, .shift]), event.charactersIgnoringModifiers?.lowercased() == "f" {  // ⌥⇧F
             onFormat?()
             return true
         }
@@ -302,8 +328,9 @@ final class CodeTextView: NSTextView {
         predictionTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled,
-                  let text = await TextPredictor.suggestCode(before: before, after: after, language: lang, linePrefix: linePrefix),
-                  !Task.isCancelled, let self, self.selectedRange() == NSRange(location: location, length: 0) else { return }
+                let text = await TextPredictor.suggestCode(before: before, after: after, language: lang, linePrefix: linePrefix),
+                !Task.isCancelled, let self, self.selectedRange() == NSRange(location: location, length: 0)
+            else { return }
             self.suggestion = text
             self.suggestionLocation = location
             self.needsDisplay = true
@@ -349,7 +376,10 @@ final class CodeTextView: NSTextView {
     /// Narrows the visible list right away, so a fast Enter never takes an entry that no longer matches.
     private func narrowVisibleCompletion() {
         let caret = selectedRange().location
-        guard caret >= completionAnchor, caret - completionAnchor <= ns.length else { hideCompletion(); return }
+        guard caret >= completionAnchor, caret - completionAnchor <= ns.length else {
+            hideCompletion()
+            return
+        }
         let typed = ns.substring(with: NSRange(location: completionAnchor, length: caret - completionAnchor))
         let narrowed = CompletionFilter.filter(completion.model.items, prefix: typed)
         if narrowed.isEmpty || !CompletionContext.isIdentifierText(typed) {
@@ -364,10 +394,16 @@ final class CodeTextView: NSTextView {
     func triggerCompletion(manual: Bool) {
         completionTask?.cancel()
         let sel = selectedRange()
-        guard sel.length == 0 else { hideCompletion(); return }
+        guard sel.length == 0 else {
+            hideCompletion()
+            return
+        }
         let ctx = CompletionContext(code: string, offset: sel.location, language: language)
         // Typing a non-identifier character (space, operator) closes the list.
-        if !manual, ctx.prefix.isEmpty, ctx.receiver == nil { hideCompletion(); return }
+        if !manual, ctx.prefix.isEmpty, ctx.receiver == nil {
+            hideCompletion()
+            return
+        }
         let location = sel.location
         completionTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(manual ? 0 : 90))
@@ -402,7 +438,10 @@ final class CodeTextView: NSTextView {
     }
 
     private func showCompletion(_ items: [CompletionItem], prefix: String, anchor: Int) {
-        guard let window, !items.isEmpty else { hideCompletion(); return }
+        guard let window, !items.isEmpty else {
+            hideCompletion()
+            return
+        }
         completionAnchor = anchor
         clearSuggestion()
         completion.model.accent = Color(nsColor: accentColor)
@@ -412,7 +451,8 @@ final class CodeTextView: NSTextView {
         let measureFont = font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
         let lineStart = ns.paragraphRange(for: NSRange(location: anchor, length: 0)).location
         let lineText = ns.substring(with: NSRange(location: lineStart, length: anchor - lineStart)).replacingOccurrences(of: "\t", with: "    ")
-        let x = textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0)
+        let x =
+            textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0)
             + (lineText as NSString).size(withAttributes: [.font: measureFont]).width
         var lineBottom = textContainerOrigin.y
         if let lm = layoutManager, ns.length > 0 {
@@ -449,7 +489,10 @@ final class CodeTextView: NSTextView {
         var text = item.insertText
         var caretBack = 0
         // Methods: add the closing parenthesis and place the cursor inside when arguments are expected.
-        if text.hasSuffix("(") { text += ")"; caretBack = 1 }
+        if text.hasSuffix("(") {
+            text += ")"
+            caretBack = 1
+        }
         guard shouldChangeText(in: range, replacementString: text) else { return }
         textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: typingAttributes))
         didChangeText()
@@ -524,7 +567,12 @@ final class LineNumberGutter: NSView {
 final class CodeEditorContainer: NSView {
     let textView: CodeTextView
     let gutter = LineNumberGutter()
-    var showsGutter = true { didSet { needsLayout = true; gutter.isHidden = !showsGutter } }
+    var showsGutter = true {
+        didSet {
+            needsLayout = true
+            gutter.isHidden = !showsGutter
+        }
+    }
     var gutterWidth: CGFloat = 36
 
     init(textView: CodeTextView) {

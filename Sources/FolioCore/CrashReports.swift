@@ -36,34 +36,34 @@ public enum CrashReports {
     }
 
     #if os(macOS)
-    public static func defaultFolders(environment: [String: String] = ProcessInfo.processInfo.environment) -> [URL] {
-        if let override = environment["FOLIO_CRASH_REPORTS"] { return [URL(fileURLWithPath: override, isDirectory: true)] }
-        let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
-        return [logs, logs.appendingPathComponent("Retired", isDirectory: true)]
-    }
+        public static func defaultFolders(environment: [String: String] = ProcessInfo.processInfo.environment) -> [URL] {
+            if let override = environment["FOLIO_CRASH_REPORTS"] { return [URL(fileURLWithPath: override, isDirectory: true)] }
+            let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
+            return [logs, logs.appendingPathComponent("Retired", isDirectory: true)]
+        }
 
-    public static func scan(folders: [URL] = defaultFolders(), limit: Int = 10) -> Scan {
-        var scan = Scan()
-        let fm = FileManager.default
-        for folder in folders {
-            let files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles])) ?? []
-            for file in files where file.pathExtension == "ips" && mentionsFolio(file.lastPathComponent) {
-                let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                guard size <= maxFileSize, let data = try? Data(contentsOf: file) else {
-                    scan.unreadable += 1
-                    continue
-                }
-                switch parse(data, id: file.lastPathComponent) {
-                case .report(let report): scan.reports.append(report)
-                case .damaged: scan.unreadable += 1
-                case .notAFolioCrash: break
+        public static func scan(folders: [URL] = defaultFolders(), limit: Int = 10) -> Scan {
+            var scan = Scan()
+            let fm = FileManager.default
+            for folder in folders {
+                let files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles])) ?? []
+                for file in files where file.pathExtension == "ips" && mentionsFolio(file.lastPathComponent) {
+                    let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                    guard size <= maxFileSize, let data = try? Data(contentsOf: file) else {
+                        scan.unreadable += 1
+                        continue
+                    }
+                    switch parse(data, id: file.lastPathComponent) {
+                    case .report(let report): scan.reports.append(report)
+                    case .damaged: scan.unreadable += 1
+                    case .notAFolioCrash: break
+                    }
                 }
             }
+            scan.reports.sort { $0.timestamp > $1.timestamp }
+            scan.reports = Array(scan.reports.prefix(limit))
+            return scan
         }
-        scan.reports.sort { $0.timestamp > $1.timestamp }
-        scan.reports = Array(scan.reports.prefix(limit))
-        return scan
-    }
 
     #endif
 
@@ -78,7 +78,8 @@ public enum CrashReports {
     /// `.ips` files are one line of JSON (header) followed by a JSON document (payload).
     public static func parse(_ data: Data, id: String, home: String = NSHomeDirectory(), userName: String = NSUserName()) -> ParseResult {
         guard let newline = data.firstIndex(of: 0x0A),
-              let header = (try? JSONSerialization.jsonObject(with: data[data.startIndex..<newline])) as? [String: Any] else {
+            let header = (try? JSONSerialization.jsonObject(with: data[data.startIndex..<newline])) as? [String: Any]
+        else {
             return .damaged
         }
         let bundle = header["bundleID"] as? String
@@ -95,9 +96,10 @@ public enum CrashReports {
         func frames(_ raw: Any?) -> [CrashReport.Frame] {
             ((raw as? [[String: Any]]) ?? []).prefix(maxFrames).map { frame in
                 let image = (frame["imageIndex"] as? Int).flatMap { images.indices.contains($0) ? images[$0] : nil }
-                return CrashReport.Frame(image: imageName(image, home: home, userName: userName),
-                                         offset: frame["imageOffset"] as? Int ?? 0,
-                                         symbol: (frame["symbol"] as? String).map { scrub($0, home: home, userName: userName) })
+                return CrashReport.Frame(
+                    image: imageName(image, home: home, userName: userName),
+                    offset: frame["imageOffset"] as? Int ?? 0,
+                    symbol: (frame["symbol"] as? String).map { scrub($0, home: home, userName: userName) })
             }
         }
 
@@ -109,17 +111,20 @@ public enum CrashReports {
             .filter { !$0.isEmpty }.joined(separator: " · ")
 
         let threads = payload["threads"] as? [[String: Any]] ?? []
-        let faulting = (payload["faultingThread"] as? Int).flatMap { threads.indices.contains($0) ? threads[$0] : nil }
+        let faulting =
+            (payload["faultingThread"] as? Int).flatMap { threads.indices.contains($0) ? threads[$0] : nil }
             ?? threads.first { $0["triggered"] as? Bool == true }
         guard !exceptionText.isEmpty || faulting != nil else { return .damaged }
 
         let timestamp = header["timestamp"] as? String ?? payload["captureTime"] as? String ?? ""
-        return .report(CrashReport(id: id, timestamp: timestamp, process: clean(header["app_name"]),
-                                   appVersion: clean(header["app_version"]), systemVersion: clean(header["os_version"]),
-                                   architecture: clean(payload["cpuType"]), exception: exceptionText,
-                                   termination: terminationText.isEmpty ? nil : terminationText,
-                                   frames: frames(faulting?["frames"]),
-                                   exceptionFrames: frames(payload["lastExceptionBacktrace"])))
+        return .report(
+            CrashReport(
+                id: id, timestamp: timestamp, process: clean(header["app_name"]),
+                appVersion: clean(header["app_version"]), systemVersion: clean(header["os_version"]),
+                architecture: clean(payload["cpuType"]), exception: exceptionText,
+                termination: terminationText.isEmpty ? nil : terminationText,
+                frames: frames(faulting?["frames"]),
+                exceptionFrames: frames(payload["lastExceptionBacktrace"])))
     }
 
     /// Images from outside the system and the app keep no name: a plug-in's name can say something about its owner.
@@ -137,7 +142,7 @@ public enum CrashReports {
         (#"/Volumes/[^\n]*"#, "<Pfad>"),
         (#"file:/[^\n]*"#, "<Pfad>"),
         (#"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#, "<E-Mail>"),
-        (#"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b"#, "<ID>"),
+        (#"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b"#, "<ID>")
     ].map { (try! NSRegularExpression(pattern: $0.0), $0.1) }
 
     /// Removes paths, names, addresses and identifiers from a kept string.
@@ -148,8 +153,9 @@ public enum CrashReports {
             out.replaceSubrange(range.lowerBound..<lineEnd, with: "<Pfad>")
         }
         for (regex, replacement) in patterns {
-            out = regex.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out),
-                                                 withTemplate: NSRegularExpression.escapedTemplate(for: replacement))
+            out = regex.stringByReplacingMatches(
+                in: out, range: NSRange(out.startIndex..., in: out),
+                withTemplate: NSRegularExpression.escapedTemplate(for: replacement))
         }
         if userName.count >= 3 {
             out = out.replacingOccurrences(of: userName, with: "<Name>", options: [.caseInsensitive])
@@ -159,15 +165,19 @@ public enum CrashReports {
 
     /// The text the person sees before saving or copying it.
     public static func render(_ reports: [CrashReport]) -> String {
-        var lines = ["Folio-Absturzbericht", "",
-                     "Enthält nur technische Angaben. Keine Notizinhalte, Titel, Datei- oder Benutzernamen und keine Geräte-IDs."]
+        var lines = [
+            "Folio-Absturzbericht", "",
+            "Enthält nur technische Angaben. Keine Notizinhalte, Titel, Datei- oder Benutzernamen und keine Geräte-IDs."
+        ]
         if reports.isEmpty { lines += ["", "Keine Abstürze gefunden."] }
         for (index, report) in reports.enumerated() {
-            lines += ["", "## Absturz \(index + 1) von \(reports.count)",
-                      "Datum: \(report.timestamp.prefix(10))",
-                      "Programm: \(report.process) \(report.appVersion)",
-                      "System: \(report.systemVersion) (\(report.architecture))",
-                      "Fehler: \(report.exception)"]
+            lines += [
+                "", "## Absturz \(index + 1) von \(reports.count)",
+                "Datum: \(report.timestamp.prefix(10))",
+                "Programm: \(report.process) \(report.appVersion)",
+                "System: \(report.systemVersion) (\(report.architecture))",
+                "Fehler: \(report.exception)"
+            ]
             if let termination = report.termination { lines.append("Beendet: \(termination)") }
             if !report.exceptionFrames.isEmpty { lines += ["", "Ausnahme:"] + report.exceptionFrames.enumerated().map(frameLine) }
             if !report.frames.isEmpty { lines += ["", "Abgestürzter Thread:"] + report.frames.enumerated().map(frameLine) }

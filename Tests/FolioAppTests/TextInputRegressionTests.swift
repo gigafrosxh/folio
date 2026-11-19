@@ -70,7 +70,10 @@ final class TextInputRegressionTests: XCTestCase {
     func testFilesGoToTheFileHandler() {
         let tv = makeView()
         var files: [URL] = []
-        tv.onPasteFiles = { files = $0; return true }
+        tv.onPasteFiles = {
+            files = $0
+            return true
+        }
         let url = URL(fileURLWithPath: "/tmp/a.txt")
         XCTAssertTrue(tv.handlePasteboard(pasteboard { $0.writeObjects([url as NSURL]) }))
         XCTAssertEqual(files, [url])
@@ -83,7 +86,11 @@ final class TextInputRegressionTests: XCTestCase {
     }
 
     private var pngData: Data {
-        let image = NSImage(size: NSSize(width: 2, height: 2), flipped: false) { rect in NSColor.red.setFill(); rect.fill(); return true }
+        let image = NSImage(size: NSSize(width: 2, height: 2), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
         return NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
     }
 
@@ -92,11 +99,13 @@ final class TextInputRegressionTests: XCTestCase {
         var images = 0
         tv.onPasteImage = { _ in images += 1 }
         let png = pngData
-        XCTAssertTrue(tv.handlePasteboard(pasteboard { pb in
-            pb.declareTypes([.png, .string], owner: nil)
-            pb.setData(png, forType: .png)
-            pb.setString("https://e.example/a.png", forType: .string)
-        }))
+        XCTAssertTrue(
+            tv.handlePasteboard(
+                pasteboard { pb in
+                    pb.declareTypes([.png, .string], owner: nil)
+                    pb.setData(png, forType: .png)
+                    pb.setString("https://e.example/a.png", forType: .string)
+                }))
         XCTAssertEqual(images, 1)
     }
 
@@ -105,11 +114,13 @@ final class TextInputRegressionTests: XCTestCase {
         var images = 0
         tv.onPasteImage = { _ in images += 1 }
         let png = pngData
-        XCTAssertFalse(tv.handlePasteboard(pasteboard { pb in
-            pb.declareTypes([.png, .string], owner: nil)
-            pb.setData(png, forType: .png)
-            pb.setString("Ein ganzer Satz", forType: .string)
-        }))
+        XCTAssertFalse(
+            tv.handlePasteboard(
+                pasteboard { pb in
+                    pb.declareTypes([.png, .string], owner: nil)
+                    pb.setData(png, forType: .png)
+                    pb.setString("Ein ganzer Satz", forType: .string)
+                }))
         XCTAssertEqual(images, 0)
     }
 
@@ -122,10 +133,12 @@ final class TextInputRegressionTests: XCTestCase {
         let rich = NSMutableAttributedString(string: "Vor")
         rich.append(NSAttributedString(attachment: attachment))
         let rtfd = try XCTUnwrap(rich.rtfd(from: NSRange(location: 0, length: rich.length)))
-        XCTAssertTrue(tv.handlePasteboard(pasteboard { pb in
-            pb.declareTypes([.rtfd], owner: nil)
-            pb.setData(rtfd, forType: .rtfd)
-        }))
+        XCTAssertTrue(
+            tv.handlePasteboard(
+                pasteboard { pb in
+                    pb.declareTypes([.rtfd], owner: nil)
+                    pb.setData(rtfd, forType: .rtfd)
+                }))
         XCTAssertEqual(images, 1)
         XCTAssertEqual(tv.string, "Vor")
     }
@@ -133,7 +146,10 @@ final class TextInputRegressionTests: XCTestCase {
     func testURLOnEmptyLineBecomesLinkBlock() {
         let tv = makeView()
         var urls: [URL] = []
-        tv.onPasteURL = { urls.append($0); return true }
+        tv.onPasteURL = {
+            urls.append($0)
+            return true
+        }
         XCTAssertTrue(tv.handlePasteboard(pasteboard { $0.setString(" https://e.example/x ", forType: .string) }))
         XCTAssertTrue(tv.handlePasteboard(pasteboard { $0.setString("localhost:3000", forType: .string) }))
         XCTAssertEqual(urls.map(\.absoluteString), ["https://e.example/x", "http://localhost:3000"])
@@ -141,13 +157,19 @@ final class TextInputRegressionTests: XCTestCase {
 
     func testURLInsideATextLineStaysText() {
         let tv = makeView("Text")
-        tv.onPasteURL = { _ in XCTFail("kein Link-Block erwartet"); return true }
+        tv.onPasteURL = { _ in
+            XCTFail("kein Link-Block erwartet")
+            return true
+        }
         XCTAssertFalse(tv.handlePasteboard(pasteboard { $0.setString("https://e.example/x", forType: .string) }))
     }
 
     func testOtherSchemesAndMultilineTextStayText() {
         let tv = makeView()
-        tv.onPasteURL = { _ in XCTFail("kein Link-Block erwartet"); return true }
+        tv.onPasteURL = { _ in
+            XCTFail("kein Link-Block erwartet")
+            return true
+        }
         XCTAssertFalse(tv.handlePasteboard(pasteboard { $0.setString("ftp://e.example/x", forType: .string) }))
         XCTAssertFalse(tv.handlePasteboard(pasteboard { $0.setString("Eine\nZweite", forType: .string) }))
     }

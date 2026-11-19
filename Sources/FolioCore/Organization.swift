@@ -118,7 +118,7 @@ public struct SearchFilter: Equatable, Sendable {
     public static let contentTypes: [(id: String, label: String, kinds: [String])] = [
         ("code", "Code", ["code"]), ("bild", "Bilder", ["image", "drawing"]), ("pdf", "PDFs", ["pdf"]),
         ("datei", "Dateien & Tabellen", ["file"]), ("web", "Webseiten", ["web"]), ("audio", "Audio", ["audio"]),
-        ("formel", "Formeln", ["math"]), ("diagramm", "Diagramme", ["diagram"]), ("datenbank", "Datenbank", ["database"]),
+        ("formel", "Formeln", ["math"]), ("diagramm", "Diagramme", ["diagram"]), ("datenbank", "Datenbank", ["database"])
     ]
 
     public var text = ""
@@ -154,7 +154,10 @@ public struct SearchFilter: Equatable, Sendable {
     static func words(of input: String) -> [String] {
         var words: [String] = [], current = "", quoted = false
         for ch in input {
-            if ch == "\"" || ch == "„" || ch == "“" || ch == "”" { quoted.toggle(); continue }
+            if ch == "\"" || ch == "„" || ch == "“" || ch == "”" {
+                quoted.toggle()
+                continue
+            }
             if ch == " " && !quoted {
                 if !current.isEmpty { words.append(current) }
                 current = ""
@@ -169,9 +172,18 @@ public struct SearchFilter: Equatable, Sendable {
     /// Takes one word as a filter; false leaves it as free text.
     private mutating func apply(_ word: String) -> Bool {
         let lower = word.lowercased()
-        if let tag = Self.tagFilter(lower) { tags.insert(tag); return true }
-        if lower.hasPrefix("ordner:"), word.count > 7 { folder = String(word.dropFirst(7)); return true }
-        if let type = Self.typeFilter(lower) { types.insert(type); return true }
+        if let tag = Self.tagFilter(lower) {
+            tags.insert(tag)
+            return true
+        }
+        if lower.hasPrefix("ordner:"), word.count > 7 {
+            folder = String(word.dropFirst(7))
+            return true
+        }
+        if let type = Self.typeFilter(lower) {
+            types.insert(type)
+            return true
+        }
         if lower.hasPrefix("seit:") {
             guard let p = Self.periodFilter(lower.dropFirst(5)) else { return false }
             period = p
@@ -208,7 +220,8 @@ public struct SearchFilter: Equatable, Sendable {
     /// Any other `name:value` is a property filter (#121); links are not.
     private static func propertyFilter(_ word: String) -> (String, String)? {
         guard let colon = word.firstIndex(of: ":"), colon != word.startIndex, word.index(after: colon) != word.endIndex,
-              word[..<colon].allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" }) else { return nil }
+            word[..<colon].allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" })
+        else { return nil }
         let lower = word.lowercased()
         let split = lower.firstIndex(of: ":")!
         let name = String(lower[..<split])
@@ -341,11 +354,14 @@ public enum TemplateText {
     public static func values(now: Date = Date(), locale: Locale = Locale(identifier: "de_DE")) -> [String: String] {
         let f = DateFormatter()
         f.locale = locale
-        func fmt(_ pattern: String) -> String { f.setLocalizedDateFormatFromTemplate(pattern); return f.string(from: now) }
+        func fmt(_ pattern: String) -> String {
+            f.setLocalizedDateFormatFromTemplate(pattern)
+            return f.string(from: now)
+        }
         let week = Calendar(identifier: .iso8601).component(.weekOfYear, from: now)
         let values: [String: String] = [
             "datum": fmt("ddMMyyyy"), "uhrzeit": fmt("HHmm"), "wochentag": fmt("EEEE"), "kw": "\(week)",
-            "jahr": fmt("yyyy"), "monat": fmt("MMMM"),
+            "jahr": fmt("yyyy"), "monat": fmt("MMMM")
         ]
         return values
     }

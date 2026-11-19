@@ -14,7 +14,10 @@ final class LinkPreviewController {
     func hover(_ url: URL?, range: NSRange, rect: NSRect, in view: NSView) {
         if let shown = shownFor, shown.view === view, NSEqualRanges(shown.range, range), url != nil { return }
         pending?.cancel()
-        guard let url, let target = Self.note(for: url) else { close(); return }
+        guard let url, let target = Self.note(for: url) else {
+            close()
+            return
+        }
         let work = DispatchWorkItem { [weak self] in self?.show(target, rect: rect, in: view, range: range) }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)

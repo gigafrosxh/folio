@@ -11,7 +11,7 @@ struct FormatToolbar: View {
     static let textColors: [(String, NSColor?)] = [
         ("Standard", nil), ("Rot", .systemRed), ("Orange", .systemOrange), ("Gelb", .systemYellow),
         ("Grün", .systemGreen), ("Mint", .systemMint), ("Blau", .systemBlue), ("Lila", .systemPurple),
-        ("Pink", .systemPink), ("Grau", .systemGray),
+        ("Pink", .systemPink), ("Grau", .systemGray)
     ]
 
     /// How much room the bar has (#103): `full` shows every tool, `compact` folds the insert tools into
@@ -71,13 +71,21 @@ struct FormatToolbar: View {
         Menu {
             Section("Textfarbe") {
                 ForEach(Self.textColors, id: \.0) { name, color in
-                    Button { f.setTextColor(color) } label: { colorLabel(name, color) }
+                    Button {
+                        f.setTextColor(color)
+                    } label: {
+                        colorLabel(name, color)
+                    }
                 }
             }
             Section("Markierung") {
                 Button("Keine") { f.setHighlight(nil) }
                 ForEach(Self.textColors.dropFirst(), id: \.0) { name, color in
-                    Button { f.setHighlight(color?.withAlphaComponent(0.3)) } label: { colorLabel(name, color) }
+                    Button {
+                        f.setHighlight(color?.withAlphaComponent(0.3))
+                    } label: {
+                        colorLabel(name, color)
+                    }
                 }
             }
             Divider()
@@ -94,11 +102,23 @@ struct FormatToolbar: View {
     private var listMenu: some View {
         Menu {
             ForEach(ListKind.allCases, id: \.self) { kind in
-                Button { f.toggleList(kind) } label: { Label(kind.label, systemImage: kind.icon) }
+                Button {
+                    f.toggleList(kind)
+                } label: {
+                    Label(kind.label, systemImage: kind.icon)
+                }
             }
             Divider()
-            Button { f.indent(1) } label: { Label("Einrücken", systemImage: "increase.indent") }
-            Button { f.indent(-1) } label: { Label("Ausrücken", systemImage: "decrease.indent") }
+            Button {
+                f.indent(1)
+            } label: {
+                Label("Einrücken", systemImage: "increase.indent")
+            }
+            Button {
+                f.indent(-1)
+            } label: {
+                Label("Ausrücken", systemImage: "decrease.indent")
+            }
         } label: {
             Image(systemName: "list.bullet")
         }
@@ -107,36 +127,80 @@ struct FormatToolbar: View {
     }
 
     @ViewBuilder private var alignmentItems: some View {
-        Button { f.setAlignment(.left) } label: { Label("Links", systemImage: "text.alignleft") }
-        Button { f.setAlignment(.center) } label: { Label("Zentriert", systemImage: "text.aligncenter") }
-        Button { f.setAlignment(.right) } label: { Label("Rechts", systemImage: "text.alignright") }
-        Button { f.setAlignment(.justified) } label: { Label("Blocksatz", systemImage: "text.justify") }
+        Button {
+            f.setAlignment(.left)
+        } label: {
+            Label("Links", systemImage: "text.alignleft")
+        }
+        Button {
+            f.setAlignment(.center)
+        } label: {
+            Label("Zentriert", systemImage: "text.aligncenter")
+        }
+        Button {
+            f.setAlignment(.right)
+        } label: {
+            Label("Rechts", systemImage: "text.alignright")
+        }
+        Button {
+            f.setAlignment(.justified)
+        } label: {
+            Label("Blocksatz", systemImage: "text.justify")
+        }
         Divider()
-        Button { f.insertDivider() } label: { Label("Trennlinie", systemImage: "minus") }
+        Button {
+            f.insertDivider()
+        } label: {
+            Label("Trennlinie", systemImage: "minus")
+        }
     }
 
     private var alignmentMenu: some View {
-        Menu { alignmentItems } label: { Image(systemName: "text.alignleft") }
-            .helpLabel("Ausrichtung")
-            .frame(width: 34)
+        Menu {
+            alignmentItems
+        } label: {
+            Image(systemName: "text.alignleft")
+        }
+        .helpLabel("Ausrichtung")
+        .frame(width: 34)
     }
 
     private var moreMenu: some View {
         Menu {
             if layout == .tiny {
-                Button { f.toggleUnderline() } label: { Label("Unterstrichen", systemImage: "underline") }
-                Button { f.toggleStrikethrough() } label: { Label("Durchgestrichen", systemImage: "strikethrough") }
+                Button {
+                    f.toggleUnderline()
+                } label: {
+                    Label("Unterstrichen", systemImage: "underline")
+                }
+                Button {
+                    f.toggleStrikethrough()
+                } label: {
+                    Label("Durchgestrichen", systemImage: "strikethrough")
+                }
                 Section("Listen") {
                     ForEach(ListKind.allCases, id: \.self) { kind in
-                        Button { f.toggleList(kind) } label: { Label(kind.label, systemImage: kind.icon) }
+                        Button {
+                            f.toggleList(kind)
+                        } label: {
+                            Label(kind.label, systemImage: kind.icon)
+                        }
                     }
                 }
                 Button("Formatierung entfernen") { f.clearFormatting() }
             }
             Section("Ausrichtung") { alignmentItems }
             Divider()
-            Button { actions.addLink() } label: { Label("Link hinzufügen (⌘K)", systemImage: "link") }
-            Button { f.showWritingTools() } label: { Label("Writing Tools", systemImage: "apple.writing.tools") }
+            Button {
+                actions.addLink()
+            } label: {
+                Label("Link hinzufügen (⌘K)", systemImage: "link")
+            }
+            Button {
+                f.showWritingTools()
+            } label: {
+                Label("Writing Tools", systemImage: "apple.writing.tools")
+            }
         } label: {
             Image(systemName: "ellipsis.circle")
         }
@@ -165,8 +229,16 @@ struct FormatToolbar: View {
         plain("mic", "Audio aufnehmen (⌃⇧A)") { insert("audio") }
         plain("paperclip", "PDF, Bild, Audio oder Dokument einfügen", actions.insertFile)
         Menu {
-            Button { actions.insertDrawing() } label: { Label("Hier zeichnen", systemImage: "scribble.variable") }
-            Button { actions.importFromDevice() } label: { Label("Skizze/Foto vom iPhone oder iPad…", systemImage: "iphone") }
+            Button {
+                actions.insertDrawing()
+            } label: {
+                Label("Hier zeichnen", systemImage: "scribble.variable")
+            }
+            Button {
+                actions.importFromDevice()
+            } label: {
+                Label("Skizze/Foto vom iPhone oder iPad…", systemImage: "iphone")
+            }
         } label: {
             Image(systemName: "scribble.variable")
         } primaryAction: {
@@ -185,17 +257,59 @@ struct FormatToolbar: View {
                 ForEach(Languages.all.filter { $0.id != "plain" }) { lang in
                     Button(lang.name) { actions.insertCode(lang.id) }
                 }
-            } label: { Label("Code-Block", systemImage: "chevron.left.forwardslash.chevron.right") }
-            Button { actions.insertNumbers() } label: { Label("Numbers-Tabelle", systemImage: "tablecells") }
-            Button { insert("database") } label: { Label("Datenbank-Abfrage", systemImage: "cylinder.split.1x2") }
-            Button { insert("math") } label: { Label("Formel (LaTeX)", systemImage: "function") }
-            Button { insert("diagram") } label: { Label("Diagramm (Mermaid)", systemImage: "point.3.connected.trianglepath.dotted") }
-            Button { insert("audio") } label: { Label("Audioaufnahme", systemImage: "mic") }
-            Button { actions.insertFile() } label: { Label("PDF, Bild oder Datei …", systemImage: "paperclip") }
-            Button { actions.insertDrawing() } label: { Label("Zeichnung", systemImage: "scribble.variable") }
-            Button { actions.importFromDevice() } label: { Label("Skizze/Foto vom iPhone oder iPad …", systemImage: "iphone") }
-            Button { actions.insertWeb() } label: { Label("Webseite …", systemImage: "globe") }
-            Button { actions.insertImagePlayground() } label: { Label("Bild mit Image Playground …", systemImage: "apple.image.playground") }
+            } label: {
+                Label("Code-Block", systemImage: "chevron.left.forwardslash.chevron.right")
+            }
+            Button {
+                actions.insertNumbers()
+            } label: {
+                Label("Numbers-Tabelle", systemImage: "tablecells")
+            }
+            Button {
+                insert("database")
+            } label: {
+                Label("Datenbank-Abfrage", systemImage: "cylinder.split.1x2")
+            }
+            Button {
+                insert("math")
+            } label: {
+                Label("Formel (LaTeX)", systemImage: "function")
+            }
+            Button {
+                insert("diagram")
+            } label: {
+                Label("Diagramm (Mermaid)", systemImage: "point.3.connected.trianglepath.dotted")
+            }
+            Button {
+                insert("audio")
+            } label: {
+                Label("Audioaufnahme", systemImage: "mic")
+            }
+            Button {
+                actions.insertFile()
+            } label: {
+                Label("PDF, Bild oder Datei …", systemImage: "paperclip")
+            }
+            Button {
+                actions.insertDrawing()
+            } label: {
+                Label("Zeichnung", systemImage: "scribble.variable")
+            }
+            Button {
+                actions.importFromDevice()
+            } label: {
+                Label("Skizze/Foto vom iPhone oder iPad …", systemImage: "iphone")
+            }
+            Button {
+                actions.insertWeb()
+            } label: {
+                Label("Webseite …", systemImage: "globe")
+            }
+            Button {
+                actions.insertImagePlayground()
+            } label: {
+                Label("Bild mit Image Playground …", systemImage: "apple.image.playground")
+            }
         } label: {
             Label("Einfügen", systemImage: "plus.circle").labelStyle(.titleAndIcon)
         }

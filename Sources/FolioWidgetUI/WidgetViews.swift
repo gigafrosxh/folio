@@ -10,7 +10,10 @@ public struct WidgetLink<Label: View>: View {
     var url: URL
     @ViewBuilder var label: () -> Label
     @Environment(\.widgetLinks) private var enabled
-    public init(_ url: URL, @ViewBuilder label: @escaping () -> Label) { self.url = url; self.label = label }
+    public init(_ url: URL, @ViewBuilder label: @escaping () -> Label) {
+        self.url = url
+        self.label = label
+    }
     public var body: some View {
         if enabled { Link(destination: url, label: label) } else { label() }
     }
@@ -21,14 +24,17 @@ public extension EnvironmentValues {
 }
 
 public enum WidgetStyle {
-    public static let accent = Color(red: 0.898, green: 0.647, blue: 0.039)   // #E5A50A, Folio's default accent
+    public static let accent = Color(red: 0.898, green: 0.647, blue: 0.039)  // #E5A50A, Folio's default accent
 }
 
 /// Shown instead of content when there is nothing to show (#84: missing snapshot, missing library).
 public struct WidgetMessage: View {
     var symbol: String
     var text: String
-    public init(symbol: String, text: String) { self.symbol = symbol; self.text = text }
+    public init(symbol: String, text: String) {
+        self.symbol = symbol
+        self.text = text
+    }
     public var body: some View {
         VStack(spacing: 6) {
             Image(systemName: symbol).font(.title2).foregroundStyle(WidgetStyle.accent)
@@ -83,8 +89,9 @@ public struct NoteListWidgetView: View {
             if !snapshot.libraryAvailable {
                 WidgetMessage.libraryMissing
             } else if notes.isEmpty {
-                WidgetMessage(symbol: kind == .pinned ? "pin" : "note.text",
-                              text: kind == .pinned ? "Noch keine angepinnten Notizen." : "Noch keine Notizen.")
+                WidgetMessage(
+                    symbol: kind == .pinned ? "pin" : "note.text",
+                    text: kind == .pinned ? "Noch keine angepinnten Notizen." : "Noch keine Notizen.")
             } else {
                 ForEach(notes.prefix(limit)) { note in
                     WidgetLink(note.link) { row(note) }
@@ -104,7 +111,9 @@ public struct NoteListWidgetView: View {
                     if let preview = note.preview, !preview.isEmpty {
                         Text(preview).privacySensitive()
                     } else {
-                        Text(note.folder.isEmpty ? note.modified.formatted(.relative(presentation: .named)) : "\(note.folder) · \(note.modified.formatted(.relative(presentation: .named)))")
+                        Text(
+                            note.folder.isEmpty
+                                ? note.modified.formatted(.relative(presentation: .named)) : "\(note.folder) · \(note.modified.formatted(.relative(presentation: .named)))")
                     }
                 }
                 .font(.caption2)

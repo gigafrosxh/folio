@@ -63,20 +63,23 @@ struct BlockRow: View {
     private var content: some View {
         switch block.kind {
         case .text:
-            RichTextView(block: block, isFirstBlock: isFirst, height: $height, theme: theme,
-                         onChange: { doc.markDirty() },
-                         onFocus: {
-                             FormattingController.shared.didFocus(FormattingController.shared.textView(for: block.id), blockID: block.id)
-                         },
-                         onDeleteEmpty: { deleteEmptyText() },
-                         onPasteFiles: { actions.pasteFiles($0, block.id) },
-                         onPasteImage: { actions.pasteImage($0, block.id) },
-                         onPasteURL: { actions.pasteURL($0, block.id) },
-                         fold: FoldHooks(willEdit: { [doc, id = block.id] in doc.prepareEdit(in: id, range: $0) },
-                                         returnAtFold: { [doc, id = block.id] in doc.insertAfterFold(blockID: id, selection: $0) },
-                                         selection: { [doc, id = block.id] in doc.revealSelection(in: id, range: $0) }))
-                .frame(height: height)
-                .onAppear { DispatchQueue.main.async { doc.applyFolds() } }
+            RichTextView(
+                block: block, isFirstBlock: isFirst, height: $height, theme: theme,
+                onChange: { doc.markDirty() },
+                onFocus: {
+                    FormattingController.shared.didFocus(FormattingController.shared.textView(for: block.id), blockID: block.id)
+                },
+                onDeleteEmpty: { deleteEmptyText() },
+                onPasteFiles: { actions.pasteFiles($0, block.id) },
+                onPasteImage: { actions.pasteImage($0, block.id) },
+                onPasteURL: { actions.pasteURL($0, block.id) },
+                fold: FoldHooks(
+                    willEdit: { [doc, id = block.id] in doc.prepareEdit(in: id, range: $0) },
+                    returnAtFold: { [doc, id = block.id] in doc.insertAfterFold(blockID: id, selection: $0) },
+                    selection: { [doc, id = block.id] in doc.revealSelection(in: id, range: $0) })
+            )
+            .frame(height: height)
+            .onAppear { DispatchQueue.main.async { doc.applyFolds() } }
         case .code:
             CodeBlockView(block: block, doc: doc)
         case .pdf:

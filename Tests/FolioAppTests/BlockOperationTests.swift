@@ -21,7 +21,9 @@ final class BlockOperationTests: XCTestCase {
     }
 
     private func step(_ d: NoteDocument, _ change: () -> Void) {
-        d.undoManager?.beginUndoGrouping(); change(); d.undoManager?.endUndoGrouping()
+        d.undoManager?.beginUndoGrouping()
+        change()
+        d.undoManager?.endUndoGrouping()
     }
 
     private func kinds(_ d: NoteDocument) -> [BlockKind] { d.blocks.map(\.kind) }
@@ -93,7 +95,7 @@ final class BlockOperationTests: XCTestCase {
         step(d) { d.remove(d.blocks[0].id) }
         XCTAssertFalse(d.blocks.isEmpty)
         XCTAssertEqual(d.blocks.first?.kind, .text)
-        step(d) { d.remove(UUID()) }   // unknown id: nothing happens
+        step(d) { d.remove(UUID()) }  // unknown id: nothing happens
         XCTAssertFalse(d.blocks.isEmpty)
     }
 
@@ -120,7 +122,13 @@ final class BlockOperationTests: XCTestCase {
         let d = doc()
         let code = BlockModel(kind: .code)
         step(d) { d.insert(code, after: d.blocks[0].id) }
-        step(d) { d.changeBlock(code, "Sprache") { code.language = "swift"; code.stdin = "1"; code.outputCollapsed = true } }
+        step(d) {
+            d.changeBlock(code, "Sprache") {
+                code.language = "swift"
+                code.stdin = "1"
+                code.outputCollapsed = true
+            }
+        }
         d.undoManager?.undo()
         XCTAssertEqual(code.language, "python")
         XCTAssertNil(code.stdin)

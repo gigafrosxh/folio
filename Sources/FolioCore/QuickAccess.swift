@@ -221,8 +221,10 @@ public struct CaptureWriter: Sendable {
 
     /// Appends the capture to its target note file and returns the note's URL.
     @discardableResult
-    public func deliver(_ item: CaptureItem, to url: URL?, rtf: (String) -> Data?, dateText: String,
-                        refreshMeta: (inout NoteFile) -> Void = { _ in }) throws -> URL {
+    public func deliver(
+        _ item: CaptureItem, to url: URL?, rtf: (String) -> Data?, dateText: String,
+        refreshMeta: (inout NoteFile) -> Void = { _ in }
+    ) throws -> URL {
         try checkLibrary()
         let target: URL
         switch item.target {
@@ -336,7 +338,13 @@ public struct SwitcherEntry: Identifiable, Hashable, Sendable {
     public static func rank(_ entries: [SwitcherEntry], query: String) -> [SwitcherEntry] {
         var q = query.trimmingCharacters(in: .whitespaces)
         var only: Kind?
-        if q.hasPrefix("#") { only = .tag; q.removeFirst() } else if q.hasPrefix("/") { only = .folder; q.removeFirst() }
+        if q.hasPrefix("#") {
+            only = .tag
+            q.removeFirst()
+        } else if q.hasPrefix("/") {
+            only = .folder
+            q.removeFirst()
+        }
         let pool = only.map { k in entries.filter { $0.kind == k } } ?? entries
         guard !q.isEmpty else { return pool }
         let order: [Kind: Int] = [.note: 0, .folder: 1, .tag: 2]
@@ -365,17 +373,25 @@ public enum DropClassifier {
 
     public static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "heic", "heif", "tif", "tiff", "webp", "bmp"]
 
-    public static func classify(_ urls: [URL], isDirectory: (URL) -> Bool = { url in
-        var dir: ObjCBool = false
-        return FileManager.default.fileExists(atPath: url.path, isDirectory: &dir) && dir.boolValue
-    }) -> Groups {
+    public static func classify(
+        _ urls: [URL],
+        isDirectory: (URL) -> Bool = { url in
+            var dir: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &dir) && dir.boolValue
+        }
+    ) -> Groups {
         var g = Groups()
         for url in urls where url.isFileURL {
             let ext = url.pathExtension.lowercased()
-            if ext == FolioArchive.fileExtension { g.notes.append(url) }
-            else if isDirectory(url) { g.skipped.append(url) }
-            else if imageExtensions.contains(ext) { g.images.append(url) }
-            else { g.files.append(url) }
+            if ext == FolioArchive.fileExtension {
+                g.notes.append(url)
+            } else if isDirectory(url) {
+                g.skipped.append(url)
+            } else if imageExtensions.contains(ext) {
+                g.images.append(url)
+            } else {
+                g.files.append(url)
+            }
         }
         return g
     }

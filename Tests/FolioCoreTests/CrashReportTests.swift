@@ -5,9 +5,11 @@ final class CrashReportTests: XCTestCase {
     private let home = "/Users/geheim"
 
     private func ips(bundle: String = "de.daniel.folio", bug: Any = "309") throws -> Data {
-        let header: [String: Any] = ["app_name": "Folio", "app_version": "1.3.0", "bundleID": bundle, "bug_type": bug,
-                                     "os_version": "macOS 27.2 (27C1)", "timestamp": "2026-11-09 08:12:34.00 +0100",
-                                     "incident_id": "ABCDEF01-2345-6789-ABCD-EF0123456789"]
+        let header: [String: Any] = [
+            "app_name": "Folio", "app_version": "1.3.0", "bundleID": bundle, "bug_type": bug,
+            "os_version": "macOS 27.2 (27C1)", "timestamp": "2026-11-09 08:12:34.00 +0100",
+            "incident_id": "ABCDEF01-2345-6789-ABCD-EF0123456789"
+        ]
         let payload: [String: Any] = [
             "cpuType": "ARM-64", "faultingThread": 0,
             "procPath": "/Users/geheim/Apps/Folio.app/Contents/MacOS/Folio",
@@ -15,14 +17,21 @@ final class CrashReportTests: XCTestCase {
             "termination": ["namespace": "SIGNAL", "indicator": "Trace/BPT trap: 5", "details": ["Geheimer Titel"]],
             "asi": ["Folio": ["Fatal error: Tagebuch geheimer Inhalt"]],
             "environment": ["SECRET=1"],
-            "usedImages": [["name": "Folio", "path": "/Users/geheim/Apps/Folio.app/Contents/MacOS/Folio"],
-                           ["name": "Geheim.dylib", "path": "/Users/geheim/lib/Geheim.dylib"],
-                           ["name": "libswiftCore.dylib", "path": "/usr/lib/swift/libswiftCore.dylib"]],
-            "threads": [["triggered": true, "frames": [
-                ["imageIndex": 2, "imageOffset": 16, "symbol": "_assertionFailure"],
-                ["imageIndex": 1, "imageOffset": 32, "symbol": "load(/Users/geheim/x)"],
-                ["imageIndex": 0, "imageOffset": 64],
-            ]]],
+            "usedImages": [
+                ["name": "Folio", "path": "/Users/geheim/Apps/Folio.app/Contents/MacOS/Folio"],
+                ["name": "Geheim.dylib", "path": "/Users/geheim/lib/Geheim.dylib"],
+                ["name": "libswiftCore.dylib", "path": "/usr/lib/swift/libswiftCore.dylib"]
+            ],
+            "threads": [
+                [
+                    "triggered": true,
+                    "frames": [
+                        ["imageIndex": 2, "imageOffset": 16, "symbol": "_assertionFailure"],
+                        ["imageIndex": 1, "imageOffset": 32, "symbol": "load(/Users/geheim/x)"],
+                        ["imageIndex": 0, "imageOffset": 64]
+                    ]
+                ]
+            ]
         ]
         var data = try JSONSerialization.data(withJSONObject: header)
         data.append(0x0A)

@@ -53,10 +53,11 @@ enum NoteAutomation {
             let hay = (ref.meta.title + " " + ref.meta.tags.joined(separator: " ") + " " + ref.meta.searchText).lowercased()
             return terms.allSatisfy { hay.contains($0) }
         }
-        return Array(hits.sorted {
-            let a = terms.allSatisfy($0.meta.title.lowercased().contains), b = terms.allSatisfy($1.meta.title.lowercased().contains)
-            return a != b ? a : $0.meta.modified > $1.meta.modified
-        }.prefix(limit))
+        return Array(
+            hits.sorted {
+                let a = terms.allSatisfy($0.meta.title.lowercased().contains), b = terms.allSatisfy($1.meta.title.lowercased().contains)
+                return a != b ? a : $0.meta.modified > $1.meta.modified
+            }.prefix(limit))
     }
 
     /// A note by id (UUID text, only as an id), exact title, else a search with exactly one hit. Empty or ambiguous

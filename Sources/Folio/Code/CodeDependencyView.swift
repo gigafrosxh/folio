@@ -15,9 +15,10 @@ extension NoteDocument {
 extension BlockModel {
     func dependencyItem(runs: RunManager) -> CodeDependencies.Item {
         let lang = Languages.spec(for: language).id
-        return CodeDependencies.Item(id: id, language: lang, session: runs.runsInSession(self, language: lang) ? lang : nil,
-                                     code: storage.string, lastRun: lastRun, running: runs.isRunning(id),
-                                     stdin: stdin, interactive: interactive, isolated: mode == "isolated")
+        return CodeDependencies.Item(
+            id: id, language: lang, session: runs.runsInSession(self, language: lang) ? lang : nil,
+            code: storage.string, lastRun: lastRun, running: runs.isRunning(id),
+            stdin: stdin, interactive: interactive, isolated: mode == "isolated")
     }
 }
 
@@ -96,7 +97,8 @@ extension RunManager {
         Task {
             for id in stalePlan(doc: doc) {
                 guard let block = doc.blocks.first(where: { $0.id == id }),
-                      let task = start(block: block, doc: doc, theme: theme) else { break }
+                    let task = start(block: block, doc: doc, theme: theme)
+                else { break }
                 await task.value
                 if block.lastRun?.succeeded != true { break }
             }
@@ -176,7 +178,10 @@ struct CodeDependencyView: View {
     private func row(index: Int, item: CodeDependencies.Item, graph: CodeDependencies.Graph) -> some View {
         let status = graph.status[item.id] ?? .notRun
         let upstream = graph.upstream(of: item.id)
-        return Button { onSelect(item.id); dismiss() } label: {
+        return Button {
+            onSelect(item.id)
+            dismiss()
+        } label: {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: CodeDependencyStyle.symbol(status)).foregroundStyle(CodeDependencyStyle.color(status)).frame(width: 16)
                 VStack(alignment: .leading, spacing: 2) {
@@ -215,8 +220,9 @@ struct CodeDependencyView: View {
                 let depth = min(size.width - 6, 18 + CGFloat(b - a) * 10 + CGFloat(n % 3) * 4)
                 var p = Path()
                 p.move(to: CGPoint(x: size.width - 2, y: y1))
-                p.addCurve(to: CGPoint(x: size.width - 2, y: y2),
-                           control1: CGPoint(x: size.width - depth, y: y1), control2: CGPoint(x: size.width - depth, y: y2))
+                p.addCurve(
+                    to: CGPoint(x: size.width - 2, y: y2),
+                    control1: CGPoint(x: size.width - depth, y: y1), control2: CGPoint(x: size.width - depth, y: y2))
                 let stale = g.status[edge.to]?.isStale == true
                 ctx.stroke(p, with: .color(stale ? .orange : .accentColor.opacity(0.7)), lineWidth: 1.5)
                 var head = Path()
@@ -233,8 +239,10 @@ struct CodeDependencyView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Reihenfolge").font(.subheadline.weight(.semibold))
             ForEach(Array(g.warnings.enumerated()), id: \.offset) { _, w in
-                Label("Block \(g.number(of: w.block) ?? 0) nutzt „\(w.name)“, das erst Block \(g.number(of: w.definedIn) ?? 0) definiert.",
-                      systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.caption)
+                Label(
+                    "Block \(g.number(of: w.block) ?? 0) nutzt „\(w.name)“, das erst Block \(g.number(of: w.definedIn) ?? 0) definiert.",
+                    systemImage: "exclamationmark.triangle"
+                ).foregroundStyle(.orange).font(.caption)
             }
         }
         .padding(.horizontal, 14).padding(.bottom, 10)

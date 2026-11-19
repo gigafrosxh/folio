@@ -52,7 +52,10 @@ public struct CompletionContext: Sendable, Equatable {
         while pos < off {
             let n = min(chunk, off - pos)
             ns.getCharacters(&buffer, range: NSRange(location: pos, length: n))
-            for i in 0..<n where buffer[i] == 10 { lineCount += 1; lastBreak = pos + i }
+            for i in 0..<n where buffer[i] == 10 {
+                lineCount += 1
+                lastBreak = pos + i
+            }
             pos += n
         }
         line = lineCount
@@ -61,7 +64,7 @@ public struct CompletionContext: Sendable, Equatable {
 
     private static func isIdentifier(_ c: unichar) -> Bool {
         guard let s = Unicode.Scalar(c) else { return false }
-        return CharacterSet.alphanumerics.contains(s) || c == 95 || c == 36 // _ $
+        return CharacterSet.alphanumerics.contains(s) || c == 95 || c == 36  // _ $
     }
 
     private static func identifierStart(in ns: NSString, before offset: Int) -> Int {
@@ -93,13 +96,13 @@ public struct CompletionContext: Sendable, Equatable {
         var depth = 0
         while j > 0 {
             let c = ns.character(at: j - 1)
-            if c == 41 || c == 93 {                         // ) ]
+            if c == 41 || c == 93 {  // ) ]
                 depth += 1
-            } else if c == 40 || c == 91 {                  // ( [
+            } else if c == 40 || c == 91 {  // ( [
                 if depth == 0 { break }
                 depth -= 1
             } else if c == 58, j >= 2, ns.character(at: j - 2) == 58 {
-                j -= 1                                      // ::
+                j -= 1  // ::
             } else if c != 46, depth == 0, !isIdentifier(c) {
                 break
             }

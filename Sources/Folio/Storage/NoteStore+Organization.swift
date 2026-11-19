@@ -14,7 +14,8 @@ extension NoteStore {
         case .missing: loaded = LibraryOrganization()
         case .unreadable(let kept):
             loaded = LibraryOrganization()
-            lastError = "Reihenfolge, Favoriten und intelligente Ansichten dieser Bibliothek konnten nicht gelesen werden. "
+            lastError =
+                "Reihenfolge, Favoriten und intelligente Ansichten dieser Bibliothek konnten nicht gelesen werden. "
                 + "Folio beginnt damit neu; deine Notizen sind nicht betroffen."
                 + (kept.map { " Die alte Datei liegt als „\($0)“ im Ordner .folio der Bibliothek." } ?? "")
         }
@@ -71,7 +72,8 @@ extension NoteStore {
         }
         // Not readable at all (#188) or broken (#181).
         guard case .unreadable(let kept) = LibraryOrganization.load(from: rootURL) else { return }
-        lastError = "Die Datei mit Reihenfolge, Favoriten und intelligenten Ansichten war von außen unlesbar geworden. "
+        lastError =
+            "Die Datei mit Reihenfolge, Favoriten und intelligenten Ansichten war von außen unlesbar geworden. "
             + "Folio hat seinen Stand gesichert; deine Notizen sind nicht betroffen."
             + (kept.map { " Die unlesbare Datei liegt als „\($0)“ im Ordner .folio der Bibliothek." } ?? "")
     }
@@ -102,8 +104,9 @@ extension NoteStore {
         case .title: ordered = list.sorted { Self.titleOrder($0, $1) }
         case .manual:
             let byDate = list.sorted { $0.meta.modified > $1.meta.modified }
-            ordered = ManualOrder.apply(byDate, order: orderKey(for: sidebarSelection).flatMap { organization.noteOrder[$0] } ?? [],
-                                        key: \.id, newFirst: true)
+            ordered = ManualOrder.apply(
+                byDate, order: orderKey(for: sidebarSelection).flatMap { organization.noteOrder[$0] } ?? [],
+                key: \.id, newFirst: true)
         }
         return ordered.filter(\.meta.pinned) + ordered.filter { !$0.meta.pinned }
     }
@@ -205,10 +208,11 @@ extension NoteStore {
             org.folderOrder[parentRel] = names
         }
         org.folderOrder = Dictionary(org.folderOrder.map { (renamed($0.key) ?? $0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
-        org.noteOrder = Dictionary(org.noteOrder.map { key, value in
-            guard key.hasPrefix("folder:"), let r = renamed(String(key.dropFirst(7))) else { return (key, value) }
-            return ("folder:" + r, value)
-        }, uniquingKeysWith: { a, _ in a })
+        org.noteOrder = Dictionary(
+            org.noteOrder.map { key, value in
+                guard key.hasPrefix("folder:"), let r = renamed(String(key.dropFirst(7))) else { return (key, value) }
+                return ("folder:" + r, value)
+            }, uniquingKeysWith: { a, _ in a })
         for i in org.smartViews.indices {
             if let f = org.smartViews[i].filter.folder, let r = renamed(f) { org.smartViews[i].filter.folder = r }
         }
@@ -234,9 +238,10 @@ extension NoteStore {
         return list.filter { ref in
             let folder = ref.folderURL.standardizedFileURL.path
             let rel = folder.hasPrefix(root) ? String(folder.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")) : ref.folderURL.lastPathComponent
-            return search.matches(ref.meta, folderPath: rel,
-                                  kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref),
-                                  haystack: ref.haystack)
+            return search.matches(
+                ref.meta, folderPath: rel,
+                kinds: search.types.isEmpty || ref.meta.kinds != nil ? nil : kinds(of: ref),
+                haystack: ref.haystack)
         }
     }
 

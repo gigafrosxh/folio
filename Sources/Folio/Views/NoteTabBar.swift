@@ -23,7 +23,9 @@ struct NoteTabBar: View {
                 .onChange(of: store.selectedNoteID) { _, id in reveal(id, with: proxy) }
                 .onChange(of: store.tabs) { _, _ in reveal(store.selectedNoteID, with: proxy) }
             }
-            Button { store.createNoteInNewTab() } label: {
+            Button {
+                store.createNoteInNewTab()
+            } label: {
                 Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).frame(width: 26, height: 26)
             }
             .buttonStyle(.plain)
@@ -53,7 +55,9 @@ struct NoteTabBar: View {
                 .font(.system(size: 12, weight: selected ? .semibold : .regular))
                 .lineLimit(1)
                 .frame(maxWidth: 170, alignment: .leading)
-            Button { store.closeTab(id) } label: {
+            Button {
+                store.closeTab(id)
+            } label: {
                 Image(systemName: "xmark").font(.system(size: 8.5, weight: .bold)).frame(width: 16, height: 16)
                     .background(Color.primary.opacity(0.06), in: Circle())
             }
@@ -94,8 +98,9 @@ struct NoteWindowView: View {
             } else if let id = noteID, let damaged = store.failures[id] {
                 DamagedNoteView(damaged: damaged)
             } else {
-                ContentUnavailableView("Notiz nicht mehr vorhanden", systemImage: "note.text",
-                                       description: Text("Sie wurde gelöscht oder in den Papierkorb gelegt."))
+                ContentUnavailableView(
+                    "Notiz nicht mehr vorhanden", systemImage: "note.text",
+                    description: Text("Sie wurde gelöscht oder in den Papierkorb gelegt."))
             }
         }
         .frame(minWidth: 520, minHeight: 420)

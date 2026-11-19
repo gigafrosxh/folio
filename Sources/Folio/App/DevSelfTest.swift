@@ -28,10 +28,15 @@ enum DevSelfTest {
         let theme = ThemeManager.shared
         let saved = theme.settings
         defer { theme.settings = saved }
-        print("DEV start"); fflush(stdout)
+        print("DEV start")
+        fflush(stdout)
         await wait(1.5)
-        print("DEV notes", store.notes.count); fflush(stdout)
-        guard store.createNote() != nil, let doc = store.currentDocument else { check(false, "Notiz"); return }
+        print("DEV notes", store.notes.count)
+        fflush(stdout)
+        guard store.createNote() != nil, let doc = store.currentDocument else {
+            check(false, "Notiz")
+            return
+        }
         let (input, interactive) = await inputChecks(doc: doc, theme: theme)
         let runtime = await errorMarkerChecks(doc: doc, interactive: interactive)
         await blockTestChecks(doc: doc, theme: theme, runtime: runtime)
@@ -40,7 +45,8 @@ enum DevSelfTest {
         let (chatty, hungry) = await limitChecks(doc: doc, theme: theme, saved: saved, slow: slow)
         savedStateCheck(doc: doc, chatty: chatty, input: input)
         await terminalChecks(doc: doc, hungry: hungry)
-        print("DEV done"); fflush(stdout)
+        print("DEV done")
+        fflush(stdout)
     }
 
     private static func inputChecks(doc: NoteDocument, theme: ThemeManager) async -> (BlockModel, BlockModel) {
@@ -75,8 +81,9 @@ enum DevSelfTest {
         let runtime = code("def f():\n    return 1 / 0\n\nf()", linked: true)
         doc.insert(runtime, after: broken.id)
         await run(runtime, doc)
-        check(runtime.diagnostics.first?.line == 2 && runtime.diagnostics.first?.message.contains("ZeroDivisionError") == true,
-              "Laufzeitfehler in der Sitzung an Zeile 2")
+        check(
+            runtime.diagnostics.first?.line == 2 && runtime.diagnostics.first?.message.contains("ZeroDivisionError") == true,
+            "Laufzeitfehler in der Sitzung an Zeile 2")
         return runtime
     }
 
@@ -115,8 +122,9 @@ enum DevSelfTest {
         }
         await run(backtracking, doc)
         heartbeat.cancel()
-        check(backtracking.testOutcome?.status == .failed && backtracking.testOutcome?.messages.contains { $0.contains("Zeitlimit") } == true,
-              "Regulärer Ausdruck läuft ins Zeitlimit und gilt als fehlgeschlagen")
+        check(
+            backtracking.testOutcome?.status == .failed && backtracking.testOutcome?.messages.contains { $0.contains("Zeitlimit") } == true,
+            "Regulärer Ausdruck läuft ins Zeitlimit und gilt als fehlgeschlagen")
         check(ticks >= 20, "Oberfläche reagiert während der Prüfung des regulären Ausdrucks (\(ticks) Takte)")
         doc.remove(backtracking.id)
     }
@@ -129,8 +137,9 @@ enum DevSelfTest {
         let env = code("import os\nprint(os.path.realpath(os.getcwd()))\nprint(os.environ.get('FOLIO_ENV'))")
         doc.insert(env, after: runtime.id)
         await run(env, doc)
-        check(env.output?.contains(dir.resolvingSymlinksInPath().path) == true && env.output?.contains("aus-der-notiz") == true,
-              "Arbeitsverzeichnis und Variablen der Notiz")
+        check(
+            env.output?.contains(dir.resolvingSymlinksInPath().path) == true && env.output?.contains("aus-der-notiz") == true,
+            "Arbeitsverzeichnis und Variablen der Notiz")
         let envLinked = code("import os\nprint(os.environ.get('FOLIO_ENV'))", linked: true)
         doc.insert(envLinked, after: env.id)
         await run(envLinked, doc)
@@ -162,8 +171,9 @@ enum DevSelfTest {
         chatty.outputCollapsed = true
         doc.saveNow()
         if let file = try? NoteFile.read(from: doc.url) {
-            check(file.body.blocks.first { $0.id == chatty.id }?.outputCollapsed == true
-                  && file.body.blocks.first { $0.id == input.id }?.stdin == "Ada", "Eingeklappt und Eingabe gespeichert")
+            check(
+                file.body.blocks.first { $0.id == chatty.id }?.outputCollapsed == true
+                    && file.body.blocks.first { $0.id == input.id }?.stdin == "Ada", "Eingeklappt und Eingabe gespeichert")
         }
     }
 
@@ -173,7 +183,10 @@ enum DevSelfTest {
         term.send("echo folio-\"42\"\n")
         for _ in 0..<60 where !term.text.contains("folio-42") { await wait(0.1) }
         check(term.text.contains("folio-42"), "Terminal führt Befehle aus")
-        if !term.text.contains("folio-42") { print("DEV terminal diagnostic", term.error ?? "", term.text.debugDescription); fflush(stdout) }
+        if !term.text.contains("folio-42") {
+            print("DEV terminal diagnostic", term.error ?? "", term.text.debugDescription)
+            fflush(stdout)
+        }
         let tblock = code("print('aus dem Terminal', input('Frage? '))")
         doc.insert(tblock, after: hungry.id)
         term.run(tblock, override: nil)

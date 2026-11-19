@@ -20,16 +20,20 @@ public enum Benchmark {
         public mutating func int(_ upper: Int) -> Int { Int(next() % UInt64(max(upper, 1))) }
     }
 
-    static let words = ["Projekt", "Idee", "Notiz", "Plan", "Daten", "Analyse", "Code", "Bericht", "Treffen", "Liste",
-                        "Server", "Swift", "Python", "Graph", "Suche", "Entwurf", "Budget", "Reise", "Buch", "Kapitel"]
+    static let words = [
+        "Projekt", "Idee", "Notiz", "Plan", "Daten", "Analyse", "Code", "Bericht", "Treffen", "Liste",
+        "Server", "Swift", "Python", "Graph", "Suche", "Entwurf", "Budget", "Reise", "Buch", "Kapitel"
+    ]
 
     public static func title(_ i: Int) -> String { "Notiz \(i) \(words[i % words.count])" }
 
     /// `count` notes in 10 folders, with tags, `[[links]]` to other notes and, for every 20th note, a small attachment.
     /// `body` builds the text block of a note (the app passes its RTF encoder; the core uses plain RTF).
     @discardableResult
-    public static func generateLibrary(at root: URL, count: Int, seed: UInt64 = 42,
-                                       rtf: (String) -> Data? = plainRTF) throws -> [URL] {
+    public static func generateLibrary(
+        at root: URL, count: Int, seed: UInt64 = 42,
+        rtf: (String) -> Data? = plainRTF
+    ) throws -> [URL] {
         var random = Random(seed: seed)
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -48,8 +52,9 @@ public enum Benchmark {
             var blocks = [text]
             var attachments: [FolioArchive.Attachment] = []
             if i % 20 == 0 {
-                let a = FolioArchive.Attachment(filename: "Anhang \(i).bin", typeIdentifier: "public.data",
-                                                data: Data((0..<4096).map { _ in UInt8(truncatingIfNeeded: random.next()) }))
+                let a = FolioArchive.Attachment(
+                    filename: "Anhang \(i).bin", typeIdentifier: "public.data",
+                    data: Data((0..<4096).map { _ in UInt8(truncatingIfNeeded: random.next()) }))
                 attachments.append(a)
                 var b = BlockRecord(kind: .file)
                 b.attachmentID = a.id
@@ -113,14 +118,15 @@ public enum Benchmark {
         }
         times.sort()
         let p95 = times[min(times.count - 1, Int((Double(times.count) * 0.95).rounded(.up)) - 1)]
-        return Result(scenario: scenario, size: size, runs: runs, medianMs: times[times.count / 2], p95Ms: p95,
-                      minMs: times.first ?? 0, peakMemoryMB: peakMemoryMB())
+        return Result(
+            scenario: scenario, size: size, runs: runs, medianMs: times[times.count / 2], p95Ms: p95,
+            minMs: times.first ?? 0, peakMemoryMB: peakMemoryMB())
     }
 
     public static func peakMemoryMB() -> Double {
         var usage = rusage()
         getrusage(RUSAGE_SELF, &usage)
-        return Double(usage.ru_maxrss) / 1_048_576   // bytes on macOS
+        return Double(usage.ru_maxrss) / 1_048_576  // bytes on macOS
     }
 
     // MARK: Report
@@ -146,9 +152,10 @@ public enum Benchmark {
         }
 
         public func csv() -> String {
-            "scenario,size,runs,median_ms,p95_ms,min_ms,peak_memory_mb\n" + results.map {
-                String(format: "%@,%d,%d,%.2f,%.2f,%.2f,%.1f", $0.scenario, $0.size, $0.runs, $0.medianMs, $0.p95Ms, $0.minMs, $0.peakMemoryMB)
-            }.joined(separator: "\n") + "\n"
+            "scenario,size,runs,median_ms,p95_ms,min_ms,peak_memory_mb\n"
+                + results.map {
+                    String(format: "%@,%d,%d,%.2f,%.2f,%.2f,%.1f", $0.scenario, $0.size, $0.runs, $0.medianMs, $0.p95Ms, $0.minMs, $0.peakMemoryMB)
+                }.joined(separator: "\n") + "\n"
         }
     }
 
@@ -159,8 +166,10 @@ public enum Benchmark {
         sysctlbyname("hw.model", nil, &size, nil, 0)
         var model = [CChar](repeating: 0, count: max(size, 1))
         sysctlbyname("hw.model", &model, &size, nil, 0)
-        return ["os": info.operatingSystemVersionString, "cpus": "\(info.activeProcessorCount)",
-                "memory_gb": String(format: "%.0f", Double(info.physicalMemory) / 1_073_741_824),
-                "model": String(cString: model)]
+        return [
+            "os": info.operatingSystemVersionString, "cpus": "\(info.activeProcessorCount)",
+            "memory_gb": String(format: "%.0f", Double(info.physicalMemory) / 1_073_741_824),
+            "model": String(cString: model)
+        ]
     }
 }

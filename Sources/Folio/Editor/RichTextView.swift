@@ -112,7 +112,8 @@ final class FolioTextView: NSTextView {
             self.suggestionLocation = location
             self.needsDisplay = true
             if ProcessInfo.processInfo.environment["FOLIO_LAYOUT_DUMP"] != nil {
-                print("LAYOUT suggestion after \(Int(Date().timeIntervalSince(started) * 1000)) ms: \(text)"); fflush(stdout)
+                print("LAYOUT suggestion after \(Int(Date().timeIntervalSince(started) * 1000)) ms: \(text)")
+                fflush(stdout)
             }
         }
     }
@@ -129,7 +130,8 @@ final class FolioTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard let s = suggestion, let lm = layoutManager, let tc = textContainer,
-              selectedRange() == NSRange(location: suggestionLocation, length: 0) else { return }
+            selectedRange() == NSRange(location: suggestionLocation, length: 0)
+        else { return }
         _ = tc
         let ns = string as NSString
         guard suggestionLocation > 0, suggestionLocation <= ns.length else { return }
@@ -149,18 +151,25 @@ final class FolioTextView: NSTextView {
         let available = bounds.width - caretX - textContainerInset.width
         guard available > 20 else { return }
         let text = NSAttributedString(string: s, attributes: attrs)
-        text.draw(with: NSRect(x: caretX, y: baseline - font.ascender, width: available, height: font.boundingRectForFont.height),
-                  options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+        text.draw(
+            with: NSRect(x: caretX, y: baseline - font.ascender, width: available, height: font.boundingRectForFont.height),
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
     }
 
     override func cancelOperation(_ sender: Any?) {
-        if suggestion != nil { clearSuggestion(); return }
+        if suggestion != nil {
+            clearSuggestion()
+            return
+        }
         super.cancelOperation(sender)
     }
 
     /// NSTextView sends Esc as `complete(_:)`; with a suggestion showing, Esc only dismisses it.
     override func complete(_ sender: Any?) {
-        if suggestion != nil { clearSuggestion(); return }
+        if suggestion != nil {
+            clearSuggestion()
+            return
+        }
         super.complete(sender)
     }
 
@@ -306,7 +315,8 @@ final class FolioTextView: NSTextView {
     /// A line that is just ![[Titel]] becomes an embedded note (#120).
     private func turnIntoEmbed(line: String, paragraph para: NSRange) -> Bool {
         guard !(isFirstBlock && para.location == 0), let embed = WikiLink.find(in: line).first, embed.isEmbed,
-              embed.range.location == 0, embed.range.length == (line as NSString).length else { return false }
+            embed.range.location == 0, embed.range.length == (line as NSString).length
+        else { return false }
         if shouldChangeText(in: para, replacementString: "") {
             textStorage?.replaceCharacters(in: para, with: "")
             didChangeText()
@@ -351,10 +361,16 @@ final class FolioTextView: NSTextView {
     /// back over empty or blank lines into the previous text.
     override func deleteWordBackward(_ sender: Any?) {
         let sel = selectedRange()
-        guard sel.length == 0, sel.location > 0 else { super.deleteWordBackward(sender); return }
+        guard sel.length == 0, sel.location > 0 else {
+            super.deleteWordBackward(sender)
+            return
+        }
         let ns = string as NSString
         let lineStart = ns.lineRange(for: NSRange(location: sel.location, length: 0)).location
-        if lineStart == sel.location { deleteBackward(sender); return }   // at the line start: join with the line above
+        if lineStart == sel.location {
+            deleteBackward(sender)
+            return
+        }  // at the line start: join with the line above
         var start = sel.location
         func char(_ i: Int) -> Character { Character(ns.substring(with: ns.rangeOfComposedCharacterSequence(at: i))) }
         // Spaces before the cursor, then one word (or one run of punctuation).
@@ -463,8 +479,10 @@ final class FolioTextView: NSTextView {
 
     // MARK: Continuity Camera (sketch, photo or scan from iPhone/iPad)
 
-    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?,
-                                 returnType: NSPasteboard.PasteboardType?) -> Any? {
+    override func validRequestor(
+        forSendType sendType: NSPasteboard.PasteboardType?,
+        returnType: NSPasteboard.PasteboardType?
+    ) -> Any? {
         if sendType == nil, let returnType, NSImage.imageTypes.contains(returnType.rawValue) || returnType == .png || returnType == .tiff {
             return self
         }
@@ -473,7 +491,8 @@ final class FolioTextView: NSTextView {
 
     override func readSelection(from pboard: NSPasteboard) -> Bool {
         if let data = pboard.data(forType: .png) ?? pboard.data(forType: .tiff)
-            ?? (pboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first?.tiffRepresentation {
+            ?? (pboard.readObjects(forClasses: [NSImage.self]) as? [NSImage])?.first?.tiffRepresentation
+        {
             let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) ?? data
             onPasteImage?(png)
             return true
@@ -520,7 +539,10 @@ final class FolioTextView: NSTextView {
         let start = selectedRange().location
         let inTitle = isFirstBlock && !ns.substring(to: start).contains("\n")
         let titleFont = typingAttributes[.font] as? NSFont
-        guard readSelection(from: pb) else { NSSound.beep(); return }
+        guard readSelection(from: pb) else {
+            NSSound.beep()
+            return
+        }
         if inTitle, let titleFont { demotePastedLinesAfterTitle(from: start, to: selectedRange().location, titleFont: titleFont) }
     }
 
@@ -604,7 +626,8 @@ final class FolioTextView: NSTextView {
     /// Rich text with embedded pictures (Notes, TextEdit, Pages): paste the text, then the pictures as blocks.
     private func pasteRichTextWithPictures(from pb: NSPasteboard) -> Bool {
         guard (pb.types ?? []).contains(.rtfd), let rtfd = pb.data(forType: .rtfd),
-              let rich = NSAttributedString(rtfd: rtfd, documentAttributes: nil) else { return false }
+            let rich = NSAttributedString(rtfd: rtfd, documentAttributes: nil)
+        else { return false }
         let (text, images) = Self.separatingPictures(of: rich)
         guard !images.isEmpty else { return false }
         if text.length > 0 { insertText(text, replacementRange: selectedRange()) }
@@ -700,8 +723,10 @@ struct RichTextView: NSViewRepresentable {
         }
         if #available(macOS 14.0, *) { tv.inlinePredictionType = theme.settings.systemPredictions ? .yes : .no }
         // The underline in the accent color too; without it AppKit draws it system blue (#126).
-        tv.linkTextAttributes = [.foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue,
-                                 .underlineColor: theme.accentNSColor.withAlphaComponent(0.6), .cursor: NSCursor.pointingHand]
+        tv.linkTextAttributes = [
+            .foregroundColor: theme.accentNSColor, .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .underlineColor: theme.accentNSColor.withAlphaComponent(0.6), .cursor: NSCursor.pointingHand
+        ]
         tv.delegate = context.coordinator
         configureCallbacks(tv, context: context)
         tv.typingAttributes = initialTypingAttributes()
@@ -840,7 +865,8 @@ struct RichTextView: NSViewRepresentable {
             FormattingController.shared.selectionChanged()
             if let tv = notification.object as? FolioTextView { tv.onSelectionChange?(tv.selectedRange()) }
             if let tv = notification.object as? FolioTextView, tv.suggestion != nil,
-               tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor {
+                tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor
+            {
                 tv.clearSuggestion()
             }
         }

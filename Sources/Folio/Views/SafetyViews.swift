@@ -90,9 +90,11 @@ struct VersionHistorySheet: View {
             .padding(16)
             Divider()
             if versions.isEmpty {
-                ContentUnavailableView("Noch keine Versionen", systemImage: "clock.arrow.circlepath",
-                                       description: Text("Sobald du die Notiz bearbeitest, erscheinen hier ältere Stände."))
-                    .frame(maxHeight: .infinity)
+                ContentUnavailableView(
+                    "Noch keine Versionen", systemImage: "clock.arrow.circlepath",
+                    description: Text("Sobald du die Notiz bearbeitest, erscheinen hier ältere Stände.")
+                )
+                .frame(maxHeight: .infinity)
             } else {
                 HStack(spacing: 0) {
                     List(versions, selection: $selected) { v in
@@ -163,7 +165,10 @@ struct VersionHistorySheet: View {
     }
 
     private func load() {
-        guard let v = selected else { preview = ""; return }
+        guard let v = selected else {
+            preview = ""
+            return
+        }
         do {
             preview = NoteText.of(try store.history.read(v))
             error = nil
@@ -195,11 +200,13 @@ struct ConflictSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("„\(conflict.doc.meta.title)“ wurde außerhalb von Folio geändert")
                         .font(.title3.weight(.semibold))
-                    Text(conflict.diskData == nil
-                         ? "Die Datei wurde gelöscht oder verschoben, während du sie bearbeitet hast."
-                         : "Ein anderes Programm oder ein Sync-Dienst (z. B. iCloud) hat die Datei geändert, während du ungesicherte Änderungen hattest. Was nicht behalten wird, landet im Versionsverlauf.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        conflict.diskData == nil
+                            ? "Die Datei wurde gelöscht oder verschoben, während du sie bearbeitet hast."
+                            : "Ein anderes Programm oder ein Sync-Dienst (z. B. iCloud) hat die Datei geändert, während du ungesicherte Änderungen hattest. Was nicht behalten wird, landet im Versionsverlauf."
+                    )
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             if let theirs = conflict.diskFile {
@@ -250,7 +257,11 @@ struct TrashView: View {
                 if !sidebarVisible { WindowControls(window: windowState.window) }
                 HStack {
                     if !sidebarVisible {
-                        Button { sidebarVisible = true } label: { Image(systemName: "sidebar.left") }.buttonStyle(.borderless)
+                        Button {
+                            sidebarVisible = true
+                        } label: {
+                            Image(systemName: "sidebar.left")
+                        }.buttonStyle(.borderless)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Papierkorb").font(.system(size: 22, weight: .bold, design: .rounded))
@@ -264,9 +275,11 @@ struct TrashView: View {
             .padding(16)
             Divider()
             if store.trashItems.isEmpty {
-                ContentUnavailableView("Der Papierkorb ist leer", systemImage: "trash",
-                                       description: Text("Gelöschte Notizen und Ordner landen hier und lassen sich wiederherstellen."))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView(
+                    "Der Papierkorb ist leer", systemImage: "trash",
+                    description: Text("Gelöschte Notizen und Ordner landen hier und lassen sich wiederherstellen.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(store.trashItems) { item in
                     HStack(spacing: 12) {
@@ -278,8 +291,12 @@ struct TrashView: View {
                         }
                         Spacer()
                         Button("Wiederherstellen") { store.restore(item) }
-                        Button(role: .destructive) { confirmDelete = item } label: { Image(systemName: "xmark.bin") }
-                            .help("Endgültig löschen")
+                        Button(role: .destructive) {
+                            confirmDelete = item
+                        } label: {
+                            Image(systemName: "xmark.bin")
+                        }
+                        .help("Endgültig löschen")
                     }
                     .padding(.vertical, 4)
                     .contextMenu {
@@ -295,8 +312,10 @@ struct TrashView: View {
         } message: {
             Text("Die Notizen und ihr Versionsverlauf werden gelöscht. Das lässt sich nicht rückgängig machen.")
         }
-        .confirmationDialog("„\(confirmDelete?.title ?? "")“ endgültig löschen?",
-                            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } })) {
+        .confirmationDialog(
+            "„\(confirmDelete?.title ?? "")“ endgültig löschen?",
+            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } })
+        ) {
             Button("Endgültig löschen", role: .destructive) { if let item = confirmDelete { store.deletePermanently(item) } }
         } message: {
             Text("Auch der Versionsverlauf geht verloren. Das lässt sich nicht rückgängig machen.")
@@ -352,13 +371,16 @@ struct DamagedNoteView: View {
                 Button {
                     store.restoreLatestVersion(damaged)
                 } label: {
-                    Label("Letzte intakte Version wiederherstellen (\(version.date.formatted(date: .abbreviated, time: .shortened)))",
-                          systemImage: "clock.arrow.circlepath")
+                    Label(
+                        "Letzte intakte Version wiederherstellen (\(version.date.formatted(date: .abbreviated, time: .shortened)))",
+                        systemImage: "clock.arrow.circlepath")
                 }
                 .buttonStyle(.borderedProminent)
             }
             if damaged.report.canSalvage {
-                Button { store.salvage(damaged) } label: {
+                Button {
+                    store.salvage(damaged)
+                } label: {
                     Label("Gerettete Inhalte als neue Notiz sichern", systemImage: "lifepreserver")
                 }
                 .buttonStyle(.bordered)

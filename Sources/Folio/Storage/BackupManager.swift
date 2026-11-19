@@ -79,7 +79,8 @@ final class BackupManager: ObservableObject {
             UserDefaults.standard.set(info.date, forKey: Self.lastKey)
             if check.isValid && !missing.isEmpty {
                 status = "Gesichert und geprüft: \(check.notes) Notiz\(check.notes == 1 ? "" : "en"), \(ByteCountFormatter.string(fromByteCount: info.size, countStyle: .file))."
-                lastError = "Ohne die ungesicherten Änderungen in \(missing.joined(separator: ", ")): Diese Notizen sind nur mit ihrem zuletzt gesicherten Stand enthalten. Löse den Konflikt oder sichere sie, dann noch einmal sichern."
+                lastError =
+                    "Ohne die ungesicherten Änderungen in \(missing.joined(separator: ", ")): Diese Notizen sind nur mit ihrem zuletzt gesicherten Stand enthalten. Löse den Konflikt oder sichere sie, dann noch einmal sichern."
             } else if check.isValid {
                 status = "Gesichert und geprüft: \(check.notes) Notiz\(check.notes == 1 ? "" : "en"), \(ByteCountFormatter.string(fromByteCount: info.size, countStyle: .file))."
             } else {
@@ -117,7 +118,9 @@ final class BackupManager: ObservableObject {
 
     /// Restores a backup as a new folder inside the library; existing notes are never touched.
     func restore(_ backup: BackupInfo) {
-        let name = "Wiederhergestellt " + backup.date.formatted(date: .numeric, time: .shortened)
+        let name =
+            "Wiederhergestellt "
+            + backup.date.formatted(date: .numeric, time: .shortened)
             .replacingOccurrences(of: ":", with: ".").replacingOccurrences(of: "/", with: "-")
         do {
             let folder = try LibraryBackup.restore(backup.url, into: NoteStore.shared.rootURL, name: name)

@@ -17,7 +17,10 @@ struct NoteRef: Identifiable, Hashable {
     }
 
     static func == (a: NoteRef, b: NoteRef) -> Bool { a.meta == b.meta && a.url == b.url }
-    func hash(into h: inout Hasher) { h.combine(meta.id); h.combine(url) }
+    func hash(into h: inout Hasher) {
+        h.combine(meta.id)
+        h.combine(url)
+    }
 }
 
 struct FolderNode: Identifiable, Hashable {

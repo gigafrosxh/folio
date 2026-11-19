@@ -44,8 +44,9 @@ final class PDFTextTests: XCTestCase {
 
     func testReflowJoinsBrokenLines() {
         let raw = "Das ist ein langer Satz, der in der PDF\numbricht und mit Bei-\nspiel endet.\n\nNeuer Absatz:\n• Punkt eins\n• Punkt zwei\n1. Erstens"
-        XCTAssertEqual(PDFText.reflow(raw),
-                       "Das ist ein langer Satz, der in der PDF umbricht und mit Beispiel endet.\nNeuer Absatz:\n• Punkt eins\n• Punkt zwei\n1. Erstens")
+        XCTAssertEqual(
+            PDFText.reflow(raw),
+            "Das ist ein langer Satz, der in der PDF umbricht und mit Beispiel endet.\nNeuer Absatz:\n• Punkt eins\n• Punkt zwei\n1. Erstens")
         XCTAssertEqual(PDFText.reflow("Nord-\nSüd-Achse"), "Nord-Süd-Achse", "a hyphen before a capital stays")
     }
 }

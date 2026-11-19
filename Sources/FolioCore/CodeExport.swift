@@ -17,9 +17,11 @@ public enum CodeExport {
         name = String(name.drop(while: { $0 == "." }))
         if name.isEmpty { name = "code" }
         let existingExtension = (name as NSString).pathExtension
-        let ext = !caption.isEmpty && !existingExtension.isEmpty
+        let ext =
+            !caption.isEmpty && !existingExtension.isEmpty
             ? existingExtension : Languages.spec(for: language).fileExtension
-        let base = !caption.isEmpty && !existingExtension.isEmpty
+        let base =
+            !caption.isEmpty && !existingExtension.isEmpty
             ? (name as NSString).deletingPathExtension : name
         // Preserve the extension while bounding the complete suggested name.
         let suffix = String(ext.prefix(40))
@@ -28,10 +30,12 @@ public enum CodeExport {
 
     private static func definitionName(_ code: String) -> String? {
         let beginning = code.components(separatedBy: "\n").prefix(30).joined(separator: "\n")
-        let pattern = #"(?m)^\s*(?:(?:public|private|internal|fileprivate|open|final|static|export|default|async|pub)\s+)*(?:def|class|function\s*\*?|func|struct|enum|actor|protocol|interface|fn|fun|sub)\s+([\p{L}_$][\p{L}\p{N}_$]*)"#
+        let pattern =
+            #"(?m)^\s*(?:(?:public|private|internal|fileprivate|open|final|static|export|default|async|pub)\s+)*(?:def|class|function\s*\*?|func|struct|enum|actor|protocol|interface|fn|fun|sub)\s+([\p{L}_$][\p{L}\p{N}_$]*)"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: beginning, range: NSRange(beginning.startIndex..., in: beginning)),
-              let range = Range(match.range(at: 1), in: beginning) else { return nil }
+            let match = regex.firstMatch(in: beginning, range: NSRange(beginning.startIndex..., in: beginning)),
+            let range = Range(match.range(at: 1), in: beginning)
+        else { return nil }
         return String(beginning[range])
     }
 

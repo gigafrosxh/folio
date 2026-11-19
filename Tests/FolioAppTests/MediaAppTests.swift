@@ -21,7 +21,11 @@ final class MediaAppTests: XCTestCase {
     }
 
     private var png: Data {
-        let image = NSImage(size: NSSize(width: 8, height: 4), flipped: false) { r in NSColor.red.setFill(); r.fill(); return true }
+        let image = NSImage(size: NSSize(width: 8, height: 4), flipped: false) { r in
+            NSColor.red.setFill()
+            r.fill()
+            return true
+        }
         return NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
     }
 
@@ -64,8 +68,9 @@ final class MediaAppTests: XCTestCase {
         var block = BlockRecord(kind: .pdf)
         block.attachmentID = att.id
         let date = Date(timeIntervalSince1970: 5_000)
-        let doc = NoteDocument(file: NoteFile(meta: NoteMetadata(title: "Bio", modified: date), body: NoteBody(blocks: [block]), attachments: [att]),
-                               url: URL(fileURLWithPath: "/dev/null"))
+        let doc = NoteDocument(
+            file: NoteFile(meta: NoteMetadata(title: "Bio", modified: date), body: NoteBody(blocks: [block]), attachments: [att]),
+            url: URL(fileURLWithPath: "/dev/null"))
         doc.indexPDFs()
         for _ in 0..<40 where doc.blocks.first(where: { $0.kind == .pdf })?.pdfText == nil { try await Task.sleep(for: .milliseconds(50)) }
         let file = doc.makeFile()
@@ -89,12 +94,13 @@ final class MediaAppTests: XCTestCase {
         // #200: same length, different content, same key.
         // Drawn with Core Graphics, not AppKit: on a build server without a screen AppKit may draw nothing.
         func picture(_ r: CGFloat, _ b: CGFloat) -> Data {
-            let ctx = CGContext(data: nil, width: 8, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
-                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            let ctx = CGContext(
+                data: nil, width: 8, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
             ctx.setFillColor(red: r, green: 0, blue: b, alpha: 1)
             ctx.fill(CGRect(x: 0, y: 0, width: 8, height: 4))
             var data = NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
-            data.append(Data(count: 4096 - data.count % 4096))   // same length for both
+            data.append(Data(count: 4096 - data.count % 4096))  // same length for both
             return data
         }
         let red = picture(1, 0), blue = picture(0, 1)
@@ -115,8 +121,9 @@ final class MediaAppTests: XCTestCase {
         let att = FolioArchive.Attachment(filename: "A.pdf", typeIdentifier: "com.adobe.pdf", data: big)
         var block = BlockRecord(kind: .pdf)
         block.attachmentID = att.id
-        let doc = NoteDocument(file: NoteFile(meta: NoteMetadata(title: "P"), body: NoteBody(blocks: [block]), attachments: [att]),
-                               url: URL(fileURLWithPath: "/dev/null"))
+        let doc = NoteDocument(
+            file: NoteFile(meta: NoteMetadata(title: "P"), body: NoteBody(blocks: [block]), attachments: [att]),
+            url: URL(fileURLWithPath: "/dev/null"))
         doc.indexPDFs()
         doc.replaceAttachmentData(att.id, data: pdf("Neuer Begriff Zellmembran"))
         let pdfBlock = try XCTUnwrap(doc.blocks.first { $0.kind == .pdf })

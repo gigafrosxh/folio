@@ -51,24 +51,28 @@ final class WidgetFeed {
         let available = FileManager.default.fileExists(atPath: store.rootURL.path)
         let byDate = store.notes.sorted { $0.meta.modified > $1.meta.modified }
         func note(_ ref: NoteRef) -> WidgetSnapshot.Note {
-            WidgetSnapshot.Note(id: ref.id, title: ref.meta.title, folder: store.relativeFolderName(ref.folderURL),
-                                modified: ref.meta.modified, pinned: ref.meta.pinned,
-                                preview: show ? String(ref.meta.preview.prefix(240)) : nil)
+            WidgetSnapshot.Note(
+                id: ref.id, title: ref.meta.title, folder: store.relativeFolderName(ref.folderURL),
+                modified: ref.meta.modified, pinned: ref.meta.pinned,
+                preview: show ? String(ref.meta.preview.prefix(240)) : nil)
         }
         var checklists: [WidgetSnapshot.Checklist] = []
         for ref in byDate where ref.meta.searchText.contains("☐") || ref.meta.searchText.contains("☑") {
             let parsed = ChecklistParser.parse(ref.meta.searchText)
             guard parsed.total > 0 else { continue }
-            checklists.append(.init(noteID: ref.id, title: ref.meta.title, done: parsed.done, total: parsed.total,
-                                    items: show ? parsed.items : []))
+            checklists.append(
+                .init(
+                    noteID: ref.id, title: ref.meta.title, done: parsed.done, total: parsed.total,
+                    items: show ? parsed.items : []))
             if checklists.count == 200 { break }
         }
-        var snapshot = WidgetSnapshot(generated: now, libraryName: store.rootURL.lastPathComponent, libraryAvailable: available,
-                                      showsContent: show,
-                                      pinned: byDate.filter(\.meta.pinned).prefix(10).map(note),
-                                      recent: byDate.prefix(10).map(note),
-                                      notes: byDate.prefix(1000).map(note),
-                                      checklists: checklists)
+        var snapshot = WidgetSnapshot(
+            generated: now, libraryName: store.rootURL.lastPathComponent, libraryAvailable: available,
+            showsContent: show,
+            pinned: byDate.filter(\.meta.pinned).prefix(10).map(note),
+            recent: byDate.prefix(10).map(note),
+            notes: byDate.prefix(1000).map(note),
+            checklists: checklists)
         snapshot.featuredNoteID = UUID(uuidString: settings.widgetNote)
         snapshot.featuredChecklistID = UUID(uuidString: settings.widgetChecklist)
         return snapshot

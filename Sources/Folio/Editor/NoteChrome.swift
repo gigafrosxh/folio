@@ -20,8 +20,10 @@ struct NoteActionsBar: View {
             .buttonStyle(.plain)
             .helpLabel("Teilen")
             let ai = AIAvailability.current
-            button("apple.intelligence", ai.isAvailable ? "KI-Chat mit \(AIProvider.name) (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
-                   tint: ai.isAvailable ? theme.accent : .secondary) {
+            button(
+                "apple.intelligence", ai.isAvailable ? "KI-Chat mit \(AIProvider.name) (⌥⌘I)" : "\(ai.title) – der Chat zeigt passende Stellen statt Antworten (⌥⌘I)",
+                tint: ai.isAvailable ? theme.accent : .secondary
+            ) {
                 NotificationCenter.default.post(name: .folioToggleChat, object: nil)
             }
             Menu {
@@ -75,8 +77,10 @@ struct NoteActionsBar: View {
     @ViewBuilder private var markButtons: some View {
         let pinned = doc.meta.pinned, favorite = store.isFavorite(doc.id)
         button(pinned ? "pin.fill" : "pin", pinned ? "Loslösen" : "Anpinnen", tint: pinned ? theme.accent : nil) { store.togglePin(doc.id) }
-        button(favorite ? "star.fill" : "star", favorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
-               tint: favorite ? .yellow : nil) { store.toggleFavorite(doc.id) }
+        button(
+            favorite ? "star.fill" : "star", favorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen",
+            tint: favorite ? .yellow : nil
+        ) { store.toggleFavorite(doc.id) }
     }
 
     private func button(_ icon: String, _ help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
@@ -101,9 +105,13 @@ struct NoteStatusPill: View {
     @State private var wordCount = 0
 
     var body: some View {
-        Button { showInfo.toggle() } label: { pill }
-            .buttonStyle(.plain)
-            .helpLabel("Informationen zur Notiz")
+        Button {
+            showInfo.toggle()
+        } label: {
+            pill
+        }
+        .buttonStyle(.plain)
+        .helpLabel("Informationen zur Notiz")
     }
 
     private var pill: some View {

@@ -22,16 +22,22 @@ enum AISelfTest {
         let store = NoteStore.shared
         await wait(2)
         let availability = AIAvailability.current
-        print("AI availability", availability.state); fflush(stdout)
+        print("AI availability", availability.state)
+        fflush(stdout)
         let body = ThemeManager.shared.bodyAttributes
         func make(_ text: String) -> UUID? {
             guard let ref = store.createNote(), let doc = store.currentDocument else { return nil }
             doc.blocks[0].storage.setAttributedString(NSAttributedString(string: text, attributes: body))
-            doc.markDirty(); doc.saveNow()
+            doc.markDirty()
+            doc.saveNow()
             return ref.id
         }
         guard let a = make("Urlaub Portugal\nFlug nach Lissabon am 3. Mai um 7:40 Uhr. Hotel Alfama, Zimmer 12."),
-              let b = make("Urlaub Spanien\nFlug nach Madrid am 9. Juni. Hotel Sol, zwei Nächte.") else { check(false, "Notizen"); return }
+            let b = make("Urlaub Spanien\nFlug nach Madrid am 9. Juni. Hotel Sol, zwei Nächte.")
+        else {
+            check(false, "Notizen")
+            return
+        }
         store.selectedNoteID = a
         await wait(0.5)
         let chat = AIChatModel.forNote(a)
@@ -39,12 +45,14 @@ enum AISelfTest {
         chat.reset()
         let answer = await ask(chat, "Wann geht der Flug?")
         let text = answer?.text ?? ""
-        print("AI answer:", text.replacingOccurrences(of: "\n", with: " ").prefix(200)); fflush(stdout)
+        print("AI answer:", text.replacingOccurrences(of: "\n", with: " ").prefix(200))
+        fflush(stdout)
         check(answer?.role == .assistant && !text.isEmpty, "Antwort erhalten\(chat.errorText.map { " (Fehler: \($0))" } ?? "")")
         check(text.contains("3") || text.lowercased().contains("mai") || answer?.isFallback == true, "Antwort nennt das Datum")
         check(!(answer?.sources.isEmpty ?? true), "Antwort hat Quellen")
-        check(availability.isAvailable == false || !CitationParser.citations(in: text, sourceCount: answer?.sources.count ?? 0).isEmpty,
-              "Antwort zitiert eine Quelle mit [n]")
+        check(
+            availability.isAvailable == false || !CitationParser.citations(in: text, sourceCount: answer?.sources.count ?? 0).isEmpty,
+            "Antwort zitiert eine Quelle mit [n]")
 
         AIChatModel.resetCache()
         check(AIChatModel.forNote(a).messages.count == chat.messages.count, "Verlauf nach Neuladen erhalten (\(chat.messages.count) Nachrichten)")
@@ -54,28 +62,34 @@ enum AISelfTest {
         cmp.addNote(b)
         let c = await ask(cmp, "Vergleiche die Notizen: Wohin gehen die Flüge?")
         check(Set(c?.sources.map(\.noteID) ?? []) == [a, b], "Vergleich sieht beide Notizen")
-        print("AI compare:", (c?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200)); fflush(stdout)
+        print("AI compare:", (c?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200))
+        fflush(stdout)
 
         let lib = AIChatModel.forLibrary()
         lib.reset()
         let l = await ask(lib, "Welches Hotel in Madrid?")
         check(l?.sources.contains { $0.noteID == b } == true, "Bibliotheksfrage findet die richtige Notiz")
-        print("AI library:", (l?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200)); fflush(stdout)
+        print("AI library:", (l?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200))
+        fflush(stdout)
 
         // The assistant carries out tasks (#124).
         if availability.isAvailable {
             let agent = AIChatModel.forLibrary()
             agent.reset()
             let r = await ask(agent, "Verknüpfe die Notiz Urlaub Portugal mit der Notiz Urlaub Spanien.")
-            print("AI agent:", (r?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), r?.actions.map(\.summary) ?? []); fflush(stdout)
+            print("AI agent:", (r?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), r?.actions.map(\.summary) ?? [])
+            fflush(stdout)
             await wait(0.5)
-            check(store.linkIndex.outgoing(a).contains(b) || store.linkIndex.outgoing(b).contains(a),
-                  "Auftrag „verknüpfen“ wird ausgeführt, nicht nur beschrieben")
+            check(
+                store.linkIndex.outgoing(a).contains(b) || store.linkIndex.outgoing(b).contains(a),
+                "Auftrag „verknüpfen“ wird ausgeführt, nicht nur beschrieben")
             let n = await ask(agent, "Lege eine neue Notiz mit dem Titel Packliste an.")
-            print("AI agent:", (n?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), n?.actions.map(\.summary) ?? []); fflush(stdout)
+            print("AI agent:", (n?.text ?? "").replacingOccurrences(of: "\n", with: " ").prefix(200), n?.actions.map(\.summary) ?? [])
+            fflush(stdout)
             await wait(0.5)
             check(store.notes.contains { $0.meta.title == "Packliste" }, "Auftrag „Notiz anlegen“ wird ausgeführt")
         }
-        print("AI done"); fflush(stdout)
+        print("AI done")
+        fflush(stdout)
     }
 }

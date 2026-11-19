@@ -56,26 +56,41 @@ public enum MarkdownStructure {
                 let lang = fence.info.lowercased()
                 var body: [String] = []
                 i += 1
-                while i < lines.count, !fence.isClosed(by: lines[i]) { body.append(lines[i]); i += 1 }
+                while i < lines.count, !fence.isClosed(by: lines[i]) {
+                    body.append(lines[i])
+                    i += 1
+                }
                 flushText()
                 let code = body.joined(separator: "\n")
-                if lang == "mermaid" { out.append(.mermaid(code)) }
-                else if lang == "math" || lang == "latex" || lang == "tex" { out.append(.math(code)) }
-                else { out.append(.code(language: lang, code: code)) }
+                if lang == "mermaid" {
+                    out.append(.mermaid(code))
+                } else if lang == "math" || lang == "latex" || lang == "tex" {
+                    out.append(.math(code))
+                } else {
+                    out.append(.code(language: lang, code: code))
+                }
                 i += 1
                 continue
             }
             if trimmed.hasPrefix("$$") {
                 var body = String(trimmed.dropFirst(2))
                 if body.hasSuffix("$$"), body.count >= 2 {
-                    flushText(); out.append(.math(String(body.dropLast(2)).trimmingCharacters(in: .whitespaces))); i += 1; continue
+                    flushText()
+                    out.append(.math(String(body.dropLast(2)).trimmingCharacters(in: .whitespaces)))
+                    i += 1
+                    continue
                 }
                 var parts: [String] = body.isEmpty ? [] : [body]
                 i += 1
                 while i < lines.count {
                     let l = lines[i].trimmingCharacters(in: .whitespaces)
-                    if l.hasSuffix("$$") { body = String(l.dropLast(2)); if !body.isEmpty { parts.append(body) }; break }
-                    parts.append(lines[i]); i += 1
+                    if l.hasSuffix("$$") {
+                        body = String(l.dropLast(2))
+                        if !body.isEmpty { parts.append(body) }
+                        break
+                    }
+                    parts.append(lines[i])
+                    i += 1
                 }
                 flushText()
                 out.append(.math(parts.joined(separator: "\n")))

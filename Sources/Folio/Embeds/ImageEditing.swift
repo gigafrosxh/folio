@@ -148,7 +148,10 @@ struct AltTextSheet: View {
                     .help("Kurz und genau ist am besten; über 250 Zeichen werden für VoiceOver lang.")
                 Spacer()
                 Button("Abbrechen", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Sichern") { onDone(text.trimmingCharacters(in: .whitespacesAndNewlines)); dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Sichern") {
+                    onDone(text.trimmingCharacters(in: .whitespacesAndNewlines))
+                    dismiss()
+                }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(18)

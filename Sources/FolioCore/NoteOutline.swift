@@ -2,7 +2,10 @@ import Foundation
 
 /// Document order, including non-text blocks. Text ranges use NSTextStorage's UTF-16 coordinates.
 public struct NoteOutline {
-    public enum Level: Int, Codable, Sendable { case title = 1, heading, subheading }
+    public enum Level: Int, Codable, Sendable {
+        case title = 1
+        case heading, subheading
+    }
 
     public struct Paragraph {
         public let blockID: UUID

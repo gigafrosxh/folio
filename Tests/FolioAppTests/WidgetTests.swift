@@ -104,11 +104,12 @@ final class WidgetTests: XCTestCase {
                 ("daily", AnyView(NoteOfTheDayWidgetView(note: full.pinned.first, snapshot: full, hideContent: false, size: size))),
                 ("daily-private", AnyView(NoteOfTheDayWidgetView(note: full.pinned.first, snapshot: full.withoutContent(), hideContent: true, size: size))),
                 ("missing-library", AnyView(NoteListWidgetView(kind: .pinned, snapshot: missing, size: size))),
-                ("no-data", AnyView(WidgetMessage.forError(.missing))),
+                ("no-data", AnyView(WidgetMessage.forError(.missing)))
             ]
             for (name, view) in views {
-                let renderer = ImageRenderer(content: view.padding(16).frame(width: frame.width, height: frame.height)
-                    .background(Color(nsColor: .windowBackgroundColor)).environment(\.widgetLinks, false))
+                let renderer = ImageRenderer(
+                    content: view.padding(16).frame(width: frame.width, height: frame.height)
+                        .background(Color(nsColor: .windowBackgroundColor)).environment(\.widgetLinks, false))
                 renderer.scale = 2
                 let image = try XCTUnwrap(renderer.nsImage, "\(name) \(size)")
                 XCTAssertGreaterThan(image.size.width, 0)

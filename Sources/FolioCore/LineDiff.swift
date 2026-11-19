@@ -52,18 +52,21 @@ public enum LineDiff {
         while prefix < min(a.count, b.count), a[prefix] == b[prefix] { prefix += 1 }
         var suffix = 0
         while suffix < min(a.count, b.count) - prefix,
-              a[a.count - suffix - 1] == b[b.count - suffix - 1] { suffix += 1 }
+            a[a.count - suffix - 1] == b[b.count - suffix - 1]
+        { suffix += 1 }
         let left = Array(a[prefix..<(a.count - suffix)])
         let right = Array(b[prefix..<(b.count - suffix)])
-        let kinds = Array(repeating: Line.Kind.same, count: prefix)
+        let kinds =
+            Array(repeating: Line.Kind.same, count: prefix)
             + middleKinds(left, right) + Array(repeating: .same, count: suffix)
         var i = 0, j = 0
         return kinds.map { kind in
             let raw = (kind == .added ? b[j] : a[i]).text
-            let line = Line(kind: kind, text: raw.hasSuffix("\n") ? String(raw.dropLast()) : raw,
-                            oldNumber: kind == .added ? nil : i + 1,
-                            newNumber: kind == .removed ? nil : j + 1,
-                            hasTrailingNewline: raw.hasSuffix("\n"))
+            let line = Line(
+                kind: kind, text: raw.hasSuffix("\n") ? String(raw.dropLast()) : raw,
+                oldNumber: kind == .added ? nil : i + 1,
+                newNumber: kind == .removed ? nil : j + 1,
+                hasTrailingNewline: raw.hasSuffix("\n"))
             if kind != .added { i += 1 }
             if kind != .removed { j += 1 }
             return line
@@ -74,7 +77,10 @@ public enum LineDiff {
     private struct ByteLine: Equatable {
         let text: String
         let bytes: [UInt8]
-        init(_ text: String) { self.text = text; bytes = Array(text.utf8) }
+        init(_ text: String) {
+            self.text = text
+            bytes = Array(text.utf8)
+        }
         static func == (l: ByteLine, r: ByteLine) -> Bool { l.bytes == r.bytes }
     }
 
@@ -86,7 +92,8 @@ public enum LineDiff {
         var lengths = Array(repeating: 0, count: (a.count + 1) * width)
         for i in (0..<a.count).reversed() {
             for j in (0..<b.count).reversed() {
-                lengths[i * width + j] = a[i] == b[j]
+                lengths[i * width + j] =
+                    a[i] == b[j]
                     ? 1 + lengths[(i + 1) * width + j + 1]
                     : max(lengths[(i + 1) * width + j], lengths[i * width + j + 1])
             }
@@ -133,9 +140,10 @@ public enum LineDiff {
         return ranges.map { range in
             let oldCount = oldOffsets[range.upperBound] - oldOffsets[range.lowerBound]
             let newCount = newOffsets[range.upperBound] - newOffsets[range.lowerBound]
-            return Hunk(oldStart: oldOffsets[range.lowerBound] + (oldCount == 0 ? 0 : 1), oldCount: oldCount,
-                        newStart: newOffsets[range.lowerBound] + (newCount == 0 ? 0 : 1), newCount: newCount,
-                        lines: Array(lines[range]))
+            return Hunk(
+                oldStart: oldOffsets[range.lowerBound] + (oldCount == 0 ? 0 : 1), oldCount: oldCount,
+                newStart: newOffsets[range.lowerBound] + (newCount == 0 ? 0 : 1), newCount: newCount,
+                lines: Array(lines[range]))
         }
     }
 

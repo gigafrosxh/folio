@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import FolioCore
 #if canImport(FoundationModels)
-import FoundationModels
+    import FoundationModels
 #endif
 
 /// A conversation with the on-device Apple Intelligence model, either about one note (plus notes added
@@ -42,19 +42,23 @@ final class AIChatModel: ObservableObject, Identifiable {
         QuickAction(title: "Stichpunkte", icon: "list.bullet", prompt: "Mach aus der Notiz eine übersichtliche Stichpunktliste."),
         QuickAction(title: "Aufgaben finden", icon: "checklist", prompt: "Welche Aufgaben oder To-dos stecken in der Notiz? Liste sie als Checkliste."),
         QuickAction(title: "Fragen dazu", icon: "questionmark.bubble", prompt: "Stelle drei sinnvolle Rückfragen zum Inhalt der Notiz."),
-        QuickAction(title: "Auf Englisch", icon: "globe", prompt: "Übersetze die Notiz ins Englische."),
+        QuickAction(title: "Auf Englisch", icon: "globe", prompt: "Übersetze die Notiz ins Englische.")
     ]
 
-    static let compareAction = QuickAction(title: "Vergleichen", icon: "square.split.2x1",
-                                           prompt: "Vergleiche die Notizen: Was haben sie gemeinsam, worin unterscheiden sie sich, und wo widersprechen sie sich?")
+    static let compareAction = QuickAction(
+        title: "Vergleichen", icon: "square.split.2x1",
+        prompt: "Vergleiche die Notizen: Was haben sie gemeinsam, worin unterscheiden sie sich, und wo widersprechen sie sich?")
 
     static let libraryActions: [QuickAction] = [
         QuickAction(title: "Offene Aufgaben", icon: "checklist", prompt: "Welche offenen Aufgaben stehen in meinen Notizen?"),
-        QuickAction(title: "Termine", icon: "calendar", prompt: "Welche Termine und Fristen kommen in meinen Notizen vor?"),
+        QuickAction(title: "Termine", icon: "calendar", prompt: "Welche Termine und Fristen kommen in meinen Notizen vor?")
     ]
 
     let scope: Scope
-    var noteID: UUID? { if case .note(let id) = scope { return id }; return nil }
+    var noteID: UUID? {
+        if case .note(let id) = scope { return id }
+        return nil
+    }
     @Published private(set) var messages: [Message] = []
     @Published private(set) var isResponding = false
     @Published var errorText: String?
@@ -175,10 +179,13 @@ final class AIChatModel: ObservableObject, Identifiable {
         let history = transcript.recentTurns(budget: 450)
         messages.append(Message(role: .user, text: question))
         let selection = includeSelection && scope != .library ? noteProvider().selection : nil
-        let plan = ContextBuilder.plan(candidates(for: question),
-                                       budget: ContextBuilder.sourceBudget - TokenEstimate.tokens(selection ?? "").clamped(to: 0...800))
-        messages.append(Message(role: .assistant, text: "", isStreaming: true, sources: plan.passages,
-                                usedTokens: plan.usedTokens, omitted: plan.omitted))
+        let plan = ContextBuilder.plan(
+            candidates(for: question),
+            budget: ContextBuilder.sourceBudget - TokenEstimate.tokens(selection ?? "").clamped(to: 0...800))
+        messages.append(
+            Message(
+                role: .assistant, text: "", isStreaming: true, sources: plan.passages,
+                usedTokens: plan.usedTokens, omitted: plan.omitted))
         isResponding = true
         task = Task { [weak self] in
             await self?.respond(question, plan: plan, history: history, selection: selection)
@@ -208,9 +215,10 @@ final class AIChatModel: ObservableObject, Identifiable {
     }
 
     private var transcript: ChatTranscript {
-        ChatTranscript(messages: messages.filter { !$0.isStreaming }.map {
-            ChatRecord(id: $0.id, role: $0.role, text: $0.text, sources: $0.sources, usedTokens: $0.usedTokens)
-        }, extraNotes: extraNotes)
+        ChatTranscript(
+            messages: messages.filter { !$0.isStreaming }.map {
+                ChatRecord(id: $0.id, role: $0.role, text: $0.text, sources: $0.sources, usedTokens: $0.usedTokens)
+            }, extraNotes: extraNotes)
     }
 
     private func persist() {
@@ -218,21 +226,24 @@ final class AIChatModel: ObservableObject, Identifiable {
     }
 
     private static let instructions = """
-    Du bist der Assistent der Notizen-App Folio und läufst komplett auf dem Mac. Antworte in der Sprache des Nutzers, \
-    knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
-    Aufträge führst du sofort mit einem Werkzeug aus: Notiz anlegen (notizAnlegen), Text ergänzen (textAnfuegen), \
-    verknüpfen (notizenVerknuepfen), taggen (tagHinzufuegen), umbenennen (notizUmbenennen), verschieben (notizVerschieben). \
-    Kündige nie nur an, was du tun wirst – ruf das Werkzeug auf und sag danach in einem Satz, was erledigt ist. \
-    Kennst du den genauen Titel einer Notiz nicht, nutze zuerst notizenSuchen.
-    Bei Fragen zum Inhalt stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in \
-    eckigen Klammern, z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich.
-    """
+        Du bist der Assistent der Notizen-App Folio und läufst komplett auf dem Mac. Antworte in der Sprache des Nutzers, \
+        knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
+        Aufträge führst du sofort mit einem Werkzeug aus: Notiz anlegen (notizAnlegen), Text ergänzen (textAnfuegen), \
+        verknüpfen (notizenVerknuepfen), taggen (tagHinzufuegen), umbenennen (notizUmbenennen), verschieben (notizVerschieben). \
+        Kündige nie nur an, was du tun wirst – ruf das Werkzeug auf und sag danach in einem Satz, was erledigt ist. \
+        Kennst du den genauen Titel einer Notiz nicht, nutze zuerst notizenSuchen.
+        Bei Fragen zum Inhalt stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in \
+        eckigen Klammern, z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich.
+        """
 
     private func respond(_ question: String, plan: ContextPlan, history: String, selection: String?) async {
         if AIProvider.usesOllama {
             await OllamaStatus.shared.refresh()
             // Ollama not running or without a usable model: matching passages instead of an error only (#237).
-            guard OllamaStatus.shared.problem == nil else { answerWithoutModel(plan); return }
+            guard OllamaStatus.shared.problem == nil else {
+                answerWithoutModel(plan)
+                return
+            }
             await streamFromOllama(Self.prompt(question: question, plan: plan, history: history, selection: selection))
             return
         }
@@ -242,10 +253,10 @@ final class AIChatModel: ObservableObject, Identifiable {
             return
         }
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            await streamAnswer(to: Self.prompt(question: question, plan: plan, history: history, selection: selection))
-            return
-        }
+            if #available(macOS 26.0, *) {
+                await streamAnswer(to: Self.prompt(question: question, plan: plan, history: history, selection: selection))
+                return
+            }
         #endif
         answerWithoutModel(plan)
     }
@@ -254,43 +265,46 @@ final class AIChatModel: ObservableObject, Identifiable {
     static func prompt(question: String, plan: ContextPlan, history: String, selection: String?) -> String {
         var prompt = ""
         if !history.isEmpty { prompt += "Bisheriges Gespräch:\n\(history)\n\n" }
-        if !plan.passages.isEmpty { prompt += "Quellen:\n\(ContextBuilder.sourceBlock(plan))\n\n" }
-        else { prompt += "Es wurden keine passenden Stellen in den Notizen gefunden.\n\n" }
+        if !plan.passages.isEmpty {
+            prompt += "Quellen:\n\(ContextBuilder.sourceBlock(plan))\n\n"
+        } else {
+            prompt += "Es wurden keine passenden Stellen in den Notizen gefunden.\n\n"
+        }
         if let selection, !selection.isEmpty { prompt += "Markierter Text:\n\"\"\"\n\(String(selection.prefix(2400)))\n\"\"\"\n\n" }
         return prompt + "Frage: \(question)"
     }
 
     #if canImport(FoundationModels)
-    /// A fresh session per question: recent turns travel in the prompt, so conversations survive restarts and
-    /// never overflow the small context window. With tools the assistant carries out tasks on the notes (#124).
-    @available(macOS 26.0, *)
-    private func streamAnswer(to prompt: String) async {
-        let session = LanguageModelSession(tools: NoteAgentTools.all, instructions: Self.instructions)
-        NoteAgent.log = []
-        do {
-            for try await partial in session.streamResponse(to: prompt) {
-                if Task.isCancelled { break }
-                updateStreamingMessage(text: partial.content)
+        /// A fresh session per question: recent turns travel in the prompt, so conversations survive restarts and
+        /// never overflow the small context window. With tools the assistant carries out tasks on the notes (#124).
+        @available(macOS 26.0, *)
+        private func streamAnswer(to prompt: String) async {
+            let session = LanguageModelSession(tools: NoteAgentTools.all, instructions: Self.instructions)
+            NoteAgent.log = []
+            do {
+                for try await partial in session.streamResponse(to: prompt) {
+                    if Task.isCancelled { break }
+                    updateStreamingMessage(text: partial.content)
+                }
+            } catch {
+                if !Task.isCancelled { errorText = Self.describe(error) }
             }
-        } catch {
-            if !Task.isCancelled { errorText = Self.describe(error) }
+            if let i = messages.lastIndex(where: { $0.isStreaming }) {
+                messages[i].actions = NoteAgent.log
+                if messages[i].text.isEmpty, !NoteAgent.log.isEmpty { messages[i].text = "Erledigt." }
+            }
+            finishStreaming()
         }
-        if let i = messages.lastIndex(where: { $0.isStreaming }) {
-            messages[i].actions = NoteAgent.log
-            if messages[i].text.isEmpty, !NoteAgent.log.isEmpty { messages[i].text = "Erledigt." }
-        }
-        finishStreaming()
-    }
     #endif
 
     /// Ollama answers without the note tools: questions and citations work, changes to notes stay with Apple
     /// Intelligence (#42).
     private static let ollamaInstructions = """
-    Du bist der Assistent der Notizen-App Folio und läufst lokal auf dem Mac. Antworte in der Sprache des Nutzers, \
-    knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
-    Stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in eckigen Klammern, \
-    z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich. Notizen ändern kannst du nicht.
-    """
+        Du bist der Assistent der Notizen-App Folio und läufst lokal auf dem Mac. Antworte in der Sprache des Nutzers, \
+        knapp und direkt, in ganzen Sätzen; Listen nur, wenn der Nutzer eine Liste will.
+        Stütze dich nur auf die nummerierten Quellen und schreib hinter jede Aussage die Quelle in eckigen Klammern, \
+        z. B. [1]. Wenn die Quellen die Frage nicht beantworten, sag das ehrlich. Notizen ändern kannst du nicht.
+        """
 
     private func streamFromOllama(_ prompt: String) async {
         do {
@@ -345,7 +359,12 @@ private extension Int {
 
 /// Why Apple Intelligence can or cannot be used, with what the user can do about it (#41).
 struct AIAvailability {
-    enum State: Equatable { case available, notEnabled, notReady, unsupportedMac, unsupportedSystem, other(String), ollama(String), ollamaDown(String) }
+    enum State: Equatable {
+        case available, notEnabled, notReady, unsupportedMac, unsupportedSystem
+        case other(String)
+        case ollama(String)
+        case ollamaDown(String)
+    }
 
     var state: State
 
@@ -356,18 +375,18 @@ struct AIAvailability {
             return AIAvailability(state: .ollama(ThemeManager.shared.settings.ollamaModel))
         }
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            switch SystemLanguageModel.default.availability {
-            case .available: return AIAvailability(state: .available)
-            case .unavailable(let reason):
-                switch reason {
-                case .appleIntelligenceNotEnabled: return AIAvailability(state: .notEnabled)
-                case .deviceNotEligible: return AIAvailability(state: .unsupportedMac)
-                case .modelNotReady: return AIAvailability(state: .notReady)
-                @unknown default: return AIAvailability(state: .other("Apple Intelligence ist nicht verfügbar."))
+            if #available(macOS 26.0, *) {
+                switch SystemLanguageModel.default.availability {
+                case .available: return AIAvailability(state: .available)
+                case .unavailable(let reason):
+                    switch reason {
+                    case .appleIntelligenceNotEnabled: return AIAvailability(state: .notEnabled)
+                    case .deviceNotEligible: return AIAvailability(state: .unsupportedMac)
+                    case .modelNotReady: return AIAvailability(state: .notReady)
+                    @unknown default: return AIAvailability(state: .other("Apple Intelligence ist nicht verfügbar."))
+                    }
                 }
             }
-        }
         #endif
         return AIAvailability(state: .unsupportedSystem)
     }
@@ -395,10 +414,14 @@ struct AIAvailability {
     var explanation: String {
         switch state {
         case .available, .ollama: return ""
-        case .notEnabled: return "Schalte Apple Intelligence in den Systemeinstellungen ein. Bis dahin zeigt Folio passende Stellen aus deinen Notizen statt einer formulierten Antwort."
+        case .notEnabled:
+            return "Schalte Apple Intelligence in den Systemeinstellungen ein. Bis dahin zeigt Folio passende Stellen aus deinen Notizen statt einer formulierten Antwort."
         case .notReady: return "macOS lädt das Sprachmodell gerade herunter. Das kann einige Minuten dauern; danach funktioniert der Chat ohne Neustart."
-        case .unsupportedMac: return "Apple Intelligence braucht einen Mac mit Apple-Chip (M1 oder neuer). Alles andere in Folio funktioniert normal; Fragen beantwortet Folio mit passenden Stellen aus deinen Notizen."
-        case .unsupportedSystem: return "Aktualisiere auf macOS 26, um den Chat, Textvorschläge und KI-Antworten zu nutzen. Bis dahin findet Folio passende Stellen in deinen Notizen."
+        case .unsupportedMac:
+            return
+                "Apple Intelligence braucht einen Mac mit Apple-Chip (M1 oder neuer). Alles andere in Folio funktioniert normal; Fragen beantwortet Folio mit passenden Stellen aus deinen Notizen."
+        case .unsupportedSystem:
+            return "Aktualisiere auf macOS 26, um den Chat, Textvorschläge und KI-Antworten zu nutzen. Bis dahin findet Folio passende Stellen in deinen Notizen."
         case .other(let reason): return reason
         case .ollamaDown(let problem): return problem + " Bis dahin zeigt Folio passende Stellen aus deinen Notizen."
         }

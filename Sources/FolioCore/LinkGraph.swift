@@ -20,8 +20,9 @@ public struct WikiLink: Equatable, Sendable {
             let target = ns.substring(with: m.range(at: 2)).trimmingCharacters(in: .whitespaces)
             guard !target.isEmpty else { return nil }
             let alias = m.range(at: 3).location == NSNotFound ? nil : ns.substring(with: m.range(at: 3)).trimmingCharacters(in: .whitespaces)
-            return WikiLink(range: m.range, target: target, alias: alias?.isEmpty == true ? nil : alias,
-                            isEmbed: m.range(at: 1).length > 0)
+            return WikiLink(
+                range: m.range, target: target, alias: alias?.isEmpty == true ? nil : alias,
+                isEmbed: m.range(at: 1).length > 0)
         }
     }
 
@@ -147,7 +148,10 @@ public struct LinkIndex: Sendable {
     public func neighborhood(of id: UUID, depth: Int) -> Set<UUID> {
         guard nodes[id] != nil else { return [] }
         var adjacency: [UUID: Set<UUID>] = [:]
-        for (a, b) in edges() { adjacency[a, default: []].insert(b); adjacency[b, default: []].insert(a) }
+        for (a, b) in edges() {
+            adjacency[a, default: []].insert(b)
+            adjacency[b, default: []].insert(a)
+        }
         var seen: Set<UUID> = [id]
         var frontier: Set<UUID> = [id]
         for _ in 0..<max(0, depth) {
@@ -161,7 +165,10 @@ public struct LinkIndex: Sendable {
     /// Notes without any link in or out (#114).
     public func orphans() -> Set<UUID> {
         var linked = Set<UUID>()
-        for (a, b) in edges() { linked.insert(a); linked.insert(b) }
+        for (a, b) in edges() {
+            linked.insert(a)
+            linked.insert(b)
+        }
         return Set(nodes.keys).subtracting(linked)
     }
 
@@ -170,7 +177,10 @@ public struct LinkIndex: Sendable {
         guard nodes[a] != nil, nodes[b] != nil else { return nil }
         if a == b { return [a] }
         var adjacency: [UUID: Set<UUID>] = [:]
-        for (x, y) in edges() { adjacency[x, default: []].insert(y); adjacency[y, default: []].insert(x) }
+        for (x, y) in edges() {
+            adjacency[x, default: []].insert(y)
+            adjacency[y, default: []].insert(x)
+        }
         var previous: [UUID: UUID] = [:]
         var queue = [a]
         var seen: Set<UUID> = [a]
@@ -196,7 +206,7 @@ public enum Mentions {
     /// Ranges (UTF-16) where `title` appears as a whole word in `text`, outside `[[…]]` links.
     public static func ranges(of title: String, in text: String) -> [NSRange] {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard t.count >= 3 else { return [] }   // „Ab“ would be everywhere
+        guard t.count >= 3 else { return [] }  // „Ab“ would be everywhere
         let ns = text as NSString
         let linked = WikiLink.find(in: text).map(\.range)
         let pattern = "(?<![\\p{L}\\p{N}])" + NSRegularExpression.escapedPattern(for: t) + "(?![\\p{L}\\p{N}])"
@@ -217,8 +227,10 @@ public enum Mentions {
 /// A force-directed layout: linked notes attract, all notes repel. Deterministic for the same input,
 /// so the graph does not jump around between openings.
 public enum GraphLayout {
-    public static func compute(nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
-                               previous: [UUID: CGPoint] = [:]) -> [UUID: CGPoint] {
+    public static func compute(
+        nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
+        previous: [UUID: CGPoint] = [:]
+    ) -> [UUID: CGPoint] {
         guard !nodes.isEmpty else { return [:] }
         let start = nodes.enumerated().map { i, id in previous[id].map { SIMD2($0.x, $0.y) } ?? spiralStart(i) }
         var simulation = ForceSimulation(positions: start, links: ForceSimulation<SIMD2<Double>>.links(edges, in: nodes)) { i, j in
@@ -271,7 +283,7 @@ public enum TemplateVariables {
             case "monat", "month": return (m.range, formatted("MMMM"), false)
             case "titel", "title": return (m.range, context.title, false)
             case "cursor": return (m.range, "", true)
-            default: return nil   // unknown names stay as written
+            default: return nil  // unknown names stay as written
             }
         }
     }
@@ -289,8 +301,7 @@ public enum TemplateVariables {
         var cursor: Int?
         for r in replacements(in: text.string, context: context).reversed() {
             text.replaceCharacters(in: r.range, with: r.value)
-            if r.isCursor { cursor = r.range.location }
-            else if let c = cursor, r.range.location < c { cursor = c - r.range.length + (r.value as NSString).length }
+            if r.isCursor { cursor = r.range.location } else if let c = cursor, r.range.location < c { cursor = c - r.range.length + (r.value as NSString).length }
         }
         return cursor
     }
@@ -310,8 +321,10 @@ public enum DailyNote {
 
 public extension GraphLayout {
     /// The same forces in three dimensions; starts on a Fibonacci sphere, deterministic.
-    static func compute3D(nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
-                          previous: [UUID: SIMD3<Double>] = [:]) -> [UUID: SIMD3<Double>] {
+    static func compute3D(
+        nodes: [UUID], edges: [(UUID, UUID)], iterations: Int = 300,
+        previous: [UUID: SIMD3<Double>] = [:]
+    ) -> [UUID: SIMD3<Double>] {
         guard !nodes.isEmpty else { return [:] }
         let start = nodes.enumerated().map { i, id in previous[id] ?? sphereStart(i, of: nodes.count) }
         var simulation = ForceSimulation(positions: start, links: ForceSimulation<SIMD3<Double>>.links(edges, in: nodes)) { i, j in
@@ -343,8 +356,11 @@ public enum FolderGraph {
             h2 = (h2 &+ UInt64(b)) &* 0x9E3779B97F4A7C15
         }
         let bytes = withUnsafeBytes(of: h1.bigEndian) { Array($0) } + withUnsafeBytes(of: h2.bigEndian) { Array($0) }
-        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+        return UUID(
+            uuid: (
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+            ))
     }
 
     /// Folder nodes (id → path) and the edges note→folder and folder→parent for the given notes.

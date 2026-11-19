@@ -116,8 +116,16 @@ public enum AnswerBlocks {
         var cells: [String] = [], current = ""
         var chars = Array(t)[...]
         while let ch = chars.popFirst() {
-            if ch == "\\", chars.first == "|" { current.append(chars.removeFirst()); continue }
-            if ch == "|" { cells.append(current.trimmingCharacters(in: .whitespaces)); current = "" } else { current.append(ch) }
+            if ch == "\\", chars.first == "|" {
+                current.append(chars.removeFirst())
+                continue
+            }
+            if ch == "|" {
+                cells.append(current.trimmingCharacters(in: .whitespaces))
+                current = ""
+            } else {
+                current.append(ch)
+            }
         }
         cells.append(current.trimmingCharacters(in: .whitespaces))
         return cells
@@ -156,7 +164,10 @@ public enum TagSuggester {
         }
     }
 
-    static let stopWords: Set<String> = ["diese", "dieser", "dieses", "eine", "einer", "einem", "einen", "aber", "auch", "dann", "denn", "noch", "nach", "über", "unter", "wenn", "weil", "dass", "sind", "wird", "werden", "haben", "kann", "können", "muss", "notiz", "notizen", "text"]
+    static let stopWords: Set<String> = [
+        "diese", "dieser", "dieses", "eine", "einer", "einem", "einen", "aber", "auch", "dann", "denn", "noch", "nach", "über", "unter", "wenn", "weil", "dass", "sind", "wird",
+        "werden", "haben", "kann", "können", "muss", "notiz", "notizen", "text"
+    ]
 
     /// Capitalised words that come back, best first; a word only at sentence starts counts less.
     static func nouns(in text: String) -> [String] {
@@ -179,7 +190,10 @@ public enum TagSuggester {
         var out: [String] = []
         for part in answer.split(whereSeparator: { ",\n;".contains($0) }) {
             var p = part.trimmingCharacters(in: .whitespaces)
-            while let f = p.first, "-*•0123456789.)".contains(f) { p.removeFirst(); p = p.trimmingCharacters(in: .whitespaces) }
+            while let f = p.first, "-*•0123456789.)".contains(f) {
+                p.removeFirst()
+                p = p.trimmingCharacters(in: .whitespaces)
+            }
             guard let tag = TagEdit.normalized(p), !out.contains(tag), tag.count <= 30 else { continue }
             out.append(tag)
             if out.count >= limit { break }

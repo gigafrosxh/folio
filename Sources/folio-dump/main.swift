@@ -9,7 +9,13 @@ if args.count >= 3, args[1] == "--seed" {
     var block = BlockRecord(kind: .text)
     block.rtf = Data(#"{\rtf1\ansi{\fonttbl\f0 Helvetica;}\f0\fs30 Testnotiz\par Inhalt}"#.utf8)
     let file = NoteFile(meta: NoteMetadata(title: "Testnotiz"), body: NoteBody(blocks: [block]))
-    do { try file.write(to: URL(fileURLWithPath: args[2])); print(args[2]) } catch { print("error:", error); exit(1) }
+    do {
+        try file.write(to: URL(fileURLWithPath: args[2]))
+        print(args[2])
+    } catch {
+        print("error:", error)
+        exit(1)
+    }
     exit(0)
 }
 if args.count >= 3, args[1] == "--check" {
@@ -26,7 +32,10 @@ if args.count >= 3, args[1] == "--check" {
     var damaged = 0
     for url in files {
         let r = FolioDiagnostics.diagnose(at: url)
-        if r.isHealthy { if !isDir.boolValue { print("OK", url.path) }; continue }
+        if r.isHealthy {
+            if !isDir.boolValue { print("OK", url.path) }
+            continue
+        }
         damaged += 1
         print("BESCHÄDIGT", url.path)
         for p in r.problems { print("  -", p.message) }
@@ -44,7 +53,10 @@ if args.count >= 4, args[1] == "--find" {
     }
     exit(0)
 }
-guard args.count >= 2 else { print("Usage: folio-dump <file.folio> [--rtf <outdir>] | --find <text> <dir>"); exit(1) }
+guard args.count >= 2 else {
+    print("Usage: folio-dump <file.folio> [--rtf <outdir>] | --find <text> <dir>")
+    exit(1)
+}
 do {
     let file = try NoteFile.read(from: URL(fileURLWithPath: args[1]))
     print("id:", file.meta.id, "title:", file.meta.title, "tags:", file.meta.tags, "attachments:", file.attachments.count)

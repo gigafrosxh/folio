@@ -39,7 +39,8 @@ struct KeyCombo: Codable, Hashable {
         default:
             // With ⌃ the characters come back as control codes, so use the key without modifiers.
             if let chars = event.charactersIgnoringModifiers?.lowercased(), let first = chars.unicodeScalars.first,
-               first.value >= 0x20, first.value != 0x7F {
+                first.value >= 0x20, first.value != 0x7F
+            {
                 key = String(Character(first))
             } else if let letter = KeyCombo.ansiLetters[event.keyCode] {
                 // Some sources deliver ⌃-letters as control characters; fall back to the physical key.
@@ -54,7 +55,7 @@ struct KeyCombo: Codable, Hashable {
 
     static let ansiLetters: [UInt16: String] = [
         0: "a", 11: "b", 8: "c", 2: "d", 14: "e", 3: "f", 5: "g", 4: "h", 34: "i", 38: "j", 40: "k", 37: "l", 46: "m",
-        45: "n", 31: "o", 35: "p", 12: "q", 15: "r", 1: "s", 17: "t", 32: "u", 9: "v", 13: "w", 7: "x", 16: "y", 6: "z",
+        45: "n", 31: "o", 35: "p", 12: "q", 15: "r", 1: "s", 17: "t", 32: "u", 9: "v", 13: "w", 7: "x", 16: "y", 6: "z"
     ]
 
     /// "⌃⇧C"
@@ -64,8 +65,10 @@ struct KeyCombo: Codable, Hashable {
         if option { s += "⌥" }
         if shift { s += "⇧" }
         if command { s += "⌘" }
-        let names = ["space": "Leertaste", "return": "↩", "tab": "⇥", "delete": "⌫", "escape": "Esc",
-                     "left": "←", "right": "→", "up": "↑", "down": "↓"]
+        let names = [
+            "space": "Leertaste", "return": "↩", "tab": "⇥", "delete": "⌫", "escape": "Esc",
+            "left": "←", "right": "→", "up": "↑", "down": "↓"
+        ]
         return s + (names[key] ?? key.uppercased())
     }
 
@@ -82,8 +85,9 @@ struct KeyCombo: Codable, Hashable {
     init?(stored: String) {
         let parts = stored.lowercased().split(separator: "+").map(String.init)
         guard let last = parts.last, !last.isEmpty else { return nil }
-        self.init(key: last, control: parts.contains("ctrl"), option: parts.contains("alt"),
-                  shift: parts.contains("shift"), command: parts.contains("cmd"))
+        self.init(
+            key: last, control: parts.contains("ctrl"), option: parts.contains("alt"),
+            shift: parts.contains("shift"), command: parts.contains("cmd"))
     }
 
     /// A shortcut needs ⌃, ⌥ or ⌘, otherwise it would swallow normal typing.
@@ -164,31 +168,40 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
 /// Built-in shortcuts that are not rebindable, for the cheat sheet.
 enum FixedShortcuts {
     static let groups: [(title: String, items: [(String, String)])] = [
-        ("Code-Blöcke", [
-            ("⇧↩ oder ⌘↩", "Code-Block ausführen"),
-            ("⌃C (während Code läuft)", "Ausführung stoppen"),
-            ("⌥⇧F", "Code formatieren"),
-            ("⌃Leertaste", "Vorschlagsliste öffnen"),
-            ("Tab / ↩", "Vorschlag übernehmen"),
-            ("Esc", "Vorschlag oder Liste schließen"),
-            ("⇥ / ⇧⇥", "Einrücken / Ausrücken"),
-        ]),
-        ("Text", [
-            ("⌘B / ⌘I / ⌘U", "Fett / Kursiv / Unterstrichen"),
-            ("⇧⌘X", "Durchgestrichen"),
-            ("⇧⌘1 / 2 / 3 / 0", "Titel / Überschrift / Unterüberschrift / Text"),
-            ("⇧⌘7 / ⇧⌘8", "Aufzählung / Nummerierte Liste"),
-            ("⌘K", "Link"),
-            ("⇧⌘W", "Writing Tools"),
-            ("Tab", "Textvorschlag übernehmen"),
-        ]),
-        ("Notizen & Fenster", [
-            ("⌘N / ⇧⌘N", "Neue Notiz / Neuer Ordner"),
-            ("⌥⌘S", "Seitenleiste ein-/ausblenden"),
-            ("⌥⌘F", "Notizen durchsuchen"),
-            ("⌥⌘I", "KI-Chat"),
-            ("⌘,", "Einstellungen"),
-        ]),
+        (
+            "Code-Blöcke",
+            [
+                ("⇧↩ oder ⌘↩", "Code-Block ausführen"),
+                ("⌃C (während Code läuft)", "Ausführung stoppen"),
+                ("⌥⇧F", "Code formatieren"),
+                ("⌃Leertaste", "Vorschlagsliste öffnen"),
+                ("Tab / ↩", "Vorschlag übernehmen"),
+                ("Esc", "Vorschlag oder Liste schließen"),
+                ("⇥ / ⇧⇥", "Einrücken / Ausrücken")
+            ]
+        ),
+        (
+            "Text",
+            [
+                ("⌘B / ⌘I / ⌘U", "Fett / Kursiv / Unterstrichen"),
+                ("⇧⌘X", "Durchgestrichen"),
+                ("⇧⌘1 / 2 / 3 / 0", "Titel / Überschrift / Unterüberschrift / Text"),
+                ("⇧⌘7 / ⇧⌘8", "Aufzählung / Nummerierte Liste"),
+                ("⌘K", "Link"),
+                ("⇧⌘W", "Writing Tools"),
+                ("Tab", "Textvorschlag übernehmen")
+            ]
+        ),
+        (
+            "Notizen & Fenster",
+            [
+                ("⌘N / ⇧⌘N", "Neue Notiz / Neuer Ordner"),
+                ("⌥⌘S", "Seitenleiste ein-/ausblenden"),
+                ("⌥⌘F", "Notizen durchsuchen"),
+                ("⌥⌘I", "KI-Chat"),
+                ("⌘,", "Einstellungen")
+            ]
+        )
     ]
 }
 
@@ -227,16 +240,19 @@ final class ShortcutCenter {
         }
         // Only in the note window (not in Settings, sheets or the completion list).
         guard let window = event.window, window.isKeyWindow, !(window is NSPanel),
-              (window.identifier?.rawValue.hasPrefix("main") == true || window.identifier?.rawValue.hasPrefix("note") == true), window.attachedSheet == nil else { return false }
+            (window.identifier?.rawValue.hasPrefix("main") == true || window.identifier?.rawValue.hasPrefix("note") == true), window.attachedSheet == nil
+        else { return false }
         // ⌃C inside a running code block stops it, like in a terminal.
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .control, event.charactersIgnoringModifiers == "c",
-           let code = window.firstResponder as? CodeTextView, let id = code.blockID, RunManager.shared.isRunning(id) {
+            let code = window.firstResponder as? CodeTextView, let id = code.blockID, RunManager.shared.isRunning(id)
+        {
             RunManager.shared.stop(id)
             return true
         }
         // ⌘W closes the current tab while several are open, like in Safari; the last one closes the window (#107).
         if event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command,
-           event.charactersIgnoringModifiers?.lowercased() == "w", window.identifier?.rawValue.hasPrefix("main") == true {
+            event.charactersIgnoringModifiers?.lowercased() == "w", window.identifier?.rawValue.hasPrefix("main") == true
+        {
             let store = NoteStore.shared
             if store.tabs.count > 1, let id = store.selectedNoteID {
                 store.closeTab(id)

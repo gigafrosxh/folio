@@ -115,7 +115,7 @@ final class ServerDetectorTests: XCTestCase {
         let code = "import http.server, socketserver\nsocketserver.TCPServer(('127.0.0.1', 0), http.server.SimpleHTTPRequestHandler).serve_forever()"
         let task = Task { try await run.run(code: code, language: Languages.spec(for: "python"), timeout: 2, onServer: { _ in detected.fulfill() }) }
         await fulfillment(of: [detected], timeout: 10)
-        try await Task.sleep(for: .seconds(3)) // past the 2 s timeout
+        try await Task.sleep(for: .seconds(3))  // past the 2 s timeout
         XCTAssertNotNil(run.serverURL)
         run.cancel()
         let result = try await task.value

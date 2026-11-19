@@ -135,9 +135,21 @@ struct TerminalPanel: View {
                 Spacer()
                 Button("⌃C") { session.interrupt() }.helpLabel("Laufendes Programm abbrechen")
                 Button("⌃D") { session.endOfInput() }.helpLabel("Eingabe beenden")
-                Button { session.clear() } label: { Image(systemName: "eraser") }.helpLabel("Leeren")
-                Button { session.restart() } label: { Image(systemName: "arrow.clockwise") }.helpLabel("Neu starten")
-                Button { onClose() } label: { Image(systemName: "chevron.down") }.helpLabel("Ausblenden (⌃`)")
+                Button {
+                    session.clear()
+                } label: {
+                    Image(systemName: "eraser")
+                }.helpLabel("Leeren")
+                Button {
+                    session.restart()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }.helpLabel("Neu starten")
+                Button {
+                    onClose()
+                } label: {
+                    Image(systemName: "chevron.down")
+                }.helpLabel("Ausblenden (⌃`)")
             }
             .buttonStyle(.borderless)
             .font(.system(size: 11.5, weight: .medium))
@@ -177,7 +189,13 @@ struct TerminalPanel: View {
                     }
                     .onKeyPress(.downArrow) {
                         guard let i = historyIndex else { return .ignored }
-                        if i + 1 < history.count { historyIndex = i + 1; input = history[i + 1] } else { historyIndex = nil; input = "" }
+                        if i + 1 < history.count {
+                            historyIndex = i + 1
+                            input = history[i + 1]
+                        } else {
+                            historyIndex = nil
+                            input = ""
+                        }
                         return .handled
                     }
             }
@@ -187,7 +205,10 @@ struct TerminalPanel: View {
         }
         .background(Color(nsColor: theme.codeTheme(dark: true).backgroundColor).opacity(0.97))
         .environment(\.colorScheme, .dark)
-        .onAppear { session.start(); inputFocused = true }
+        .onAppear {
+            session.start()
+            inputFocused = true
+        }
     }
 }
 
@@ -236,9 +257,12 @@ struct RunEnvironmentSheet: View {
                 Section {
                     ForEach(languages) { lang in
                         LabeledContent(lang.name) {
-                            TextField(theme.settings.interpreterOverrides[lang.id] ?? "automatisch", text: Binding(
-                                get: { interpreters[lang.id] ?? "" }, set: { interpreters[lang.id] = $0 }))
-                                .font(.system(size: 12, design: .monospaced))
+                            TextField(
+                                theme.settings.interpreterOverrides[lang.id] ?? "automatisch",
+                                text: Binding(
+                                    get: { interpreters[lang.id] ?? "" }, set: { interpreters[lang.id] = $0 })
+                            )
+                            .font(.system(size: 12, design: .monospaced))
                         }
                     }
                 } header: {
@@ -250,10 +274,18 @@ struct RunEnvironmentSheet: View {
             }
             .formStyle(.grouped)
             HStack {
-                Button("Zurücksetzen") { directory = ""; variables = ""; timeout = ""; interpreters = [:] }
+                Button("Zurücksetzen") {
+                    directory = ""
+                    variables = ""
+                    timeout = ""
+                    interpreters = [:]
+                }
                 Spacer()
                 Button("Abbrechen") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Sichern") { save(); dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Sichern") {
+                    save()
+                    dismiss()
+                }.keyboardShortcut(.defaultAction)
             }
             .padding(16)
         }
@@ -277,10 +309,11 @@ struct RunEnvironmentSheet: View {
     }
 
     private func save() {
-        let env = RunEnvironment(interpreters: interpreters.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty },
-                                 workingDirectory: directory.isEmpty ? nil : directory,
-                                 variables: RunEnvironment.parseVariables(variables),
-                                 timeout: Double(timeout.trimmingCharacters(in: .whitespaces)).flatMap { $0 > 0 ? $0 : nil })
+        let env = RunEnvironment(
+            interpreters: interpreters.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty },
+            workingDirectory: directory.isEmpty ? nil : directory,
+            variables: RunEnvironment.parseVariables(variables),
+            timeout: Double(timeout.trimmingCharacters(in: .whitespaces)).flatMap { $0 > 0 ? $0 : nil })
         guard env != (doc.meta.environment ?? RunEnvironment()) else { return }
         doc.setEnvironment(env)
         // Sessions and the terminal start fresh with the new directory and variables.

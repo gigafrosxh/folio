@@ -32,17 +32,21 @@ final class LineDiffTests: XCTestCase {
     }
 
     func testUnifiedExactOutput() {
-        XCTAssertEqual(LineDiff.unified(old: "a\nb\nc\n", new: "a\nx\nc\n", oldName: "old.py", newName: "new.py"),
-                       "--- old.py\n+++ new.py\n@@ -1,3 +1,3 @@\n a\n-b\n+x\n c\n")
-        XCTAssertEqual(LineDiff.unified(old: "", new: "a\n", oldName: "old", newName: "new"),
-                       "--- old\n+++ new\n@@ -0,0 +1,1 @@\n+a\n")
-        XCTAssertEqual(LineDiff.unified(old: "a\n", new: "", oldName: "old", newName: "new"),
-                       "--- old\n+++ new\n@@ -1,1 +0,0 @@\n-a\n")
+        XCTAssertEqual(
+            LineDiff.unified(old: "a\nb\nc\n", new: "a\nx\nc\n", oldName: "old.py", newName: "new.py"),
+            "--- old.py\n+++ new.py\n@@ -1,3 +1,3 @@\n a\n-b\n+x\n c\n")
+        XCTAssertEqual(
+            LineDiff.unified(old: "", new: "a\n", oldName: "old", newName: "new"),
+            "--- old\n+++ new\n@@ -0,0 +1,1 @@\n+a\n")
+        XCTAssertEqual(
+            LineDiff.unified(old: "a\n", new: "", oldName: "old", newName: "new"),
+            "--- old\n+++ new\n@@ -1,1 +0,0 @@\n-a\n")
     }
 
     func testMissingFinalNewlineAndBlankLines() {
-        XCTAssertEqual(LineDiff.unified(old: "a", new: "a\n", oldName: "old", newName: "new"),
-                       "--- old\n+++ new\n@@ -1,1 +1,1 @@\n-a\n\\ No newline at end of file\n+a\n")
+        XCTAssertEqual(
+            LineDiff.unified(old: "a", new: "a\n", oldName: "old", newName: "new"),
+            "--- old\n+++ new\n@@ -1,1 +1,1 @@\n-a\n\\ No newline at end of file\n+a\n")
         XCTAssertEqual(LineDiff.diff(old: "", new: "\n").map(\.text), [""])
         XCTAssertEqual(LineDiff.diff(old: "a\n", new: "a\n\n").map(\.kind), [.same, .added])
     }

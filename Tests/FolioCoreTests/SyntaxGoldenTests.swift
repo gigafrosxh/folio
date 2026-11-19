@@ -5,13 +5,16 @@ import XCTest
 /// FOLIO_WRITE_GOLDEN=1 rewrites the stored file.
 final class SyntaxGoldenTests: XCTestCase {
     private let samples: [(String, String)] = [
-        ("python", "import os\n# Kommentar \"x\"\ndef f(a, b=1):\n    s = 'text # kein Kommentar'\n    return Foo(a) + 0x1F\n@decorator\nclass Bar: pass\n\"\"\"lang\nblock\"\"\"\n"),
+        (
+            "python",
+            "import os\n# Kommentar \"x\"\ndef f(a, b=1):\n    s = 'text # kein Kommentar'\n    return Foo(a) + 0x1F\n@decorator\nclass Bar: pass\n\"\"\"lang\nblock\"\"\"\n"
+        ),
         ("javascript", "const a = `x ${y}`; // Kommentar\nfunction f(b) { return b * 2.5e3; }\n/* block\nende */ let s = \"str\\\"ing\";\n"),
         ("swift", "import Foundation\n@MainActor struct A { let x: Int = 1_000 }\nfunc g() -> String { \"ä😀\" } // c\n"),
         ("sql", "SELECT name, COUNT(*) FROM t -- Kommentar\nwhere id = 'x''y';\n"),
         ("bash", "#!/bin/bash\necho \"$HOME\" # c\nfor i in 1 2; do ls -la; done\n"),
         ("plain", "nichts (hervorheben) 123\n"),
-        ("markdown", "# Titel\n**fett** `code`\n"),
+        ("markdown", "# Titel\n**fett** `code`\n")
     ]
 
     private var goldenURL: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/syntax-tokens.txt") }
@@ -94,8 +97,9 @@ final class HighlightDiffTests: XCTestCase {
     private let py = Languages.spec(for: "python")
 
     private func span(_ a: String, _ b: String) -> NSRange? {
-        HighlightDiff.span(oldText: a as NSString, newText: b as NSString,
-                           oldTokens: SyntaxHighlighter.tokens(in: a, language: py), newTokens: SyntaxHighlighter.tokens(in: b, language: py))
+        HighlightDiff.span(
+            oldText: a as NSString, newText: b as NSString,
+            oldTokens: SyntaxHighlighter.tokens(in: a, language: py), newTokens: SyntaxHighlighter.tokens(in: b, language: py))
     }
 
     func testTypingAtEndTouchesOnlyTheEnd() {

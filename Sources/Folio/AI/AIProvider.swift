@@ -1,7 +1,7 @@
 import Foundation
 import FolioCore
 #if canImport(FoundationModels)
-import FoundationModels
+    import FoundationModels
 #endif
 
 /// Whether the chosen Ollama answers and has the chosen model (#237). Checked when the chat opens and before
@@ -16,9 +16,13 @@ final class OllamaStatus: ObservableObject {
         do {
             let client = try AIProvider.ollama()
             let models = try await client.models()
-            if s.ollamaModel.isEmpty { set(OllamaClient.Failure.noModel.errorDescription) }
-            else if !models.contains(s.ollamaModel) { set("„\(s.ollamaModel)“ ist in Ollama nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell in den Einstellungen (Editor › KI).") }
-            else { set(nil) }
+            if s.ollamaModel.isEmpty {
+                set(OllamaClient.Failure.noModel.errorDescription)
+            } else if !models.contains(s.ollamaModel) {
+                set("„\(s.ollamaModel)“ ist in Ollama nicht installiert oder kann keinen Text schreiben. Wähle ein anderes Modell in den Einstellungen (Editor › KI).")
+            } else {
+                set(nil)
+            }
         } catch {
             set((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
@@ -33,7 +37,10 @@ final class OllamaStatus: ObservableObject {
 enum AIProvider {
     enum Failure: Error, LocalizedError {
         case unavailable(String)
-        var errorDescription: String? { if case .unavailable(let s) = self { return s }; return nil }
+        var errorDescription: String? {
+            if case .unavailable(let s) = self { return s }
+            return nil
+        }
     }
 
     static var usesOllama: Bool { ThemeManager.shared.settings.aiProvider == "ollama" }
@@ -59,16 +66,16 @@ enum AIProvider {
         let availability = AIAvailability.current
         guard availability.isAvailable else { throw Failure.unavailable("\(availability.title). \(availability.explanation)") }
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            let session = LanguageModelSession(instructions: system)
-            var text = ""
-            for try await partial in session.streamResponse(to: prompt) {
-                try Task.checkCancellation()
-                text = partial.content
-                onPart(text)
+            if #available(macOS 26.0, *) {
+                let session = LanguageModelSession(instructions: system)
+                var text = ""
+                for try await partial in session.streamResponse(to: prompt) {
+                    try Task.checkCancellation()
+                    text = partial.content
+                    onPart(text)
+                }
+                return text
             }
-            return text
-        }
         #endif
         throw Failure.unavailable(AIAvailability.current.explanation)
     }

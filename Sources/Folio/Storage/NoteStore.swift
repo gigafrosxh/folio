@@ -12,7 +12,12 @@ final class NoteStore: ObservableObject {
 
     @Published internal(set) var rootURL: URL
     @Published internal(set) var folders: [FolderNode] = []
-    @Published internal(set) var notes: [NoteRef] = [] { didSet { notesVersion += 1; refreshLinkIndex() } }
+    @Published internal(set) var notes: [NoteRef] = [] {
+        didSet {
+            notesVersion += 1
+            refreshLinkIndex()
+        }
+    }
     @Published var sidebarSelection: SidebarItem? = .all {
         didSet { if oldValue != sidebarSelection, let id = selectedNoteID, !filteredNotes.contains(where: { $0.id == id }) { selectedNoteID = filteredNotes.first?.id } }
     }
@@ -84,7 +89,8 @@ final class NoteStore: ObservableObject {
     @Published internal(set) var recent: RecentList = {
         if let d = UserDefaults.standard.data(forKey: "folio.recent"), let r = try? JSONDecoder().decode(RecentList.self, from: d) { return r }
         return RecentList()
-    }() {
+    }()
+    {
         didSet { if let d = try? JSONEncoder().encode(recent) { UserDefaults.standard.set(d, forKey: "folio.recent") } }
     }
     /// Note templates.
@@ -157,7 +163,8 @@ final class NoteStore: ObservableObject {
     func setLibrary(_ url: URL) -> Bool {
         let unsaved = unsavedAfterSaving()
         guard unsaved.isEmpty else {
-            lastError = "Die Bibliothek wurde nicht gewechselt: \(Self.titles(unsaved)) konnte nicht gesichert werden. "
+            lastError =
+                "Die Bibliothek wurde nicht gewechselt: \(Self.titles(unsaved)) konnte nicht gesichert werden. "
                 + "Sichere die Notiz zuerst (oder kopiere den Text), dann versuche es erneut."
             return false
         }
@@ -203,7 +210,9 @@ final class NoteStore: ObservableObject {
         let templates = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.pathExtension == FolioArchive.fileExtension }
             .compactMap { url in (try? NoteFile.readMetadata(at: url)).map { NoteRef(meta: $0, url: url) } }
-        return LibrarySnapshot(root: root, scan: result, refs: result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }, damaged: damaged, trash: LibraryTrash(library: root).items(), templates: templates)
+        return LibrarySnapshot(
+            root: root, scan: result, refs: result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }, damaged: damaged, trash: LibraryTrash(library: root).items(),
+            templates: templates)
     }
 
     /// Reads the library now. Callers that use the notes right afterwards need this; everything else should use
@@ -279,7 +288,8 @@ final class NoteStore: ObservableObject {
     var isSearching: Bool { !activeSearch.isEmpty }
 
     var filteredNotes: [NoteRef] {
-        let key = "\(notesVersion)|\(String(describing: sidebarSelection))|\(searchText)|\(String(describing: searchFilter))|\(searchEverywhere)|\(includeSubfolders)|\(templates.count)|\(organizationVersion)"
+        let key =
+            "\(notesVersion)|\(String(describing: sidebarSelection))|\(searchText)|\(String(describing: searchFilter))|\(searchEverywhere)|\(includeSubfolders)|\(templates.count)|\(organizationVersion)"
         if let memo = filterMemo, memo.key == key { return memo.notes }
         let result = computeFilteredNotes()
         filterMemo = (key, result)
@@ -338,7 +348,12 @@ final class NoteStore: ObservableObject {
 
     var allFolderURLs: [URL] {
         var out: [URL] = []
-        func walk(_ nodes: [FolderNode]) { for n in nodes { out.append(n.url); walk(n.children ?? []) } }
+        func walk(_ nodes: [FolderNode]) {
+            for n in nodes {
+                out.append(n.url)
+                walk(n.children ?? [])
+            }
+        }
         walk(folders)
         return out
     }
@@ -459,14 +474,20 @@ final class NoteStore: ObservableObject {
     }
 
     func closeAllDocuments() {
-        for (id, doc) in documents { doc.saveNow(); KernelManager.shared.shutdown(note: id) }
+        for (id, doc) in documents {
+            doc.saveNow()
+            KernelManager.shared.shutdown(note: id)
+        }
         documents = [:]
         failures = [:]
     }
 
     /// Closes a note everywhere (it was deleted or moved away).
     func closeDocument(_ id: UUID) {
-        if let doc = documents[id] { doc.saveNow(); KernelManager.shared.shutdown(note: id) }
+        if let doc = documents[id] {
+            doc.saveNow()
+            KernelManager.shared.shutdown(note: id)
+        }
         documents[id] = nil
         tabs.removeAll { $0 == id }
         if splitNoteID == id { splitNoteID = nil }

@@ -100,11 +100,12 @@ extension SearchFilter: Codable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
-                  tags: try c.decodeIfPresent(Set<String>.self, forKey: .tags) ?? [],
-                  folder: try c.decodeIfPresent(String.self, forKey: .folder),
-                  period: (try? c.decodeIfPresent(Period.self, forKey: .period)) ?? .any,
-                  types: try c.decodeIfPresent(Set<String>.self, forKey: .types) ?? [])
+        self.init(
+            text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
+            tags: try c.decodeIfPresent(Set<String>.self, forKey: .tags) ?? [],
+            folder: try c.decodeIfPresent(String.self, forKey: .folder),
+            period: (try? c.decodeIfPresent(Period.self, forKey: .period)) ?? .any,
+            types: try c.decodeIfPresent(Set<String>.self, forKey: .types) ?? [])
         properties = try c.decodeIfPresent([String: String].self, forKey: .properties) ?? [:]
     }
 
@@ -213,7 +214,10 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
         }
         var orders: [String: [UUID]] = [:]
         for (key, value) in noteOrder {
-            guard key.hasPrefix("tag:") else { orders[key] = value; continue }
+            guard key.hasPrefix("tag:") else {
+                orders[key] = value
+                continue
+            }
             guard let tag = renamed(String(key.dropFirst(4))) else { continue }
             // Merging into a tag that has an order already: that order stays, the other notes follow.
             orders["tag:" + tag] = ManualOrder.unique((orders["tag:" + tag] ?? []) + value)

@@ -38,12 +38,14 @@ for size in sizes {
 
     let metas = scanned.notes.map(\.meta)
     let filter = SearchFilter(text: "analyse budget", tags: ["thema3"])
-    record(Benchmark.measure("suche-filter", size: size, runs: runs) {
-        _ = metas.filter { filter.matches($0, folderPath: "") }
-    })
-    record(Benchmark.measure("suche-unscharf", size: size, runs: runs) {
-        _ = FuzzyMatch.rank(metas, query: "notiz 42 plan") { $0.title + " " + $0.preview }
-    })
+    record(
+        Benchmark.measure("suche-filter", size: size, runs: runs) {
+            _ = metas.filter { filter.matches($0, folderPath: "") }
+        })
+    record(
+        Benchmark.measure("suche-unscharf", size: size, runs: runs) {
+            _ = FuzzyMatch.rank(metas, query: "notiz 42 plan") { $0.title + " " + $0.preview }
+        })
     let pairs = scanned.notes.map { (meta: $0.meta, folder: $0.url.deletingLastPathComponent().lastPathComponent) }
     record(Benchmark.measure("linkindex-aufbau", size: size, runs: runs) { _ = LinkIndex(pairs) })
     if size <= 1000 {
@@ -61,22 +63,26 @@ for size in sizes {
 for chars in [1_000, 10_000, 100_000] {
     let line = "wert = berechne(daten, faktor) + 1\n"
     let code = String(repeating: line, count: chars / line.count)
-    record(Benchmark.measure("completion-kontext", size: chars) {
-        _ = CompletionContext(code: code, offset: (code as NSString).length - 5, language: "python")
-    })
-    record(Benchmark.measure("code-abhaengigkeiten", size: chars) {
-        _ = CodeDependencies.build([.init(id: UUID(), language: "python", session: "python", code: code, lastRun: nil)])
-    })
+    record(
+        Benchmark.measure("completion-kontext", size: chars) {
+            _ = CompletionContext(code: code, offset: (code as NSString).length - 5, language: "python")
+        })
+    record(
+        Benchmark.measure("code-abhaengigkeiten", size: chars) {
+            _ = CodeDependencies.build([.init(id: UUID(), language: "python", session: "python", code: code, lastRun: nil)])
+        })
     let py = Languages.spec(for: "python")
     let tokens = SyntaxHighlighter.tokens(in: code, language: py)
     record(Benchmark.measure("syntax-tokens", size: chars) { _ = SyntaxHighlighter.tokens(in: code, language: py) })
     let typed = code + "x"
-    record(Benchmark.measure("highlight-diff", size: chars) {
-        _ = HighlightDiff.span(oldText: code as NSString, newText: typed as NSString, oldTokens: tokens, newTokens: tokens)
-    })
-    record(Benchmark.measure("zeilen-diff", size: chars, runs: 3) {
-        _ = LineDiff.diff(old: code, new: code.replacingOccurrences(of: "faktor", with: "faktor2"))
-    })
+    record(
+        Benchmark.measure("highlight-diff", size: chars) {
+            _ = HighlightDiff.span(oldText: code as NSString, newText: typed as NSString, oldTokens: tokens, newTokens: tokens)
+        })
+    record(
+        Benchmark.measure("zeilen-diff", size: chars, runs: 3) {
+            _ = LineDiff.diff(old: code, new: code.replacingOccurrences(of: "faktor", with: "faktor2"))
+        })
 }
 
 let rep = Benchmark.Report(commit: commit, results: results)

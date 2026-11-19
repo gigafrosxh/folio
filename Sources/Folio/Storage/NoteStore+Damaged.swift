@@ -26,7 +26,8 @@ extension NoteStore {
     /// Restores the newest intact version of a damaged note in place (the damaged file is kept aside).
     func restoreLatestVersion(_ damaged: DamagedNote) {
         guard let id = damaged.report.meta?.id, let version = history.versions(of: id).first(where: { (try? history.read($0)) != nil }),
-              var file = try? history.read(version) else { return }
+            var file = try? history.read(version)
+        else { return }
         do {
             try quarantine(damaged.url)
             file.meta.modified = Date()

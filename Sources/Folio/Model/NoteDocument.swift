@@ -355,8 +355,11 @@ final class NoteDocument: ObservableObject, Identifiable {
     }
 
     private func snapshot() -> StructureSnapshot {
-        StructureSnapshot(blocks: blocks, texts: Dictionary(uniqueKeysWithValues: blocks.filter { $0.kind == .text }
-            .map { ($0.id, NSAttributedString(attributedString: $0.storage)) }))
+        StructureSnapshot(
+            blocks: blocks,
+            texts: Dictionary(
+                uniqueKeysWithValues: blocks.filter { $0.kind == .text }
+                    .map { ($0.id, NSAttributedString(attributedString: $0.storage)) }))
     }
 
     private func restore(_ snap: StructureSnapshot, actionName: String) {
@@ -366,7 +369,10 @@ final class NoteDocument: ObservableObject, Identifiable {
         }
         undoManager?.setActionName(actionName)
         for b in snap.blocks where b.kind == .text {
-            if let t = snap.texts[b.id], !b.storage.isEqual(to: t) { b.storage.setAttributedString(t); b.revision += 1 }
+            if let t = snap.texts[b.id], !b.storage.isEqual(to: t) {
+                b.storage.setAttributedString(t)
+                b.revision += 1
+            }
         }
         // Code blocks that disappear again stop running and leave the shared session.
         let kept = Set(snap.blocks.map(\.id))

@@ -19,8 +19,12 @@ enum LinkSelfTest {
         let store = NoteStore.shared
         await wait(2)
         guard let alpha = store.createNote(titled: "Projekt Alpha", body: "Siehe [[Beta]] und [[Gamma]]."),
-              let beta = store.createNote(titled: "Beta", body: "Im Projekt Alpha gab es Neues."),
-              store.createNote(titled: "Delta", body: "Steht für sich.") != nil else { check(false, "Notizen anlegen"); return }
+            let beta = store.createNote(titled: "Beta", body: "Im Projekt Alpha gab es Neues."),
+            store.createNote(titled: "Delta", body: "Steht für sich.") != nil
+        else {
+            check(false, "Notizen anlegen")
+            return
+        }
         await wait(0.3)
         indexChecks(store: store, alpha: alpha, beta: beta)
         await mentionChecks(store: store, alpha: alpha, beta: beta)
@@ -32,38 +36,39 @@ enum LinkSelfTest {
         await propertyChecks(store: store, alpha: alpha)
         await graphChecks(store: store, alpha: alpha)
         await assistantChecks(store: store)
-        print("LINK done"); fflush(stdout)
+        print("LINK done")
+        fflush(stdout)
     }
 
     private static func graphSnapshots(to path: String, store: NoteStore, alpha: NoteRef) {
-            let index = store.linkIndex
-            let folders = FolderGraph.augment(notes: index.nodes.values.map { ($0.id, $0.folder) })
-            let ids = (Array(index.nodes.keys) + Array(folders.folders.keys)).sorted { $0.uuidString < $1.uuidString }
-            let layout = GraphLayout.compute(nodes: ids, edges: index.edges() + folders.edges)
-            let layout3D = GraphLayout.compute3D(nodes: ids, edges: index.edges() + folders.edges)
-            UserDefaults.standard.set(true, forKey: "folio.graph.folders")
-            UserDefaults.standard.set(true, forKey: "folio.graph.3d")
-            let view3D = GraphView(initialPositions3D: layout3D).environmentObject(store).environmentObject(ThemeManager.shared)
+        let index = store.linkIndex
+        let folders = FolderGraph.augment(notes: index.nodes.values.map { ($0.id, $0.folder) })
+        let ids = (Array(index.nodes.keys) + Array(folders.folders.keys)).sorted { $0.uuidString < $1.uuidString }
+        let layout = GraphLayout.compute(nodes: ids, edges: index.edges() + folders.edges)
+        let layout3D = GraphLayout.compute3D(nodes: ids, edges: index.edges() + folders.edges)
+        UserDefaults.standard.set(true, forKey: "folio.graph.folders")
+        UserDefaults.standard.set(true, forKey: "folio.graph.3d")
+        let view3D = GraphView(initialPositions3D: layout3D).environmentObject(store).environmentObject(ThemeManager.shared)
+            .frame(width: 900, height: 560).background(Color(nsColor: .windowBackgroundColor))
+        let r3 = ImageRenderer(content: view3D)
+        r3.scale = 2
+        if let tiff = r3.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: path.replacingOccurrences(of: ".png", with: "-3d.png")))
+            check(true, "3D-Graph gezeichnet")
+        }
+        UserDefaults.standard.set(false, forKey: "folio.graph.3d")
+        for (focus, suffix) in [(nil as UUID?, ""), (alpha.id, "-lokal")] {
+            let view = GraphView(focus: focus, depth: 2, compact: focus != nil, initialPositions: layout)
+                .environmentObject(store).environmentObject(ThemeManager.shared)
                 .frame(width: 900, height: 560).background(Color(nsColor: .windowBackgroundColor))
-            let r3 = ImageRenderer(content: view3D)
-            r3.scale = 2
-            if let tiff = r3.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                try? png.write(to: URL(fileURLWithPath: path.replacingOccurrences(of: ".png", with: "-3d.png")))
-                check(true, "3D-Graph gezeichnet")
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                let url = URL(fileURLWithPath: path.replacingOccurrences(of: ".png", with: suffix + ".png"))
+                try? png.write(to: url)
+                check(true, "Graph gezeichnet: \(url.lastPathComponent)")
             }
-            UserDefaults.standard.set(false, forKey: "folio.graph.3d")
-            for (focus, suffix) in [(nil as UUID?, ""), (alpha.id, "-lokal")] {
-                let view = GraphView(focus: focus, depth: 2, compact: focus != nil, initialPositions: layout)
-                    .environmentObject(store).environmentObject(ThemeManager.shared)
-                    .frame(width: 900, height: 560).background(Color(nsColor: .windowBackgroundColor))
-                let renderer = ImageRenderer(content: view)
-                renderer.scale = 2
-                if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                    let url = URL(fileURLWithPath: path.replacingOccurrences(of: ".png", with: suffix + ".png"))
-                    try? png.write(to: url)
-                    check(true, "Graph gezeichnet: \(url.lastPathComponent)")
-                }
-            }
+        }
     }
 
     private static func indexChecks(store: NoteStore, alpha: NoteRef, beta: NoteRef) {
@@ -79,8 +84,9 @@ enum LinkSelfTest {
         check(store.linkMention(in: beta.id, to: alpha.id), "Erwähnung verlinkt")
         await wait(0.3)
         let betaText = ref("Beta")?.meta.searchText ?? ""
-        check(betaText.contains("[[Projekt Alpha]]") && store.linkIndex.backlinks(alpha.id).contains(beta.id),
-              "Nach dem Verlinken ist Beta ein Backlink von Alpha (\(betaText.replacingOccurrences(of: "\n", with: " ")))")
+        check(
+            betaText.contains("[[Projekt Alpha]]") && store.linkIndex.backlinks(alpha.id).contains(beta.id),
+            "Nach dem Verlinken ist Beta ein Backlink von Alpha (\(betaText.replacingOccurrences(of: "\n", with: " ")))")
         check(store.unlinkedMentions(of: alpha.id).isEmpty, "Keine unverlinkte Erwähnung mehr")
     }
 
@@ -104,8 +110,9 @@ enum LinkSelfTest {
             doc.saveNow()
         }
         await wait(0.3)
-        check(!store.linkIndex.outgoing(alpha.id).contains(beta.id) && store.linkIndex.unresolved(alpha.id) == [WikiLink.key("Beta")],
-              "Umbenannte Notiz: [[Beta]] ist wieder offen")
+        check(
+            !store.linkIndex.outgoing(alpha.id).contains(beta.id) && store.linkIndex.unresolved(alpha.id) == [WikiLink.key("Beta")],
+            "Umbenannte Notiz: [[Beta]] ist wieder offen")
         check(store.linkIndex.orphans().contains { store.linkIndex.nodes[$0]?.title == "Delta" }, "Delta ist verwaist (#114)")
     }
 
@@ -130,8 +137,9 @@ enum LinkSelfTest {
         // Daily note (#117): created once, opened again the second time.
         let daily = store.openDailyNote()
         let again = store.openDailyNote()
-        check(daily != nil && daily?.id == again?.id && daily?.meta.title == DailyNote.title(for: Date())
-              && daily?.folderURL.lastPathComponent == "Tagesnotizen", "Tagesnotiz „\(daily?.meta.title ?? "-")“ im Ordner Tagesnotizen, nur einmal")
+        check(
+            daily != nil && daily?.id == again?.id && daily?.meta.title == DailyNote.title(for: Date())
+                && daily?.folderURL.lastPathComponent == "Tagesnotizen", "Tagesnotiz „\(daily?.meta.title ?? "-")“ im Ordner Tagesnotizen, nur einmal")
     }
 
     private static func templateChecks(store: NoteStore) async {
@@ -144,11 +152,13 @@ enum LinkSelfTest {
         _ = store.writeTemplate(NoteFile(meta: NoteMetadata(title: "Protokoll"), body: NoteBody(blocks: [body])))
         store.templates = NoteStore.scanTemplates(store.templatesFolder)
         if let template = store.templates.first(where: { $0.meta.title == "Protokoll" }),
-           let note = store.createNote(from: template, title: "Sitzung") {
+            let note = store.createNote(from: template, title: "Sitzung")
+        {
             await wait(0.6)
             let text = store.currentDocument?.blocks.first?.storage.string ?? ""
-            check(note.meta.title == "Sitzung" && text.hasPrefix("Sitzung\nAm \(DailyNote.title(for: Date()))\n\nEnde"),
-                  "Vorlage setzt Titel, Datum und Cursor ein (\(text.replacingOccurrences(of: "\n", with: "⏎")))")
+            check(
+                note.meta.title == "Sitzung" && text.hasPrefix("Sitzung\nAm \(DailyNote.title(for: Date()))\n\nEnde"),
+                "Vorlage setzt Titel, Datum und Cursor ein (\(text.replacingOccurrences(of: "\n", with: "⏎")))")
             // The cursor is set once the editor exists, which takes a varying time in a release build (#135).
             let expected = ("Sitzung\nAm 0000-00-00\n" as NSString).length
             var waited = 0.0
@@ -162,7 +172,9 @@ enum LinkSelfTest {
             } else {
                 check(cursor == expected, "Cursor steht an {{cursor}} (\(cursor ?? -1))")
             }
-        } else { check(false, "Vorlage anwenden") }
+        } else {
+            check(false, "Vorlage anwenden")
+        }
     }
 
     private static func propertyChecks(store: NoteStore, alpha: NoteRef) async {
@@ -190,8 +202,9 @@ enum LinkSelfTest {
         store.sidebarSelection = .graph
         let created = store.createNote()
         await wait(0.5)
-        check(created != nil && store.sidebarSelection == .all && store.currentDocument?.id == created?.id,
-              "Neue Notiz aus dem Graphen öffnet den Editor (#162)")
+        check(
+            created != nil && store.sidebarSelection == .all && store.currentDocument?.id == created?.id,
+            "Neue Notiz aus dem Graphen öffnet den Editor (#162)")
     }
 
     private static func assistantChecks(store: NoteStore) async {
@@ -205,8 +218,9 @@ enum LinkSelfTest {
         await wait(0.5)
         let delta = ref("Delta")
         let target = ref("Agent Ziel 2")
-        check(delta != nil && target != nil && store.linkIndex.outgoing(delta!.id).contains(target!.id) == false,
-              "Nach dem Umbenennen zeigt der alte [[Agent Ziel]]-Link ins Leere (erwartet)")
+        check(
+            delta != nil && target != nil && store.linkIndex.outgoing(delta!.id).contains(target!.id) == false,
+            "Nach dem Umbenennen zeigt der alte [[Agent Ziel]]-Link ins Leere (erwartet)")
         check(delta?.meta.tags.contains("projekt-x") == true, "Assistent setzt #projekt-x")
         check(delta?.folderURL.path.hasSuffix("Archiv/2026") == true, "Assistent verschiebt nach Archiv/2026 (\(delta?.folderURL.path ?? "-"))")
         check(NoteAgent.log.count == 5, "Fünf Aktionen protokolliert (\(NoteAgent.log.map(\.summary)))")

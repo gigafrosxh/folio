@@ -37,7 +37,7 @@ final class KernelTests: XCTestCase {
         defer { k.shutdown() }
         let one = Task { await k.execute("import time\ntime.sleep(0.3)\nn = 1") }
         try await Task.sleep(for: .milliseconds(50))
-        let r2 = await k.execute("print(n)")   // waits for the first run
+        let r2 = await k.execute("print(n)")  // waits for the first run
         _ = await one.value
         XCTAssertEqual(r2.stdout, "1\n")
     }

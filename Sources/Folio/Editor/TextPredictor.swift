@@ -1,7 +1,7 @@
 import Foundation
 import FolioCore
 #if canImport(FoundationModels)
-import FoundationModels
+    import FoundationModels
 #endif
 
 /// On-device text completion with Apple Intelligence (Foundation Models). Nothing leaves the Mac.
@@ -14,46 +14,47 @@ enum TextPredictor {
 
     static var status: Status {
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            switch SystemLanguageModel.default.availability {
-            case .available:
-                return .available
-            case .unavailable(let reason):
-                switch reason {
-                case .appleIntelligenceNotEnabled:
-                    return .unavailable("Apple Intelligence ist in den Systemeinstellungen nicht aktiviert.")
-                case .deviceNotEligible:
-                    return .unavailable("Dieser Mac unterstützt Apple Intelligence nicht.")
-                case .modelNotReady:
-                    return .unavailable("Das Sprachmodell wird noch geladen.")
-                @unknown default:
-                    return .unavailable("Apple Intelligence ist nicht verfügbar.")
+            if #available(macOS 26.0, *) {
+                switch SystemLanguageModel.default.availability {
+                case .available:
+                    return .available
+                case .unavailable(let reason):
+                    switch reason {
+                    case .appleIntelligenceNotEnabled:
+                        return .unavailable("Apple Intelligence ist in den Systemeinstellungen nicht aktiviert.")
+                    case .deviceNotEligible:
+                        return .unavailable("Dieser Mac unterstützt Apple Intelligence nicht.")
+                    case .modelNotReady:
+                        return .unavailable("Das Sprachmodell wird noch geladen.")
+                    @unknown default:
+                        return .unavailable("Apple Intelligence ist nicht verfügbar.")
+                    }
                 }
             }
-        }
         #endif
         return .unavailable("Benötigt macOS 26 oder neuer.")
     }
 
     private static let instructions = """
-    Du bist eine Autovervollständigung in einer Notizen-App. Du bekommst den Text vor dem Cursor. \
-    Antworte ausschließlich mit der wahrscheinlichsten Fortsetzung: höchstens ein Satz und höchstens 12 Wörter, \
-    in derselben Sprache, ohne Anführungszeichen, ohne Erklärungen und ohne den vorhandenen Text zu wiederholen.
-    """
+        Du bist eine Autovervollständigung in einer Notizen-App. Du bekommst den Text vor dem Cursor. \
+        Antworte ausschließlich mit der wahrscheinlichsten Fortsetzung: höchstens ein Satz und höchstens 12 Wörter, \
+        in derselben Sprache, ohne Anführungszeichen, ohne Erklärungen und ohne den vorhandenen Text zu wiederholen.
+        """
 
     /// Suggests how `context` (the text before the cursor, ending in a space) continues; nil if nothing useful.
     static func suggest(for context: String) async -> String? {
         let trimmed = String(context.suffix(400))
         if let hit = cache[trimmed] { return hit }
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *), case .available = status {
-            let session = SessionPool.take(.text, instructions: instructions)
-            let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 20)
-            guard let response = try? await session.respond(to: trimmed, options: options),
-                  let text = clean(response.content, context: context) else { return nil }
-            remember(trimmed, text)
-            return text
-        }
+            if #available(macOS 26.0, *), case .available = status {
+                let session = SessionPool.take(.text, instructions: instructions)
+                let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 20)
+                guard let response = try? await session.respond(to: trimmed, options: options),
+                    let text = clean(response.content, context: context)
+                else { return nil }
+                remember(trimmed, text)
+                return text
+            }
         #endif
         return nil
     }
@@ -73,27 +74,28 @@ enum TextPredictor {
     /// Loads the model and the instructions ahead of time, so the first suggestion doesn't wait ~3 s.
     static func prewarm() {
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *), case .available = status {
-            SessionPool.prepare(.text, instructions: instructions)
-            SessionPool.prepare(.code, instructions: codeInstructions(for: "Code"))
-        }
+            if #available(macOS 26.0, *), case .available = status {
+                SessionPool.prepare(.text, instructions: instructions)
+                SessionPool.prepare(.code, instructions: codeInstructions(for: "Code"))
+            }
         #endif
     }
 
     /// Suggests code to insert at the cursor of a code block, knowing the code around it.
     static func suggestCode(before: String, after: String, language: String, linePrefix: String) async -> String? {
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *), case .available = status {
-            let name = Languages.spec(for: language).name
-            let prompt = "Language: \(name)\n" + String(before.suffix(900)) + "<CURSOR>" + String(after.prefix(200))
-            if let hit = cache[prompt] { return hit }
-            let session = SessionPool.take(.code, instructions: codeInstructions(for: name))
-            let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 60)
-            guard let response = try? await session.respond(to: prompt, options: options),
-                  let code = cleanCode(response.content, linePrefix: linePrefix, after: after) else { return nil }
-            remember(prompt, code)
-            return code
-        }
+            if #available(macOS 26.0, *), case .available = status {
+                let name = Languages.spec(for: language).name
+                let prompt = "Language: \(name)\n" + String(before.suffix(900)) + "<CURSOR>" + String(after.prefix(200))
+                if let hit = cache[prompt] { return hit }
+                let session = SessionPool.take(.code, instructions: codeInstructions(for: name))
+                let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 60)
+                guard let response = try? await session.respond(to: prompt, options: options),
+                    let code = cleanCode(response.content, linePrefix: linePrefix, after: after)
+                else { return nil }
+                remember(prompt, code)
+                return code
+            }
         #endif
         return nil
     }
@@ -135,7 +137,10 @@ enum TextPredictor {
         let tailWords = context.split(whereSeparator: \.isWhitespace).suffix(12).map(String.init)
         for n in stride(from: tailWords.count, through: 1, by: -1) {
             let tail = tailWords.suffix(n).joined(separator: " ")
-            if s.lowercased().hasPrefix(tail.lowercased() + " ") { s = String(s.dropFirst(tail.count + 1)); break }
+            if s.lowercased().hasPrefix(tail.lowercased() + " ") {
+                s = String(s.dropFirst(tail.count + 1))
+                break
+            }
         }
         s = s.trimmingCharacters(in: .whitespaces)
         return s.count >= 2 ? s : nil
@@ -143,25 +148,25 @@ enum TextPredictor {
 }
 
 #if canImport(FoundationModels)
-/// Keeps one prewarmed session per kind ready; taking one immediately prepares the next, so every
-/// request starts on a warm session and never pays the model load time.
-@available(macOS 26.0, *)
-@MainActor
-private enum SessionPool {
-    enum Kind { case text, code }
-    private static var ready: [Kind: LanguageModelSession] = [:]
+    /// Keeps one prewarmed session per kind ready; taking one immediately prepares the next, so every
+    /// request starts on a warm session and never pays the model load time.
+    @available(macOS 26.0, *)
+    @MainActor
+    private enum SessionPool {
+        enum Kind { case text, code }
+        private static var ready: [Kind: LanguageModelSession] = [:]
 
-    static func prepare(_ kind: Kind, instructions: String) {
-        guard ready[kind] == nil else { return }
-        let s = LanguageModelSession(instructions: instructions)
-        s.prewarm()
-        ready[kind] = s
-    }
+        static func prepare(_ kind: Kind, instructions: String) {
+            guard ready[kind] == nil else { return }
+            let s = LanguageModelSession(instructions: instructions)
+            s.prewarm()
+            ready[kind] = s
+        }
 
-    static func take(_ kind: Kind, instructions: String) -> LanguageModelSession {
-        let s = ready.removeValue(forKey: kind) ?? LanguageModelSession(instructions: instructions)
-        prepare(kind, instructions: instructions)
-        return s
+        static func take(_ kind: Kind, instructions: String) -> LanguageModelSession {
+            let s = ready.removeValue(forKey: kind) ?? LanguageModelSession(instructions: instructions)
+            prepare(kind, instructions: instructions)
+            return s
+        }
     }
-}
 #endif

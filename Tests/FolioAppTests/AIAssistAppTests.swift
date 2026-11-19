@@ -17,13 +17,21 @@ final class AIAssistAppTests: XCTestCase {
         return d
     }
 
-    private func step(_ change: () -> Void) { undo.beginUndoGrouping(); change(); undo.endUndoGrouping() }
+    private func step(_ change: () -> Void) {
+        undo.beginUndoGrouping()
+        change()
+        undo.endUndoGrouping()
+    }
 
     func testAppendTagUsesTagLineAndUndoes() {
         let d = doc("Einkauf\nMilch")
-        undo.beginUndoGrouping(); d.appendTag("haushalt"); undo.endUndoGrouping()
+        undo.beginUndoGrouping()
+        d.appendTag("haushalt")
+        undo.endUndoGrouping()
         XCTAssertEqual(d.blocks[0].storage.string, "Einkauf\nMilch\n#haushalt")
-        undo.beginUndoGrouping(); d.appendTag("liste"); undo.endUndoGrouping()
+        undo.beginUndoGrouping()
+        d.appendTag("liste")
+        undo.endUndoGrouping()
         XCTAssertEqual(d.blocks[0].storage.string, "Einkauf\nMilch\n#haushalt #liste")
         undo.undo()
         XCTAssertEqual(d.blocks[0].storage.string, "Einkauf\nMilch\n#haushalt")
@@ -95,8 +103,9 @@ final class AIAssistAppTests: XCTestCase {
         XCTAssertEqual(out.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemRed)
         // Inserting from the chat keeps the heading style.
         let chat = ChatAnswerFormatter.attributed(fromMarkdown: "# Neu", theme: ThemeManager.shared)
-        XCTAssertEqual((chat.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.pointSize,
-                       (TextStyle.subheading.attributes(theme: ThemeManager.shared)[.font] as? NSFont)?.pointSize)
+        XCTAssertEqual(
+            (chat.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.pointSize,
+            (TextStyle.subheading.attributes(theme: ThemeManager.shared)[.font] as? NSFont)?.pointSize)
     }
 
     func testNestedBoldInItalics() {

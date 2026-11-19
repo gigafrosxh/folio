@@ -68,7 +68,11 @@ struct NoteEditorView: View {
     @ViewBuilder private var headerArea: some View {
         if !focusMode || headerHover {
             header
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) {
+                    $0.size.height
+                } action: {
+                    headerHeight = $0
+                }
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .onHover { if focusMode { headerHover = $0 } }
         } else {
@@ -98,7 +102,9 @@ struct NoteEditorView: View {
                 .frame(maxWidth: .infinity)
         }
         .scrollContentBackground(.hidden)
-        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y > 2 } action: { _, now in
+        .onScrollGeometryChange(for: Bool.self) {
+            $0.contentOffset.y > 2
+        } action: { _, now in
             withAnimation(.easeOut(duration: 0.15)) { scrolled = now }
         }
         .onDrop(of: [.fileURL, .image, .url], isTargeted: $dropTargeted, perform: handleDrop)
@@ -142,16 +148,19 @@ struct NoteEditorView: View {
         guard doc.foldRevision >= 0, block.kind == .text else { return nil }
         let collapsed = doc.foldHeadings(in: block.id).filter(\.collapsed)
         guard !collapsed.isEmpty else { return nil }
-        return AnyView(VStack(alignment: .leading, spacing: 2) {
-            ForEach(collapsed) { h in
-                Button { doc.toggleFold(h.section.heading) } label: {
-                    Text("▸ \(h.section.heading.title.prefix(40)) … (\(h.summary))").font(.system(size: 11)).foregroundStyle(.secondary)
+        return AnyView(
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(collapsed) { h in
+                    Button {
+                        doc.toggleFold(h.section.heading)
+                    } label: {
+                        Text("▸ \(h.section.heading.title.prefix(40)) … (\(h.summary))").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Abschnitt ausklappen")
                 }
-                .buttonStyle(.plain)
-                .help("Abschnitt ausklappen")
             }
-        }
-        .padding(.leading, BlockRow.gutter))
+            .padding(.leading, BlockRow.gutter))
     }
 
     @ViewBuilder private var tagRow: some View {
@@ -169,7 +178,9 @@ struct NoteEditorView: View {
                     .fixedSize()
             }
             // Tag ideas from the text and the library (#37); nothing is added until a chip is clicked.
-            Button { showTagSuggestions = true } label: {
+            Button {
+                showTagSuggestions = true
+            } label: {
                 Label(doc.meta.tags.isEmpty ? "Tags vorschlagen" : "", systemImage: "tag")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -186,11 +197,17 @@ struct NoteEditorView: View {
             }
         }
         .padding(.leading, BlockRow.gutter)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tagRowWidth = $0 - BlockRow.gutter }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            tagRowWidth = $0 - BlockRow.gutter
+        }
     }
 
     private func tagButton(_ tag: String) -> some View {
-        Button { store.sidebarSelection = .tag(tag) } label: {
+        Button {
+            store.sidebarSelection = .tag(tag)
+        } label: {
             Text("#\(tag)")
                 .lineLimit(1)
                 .fixedSize()
@@ -229,7 +246,11 @@ struct NoteEditorView: View {
                     if (note.object as? UUID) == doc.id { showInfo = true }
                 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { areaWidth = $0 }
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.width
+            } action: {
+                areaWidth = $0
+            }
             .overlay(alignment: .topTrailing) { chatPanel }
             .modifier(DeveloperPanels(doc: doc, isActive: isActive, showTerminal: $showTerminal, showEnvironment: $showEnvironment))
             .sheet(isPresented: $showHistory) { VersionHistorySheet(doc: doc).environmentObject(store) }
@@ -240,16 +261,18 @@ struct NoteEditorView: View {
 
     @ViewBuilder private var chatPanel: some View {
         if showChat {
-            AIChatView(chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
-                       onInsert: insertChatAnswer, onClose: { setChat(false) })
-                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-                .frame(width: chatWidth)
-                .shadow(color: .black.opacity(chatPushesText ? 0 : 0.25), radius: 16, y: 6)
-                // The popup grows out of the ✨ button (top right) and shrinks back into it.
-                .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
-                .opacity(chatPopped ? 1 : 0)
-                .padding(.top, headerHeight + 10)
-                .padding([.trailing, .bottom], 12)
+            AIChatView(
+                chat: chatModel, onScope: { scope in chatLibrary = scope == .library },
+                onInsert: insertChatAnswer, onClose: { setChat(false) }
+            )
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+            .frame(width: chatWidth)
+            .shadow(color: .black.opacity(chatPushesText ? 0 : 0.25), radius: 16, y: 6)
+            // The popup grows out of the ✨ button (top right) and shrinks back into it.
+            .scaleEffect(chatPopped ? 1 : 0.12, anchor: .topTrailing)
+            .opacity(chatPopped ? 1 : 0)
+            .padding(.top, headerHeight + 10)
+            .padding([.trailing, .bottom], 12)
         }
     }
 
@@ -279,14 +302,21 @@ struct NoteEditorView: View {
             .onReceive(formatting.$activeBlockID) { id in
                 if let id, doc.block(id) != nil, store.focusedNoteID != doc.id { store.focusedNoteID = doc.id }
             }
-            .onAppear { if chatRemembered && store.splitNoteID == nil && store.selectedNoteID == doc.id { showChat = true; chatPopped = true } }
+            .onAppear {
+                if chatRemembered && store.splitNoteID == nil && store.selectedNoteID == doc.id {
+                    showChat = true
+                    chatPopped = true
+                }
+            }
             .background(Color(nsColor: .textBackgroundColor))
     }
 
     private func withPrompts<V: View>(_ view: V) -> some View {
         view
-            .imagePlaygroundSheet(isPresented: $showPlayground,
-                                  concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]) { url in
+            .imagePlaygroundSheet(
+                isPresented: $showPlayground,
+                concepts: playgroundConcept.isEmpty ? [] : [.text(playgroundConcept)]
+            ) { url in
                 insertImageFile(url)
             }
             .alert("Webseite einbetten", isPresented: $showWebPrompt) {
@@ -428,8 +458,8 @@ struct NoteEditorView: View {
 
     private func receiveAIAction(_ note: Notification) {
         guard let info = note.userInfo, let raw = info["action"] as? String, let action = AITextAction(rawValue: raw),
-              let text = info["text"] as? String, let loc = info["location"] as? Int, let len = info["length"] as? Int,
-              let idString = info["block"] as? String, let blockID = UUID(uuidString: idString), doc.block(blockID) != nil
+            let text = info["text"] as? String, let loc = info["location"] as? Int, let len = info["length"] as? Int,
+            let idString = info["block"] as? String, let blockID = UUID(uuidString: idString), doc.block(blockID) != nil
         else { return }
         aiRequest = AIActionRequest(action: action, text: text, range: NSRange(location: loc, length: len), blockID: blockID)
     }
@@ -508,14 +538,23 @@ struct NoteEditorView: View {
             insertCode: { insertCode(language: $0) },
             insertFile: pickFiles,
             insertNumbers: createNumbersTable,
-            insertWeb: { promptText = ""; showWebPrompt = true },
+            insertWeb: {
+                promptText = ""
+                showWebPrompt = true
+            },
             insertImagePlayground: openPlayground,
             insertDrawing: { insertBlock(BlockModel(kind: .drawing)) },
             importFromDevice: { formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id) },
-            addLink: { promptText = ""; showLinkPrompt = true },
+            addLink: {
+                promptText = ""
+                showLinkPrompt = true
+            },
             pasteFiles: { urls, anchor in insertFiles(urls, after: anchor) },
             pasteImage: { data, anchor in insertBlock(AttachmentSync.makeImageBlock(data: data, in: doc), after: anchor) },
-            pasteURL: { url, anchor in insertBlock(webBlock(url), after: anchor); return true }
+            pasteURL: { url, anchor in
+                insertBlock(webBlock(url), after: anchor)
+                return true
+            }
         )
     }
 
@@ -531,7 +570,9 @@ struct NoteEditorView: View {
         case "code": insertCode(language: "python")
         case "file": pickFiles()
         case "numbers": createNumbersTable()
-        case "web": promptText = ""; showWebPrompt = true
+        case "web":
+            promptText = ""
+            showWebPrompt = true
         case "playground": openPlayground()
         case "drawing": insertBlock(BlockModel(kind: .drawing))
         case "runall": RunManager.shared.runAll(doc: doc, theme: theme)
@@ -542,7 +583,9 @@ struct NoteEditorView: View {
         case "audio": insertBlock(AudioBlockView.recordingBlock())
         case "exportpdf": NotePDFExporter.exportWithPanel(doc)
         case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
-        case "link": promptText = ""; showLinkPrompt = true
+        case "link":
+            promptText = ""
+            showLinkPrompt = true
         default: break
         }
     }
@@ -602,7 +645,10 @@ struct NoteEditorView: View {
         var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return }
         if !s.contains("://") { s = (Self.isLocalAddress(s) ? "http://" : "https://") + s }
-        guard let url = URL(string: s), url.host() != nil else { alertMessage = "„\(text)“ ist kein gültiger Link."; return }
+        guard let url = URL(string: s), url.host() != nil else {
+            alertMessage = "„\(text)“ ist kein gültiger Link."
+            return
+        }
         insertBlock(webBlock(url))
     }
 
@@ -632,7 +678,10 @@ struct NoteEditorView: View {
     }
 
     private func insertImageFile(_ url: URL) {
-        guard let data = try? Data(contentsOf: url) else { alertMessage = "Das Bild konnte nicht gelesen werden."; return }
+        guard let data = try? Data(contentsOf: url) else {
+            alertMessage = "Das Bild konnte nicht gelesen werden."
+            return
+        }
         let name = "Playground \(Date().formatted(date: .numeric, time: .shortened)).\(url.pathExtension.isEmpty ? "png" : url.pathExtension)"
         insertBlock(AttachmentSync.makeImageBlock(data: data, filename: name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "."), in: doc))
     }
@@ -696,11 +745,14 @@ struct NoteEditorView: View {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
             insertFiles(urls, after: formatting.activeBlockID ?? doc.blocks.last?.id)
         } else if let data = FolioTextView.imageData(in: pb) {
-            insertBlock(AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc),
-                        after: formatting.activeBlockID ?? doc.blocks.last?.id)
+            insertBlock(
+                AttachmentSync.makeImageBlock(data: FolioTextView.normalizedImage(data), in: doc),
+                after: formatting.activeBlockID ?? doc.blocks.last?.id)
         } else if let text = pb.string(forType: .string), !text.isEmpty, let last = doc.blocks.last(where: { $0.kind == .text }) {
             formatting.focus(blockID: last.id)
-            DispatchQueue.main.async { formatting.textView(for: last.id)?.insertText(text, replacementRange: formatting.textView(for: last.id)?.selectedRange() ?? NSRange(location: 0, length: 0)) }
+            DispatchQueue.main.async {
+                formatting.textView(for: last.id)?.insertText(text, replacementRange: formatting.textView(for: last.id)?.selectedRange() ?? NSRange(location: 0, length: 0))
+            }
         }
     }
 
@@ -719,7 +771,7 @@ struct NoteEditorView: View {
 enum TagRowFit {
     static func count(_ tags: [String], width: CGFloat, rows: Int = 2) -> Int {
         let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        let reserve: CGFloat = 130   // „+N weitere“ and the suggestion button at the end
+        let reserve: CGFloat = 130  // „+N weitere“ and the suggestion button at the end
         var row = 1, x: CGFloat = 0
         for (i, tag) in tags.enumerated() {
             let w = ("#" + tag as NSString).size(withAttributes: [.font: font]).width + 18 + 6

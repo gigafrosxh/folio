@@ -9,8 +9,10 @@ final class KernelMoreTests: XCTestCase {
         return try Kernel(language: language)
     }
 
-    private func check(_ language: KernelLanguage, definition: String, read: String,
-                       error: String, message: String, sleep: String) async throws {
+    private func check(
+        _ language: KernelLanguage, definition: String, read: String,
+        error: String, message: String, sleep: String
+    ) async throws {
         let k = try kernel(language)
         defer { k.shutdown() }
         let defined = await k.execute(definition)
@@ -32,25 +34,29 @@ final class KernelMoreTests: XCTestCase {
     }
 
     func testJavaScript() async throws {
-        try await check(KernelLanguages.javascript, definition: "const a = 10", read: "console.log(a)",
-                        error: "throw new Error('Testfehler')", message: "Testfehler",
-                        sleep: "new Promise(resolve => setTimeout(resolve, 5000))")
+        try await check(
+            KernelLanguages.javascript, definition: "const a = 10", read: "console.log(a)",
+            error: "throw new Error('Testfehler')", message: "Testfehler",
+            sleep: "new Promise(resolve => setTimeout(resolve, 5000))")
     }
 
     func testRuby() async throws {
-        try await check(KernelLanguages.ruby, definition: "a = 10", read: "puts a",
-                        error: "raise 'Testfehler'", message: "RuntimeError: Testfehler", sleep: "sleep 5")
+        try await check(
+            KernelLanguages.ruby, definition: "a = 10", read: "puts a",
+            error: "raise 'Testfehler'", message: "RuntimeError: Testfehler", sleep: "sleep 5")
     }
 
     func testBash() async throws {
-        try await check(KernelLanguages.bash, definition: "a=10", read: "echo $a",
-                        error: "echo Testfehler >&2; false", message: "Testfehler", sleep: "sleep 5")
+        try await check(
+            KernelLanguages.bash, definition: "a=10", read: "echo $a",
+            error: "echo Testfehler >&2; false", message: "Testfehler", sleep: "sleep 5")
         try await checkShellState(KernelLanguages.bash)
     }
 
     func testZsh() async throws {
-        try await check(KernelLanguages.zsh, definition: "a=10", read: "echo $a",
-                        error: "echo Testfehler >&2; false", message: "Testfehler", sleep: "sleep 5")
+        try await check(
+            KernelLanguages.zsh, definition: "a=10", read: "echo $a",
+            error: "echo Testfehler >&2; false", message: "Testfehler", sleep: "sleep 5")
         try await checkShellState(KernelLanguages.zsh)
     }
 

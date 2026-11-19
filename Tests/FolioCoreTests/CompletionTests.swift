@@ -26,7 +26,7 @@ final class LSPCompleterTests: XCTestCase {
         guard LSPCompleter.shared.supports(lang) else { throw XCTSkip("kein Sprachserver für \(lang)") }
         let ctx = CompletionContext(code: code, offset: (code as NSString).length, language: lang)
         var labels: [String] = []
-        for attempt in 0..<6 where labels.isEmpty {   // the server may still be parsing headers
+        for attempt in 0..<6 where labels.isEmpty {  // the server may still be parsing headers
             if attempt > 0 { try await Task.sleep(for: .seconds(1)) }
             labels = await LSPCompleter.shared.complete(ctx).map(\.label)
         }

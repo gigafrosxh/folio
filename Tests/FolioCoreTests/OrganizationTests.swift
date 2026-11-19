@@ -13,7 +13,7 @@ final class OrganizationTests: XCTestCase {
         var a = NoteMetadata(title: "A"), b = NoteMetadata(title: "B"), c = NoteMetadata(title: "C")
         a.links = [c.id]
         b.links = [c.id, a.id]
-        c.links = [c.id]   // a link to itself is not a backlink
+        c.links = [c.id]  // a link to itself is not a backlink
         XCTAssertEqual(NoteLink.backlinks(to: c.id, in: [a, b, c]).map(\.title), ["A", "B"])
         XCTAssertEqual(NoteLink.backlinks(to: a.id, in: [a, b, c]).map(\.title), ["B"])
     }
@@ -60,8 +60,9 @@ final class OrganizationTests: XCTestCase {
 
     func testSearchMatching() {
         let now = Date()
-        var m = NoteMetadata(title: "Pasta Rezept", tags: ["rezept", "projekt/alpha"], modified: now.addingTimeInterval(-3 * 86_400),
-                             searchText: "Tomaten und Basilikum")
+        var m = NoteMetadata(
+            title: "Pasta Rezept", tags: ["rezept", "projekt/alpha"], modified: now.addingTimeInterval(-3 * 86_400),
+            searchText: "Tomaten und Basilikum")
         m.kinds = ["text", "code", "image"]
         XCTAssertTrue(SearchFilter(text: "basilikum pasta").matches(m, folderPath: "Küche", now: now))
         XCTAssertFalse(SearchFilter(text: "basilikum oregano").matches(m, folderPath: "Küche", now: now))
@@ -83,8 +84,9 @@ final class OrganizationTests: XCTestCase {
 
     func testTagRenameMergeRemove() {
         let text = "Heute #Projekt und #projekt/alpha, nicht #projektplan oder C#projekt. #andere"
-        XCTAssertEqual(TagEdit.apply(text, tag: "projekt", to: "arbeit"),
-                       "Heute #arbeit und #arbeit/alpha, nicht #projektplan oder C#projekt. #andere")
+        XCTAssertEqual(
+            TagEdit.apply(text, tag: "projekt", to: "arbeit"),
+            "Heute #arbeit und #arbeit/alpha, nicht #projektplan oder C#projekt. #andere")
         XCTAssertEqual(TagEdit.apply("a #alt b #alt", tag: "alt", to: nil), "a b ")
         XCTAssertEqual(TagEdit.apply("x #a", tag: "b", to: "c"), "x #a")
         XCTAssertEqual(TagEdit.normalized("#Neue Idee"), "neue-idee")
@@ -94,7 +96,11 @@ final class OrganizationTests: XCTestCase {
 
     func testTemplatePlaceholders() {
         var c = DateComponents()
-        c.year = 2026; c.month = 10; c.day = 20; c.hour = 9; c.minute = 5
+        c.year = 2026
+        c.month = 10
+        c.day = 20
+        c.hour = 9
+        c.minute = 5
         let date = Calendar(identifier: .gregorian).date(from: c)!
         let out = TemplateText.fill("Meeting {{Datum}} um {{uhrzeit}} ({{wochentag}}, KW {{kw}}) {{unbekannt}}", now: date)
         XCTAssertEqual(out, "Meeting 20.10.2026 um 09:05 (Dienstag, KW 43) {{unbekannt}}")
@@ -102,33 +108,35 @@ final class OrganizationTests: XCTestCase {
 
     func testMarkdownPieces() {
         let md = """
-        # Titel
+            # Titel
 
-        Text mit **fett**.
+            Text mit **fett**.
 
-        ```swift
-        let x = 1
-        ```
+            ```swift
+            let x = 1
+            ```
 
-        ```mermaid
-        graph TD; A-->B
-        ```
+            ```mermaid
+            graph TD; A-->B
+            ```
 
-        $$
-        e^{i\\pi}+1=0
-        $$
+            $$
+            e^{i\\pi}+1=0
+            $$
 
-        ![Bild](bilder/a.png)
-        Ende
-        """
-        XCTAssertEqual(MarkdownStructure.pieces(md), [
-            .text("# Titel\n\nText mit **fett**."),
-            .code(language: "swift", code: "let x = 1"),
-            .mermaid("graph TD; A-->B"),
-            .math("e^{i\\pi}+1=0"),
-            .image(alt: "Bild", path: "bilder/a.png"),
-            .text("Ende"),
-        ])
+            ![Bild](bilder/a.png)
+            Ende
+            """
+        XCTAssertEqual(
+            MarkdownStructure.pieces(md),
+            [
+                .text("# Titel\n\nText mit **fett**."),
+                .code(language: "swift", code: "let x = 1"),
+                .mermaid("graph TD; A-->B"),
+                .math("e^{i\\pi}+1=0"),
+                .image(alt: "Bild", path: "bilder/a.png"),
+                .text("Ende")
+            ])
         XCTAssertEqual(MarkdownStructure.pieces("$$a^2$$"), [.math("a^2")])
         XCTAssertEqual(MarkdownStructure.title(of: "\n## Hallo Welt\nText", fallback: "x"), "Hallo Welt")
         XCTAssertEqual(MarkdownStructure.title(of: "Kein Titel", fallback: "datei"), "datei")

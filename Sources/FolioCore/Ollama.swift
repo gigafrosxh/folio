@@ -14,11 +14,14 @@ public struct OllamaClient: Sendable {
 
         public var errorDescription: String? {
             switch self {
-            case .notLocal(let url): return "„\(url)“ ist kein Server auf diesem Mac. Folio spricht nur mit einem lokalen Ollama (localhost), damit Notizen den Mac nicht verlassen."
+            case .notLocal(let url):
+                return "„\(url)“ ist kein Server auf diesem Mac. Folio spricht nur mit einem lokalen Ollama (localhost), damit Notizen den Mac nicht verlassen."
             case .notRunning(let url): return "Ollama antwortet nicht unter \(url). Starte die Ollama-App oder im Terminal `ollama serve`."
             case .noModel: return "In Ollama ist noch kein Modell ausgewählt. Wähle eines in den Einstellungen (Editor › KI) oder lade eines mit `ollama pull llama3.2`."
             case .modelMissing(let name): return "Das Modell „\(name)“ ist in Ollama nicht installiert. Lade es mit `ollama pull \(name)` oder wähle ein anderes."
-            case .notChat(let name): return "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Editor › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
+            case .notChat(let name):
+                return
+                    "„\(name)“ kann keinen Text schreiben (z. B. ein Embedding-Modell). Wähle in den Einstellungen (Editor › KI) ein anderes Modell, etwa `gemma3` oder `llama3.2`."
             case .incomplete: return "Ollama hat die Antwort abgebrochen, bevor sie fertig war. Versuch es noch einmal."
             case .server(let message): return "Ollama meldet einen Fehler: \(message)"
             }
@@ -33,9 +36,10 @@ public struct OllamaClient: Sendable {
     public static func localURL(_ text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed.contains("://") ? trimmed : "http://" + trimmed),
-              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-              let host = url.host()?.lowercased(),
-              ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host) || host.hasSuffix(".localhost") else { return nil }
+            ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+            let host = url.host()?.lowercased(),
+            ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host) || host.hasSuffix(".localhost")
+        else { return nil }
         return url
     }
 
@@ -53,7 +57,13 @@ public struct OllamaClient: Sendable {
     }
 
     static func chatModels(in data: Data) throws -> [String] {
-        struct Tags: Decodable { struct Model: Decodable { var name: String; var capabilities: [String]? }; var models: [Model] }
+        struct Tags: Decodable {
+            struct Model: Decodable {
+                var name: String
+                var capabilities: [String]?
+            }
+            var models: [Model]
+        }
         guard let tags = try? JSONDecoder().decode(Tags.self, from: data) else { throw Failure.server("unerwartete Antwort auf /api/tags") }
         return tags.models.filter { $0.capabilities.map { $0.contains("completion") } ?? true }.map(\.name).sorted()
     }
@@ -61,7 +71,10 @@ public struct OllamaClient: Sendable {
     public struct Message: Codable, Equatable, Sendable {
         public var role: String
         public var content: String
-        public init(role: String, content: String) { self.role = role; self.content = content }
+        public init(role: String, content: String) {
+            self.role = role
+            self.content = content
+        }
     }
 
     /// The answer, streamed: `onPart` gets the whole text so far after each piece.
@@ -71,7 +84,11 @@ public struct OllamaClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 300
-        struct Body: Encodable { var model: String; var messages: [Message]; var stream: Bool }
+        struct Body: Encodable {
+            var model: String
+            var messages: [Message]
+            var stream: Bool
+        }
         request.httpBody = try JSONEncoder().encode(Body(model: model, messages: [Message(role: "system", content: system), Message(role: "user", content: prompt)], stream: true))
         let (bytes, response) = try await call { try await session.bytes(for: request) }
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
@@ -87,7 +104,10 @@ public struct OllamaClient: Sendable {
             if let error = piece.error { throw Failure.server(error) }
             text += piece.content
             onPart(text)
-            if piece.done { finished = true; break }
+            if piece.done {
+                finished = true
+                break
+            }
         }
         // A stream that ends without `done` was cut off (e.g. Ollama crashed): never a finished answer (#233).
         guard finished else { throw Failure.incomplete }
@@ -96,7 +116,11 @@ public struct OllamaClient: Sendable {
 
     /// One line of Ollama's streamed answer (NDJSON).
     public static func piece(_ line: String) -> (content: String, done: Bool, error: String?)? {
-        struct Line: Decodable { var message: Message?; var done: Bool?; var error: String? }
+        struct Line: Decodable {
+            var message: Message?
+            var done: Bool?
+            var error: String?
+        }
         guard let data = line.data(using: .utf8), let l = try? JSONDecoder().decode(Line.self, from: data) else { return nil }
         return (l.message?.content ?? "", l.done ?? false, l.error)
     }

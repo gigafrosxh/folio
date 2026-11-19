@@ -11,7 +11,7 @@ import FolioCore
 enum NotePDFExporter {
     struct Options {
         var includeOutputs = true
-        var paper = NSSize(width: 595.28, height: 841.89)   // A4 in points
+        var paper = NSSize(width: 595.28, height: 841.89)  // A4 in points
         var margin: CGFloat = 50
     }
 
@@ -175,8 +175,9 @@ enum NotePDFExporter {
     /// Quick Look preview of a document (e.g. the first sheet of a Numbers table).
     private static func thumbnail(_ att: FolioArchive.Attachment, noteID: UUID, width: CGFloat) async -> NSImage? {
         guard let url = AttachmentSync.materialize(att, noteID: noteID) else { return nil }
-        let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: width, height: width * 1.3),
-                                                   scale: 2, representationTypes: .thumbnail)
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: width, height: width * 1.3),
+            scale: 2, representationTypes: .thumbnail)
         return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
     }
 }
@@ -267,7 +268,8 @@ extension NotePDFExporter {
             appendLabel("Eingebettet: \(title)", icon: "↳")
             let store = NoteStore.shared
             guard let id = store.linkIndex.resolve(title), id != doc.id,
-                  let ref = store.notes.first(where: { $0.id == id }), let file = try? NoteFile.read(from: ref.url) else { return }
+                let ref = store.notes.first(where: { $0.id == id }), let file = try? NoteFile.read(from: ref.url)
+            else { return }
             for text in file.body.blocks.filter({ $0.kind == .text }).map({ RichTextCodec.attributedString(from: $0.rtf) }) where text.length > 0 {
                 newline()
                 out.append(printable(text))
@@ -279,30 +281,34 @@ extension NotePDFExporter {
             appendLabel(spec.name, icon: "⌘")
             let code = block.storage.string
             let background = codeTheme.backgroundColor.blended(withFraction: 0.5, of: lightBox) ?? .white
-            appendBox(code, font: codeFont, background: background, foreground: codeTheme.foregroundColor,
-                      tokens: SyntaxHighlighter.tokens(in: code, language: spec), colors: codeTheme)
+            appendBox(
+                code, font: codeFont, background: background, foreground: codeTheme.foregroundColor,
+                tokens: SyntaxHighlighter.tokens(in: code, language: spec), colors: codeTheme)
             appendOutput(of: block)
         }
 
         private func appendOutput(of block: BlockModel) {
             guard options.includeOutputs, let output = block.output?.trimmingCharacters(in: .newlines), !output.isEmpty else { return }
             appendLabel(block.outputIsError ? "Fehler" : "Ausgabe", icon: "▸")
-            appendBox(String(output.prefix(20_000)), font: NSFont.monospacedSystemFont(ofSize: 9, weight: .regular),
-                      background: NSColor(white: 0.95, alpha: 1),
-                      foreground: block.outputIsError ? .systemRed : NSColor(white: 0.25, alpha: 1))
+            appendBox(
+                String(output.prefix(20_000)), font: NSFont.monospacedSystemFont(ofSize: 9, weight: .regular),
+                background: NSColor(white: 0.95, alpha: 1),
+                foreground: block.outputIsError ? .systemRed : NSColor(white: 0.25, alpha: 1))
         }
 
         private func appendDatabase(_ block: BlockModel) {
             appendLabel("SQL" + (block.connection.map { " · \($0.name)" } ?? ""), icon: "⛁")
             let code = block.storage.string
-            appendBox(code, font: codeFont, background: lightBox, foreground: codeTheme.foregroundColor,
-                      tokens: SyntaxHighlighter.tokens(in: code, language: Languages.spec(for: "sql")), colors: codeTheme)
+            appendBox(
+                code, font: codeFont, background: lightBox, foreground: codeTheme.foregroundColor,
+                tokens: SyntaxHighlighter.tokens(in: code, language: Languages.spec(for: "sql")), colors: codeTheme)
         }
 
         private func appendPicture(_ block: BlockModel) {
             // Printed and exported as shown: with crop and rotation (#45).
             guard let data = attachment(of: block)?.data,
-                  let image = EditedImage.image(data, edit: block.imageEdit, key: block.id.uuidString) else { return }
+                let image = EditedImage.image(data, edit: block.imageEdit, key: block.id.uuidString)
+            else { return }
             appendImage(image, fraction: CGFloat(block.width))
             appendCaption(block.caption)
         }
@@ -344,7 +350,8 @@ extension NotePDFExporter {
             guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             let options = RenderScript.Options(dark: false, fontSize: kind == .math ? 16 : 13, view: block.mode.isEmpty ? "er" : block.mode)
             if let rendered = try? await OffscreenRenderer.render(kind, source: source, width: width, options: options),
-               let image = OffscreenRenderer.image(from: rendered) {
+                let image = OffscreenRenderer.image(from: rendered)
+            {
                 appendImage(image)
             } else {
                 appendBox(source, font: codeFont, background: lightBox, foreground: .black)
@@ -379,15 +386,23 @@ extension NotePDFExporter {
             guard !text.isEmpty else { return }
             let style = paragraph(spacingBefore: 0, spacingAfter: 10)
             style.alignment = .center
-            out.append(NSAttributedString(string: text + "\n", attributes: [
-                .font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style]))
+            out.append(
+                NSAttributedString(
+                    string: text + "\n",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style
+                    ]))
         }
 
         private func appendLabel(_ text: String, icon: String) {
             newline()
-            out.append(NSAttributedString(string: "\(icon)  \(text)\n", attributes: [
-                .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
-                .paragraphStyle: paragraph(spacingBefore: 8, spacingAfter: 3)]))
+            out.append(
+                NSAttributedString(
+                    string: "\(icon)  \(text)\n",
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
+                        .paragraphStyle: paragraph(spacingBefore: 8, spacingAfter: 3)
+                    ]))
         }
 
         private func appendBox(_ text: String, font: NSFont, background: NSColor, foreground: NSColor, tokens: [Token] = [], colors: CodeTheme? = nil) {

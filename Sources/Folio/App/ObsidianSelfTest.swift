@@ -17,7 +17,7 @@ enum ObsidianSelfTest {
         try? "{}".write(to: vault.appendingPathComponent(".obsidian/app.json"), atomically: true, encoding: .utf8)
         try? "---\ntags: [obsidian]\nstatus: offen\n---\nVerweis auf [[Plan|den Plan]].\n![[Logo.png]]\n![[weg.pdf]]"
             .write(to: vault.appendingPathComponent("Start.md"), atomically: true, encoding: .utf8)
-        try? "# Plan\nInhalt des Plans" .write(to: vault.appendingPathComponent("Projekte/Plan.md"), atomically: true, encoding: .utf8)
+        try? "# Plan\nInhalt des Plans".write(to: vault.appendingPathComponent("Projekte/Plan.md"), atomically: true, encoding: .utf8)
         let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
         try? png.write(to: vault.appendingPathComponent("Projekte/Anhänge/Logo.png"))
         let before = store.notes.count

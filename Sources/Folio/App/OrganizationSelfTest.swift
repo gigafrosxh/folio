@@ -32,7 +32,8 @@ enum OrganizationSelfTest {
         await organizationChecks(store: store, a: a, b: b)
         await AIAssistSelfTest.run(store: store)
         await ObsidianSelfTest.run(store: NoteStore.shared)
-        print("ORG done"); fflush(stdout)
+        print("ORG done")
+        fflush(stdout)
     }
 
     /// Order, favorites, smart views, note information and printing (1.4.0: #13, #14, #15, #19, #169).
@@ -54,8 +55,9 @@ enum OrganizationSelfTest {
         store.sidebarSelection = .all
         store.searchText = "Quelle typ:code"
         let view = store.saveSearchAsSmartView(named: "Code-Quellen")
-        check(view != nil && store.sidebarSelection == view.map { .smartView($0.id) } && store.filteredNotes.map(\.id) == [b.id],
-              "Intelligente Ansicht zeigt die passenden Notizen")
+        check(
+            view != nil && store.sidebarSelection == view.map { .smartView($0.id) } && store.filteredNotes.map(\.id) == [b.id],
+            "Intelligente Ansicht zeigt die passenden Notizen")
         if let view { store.deleteSmartView(view.id) }
         check(store.sidebarSelection == .all && store.organization.smartViews.isEmpty, "Intelligente Ansicht gelöscht")
 
@@ -67,7 +69,9 @@ enum OrganizationSelfTest {
             let data = try? await NotePDFExporter.pdfData(doc)
             let op = data.flatMap { try? NotePrinter.operation(for: $0, title: doc.meta.title) }
             check(op?.showsPrintPanel == true, "Druckauftrag mit Systemdialog vorbereitet")
-        } else { check(false, "Notiz für Statistik und Druck geöffnet") }
+        } else {
+            check(false, "Notiz für Statistik und Druck geöffnet")
+        }
     }
 
     private static func templateChecks(store: NoteStore) async {
@@ -80,7 +84,9 @@ enum OrganizationSelfTest {
             let today = TemplateText.values()["datum"] ?? "?"
             check(text.contains("Meeting \(today)") && !text.contains("{{"), "Notiz aus Vorlage mit ausgefülltem Datum")
             check(store.notes.contains { $0.id == ref.id } && !store.templates.contains { $0.id == ref.id }, "Vorlagennotiz liegt in der Bibliothek, nicht bei den Vorlagen")
-        } else { check(false, "Meeting-Vorlage") }
+        } else {
+            check(false, "Meeting-Vorlage")
+        }
     }
 
     private static func linkChecks(store: NoteStore, body: [NSAttributedString.Key: Any]) async -> (NoteRef, NoteRef)? {
@@ -150,20 +156,20 @@ enum OrganizationSelfTest {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-md-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let md = """
-        # Import-Test
-        Text mit **fett**, *kursiv* und [Link](https://example.com).
-        - [ ] offen
-        - [x] erledigt
-        1. eins
+            # Import-Test
+            Text mit **fett**, *kursiv* und [Link](https://example.com).
+            - [ ] offen
+            - [x] erledigt
+            1. eins
 
-        ```python
-        print("hi")
-        ```
+            ```python
+            print("hi")
+            ```
 
-        ```mermaid
-        graph TD; A-->B
-        ```
-        """
+            ```mermaid
+            graph TD; A-->B
+            ```
+            """
         let mdURL = dir.appendingPathComponent("Import.md")
         try? md.write(to: mdURL, atomically: true, encoding: .utf8)
         MarkdownTransfer.importFiles([mdURL])
@@ -175,10 +181,13 @@ enum OrganizationSelfTest {
             let out = dir.appendingPathComponent("Export.md")
             try? MarkdownTransfer.export(file, to: out)
             let exported = (try? String(contentsOf: out, encoding: .utf8)) ?? ""
-            check(exported.contains("# Import-Test") && exported.contains("**fett**") && exported.contains("- [ ] offen")
-                  && exported.contains("```python") && exported.contains("```mermaid") && exported.contains("[Link](https://example.com)"),
-                  "Markdown exportiert")
+            check(
+                exported.contains("# Import-Test") && exported.contains("**fett**") && exported.contains("- [ ] offen")
+                    && exported.contains("```python") && exported.contains("```mermaid") && exported.contains("[Link](https://example.com)"),
+                "Markdown exportiert")
             if !exported.contains("**fett**") { print(exported) }
-        } else { check(false, "Markdown-Import") }
+        } else {
+            check(false, "Markdown-Import")
+        }
     }
 }

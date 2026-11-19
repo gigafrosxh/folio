@@ -24,7 +24,9 @@ extension NoteStore {
         for ref in affected {
             if let doc = documents[ref.id], doc.isDirty {
                 // Its own changes could not be saved: changing the file and reloading it would lose them (#184).
-                tagEdit?.failures.append("\(ref.meta.title.isEmpty ? ref.url.lastPathComponent : ref.meta.title): Ungesicherte Änderungen konnten nicht gesichert werden; der Tag wurde hier nicht geändert.")
+                tagEdit?.failures.append(
+                    "\(ref.meta.title.isEmpty ? ref.url.lastPathComponent : ref.meta.title): Ungesicherte Änderungen konnten nicht gesichert werden; der Tag wurde hier nicht geändert."
+                )
             } else if applyTagEdit(to: ref, tag: tag, newTag: newTag), documents[ref.id] != nil {
                 reopen.append(ref.id)
             }

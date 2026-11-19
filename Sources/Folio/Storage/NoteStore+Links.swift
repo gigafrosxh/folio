@@ -10,11 +10,13 @@ extension NoteStore {
         var folderNames: [URL: String] = [:]
         for ref in notes {
             seen.insert(ref.id)
-            let folder = folderNames[ref.folderURL] ?? {
-                let name = relativeFolderName(ref.folderURL)
-                folderNames[ref.folderURL] = name
-                return name
-            }()
+            let folder =
+                folderNames[ref.folderURL]
+                ?? {
+                    let name = relativeFolderName(ref.folderURL)
+                    folderNames[ref.folderURL] = name
+                    return name
+                }()
             let stamp = "\(ref.meta.modified.timeIntervalSince1970)|\(ref.meta.title)|\(folder)|\(ref.meta.links.count)|\(ref.meta.tags.joined(separator: ","))"
             if linkIndexStamps[ref.id] != stamp {
                 linkIndex.update(ref.meta, folder: folder)
@@ -29,7 +31,10 @@ extension NoteStore {
 
     /// `[[Titel]]`: opens the note with that title, or creates it next to the current note (#115).
     func openOrCreate(title: String) {
-        if let id = linkIndex.resolve(title) { open(noteID: id); return }
+        if let id = linkIndex.resolve(title) {
+            open(noteID: id)
+            return
+        }
         let folder = currentDocument?.url.deletingLastPathComponent()
         guard let ref = createNote(titled: title, in: folder) else { return }
         open(noteID: ref.id)
@@ -60,7 +65,8 @@ extension NoteStore {
     @discardableResult
     func linkMention(in source: UUID, to target: UUID) -> Bool {
         guard let title = notes.first(where: { $0.id == target })?.meta.title,
-              let ref = notes.first(where: { $0.id == source }) else { return false }
+            let ref = notes.first(where: { $0.id == source })
+        else { return false }
         if documents[source] == nil { open(ref.url, id: source) }
         guard let doc = document(for: source) else { return false }
         for block in doc.blocks where block.kind == .text {
@@ -99,12 +105,16 @@ extension NoteStore {
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         if let template = templates.first(where: { $0.id.uuidString == settings.dailyTemplate }),
-           let ref = createNote(from: template, in: folder, title: title, date: date) {
+            let ref = createNote(from: template, in: folder, title: title, date: date)
+        {
             organization.dailyNotes[day] = ref.id
             return ref
         }
         let ref = createNote(titled: title, in: folder)
-        if let ref { organization.dailyNotes[day] = ref.id; open(noteID: ref.id) }
+        if let ref {
+            organization.dailyNotes[day] = ref.id
+            open(noteID: ref.id)
+        }
         return ref
     }
 }

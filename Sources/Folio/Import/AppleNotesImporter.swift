@@ -45,8 +45,7 @@ enum AppleNotesImporter {
             let output = Pipe(), errors = Pipe()
             process.standardOutput = output
             process.standardError = errors
-            do { try process.run() }
-            catch { throw ImportError.execution(error.localizedDescription) }
+            do { try process.run() } catch { throw ImportError.execution(error.localizedDescription) }
 
             let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
             DispatchQueue.global().asyncAfter(deadline: .now() + 300, execute: timeout)
@@ -73,8 +72,7 @@ enum AppleNotesImporter {
                 if let date = formatter.date(from: value) { return date }
                 throw ImportError.invalidData
             }
-            do { return try decoder.decode(Report.self, from: data) }
-            catch { throw ImportError.invalidData }
+            do { return try decoder.decode(Report.self, from: data) } catch { throw ImportError.invalidData }
         }.value
     }
 
@@ -92,12 +90,15 @@ enum AppleNotesImporter {
         func appendText(_ html: String) {
             guard !html.isEmpty else { return }
             let styled = "<style>body{font-family:-apple-system;font-size:15px}</style>" + html
-            let text = (try? NSMutableAttributedString(
-                data: Data(styled.utf8),
-                options: [.documentType: NSAttributedString.DocumentType.html,
-                          .characterEncoding: String.Encoding.utf8.rawValue],
-                documentAttributes: nil
-            )) ?? NSMutableAttributedString(string: html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
+            let text =
+                (try? NSMutableAttributedString(
+                    data: Data(styled.utf8),
+                    options: [
+                        .documentType: NSAttributedString.DocumentType.html,
+                        .characterEncoding: String.Encoding.utf8.rawValue
+                    ],
+                    documentAttributes: nil
+                )) ?? NSMutableAttributedString(string: html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
             RichTextCodec.normalizeImported(text, bodyFont: ThemeManager.shared.bodyFont())
             let string = text.string as NSString
             let content = string.rangeOfCharacter(from: CharacterSet.newlines.inverted)
@@ -139,63 +140,65 @@ enum AppleNotesImporter {
         if lines.first?.trimmingCharacters(in: .whitespaces) == raw.name.trimmingCharacters(in: .whitespacesAndNewlines) {
             lines.removeFirst()
         }
-        let meta = NoteMetadata(title: raw.name, preview: String(lines.joined(separator: "\n").prefix(200)),
-                                tags: TagParser.tags(in: plainText), created: raw.created, modified: raw.modified,
-                                searchText: plainText)
-        return ImportedNote(folderPath: ["Apple Notizen"] + (multipleAccounts ? [raw.account] : []) + raw.folderPath,
-                            file: NoteFile(meta: meta, body: NoteBody(blocks: blocks), attachments: attachments))
+        let meta = NoteMetadata(
+            title: raw.name, preview: String(lines.joined(separator: "\n").prefix(200)),
+            tags: TagParser.tags(in: plainText), created: raw.created, modified: raw.modified,
+            searchText: plainText)
+        return ImportedNote(
+            folderPath: ["Apple Notizen"] + (multipleAccounts ? [raw.account] : []) + raw.folderPath,
+            file: NoteFile(meta: meta, body: NoteBody(blocks: blocks), attachments: attachments))
     }
 
     /// Walks the flat folder list of each account. Nested folders reached through `folder.folders()` can
     /// fail to resolve in JXA (error -1728), so the folder path is rebuilt from each folder's container
     /// chain instead, and any folder or note that still fails is skipped and reported, not fatal.
     private static let script = #"""
-    const app = Application('Notes');
-    const result = [];
-    const skipped = [];
-    const deletedNames = ['Recently Deleted', 'Zuletzt gelöscht'];
-    function attempt(f, fallback) { try { return f(); } catch (e) { return fallback; } }
-    function denied(e) { return String(e).includes('-1743') || /not authori[sz]ed/i.test(String(e)); }
-    app.accounts().forEach(account => {
-        const accountID = account.id();
-        const accountName = account.name();
-        account.folders().forEach(folder => {
-            let name = '?';
-            try {
-                name = folder.name();
-                if (deletedNames.includes(name)) return;
-                const path = [name];
-                let parent = attempt(() => folder.container(), null);
-                let depth = 0;
-                while (parent && depth < 20 && attempt(() => parent.id(), accountID) !== accountID) {
-                    const parentName = attempt(() => parent.name(), null);
-                    if (parentName === null) break;
-                    if (deletedNames.includes(parentName)) return;
-                    path.unshift(parentName);
-                    parent = attempt(() => parent.container(), null);
-                    depth++;
+        const app = Application('Notes');
+        const result = [];
+        const skipped = [];
+        const deletedNames = ['Recently Deleted', 'Zuletzt gelöscht'];
+        function attempt(f, fallback) { try { return f(); } catch (e) { return fallback; } }
+        function denied(e) { return String(e).includes('-1743') || /not authori[sz]ed/i.test(String(e)); }
+        app.accounts().forEach(account => {
+            const accountID = account.id();
+            const accountName = account.name();
+            account.folders().forEach(folder => {
+                let name = '?';
+                try {
+                    name = folder.name();
+                    if (deletedNames.includes(name)) return;
+                    const path = [name];
+                    let parent = attempt(() => folder.container(), null);
+                    let depth = 0;
+                    while (parent && depth < 20 && attempt(() => parent.id(), accountID) !== accountID) {
+                        const parentName = attempt(() => parent.name(), null);
+                        if (parentName === null) break;
+                        if (deletedNames.includes(parentName)) return;
+                        path.unshift(parentName);
+                        parent = attempt(() => parent.container(), null);
+                        depth++;
+                    }
+                    const ids = folder.notes.id();
+                    if (ids.length === 0) return;
+                    const names = folder.notes.name();
+                    const created = folder.notes.creationDate();
+                    const modified = folder.notes.modificationDate();
+                    const locked = attempt(() => folder.notes.passwordProtected(), ids.map(() => false));
+                    let bodies = attempt(() => folder.notes.body(), null);
+                    for (let i = 0; i < ids.length; i++) {
+                        if (locked[i]) { skipped.push(path.join('/') + '/' + names[i] + ' (gesperrt)'); continue; }
+                        let body = bodies ? bodies[i] : null;
+                        if (body == null) body = attempt(() => app.notes.byId(ids[i]).body(), null);
+                        if (body == null) { skipped.push(path.join('/') + '/' + names[i]); continue; }
+                        result.push({account: accountName, folderPath: path, name: names[i], body: body,
+                                     created: created[i].toISOString(), modified: modified[i].toISOString(), id: ids[i]});
+                    }
+                } catch (e) {
+                    if (denied(e)) throw e;
+                    skipped.push(name + ' (Ordner)');
                 }
-                const ids = folder.notes.id();
-                if (ids.length === 0) return;
-                const names = folder.notes.name();
-                const created = folder.notes.creationDate();
-                const modified = folder.notes.modificationDate();
-                const locked = attempt(() => folder.notes.passwordProtected(), ids.map(() => false));
-                let bodies = attempt(() => folder.notes.body(), null);
-                for (let i = 0; i < ids.length; i++) {
-                    if (locked[i]) { skipped.push(path.join('/') + '/' + names[i] + ' (gesperrt)'); continue; }
-                    let body = bodies ? bodies[i] : null;
-                    if (body == null) body = attempt(() => app.notes.byId(ids[i]).body(), null);
-                    if (body == null) { skipped.push(path.join('/') + '/' + names[i]); continue; }
-                    result.push({account: accountName, folderPath: path, name: names[i], body: body,
-                                 created: created[i].toISOString(), modified: modified[i].toISOString(), id: ids[i]});
-                }
-            } catch (e) {
-                if (denied(e)) throw e;
-                skipped.push(name + ' (Ordner)');
-            }
+            });
         });
-    });
-    JSON.stringify({notes: result, skipped: skipped});
-    """#
+        JSON.stringify({notes: result, skipped: skipped});
+        """#
 }

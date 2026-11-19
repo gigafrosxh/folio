@@ -67,30 +67,38 @@ struct CodeTheme: Codable, Hashable, Identifiable {
     var foregroundColor: NSColor { NSColor(hex: foreground) ?? .textColor }
 
     static let presets: [CodeTheme] = [
-        CodeTheme(id: "xcode-light", name: "Xcode Hell", isDark: false, background: "#FFFFFF", foreground: "#1F1F24",
-                  keyword: "#9B2393", string: "#C41A16", comment: "#5D6C79", number: "#1C00CF", type: "#0B4F79",
-                  function: "#326D74", attribute: "#815F03", outputBackground: "#F4F4F6"),
-        CodeTheme(id: "xcode-dark", name: "Xcode Dunkel", isDark: true, background: "#1F1F24", foreground: "#FFFFFF",
-                  keyword: "#FF7AB2", string: "#FF8170", comment: "#7F8C98", number: "#D9C97C", type: "#6BDFFF",
-                  function: "#67B7A4", attribute: "#FFA14F", outputBackground: "#18181C"),
-        CodeTheme(id: "github-light", name: "GitHub Hell", isDark: false, background: "#F6F8FA", foreground: "#24292F",
-                  keyword: "#CF222E", string: "#0A3069", comment: "#6E7781", number: "#0550AE", type: "#953800",
-                  function: "#8250DF", attribute: "#116329", outputBackground: "#EEF1F4"),
-        CodeTheme(id: "monokai", name: "Monokai", isDark: true, background: "#272822", foreground: "#F8F8F2",
-                  keyword: "#F92672", string: "#E6DB74", comment: "#75715E", number: "#AE81FF", type: "#66D9EF",
-                  function: "#A6E22E", attribute: "#FD971F", outputBackground: "#1E1F1A"),
-        CodeTheme(id: "dracula", name: "Dracula", isDark: true, background: "#282A36", foreground: "#F8F8F2",
-                  keyword: "#FF79C6", string: "#F1FA8C", comment: "#6272A4", number: "#BD93F9", type: "#8BE9FD",
-                  function: "#50FA7B", attribute: "#FFB86C", outputBackground: "#21222C"),
-        CodeTheme(id: "solarized-light", name: "Solarized Hell", isDark: false, background: "#FDF6E3", foreground: "#586E75",
-                  keyword: "#859900", string: "#2AA198", comment: "#93A1A1", number: "#D33682", type: "#B58900",
-                  function: "#268BD2", attribute: "#CB4B16", outputBackground: "#EEE8D5"),
-        CodeTheme(id: "solarized-dark", name: "Solarized Dunkel", isDark: true, background: "#002B36", foreground: "#93A1A1",
-                  keyword: "#859900", string: "#2AA198", comment: "#586E75", number: "#D33682", type: "#B58900",
-                  function: "#268BD2", attribute: "#CB4B16", outputBackground: "#00222B"),
-        CodeTheme(id: "nord", name: "Nord", isDark: true, background: "#2E3440", foreground: "#D8DEE9",
-                  keyword: "#81A1C1", string: "#A3BE8C", comment: "#616E88", number: "#B48EAD", type: "#8FBCBB",
-                  function: "#88C0D0", attribute: "#D08770", outputBackground: "#272C36"),
+        CodeTheme(
+            id: "xcode-light", name: "Xcode Hell", isDark: false, background: "#FFFFFF", foreground: "#1F1F24",
+            keyword: "#9B2393", string: "#C41A16", comment: "#5D6C79", number: "#1C00CF", type: "#0B4F79",
+            function: "#326D74", attribute: "#815F03", outputBackground: "#F4F4F6"),
+        CodeTheme(
+            id: "xcode-dark", name: "Xcode Dunkel", isDark: true, background: "#1F1F24", foreground: "#FFFFFF",
+            keyword: "#FF7AB2", string: "#FF8170", comment: "#7F8C98", number: "#D9C97C", type: "#6BDFFF",
+            function: "#67B7A4", attribute: "#FFA14F", outputBackground: "#18181C"),
+        CodeTheme(
+            id: "github-light", name: "GitHub Hell", isDark: false, background: "#F6F8FA", foreground: "#24292F",
+            keyword: "#CF222E", string: "#0A3069", comment: "#6E7781", number: "#0550AE", type: "#953800",
+            function: "#8250DF", attribute: "#116329", outputBackground: "#EEF1F4"),
+        CodeTheme(
+            id: "monokai", name: "Monokai", isDark: true, background: "#272822", foreground: "#F8F8F2",
+            keyword: "#F92672", string: "#E6DB74", comment: "#75715E", number: "#AE81FF", type: "#66D9EF",
+            function: "#A6E22E", attribute: "#FD971F", outputBackground: "#1E1F1A"),
+        CodeTheme(
+            id: "dracula", name: "Dracula", isDark: true, background: "#282A36", foreground: "#F8F8F2",
+            keyword: "#FF79C6", string: "#F1FA8C", comment: "#6272A4", number: "#BD93F9", type: "#8BE9FD",
+            function: "#50FA7B", attribute: "#FFB86C", outputBackground: "#21222C"),
+        CodeTheme(
+            id: "solarized-light", name: "Solarized Hell", isDark: false, background: "#FDF6E3", foreground: "#586E75",
+            keyword: "#859900", string: "#2AA198", comment: "#93A1A1", number: "#D33682", type: "#B58900",
+            function: "#268BD2", attribute: "#CB4B16", outputBackground: "#EEE8D5"),
+        CodeTheme(
+            id: "solarized-dark", name: "Solarized Dunkel", isDark: true, background: "#002B36", foreground: "#93A1A1",
+            keyword: "#859900", string: "#2AA198", comment: "#586E75", number: "#D33682", type: "#B58900",
+            function: "#268BD2", attribute: "#CB4B16", outputBackground: "#00222B"),
+        CodeTheme(
+            id: "nord", name: "Nord", isDark: true, background: "#2E3440", foreground: "#D8DEE9",
+            keyword: "#81A1C1", string: "#A3BE8C", comment: "#616E88", number: "#B48EAD", type: "#8FBCBB",
+            function: "#88C0D0", attribute: "#D08770", outputBackground: "#272C36")
     ]
 }
 
@@ -233,7 +241,8 @@ final class ThemeManager: ObservableObject {
 
     private init() {
         if let data = UserDefaults.standard.data(forKey: Self.key),
-           let s = try? JSONDecoder().decode(ThemeSettings.self, from: data) {
+            let s = try? JSONDecoder().decode(ThemeSettings.self, from: data)
+        {
             settings = s
         } else {
             settings = ThemeSettings()

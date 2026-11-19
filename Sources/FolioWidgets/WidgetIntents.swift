@@ -84,11 +84,13 @@ struct ConfiguredProvider<Intent: WidgetConfigurationIntent>: AppIntentTimelineP
     }
 
     private func entry(_ configuration: Intent, date: Date) -> SnapshotEntry {
-        SnapshotEntry(date: date, result: WidgetSnapshotStore.read().map { snapshot in
-            var s = snapshot
-            apply(configuration, &s)
-            return s
-        })
+        SnapshotEntry(
+            date: date,
+            result: WidgetSnapshotStore.read().map { snapshot in
+                var s = snapshot
+                apply(configuration, &s)
+                return s
+            })
     }
 }
 
@@ -97,7 +99,14 @@ extension ConfiguredProvider where Intent == PickNoteIntent {
     static var note: Self {
         Self { intent, s in
             guard let id = intent.note.flatMap({ UUID(uuidString: $0.id) }) else { return }
-            if s.note(id) != nil { s.featuredNoteID = id } else { s.notes = []; s.pinned = []; s.recent = []; s.featuredNoteID = nil }
+            if s.note(id) != nil {
+                s.featuredNoteID = id
+            } else {
+                s.notes = []
+                s.pinned = []
+                s.recent = []
+                s.featuredNoteID = nil
+            }
         }
     }
 }
@@ -106,7 +115,12 @@ extension ConfiguredProvider where Intent == PickChecklistIntent {
     static var checklist: Self {
         Self { intent, s in
             guard let id = intent.checklist.flatMap({ UUID(uuidString: $0.id) }) else { return }
-            if s.checklist(id) != nil { s.featuredChecklistID = id } else { s.checklists = []; s.featuredChecklistID = nil }
+            if s.checklist(id) != nil {
+                s.featuredChecklistID = id
+            } else {
+                s.checklists = []
+                s.featuredChecklistID = nil
+            }
         }
     }
 }

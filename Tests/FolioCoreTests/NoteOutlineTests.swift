@@ -8,8 +8,10 @@ final class NoteOutlineTests: XCTestCase {
     }
 
     func testSectionsSpanBlocksAndStopAtPeers() {
-        let o = NoteOutline([p(a, .text, 0, 5, .heading, "A"), p(a, .text, 5, 4), p(a, .text, 9, 6, .subheading, "A1"), p(a, .text, 15, 3),
-                             p(img, .image, 0, 0), p(b, .text, 0, 2, .heading, "B"), p(b, .text, 2, 3)])
+        let o = NoteOutline([
+            p(a, .text, 0, 5, .heading, "A"), p(a, .text, 5, 4), p(a, .text, 9, 6, .subheading, "A1"), p(a, .text, 15, 3),
+            p(img, .image, 0, 0), p(b, .text, 0, 2, .heading, "B"), p(b, .text, 2, 3)
+        ])
         let sA = o.sections.first { $0.heading.title == "A" }!
         XCTAssertEqual(sA.content, 1..<5, "A ends before B and contains A1 and the image")
         XCTAssertEqual(o.sections.first { $0.heading.title == "A1" }!.content, 3..<5)

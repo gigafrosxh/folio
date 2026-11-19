@@ -41,8 +41,10 @@ public enum CodeDependencies {
         public var isolated: Bool
         public var running: Bool
 
-        public init(id: UUID, language: String, session: String?, code: String, lastRun: CodeRunStamp?, running: Bool = false,
-                    stdin: String? = nil, interactive: Bool = false, isolated: Bool = false) {
+        public init(
+            id: UUID, language: String, session: String?, code: String, lastRun: CodeRunStamp?, running: Bool = false,
+            stdin: String? = nil, interactive: Bool = false, isolated: Bool = false
+        ) {
             self.id = id
             self.language = language
             self.session = session
@@ -140,7 +142,9 @@ public enum CodeDependencies {
         var warnings: [OrderWarning] = []
         for name in symbols[i].uses.sorted() {
             if let j = definer(Array(0..<i), name).last {
-                if let k = edges.firstIndex(where: { $0.from == items[j].id }) { edges[k].names.append(name) } else {
+                if let k = edges.firstIndex(where: { $0.from == items[j].id }) {
+                    edges[k].names.append(name)
+                } else {
                     edges.append(Edge(from: items[j].id, to: items[i].id, names: [name]))
                 }
             } else if !symbols[i].defines.contains(name), let k = definer(Array((i + 1)..<items.count), name).first {
@@ -227,7 +231,10 @@ public enum SymbolScan {
     public static func cachedScan(_ code: String, language: String) -> Symbols {
         let key = language + "\u{1}" + CodeDependencies.fingerprint(code) + "\u{1}\(code.utf8.count)"
         cacheLock.lock()
-        if let hit = cache[key] { cacheLock.unlock(); return hit }
+        if let hit = cache[key] {
+            cacheLock.unlock()
+            return hit
+        }
         cacheLock.unlock()
         let symbols = scan(code, language: language)
         cacheLock.lock()
@@ -264,14 +271,16 @@ public enum SymbolScan {
 
     private static func uses(in source: NSString, language lang: String, skipping definitionRanges: [NSRange]) -> Set<String> {
         // `x += 1` both reads and writes x.
-        var uses = Set(matches(#"^[ \t]*([A-Za-z_$][\w$]*)[ \t]*(?:\+|-|\*|/|%|\|\||&&|\?\?|\||<<|>>)=(?!=)"#, in: source)
-            .map { source.substring(with: $0.range(at: 1)) })
+        var uses = Set(
+            matches(#"^[ \t]*([A-Za-z_$][\w$]*)[ \t]*(?:\+|-|\*|/|%|\|\||&&|\?\?|\||<<|>>)=(?!=)"#, in: source)
+                .map { source.substring(with: $0.range(at: 1)) })
         let keywords = Self.keywords(lang)
         for match in matches("(?<![\\w.$@])[A-Za-z_$][\\w$]*", in: source) {
             let r = match.range
             let name = source.substring(with: r)
             guard !keywords.contains(name), !definitionRanges.contains(where: { NSLocationInRange(r.location, $0) }),
-                  !isKeywordArgument(source, range: r) else { continue }
+                !isKeywordArgument(source, range: r)
+            else { continue }
             uses.insert(name)
         }
         return uses
@@ -302,11 +311,15 @@ public enum SymbolScan {
         var i = location - 1
         while i >= 0 {
             let c = s.character(at: i)
-            if c == 0x29 { depth += 1 }            // )
-            else if c == 0x28 {                    // (
+            if c == 0x29 {
+                depth += 1
+            }  // )
+            else if c == 0x28 {  // (
                 if depth == 0 { return true }
                 depth -= 1
-            } else if c == 0x0A && depth == 0 { return false }
+            } else if c == 0x0A && depth == 0 {
+                return false
+            }
             i -= 1
         }
         return false
@@ -316,27 +329,33 @@ public enum SymbolScan {
         let assign = #"^[ \t]*([A-Za-z_$][\w$]*(?:[ \t]*,[ \t]*[A-Za-z_$][\w$]*)*)[ \t]*(?::[^=\n]+)?(?:\+|-|\*|/|%|\|\||&&|\?\?|\|)?=(?!=)"#
         switch lang {
         case "python":
-            return [assign,
-                    #"^[ \t]*(?:async[ \t]+)?(?:def|class)[ \t]+([A-Za-z_]\w*)"#,
-                    #"^[ \t]*import[ \t]+([\w., \t]+(?:[ \t]+as[ \t]+\w+)?)"#,
-                    #"^[ \t]*from[ \t]+[\w.]+[ \t]+import[ \t]+\(?([\w, \t]+(?:as[ \t]+\w+)?[\w, \t]*)"#,
-                    #"^[ \t]*for[ \t]+([\w, \t()]+?)[ \t]+in[ \t]"#,
-                    #"\bas[ \t]+([A-Za-z_]\w*)[ \t]*:"#,
-                    #"^[ \t]*global[ \t]+([\w, \t]+)"#]
+            return [
+                assign,
+                #"^[ \t]*(?:async[ \t]+)?(?:def|class)[ \t]+([A-Za-z_]\w*)"#,
+                #"^[ \t]*import[ \t]+([\w., \t]+(?:[ \t]+as[ \t]+\w+)?)"#,
+                #"^[ \t]*from[ \t]+[\w.]+[ \t]+import[ \t]+\(?([\w, \t]+(?:as[ \t]+\w+)?[\w, \t]*)"#,
+                #"^[ \t]*for[ \t]+([\w, \t()]+?)[ \t]+in[ \t]"#,
+                #"\bas[ \t]+([A-Za-z_]\w*)[ \t]*:"#,
+                #"^[ \t]*global[ \t]+([\w, \t]+)"#
+            ]
         case "javascript", "typescript", "node":
-            return [#"\b(?:let|const|var)[ \t]+([A-Za-z_$][\w$]*)"#,
-                    #"\b(?:let|const|var)[ \t]+[\[{]([^\]}=]+)[\]}]"#,
-                    #"\b(?:async[ \t]+)?function\*?[ \t]+([A-Za-z_$][\w$]*)"#,
-                    #"\bclass[ \t]+([A-Za-z_$][\w$]*)"#,
-                    #"\bimport[ \t]+([A-Za-z_$][\w$]*)[ \t]+from"#,
-                    #"\bimport[ \t]*\{([^}]*)\}"#,
-                    #"\bimport[ \t]*\*[ \t]*as[ \t]+([A-Za-z_$][\w$]*)"#,
-                    assign]
+            return [
+                #"\b(?:let|const|var)[ \t]+([A-Za-z_$][\w$]*)"#,
+                #"\b(?:let|const|var)[ \t]+[\[{]([^\]}=]+)[\]}]"#,
+                #"\b(?:async[ \t]+)?function\*?[ \t]+([A-Za-z_$][\w$]*)"#,
+                #"\bclass[ \t]+([A-Za-z_$][\w$]*)"#,
+                #"\bimport[ \t]+([A-Za-z_$][\w$]*)[ \t]+from"#,
+                #"\bimport[ \t]*\{([^}]*)\}"#,
+                #"\bimport[ \t]*\*[ \t]*as[ \t]+([A-Za-z_$][\w$]*)"#,
+                assign
+            ]
         case "r":
             return [#"^[ \t]*([A-Za-z_.][\w.]*)[ \t]*(?:<<?-|=(?!=))"#, #"^[ \t]*library\(([\w.]+)\)"#]
         case "julia":
-            return [assign, #"^[ \t]*(?:function|struct|mutable struct|macro|module)[ \t]+([A-Za-z_]\w*)"#,
-                    #"^[ \t]*(?:using|import)[ \t]+([\w., \t]+)"#]
+            return [
+                assign, #"^[ \t]*(?:function|struct|mutable struct|macro|module)[ \t]+([A-Za-z_]\w*)"#,
+                #"^[ \t]*(?:using|import)[ \t]+([\w., \t]+)"#
+            ]
         case "ruby":
             return [assign, #"^[ \t]*(?:def|class|module)[ \t]+(?:self\.)?([A-Za-z_]\w*)"#]
         case "swift":
@@ -387,12 +406,21 @@ public enum SymbolScan {
         }
 
         private mutating func lineComment() {
-            while i < chars.count && chars[i] != "\n" { out.append(" "); i += 1 }
+            while i < chars.count && chars[i] != "\n" {
+                out.append(" ")
+                i += 1
+            }
         }
 
         private mutating func blockComment() {
-            while i < chars.count && !(chars[i] == "*" && at(i + 1) == "/") { out.append(Self.blank(chars[i])); i += 1 }
-            if i < chars.count { out.append(contentsOf: "  "); i += 2 }
+            while i < chars.count && !(chars[i] == "*" && at(i + 1) == "/") {
+                out.append(Self.blank(chars[i]))
+                i += 1
+            }
+            if i < chars.count {
+                out.append(contentsOf: "  ")
+                i += 2
+            }
         }
 
         private func closes(_ quote: Character, triple: Bool) -> Bool {
@@ -400,7 +428,7 @@ public enum SymbolScan {
         }
 
         private mutating func string(_ quote: Character) {
-            let triple = at(i + 1) == quote && at(i + 2) == quote   // Python triple quotes
+            let triple = at(i + 1) == quote && at(i + 2) == quote  // Python triple quotes
             let length = triple ? 3 : 1
             out.append(contentsOf: Array(repeating: quote, count: length))
             i += length
@@ -421,14 +449,16 @@ public enum SymbolScan {
     }
 
     static func keywords(_ lang: String) -> Set<String> {
-        var common: Set<String> = ["if", "else", "for", "while", "return", "in", "and", "or", "not", "is", "true", "false",
-                                   "True", "False", "None", "null", "nil", "undefined", "def", "class", "import", "from", "as",
-                                   "let", "const", "var", "function", "new", "this", "self", "try", "catch", "except", "finally",
-                                   "with", "lambda", "yield", "await", "async", "break", "continue", "pass", "raise", "throw",
-                                   "elif", "do", "end", "then", "fi", "done", "case", "switch", "default", "typeof", "instanceof",
-                                   "global", "nonlocal", "del", "assert", "of", "func", "struct", "enum", "export", "local", "echo",
-                                   "print", "len", "range", "str", "int", "float", "list", "dict", "set", "tuple", "type", "console",
-                                   "Math", "JSON", "Object", "Array", "String", "Number", "require", "module", "library", "c"]
+        var common: Set<String> = [
+            "if", "else", "for", "while", "return", "in", "and", "or", "not", "is", "true", "false",
+            "True", "False", "None", "null", "nil", "undefined", "def", "class", "import", "from", "as",
+            "let", "const", "var", "function", "new", "this", "self", "try", "catch", "except", "finally",
+            "with", "lambda", "yield", "await", "async", "break", "continue", "pass", "raise", "throw",
+            "elif", "do", "end", "then", "fi", "done", "case", "switch", "default", "typeof", "instanceof",
+            "global", "nonlocal", "del", "assert", "of", "func", "struct", "enum", "export", "local", "echo",
+            "print", "len", "range", "str", "int", "float", "list", "dict", "set", "tuple", "type", "console",
+            "Math", "JSON", "Object", "Array", "String", "Number", "require", "module", "library", "c"
+        ]
         if lang == "python" { common.formUnion(["open", "sorted", "sum", "min", "max", "abs", "enumerate", "zip", "map", "filter", "isinstance", "super", "object", "bool"]) }
         return common
     }

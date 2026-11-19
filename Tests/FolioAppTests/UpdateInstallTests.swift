@@ -34,8 +34,10 @@ final class UpdateInstallTests: XCTestCase {
         try FileManager.default.createDirectory(at: contents.appendingPathComponent("MacOS"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: contents.appendingPathComponent("Resources"), withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: contents.appendingPathComponent("MacOS/Folio"))
-        let plist: NSDictionary = ["CFBundleIdentifier": "de.daniel.folio", "CFBundleExecutable": "Folio",
-                                   "CFBundleShortVersionString": version, "CFBundlePackageType": "APPL"]
+        let plist: NSDictionary = [
+            "CFBundleIdentifier": "de.daniel.folio", "CFBundleExecutable": "Folio",
+            "CFBundleShortVersionString": version, "CFBundlePackageType": "APPL"
+        ]
         plist.write(to: contents.appendingPathComponent("Info.plist"), atomically: true)
         try Data("render".utf8).write(to: contents.appendingPathComponent("Resources/render.html"))
         XCTAssertEqual(try shell("/usr/bin/codesign", ["--force", "--sign", "-", app.path]), 0)
@@ -86,8 +88,10 @@ final class UpdateInstallTests: XCTestCase {
         // The old test bundle went to the Trash; take it out again so the user's Trash stays clean.
         let trash = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash")
         for item in (try? FileManager.default.contentsOfDirectory(at: trash, includingPropertiesForKeys: nil)) ?? []
-        where item.lastPathComponent.hasPrefix("Folio") && NSDictionary(contentsOf: item.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String == "1.0.0-rc.1"
-            && (try? FileManager.default.contentsOfDirectory(atPath: item.appendingPathComponent("Contents/Resources").path)) == ["render.html"] {
+        where item.lastPathComponent.hasPrefix("Folio")
+            && NSDictionary(contentsOf: item.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String == "1.0.0-rc.1"
+            && (try? FileManager.default.contentsOfDirectory(atPath: item.appendingPathComponent("Contents/Resources").path)) == ["render.html"]
+        {
             try? FileManager.default.removeItem(at: item)
         }
     }

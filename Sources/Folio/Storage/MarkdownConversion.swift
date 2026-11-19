@@ -142,7 +142,8 @@ extension MarkdownTransfer {
     /// Headings by size (title / heading / subheading).
     private static func headingPrefix(of s: NSAttributedString, paragraph range: NSRange, line: String, base: CGFloat) -> String {
         guard range.length > 0, let font = s.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont,
-              !line.trimmingCharacters(in: .whitespaces).isEmpty else { return "" }
+            !line.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return "" }
         if font.pointSize >= base * 1.7 { return "# " }
         if font.pointSize >= base * 1.3 { return "## " }
         return font.pointSize > base * 1.05 ? "### " : ""
@@ -193,7 +194,8 @@ extension MarkdownTransfer {
 // MARK: Import
 
 extension MarkdownTransfer {
-    private static let inlineSyntax = try! NSRegularExpression(pattern: #"\*\*(.+?)\*\*|__(.+?)__|~~(.+?)~~|(?<![\*\w])\*(?!\s)(.+?)\*(?!\*)|(?<![_\w])_(?!\s)(.+?)_(?!\w)|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)"#)
+    private static let inlineSyntax = try! NSRegularExpression(
+        pattern: #"\*\*(.+?)\*\*|__(.+?)__|~~(.+?)~~|(?<![\*\w])\*(?!\s)(.+?)\*(?!\*)|(?<![_\w])_(?!\s)(.+?)_(?!\w)|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)"#)
 
     /// Inline Markdown in a run of text lines to Folio rich text.
     static func attributed(fromMarkdown text: String) -> NSAttributedString {
@@ -245,8 +247,10 @@ extension MarkdownTransfer {
         if cursor < ns.length { appendPlain(ns.substring(from: cursor)) }
     }
 
-    private static func inlineSpan(_ match: NSTextCheckingResult, in ns: NSString, attrs: [NSAttributedString.Key: Any],
-                                   theme: ThemeManager) -> (String, [NSAttributedString.Key: Any]) {
+    private static func inlineSpan(
+        _ match: NSTextCheckingResult, in ns: NSString, attrs: [NSAttributedString.Key: Any],
+        theme: ThemeManager
+    ) -> (String, [NSAttributedString.Key: Any]) {
         func group(_ n: Int) -> String? { match.range(at: n).location != NSNotFound ? ns.substring(with: match.range(at: n)) : nil }
         var a = attrs
         let font = a[.font] as? NSFont ?? theme.bodyFont()

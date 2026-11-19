@@ -17,9 +17,11 @@ final class FoldLayout: NSObject, NSLayoutManagerDelegate {
 
     private func isHidden(_ index: Int) -> Bool { hidden.contains { NSLocationInRange(index, $0) } }
 
-    func layoutManager(_ lm: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
-                       properties props: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes charIndexes: UnsafePointer<Int>,
-                       font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
+    func layoutManager(
+        _ lm: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
+        properties props: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes charIndexes: UnsafePointer<Int>,
+        font aFont: NSFont, forGlyphRange glyphRange: NSRange
+    ) -> Int {
         guard !hidden.isEmpty else { return 0 }
         var changed = false
         let newProps = (0..<glyphRange.length).map { i -> NSLayoutManager.GlyphProperty in
@@ -33,9 +35,11 @@ final class FoldLayout: NSObject, NSLayoutManagerDelegate {
         return glyphRange.length
     }
 
-    func layoutManager(_ lm: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
-                       lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>,
-                       in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+    func layoutManager(
+        _ lm: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
+        lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>,
+        in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange
+    ) -> Bool {
         guard !hidden.isEmpty else { return false }
         let chars = lm.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
         guard chars.length > 0, hidden.contains(where: { NSIntersectionRange($0, chars) == chars }) else { return false }

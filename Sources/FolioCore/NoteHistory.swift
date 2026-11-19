@@ -69,7 +69,8 @@ public struct NoteHistory: Sendable {
     /// differs because of the modification date).
     static func sameContent(_ a: Data, _ b: Data) -> Bool {
         guard let x = try? FolioArchive.decode(a), let y = try? FolioArchive.decode(b),
-              x.attachments.map(\.data) == y.attachments.map(\.data) else { return false }
+            x.attachments.map(\.data) == y.attachments.map(\.data)
+        else { return false }
         // Properties (status, dates …) live in the metadata; a change to them is a new version (#209).
         let px = (try? JSONDecoder().decode(NoteMetadata.self, from: x.meta))?.properties
         let py = (try? JSONDecoder().decode(NoteMetadata.self, from: y.meta))?.properties

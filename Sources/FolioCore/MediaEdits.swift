@@ -14,7 +14,10 @@ public struct ImageEdit: Codable, Equatable, Sendable {
     public struct CropRect: Codable, Equatable, Sendable {
         public var x: Double, y: Double, width: Double, height: Double
         public init(x: Double, y: Double, width: Double, height: Double) {
-            self.x = x; self.y = y; self.width = width; self.height = height
+            self.x = x
+            self.y = y
+            self.width = width
+            self.height = height
         }
 
         /// Kept inside the image and at least 2 % in each direction, so a crop never makes the picture vanish.
@@ -38,7 +41,8 @@ public struct ImageEdit: Codable, Equatable, Sendable {
     /// Turning keeps the same part of the picture: the crop turns with it.
     public func rotated(clockwise: Bool) -> ImageEdit {
         guard let c = crop else { return ImageEdit(quarterTurns: quarterTurns + (clockwise ? 1 : -1)) }
-        let turned = clockwise
+        let turned =
+            clockwise
             ? CropRect(x: 1 - c.y - c.height, y: c.x, width: c.height, height: c.width)
             : CropRect(x: c.y, y: 1 - c.x - c.width, width: c.height, height: c.width)
         return ImageEdit(quarterTurns: quarterTurns + (clockwise ? 1 : -1), crop: turned)
@@ -56,15 +60,23 @@ public struct ImageEdit: Codable, Equatable, Sendable {
         guard !isIdentity else { return image }
         let w = image.width, h = image.height
         let turnedW = quarterTurns % 2 == 1 ? h : w, turnedH = quarterTurns % 2 == 1 ? w : h
-        guard let ctx = CGContext(data: nil, width: turnedW, height: turnedH, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        guard
+            let ctx = CGContext(
+                data: nil, width: turnedW, height: turnedH, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { return nil }
         ctx.interpolationQuality = .high
         // Clockwise turns in a bottom-left coordinate system.
         switch quarterTurns {
-        case 1: ctx.translateBy(x: 0, y: CGFloat(turnedH)); ctx.rotate(by: -.pi / 2)
-        case 2: ctx.translateBy(x: CGFloat(turnedW), y: CGFloat(turnedH)); ctx.rotate(by: .pi)
-        case 3: ctx.translateBy(x: CGFloat(turnedW), y: 0); ctx.rotate(by: .pi / 2)
+        case 1:
+            ctx.translateBy(x: 0, y: CGFloat(turnedH))
+            ctx.rotate(by: -.pi / 2)
+        case 2:
+            ctx.translateBy(x: CGFloat(turnedW), y: CGFloat(turnedH))
+            ctx.rotate(by: .pi)
+        case 3:
+            ctx.translateBy(x: CGFloat(turnedW), y: 0)
+            ctx.rotate(by: .pi / 2)
         default: break
         }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
@@ -82,13 +94,16 @@ public struct ImageEdit: Codable, Equatable, Sendable {
     /// so edits start from what the user sees (#201).
     public static func orientedImage(from data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+            let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else { return nil }
         let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
         guard orientation != 1 else { return CGImageSourceCreateImageAtIndex(source, 0, nil) }
         let w = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
         let h = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
-        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
-                                        kCGImageSourceThumbnailMaxPixelSize: max(w, h, 1), kCGImageSourceShouldCacheImmediately: true]
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(w, h, 1), kCGImageSourceShouldCacheImmediately: true
+        ]
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) ?? CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 

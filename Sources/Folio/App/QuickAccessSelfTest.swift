@@ -22,7 +22,10 @@ enum QuickAccessSelfTest {
         WidgetFeed.shared.update()
         let folder = WidgetFeed.shared.folder
         check(folder.path.hasPrefix(store.rootURL.path), "Widget-Snapshot der Testbibliothek bleibt in ihr (\(folder.lastPathComponent))")
-        guard case .success(let s) = WidgetSnapshotStore.read(from: folder) else { check(false, "Widget-Snapshot lesbar"); return }
+        guard case .success(let s) = WidgetSnapshotStore.read(from: folder) else {
+            check(false, "Widget-Snapshot lesbar")
+            return
+        }
         check(s.pinned.contains { $0.title == "Inbox" } && !s.recent.isEmpty, "Widget kennt angepinnte und letzte Notizen")
         check(s.notes.allSatisfy { $0.preview == nil } && s.checklists.allSatisfy(\.items.isEmpty), "Ohne Erlaubnis keine Notizinhalte im Widget (#83)")
         let inbox = s.checklists.first { $0.title == "Inbox" }
@@ -43,7 +46,10 @@ enum QuickAccessSelfTest {
         let text = dir.appendingPathComponent("Plan.txt")
         try? Data("Plan".utf8).write(to: text)
         let image = NSImage(size: NSSize(width: 4, height: 4))
-        image.lockFocus(); NSColor.red.setFill(); NSRect(x: 0, y: 0, width: 4, height: 4).fill(); image.unlockFocus()
+        image.lockFocus()
+        NSColor.red.setFill()
+        NSRect(x: 0, y: 0, width: 4, height: 4).fill()
+        image.unlockFocus()
         let png = dir.appendingPathComponent("Rot.png")
         if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) { try? rep.representation(using: .png, properties: [:])?.write(to: png) }
         let count = store.notes.count
@@ -71,7 +77,8 @@ enum QuickAccessSelfTest {
         let renderer = ImageRenderer(content: MenuBarPanel().environmentObject(store).environmentObject(ThemeManager.shared))
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]) else { return check(false, "Menüleisten-Bild") }
+            let png = rep.representation(using: .png, properties: [:])
+        else { return check(false, "Menüleisten-Bild") }
         try? png.write(to: URL(fileURLWithPath: path))
         check(true, "Menüleisten-Bild gesichert")
     }
@@ -82,7 +89,10 @@ enum QuickAccessSelfTest {
         await wait(2)
         inboxChecks(store: store, service: service)
         // Capture into a note that is open with unsaved edits
-        guard let target = store.createNote(), let doc = store.currentDocument else { check(false, "Zielnotiz"); return }
+        guard let target = store.createNote(), let doc = store.currentDocument else {
+            check(false, "Zielnotiz")
+            return
+        }
         openNoteCheck(store: store, service: service, target: target, doc: doc)
         guard let other = store.createNote() else { return }
         await closedNoteCheck(store: store, service: service, target: target, other: other)
@@ -95,7 +105,8 @@ enum QuickAccessSelfTest {
         await widgetChecks(store)
         dropChecks(store)
         menuBarSnapshot(store)
-        print("QUICK done"); fflush(stdout)
+        print("QUICK done")
+        fflush(stdout)
     }
 
     private static func inboxChecks(store: NoteStore, service: CaptureService) {
@@ -131,7 +142,8 @@ enum QuickAccessSelfTest {
         let otherAfter = store.notes.first { $0.id == other.id }
         check(r.ok && otherAfter?.meta.searchText.contains("In die geschlossene Notiz") == true, "Erfassung in geschlossene Notiz")
         // An empty target takes the first captured line as title, never the date line (#95).
-        check(otherAfter?.meta.title == "In die geschlossene Notiz", "Leere Zielnotiz heißt wie die erste erfasste Zeile (\(titleBefore ?? "-") → \(otherAfter?.meta.title ?? "-"))")
+        check(
+            otherAfter?.meta.title == "In die geschlossene Notiz", "Leere Zielnotiz heißt wie die erste erfasste Zeile (\(titleBefore ?? "-") → \(otherAfter?.meta.title ?? "-"))")
     }
 
     private static func waitingQueueChecks(store: NoteStore, service: CaptureService) {
@@ -200,7 +212,8 @@ enum QuickAccessSelfTest {
         let again = AIChatModel.forNote(other.id)
         check(again.extraNotes == [target.id], "KI-Chat: hinzugefügte Notiz bleibt nach Neuladen")
         again.removeNote(target.id)
-        check(!FileManager.default.fileExists(atPath: LibraryData.folder(store.rootURL, "chats").appendingPathComponent(other.id.uuidString + ".json").path),
-              "Leerer Chat hinterlässt keine Datei")
+        check(
+            !FileManager.default.fileExists(atPath: LibraryData.folder(store.rootURL, "chats").appendingPathComponent(other.id.uuidString + ".json").path),
+            "Leerer Chat hinterlässt keine Datei")
     }
 }

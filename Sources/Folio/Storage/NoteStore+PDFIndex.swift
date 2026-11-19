@@ -10,15 +10,17 @@ extension NoteStore {
         Task.detached(priority: .background) {
             for (id, url) in candidates {
                 guard await NoteStore.shared.documents[id] == nil,
-                      let data = try? Data(contentsOf: url), var file = try? NoteFile.decode(data),
-                      file.indexPDFText() else { continue }
+                    let data = try? Data(contentsOf: url), var file = try? NoteFile.decode(data),
+                    file.indexPDFText()
+                else { continue }
                 let before = FileFingerprint(data: data)
                 let indexed = file
                 let ok: Bool = await MainActor.run {
                     let store = NoteStore.shared
                     // Opened or changed by someone in the meantime: the open note indexes itself.
                     guard store.documents[id] == nil, FileFingerprint.of(url) == before,
-                          (try? indexed.write(to: url)) != nil else { return false }
+                        (try? indexed.write(to: url)) != nil
+                    else { return false }
                     if let i = store.notes.firstIndex(where: { $0.id == id }) { store.notes[i].meta = indexed.meta }
                     return true
                 }

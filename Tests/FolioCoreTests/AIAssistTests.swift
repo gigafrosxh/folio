@@ -6,19 +6,19 @@ final class AIAssistTests: XCTestCase {
 
     func testAnswerWithCodeAndTable() {
         let md = """
-        Hier ist die Lösung:
+            Hier ist die Lösung:
 
-        ```Python
-        print("hi")
-        x = 1
-        ```
+            ```Python
+            print("hi")
+            x = 1
+            ```
 
-        | Name | Wert |
-        |------|-----:|
-        | a | 1 |
-        | b \\| c |
-        Ende.
-        """
+            | Name | Wert |
+            |------|-----:|
+            | a | 1 |
+            | b \\| c |
+            Ende.
+            """
         let s = AnswerBlocks.segments(of: md)
         XCTAssertEqual(s.count, 4)
         XCTAssertEqual(s[0], .text("Hier ist die Lösung:"))
@@ -58,7 +58,10 @@ final class AIAssistTests: XCTestCase {
         XCTAssertTrue(AITextAction.simplify.replacesSelection)
         XCTAssertFalse(AITextAction.explain.replacesSelection)
         XCTAssertFalse(AITextAction.quiz.replacesSelection)
-        for a in AITextAction.allCases { XCTAssertFalse(a.label.isEmpty); XCTAssertFalse(a.instructions.isEmpty) }
+        for a in AITextAction.allCases {
+            XCTAssertFalse(a.label.isEmpty)
+            XCTAssertFalse(a.instructions.isEmpty)
+        }
         XCTAssertTrue(AITextAction.explain.prompt(for: "Photosynthese").contains("Photosynthese"))
         let long = String(repeating: "x", count: 100)
         let p = AITextAction.rewrite.prompt(for: long, limit: 10)
@@ -87,8 +90,9 @@ final class AIAssistTests: XCTestCase {
     }
 
     func testParseModelAnswer() {
-        XCTAssertEqual(TagSuggester.parse("rezept, Kochen, #italien\n- schnelle küche\n1. pasta, rezept, 2024"),
-                       ["rezept", "kochen", "italien", "schnelle-küche", "pasta"])
+        XCTAssertEqual(
+            TagSuggester.parse("rezept, Kochen, #italien\n- schnelle küche\n1. pasta, rezept, 2024"),
+            ["rezept", "kochen", "italien", "schnelle-küche", "pasta"])
         XCTAssertEqual(TagSuggester.parse("a, b, c, d, e, f, g, h", limit: 3), ["a", "b", "c"])
         XCTAssertEqual(TagSuggester.parse(""), [])
     }
@@ -103,13 +107,24 @@ final class OllamaStub: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        if let code = Self.failWith { client?.urlProtocol(self, didFailWithError: URLError(code)); return }
-        Self.lastBody = request.httpBody ?? request.httpBodyStream.map { s in
-            s.open(); defer { s.close() }
-            var d = Data(); var buf = [UInt8](repeating: 0, count: 4096)
-            while s.hasBytesAvailable { let n = s.read(&buf, maxLength: buf.count); if n <= 0 { break }; d.append(buf, count: n) }
-            return d
+        if let code = Self.failWith {
+            client?.urlProtocol(self, didFailWithError: URLError(code))
+            return
         }
+        Self.lastBody =
+            request.httpBody
+            ?? request.httpBodyStream.map { s in
+                s.open()
+                defer { s.close() }
+                var d = Data()
+                var buf = [UInt8](repeating: 0, count: 4096)
+                while s.hasBytesAvailable {
+                    let n = s.read(&buf, maxLength: buf.count)
+                    if n <= 0 { break }
+                    d.append(buf, count: n)
+                }
+                return d
+            }
         let (status, body) = Self.routes[request.url?.path ?? ""] ?? (404, "404 page not found")
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -147,8 +162,9 @@ final class OllamaClientTests: XCTestCase {
     func testOnlyChatModels() throws {
         let json = #"{"models":[{"name":"embeddinggemma:latest","capabilities":["embedding"]},{"name":"gemma3:4b","capabilities":["completion","vision"]},{"name":"alt:1b"}]}"#
         XCTAssertEqual(try OllamaClient.chatModels(in: Data(json.utf8)), ["alt:1b", "gemma3:4b"])
-        XCTAssertEqual(OllamaClient.failure(status: 400, body: #"{"error":"\"embeddinggemma:latest\" does not support chat"}"#, model: "embeddinggemma:latest"),
-                       .notChat("embeddinggemma:latest"))
+        XCTAssertEqual(
+            OllamaClient.failure(status: 400, body: #"{"error":"\"embeddinggemma:latest\" does not support chat"}"#, model: "embeddinggemma:latest"),
+            .notChat("embeddinggemma:latest"))
     }
 
     func testStreamPieces() {
@@ -160,11 +176,14 @@ final class OllamaClientTests: XCTestCase {
 
     func testModelsAndChat() async throws {
         OllamaStub.routes["/api/tags"] = (200, #"{"models":[{"name":"qwen3:4b"},{"name":"llama3.2:latest"}]}"#)
-        OllamaStub.routes["/api/chat"] = (200, """
-        {"message":{"role":"assistant","content":"Hallo "},"done":false}
-        {"message":{"role":"assistant","content":"Welt"},"done":false}
-        {"message":{"role":"assistant","content":""},"done":true}
-        """)
+        OllamaStub.routes["/api/chat"] = (
+            200,
+            """
+            {"message":{"role":"assistant","content":"Hallo "},"done":false}
+            {"message":{"role":"assistant","content":"Welt"},"done":false}
+            {"message":{"role":"assistant","content":""},"done":true}
+            """
+        )
         let client = try OllamaClient(baseURL: "localhost:11434", model: "qwen3:4b", session: session)
         let models = try await client.models()
         XCTAssertEqual(models, ["llama3.2:latest", "qwen3:4b"])
@@ -178,7 +197,10 @@ final class OllamaClientTests: XCTestCase {
         OllamaStub.routes["/api/chat"] = (200, #"{"message":{"role":"assistant","content":"Nur der Anf"},"done":false}"#)
         let client = try OllamaClient(baseURL: "localhost:11434", model: "m", session: session)
         var parts: [String] = []
-        do { _ = try await client.chat(system: "", prompt: "x") { parts.append($0) }; XCTFail() } catch {
+        do {
+            _ = try await client.chat(system: "", prompt: "x") { parts.append($0) }
+            XCTFail()
+        } catch {
             XCTAssertEqual(error as? OllamaClient.Failure, .incomplete)
         }
         XCTAssertFalse(OllamaClient.Failure.incomplete.errorDescription!.isEmpty)
@@ -186,17 +208,29 @@ final class OllamaClientTests: XCTestCase {
 
     func testErrors() async throws {
         let empty = try OllamaClient(baseURL: "localhost:11434", model: "", session: session)
-        do { _ = try await empty.chat(system: "", prompt: "x"); XCTFail() } catch { XCTAssertEqual(error as? OllamaClient.Failure, .noModel) }
+        do {
+            _ = try await empty.chat(system: "", prompt: "x")
+            XCTFail()
+        } catch { XCTAssertEqual(error as? OllamaClient.Failure, .noModel) }
 
         OllamaStub.routes["/api/chat"] = (404, #"{"error":"model \"mistral\" not found, try pulling it first"}"#)
         let missing = try OllamaClient(baseURL: "localhost:11434", model: "mistral", session: session)
-        do { _ = try await missing.chat(system: "", prompt: "x"); XCTFail() } catch { XCTAssertEqual(error as? OllamaClient.Failure, .modelMissing("mistral")) }
+        do {
+            _ = try await missing.chat(system: "", prompt: "x")
+            XCTFail()
+        } catch { XCTAssertEqual(error as? OllamaClient.Failure, .modelMissing("mistral")) }
 
         OllamaStub.routes["/api/chat"] = (500, #"{"error":"out of memory"}"#)
-        do { _ = try await missing.chat(system: "", prompt: "x"); XCTFail() } catch { XCTAssertEqual(error as? OllamaClient.Failure, .server("out of memory")) }
+        do {
+            _ = try await missing.chat(system: "", prompt: "x")
+            XCTFail()
+        } catch { XCTAssertEqual(error as? OllamaClient.Failure, .server("out of memory")) }
 
         OllamaStub.failWith = .cannotConnectToHost
-        do { _ = try await missing.models(); XCTFail() } catch {
+        do {
+            _ = try await missing.models()
+            XCTFail()
+        } catch {
             guard case .notRunning = error as? OllamaClient.Failure else { return XCTFail("\(error)") }
         }
         for f in [OllamaClient.Failure.noModel, .notRunning("u"), .notLocal("u"), .modelMissing("m"), .server("s")] {

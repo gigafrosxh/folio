@@ -70,7 +70,7 @@ struct SidebarView: View {
                             TagCloud(tags: store.tagCounts, selection: $store.sidebarSelection) { tag, action in
                                 tagAction = TagActionRequest(tag: tag, action: action)
                             }
-                                .padding(.horizontal, 4)
+                            .padding(.horizontal, 4)
                         }
                     }
                 }
@@ -149,8 +149,12 @@ struct SidebarView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
             if !store.searchText.isEmpty {
-                Button { store.searchText = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
-                    .buttonStyle(.plain)
+                Button {
+                    store.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
             }
         }
         .font(.system(size: 13))
@@ -168,8 +172,10 @@ struct SidebarView: View {
     }
 
     /// `count` nil: a place without notes of its own, such as the graph, shows no number (#164).
-    private func row(icon: String, title: String, count: Int?, item: SidebarItem, depth: Int = 0,
-                     hasChildren: Bool = false, url: URL? = nil) -> some View {
+    private func row(
+        icon: String, title: String, count: Int?, item: SidebarItem, depth: Int = 0,
+        hasChildren: Bool = false, url: URL? = nil
+    ) -> some View {
         let selected = store.sidebarSelection == item
         return HStack(spacing: 8) {
             disclosure(hasChildren: hasChildren, url: url, depth: depth)
@@ -256,7 +262,10 @@ struct SidebarView: View {
             .help(view.summary)
             .accessibilityHint(Text("Zeigt Notizen zu: \(view.summary)"))
             .contextMenu {
-                Button("Umbenennen …") { folderName = view.name; renamingView = view.id }
+                Button("Umbenennen …") {
+                    folderName = view.name
+                    renamingView = view.id
+                }
                 Button("Suche bearbeiten") { store.editSmartView(view.id) }
                 if store.isSearching { Button("Durch aktuelle Suche ersetzen") { store.updateSmartView(view.id) } }
                 Divider()
@@ -269,42 +278,46 @@ struct SidebarView: View {
 
     /// Folders take dropped notes (move) and dropped folders of the same parent (own order, #13).
     private func folderRow(_ folder: FolderNode, depth: Int) -> some View {
-        row(icon: "folder", title: folder.name, count: store.noteCount(in: folder.url), item: .folder(folder.url),
-            depth: depth, hasChildren: !(folder.children ?? []).isEmpty, url: folder.url)
-            .draggable(Self.folderDragPrefix + folder.url.path)
-            .dropDestination(for: String.self) { items, _ in
-                var moved = false
-                for item in items {
-                    if let id = UUID(uuidString: item) { store.move(id, to: folder.url); moved = true }
-                    else if item.hasPrefix(Self.folderDragPrefix) {
-                        let url = URL(fileURLWithPath: String(item.dropFirst(Self.folderDragPrefix.count)), isDirectory: true)
-                        if url != folder.url, store.moveFolder(url, before: folder.url) { moved = true }
-                    }
+        row(
+            icon: "folder", title: folder.name, count: store.noteCount(in: folder.url), item: .folder(folder.url),
+            depth: depth, hasChildren: !(folder.children ?? []).isEmpty, url: folder.url
+        )
+        .draggable(Self.folderDragPrefix + folder.url.path)
+        .dropDestination(for: String.self) { items, _ in
+            var moved = false
+            for item in items {
+                if let id = UUID(uuidString: item) {
+                    store.move(id, to: folder.url)
+                    moved = true
+                } else if item.hasPrefix(Self.folderDragPrefix) {
+                    let url = URL(fileURLWithPath: String(item.dropFirst(Self.folderDragPrefix.count)), isDirectory: true)
+                    if url != folder.url, store.moveFolder(url, before: folder.url) { moved = true }
                 }
-                return moved
             }
-            .contextMenu {
-                Button("Neue Notiz hier") { store.createNote(in: folder.url) }
-                Button("Neuer Unterordner…") {
-                    newFolderParent = folder.url
-                    folderName = ""
-                    showNewFolder = true
-                }
-                Button("Umbenennen…") {
-                    folderName = folder.name
-                    renaming = folder.url
-                }
-                Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
-                Button("Als Markdown exportieren …") { MarkdownTransfer.exportFolderWithPanel(folder.url) }
-                Toggle("Unterordner einbeziehen", isOn: $store.includeSubfolders)
-                Menu("Anordnen") {
-                    Button("Nach oben") { store.stepFolder(folder.url, by: -1) }
-                    Button("Nach unten") { store.stepFolder(folder.url, by: 1) }
-                    Button("Alphabetisch sortieren") { store.sortFoldersAlphabetically(besides: folder.url) }
-                }
-                Divider()
-                Button("In den Papierkorb legen", role: .destructive) { store.deleteFolder(folder.url) }
+            return moved
+        }
+        .contextMenu {
+            Button("Neue Notiz hier") { store.createNote(in: folder.url) }
+            Button("Neuer Unterordner…") {
+                newFolderParent = folder.url
+                folderName = ""
+                showNewFolder = true
             }
+            Button("Umbenennen…") {
+                folderName = folder.name
+                renaming = folder.url
+            }
+            Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([folder.url]) }
+            Button("Als Markdown exportieren …") { MarkdownTransfer.exportFolderWithPanel(folder.url) }
+            Toggle("Unterordner einbeziehen", isOn: $store.includeSubfolders)
+            Menu("Anordnen") {
+                Button("Nach oben") { store.stepFolder(folder.url, by: -1) }
+                Button("Nach unten") { store.stepFolder(folder.url, by: 1) }
+                Button("Alphabetisch sortieren") { store.sortFoldersAlphabetically(besides: folder.url) }
+            }
+            Divider()
+            Button("In den Papierkorb legen", role: .destructive) { store.deleteFolder(folder.url) }
+        }
     }
 }
 
@@ -356,7 +369,11 @@ struct FlowLayout: Layout {
         var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
         for s in subviews {
             let size = s.sizeThatFits(.unspecified)
-            if x + size.width > width, x > 0 { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            if x + size.width > width, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
@@ -367,7 +384,11 @@ struct FlowLayout: Layout {
         var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
         for s in subviews {
             let size = s.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
             s.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)

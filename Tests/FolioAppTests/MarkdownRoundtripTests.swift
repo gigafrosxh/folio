@@ -64,34 +64,50 @@ final class MarkdownRoundtripTests: XCTestCase {
             block(.text) { $0.rtf = RichTextCodec.rtfData(from: MarkdownTransfer.attributed(fromMarkdown: "Text")) },
             block(.text) { $0.rtf = RichTextCodec.rtfData(from: NSAttributedString(string: "  \n")) },
             block(.embed) { $0.code = "Andere" },
-            block(.code) { $0.language = "python"; $0.code = "print(1)"; $0.output = "1" },
+            block(.code) {
+                $0.language = "python"
+                $0.code = "print(1)"
+                $0.output = "1"
+            },
             block(.database) { $0.code = "select 1" },
             block(.math) { $0.code = "x^2" },
             block(.diagram) { $0.code = "graph TD" },
-            block(.image) { $0.attachmentID = image.id; $0.caption = "Alt" },
+            block(.image) {
+                $0.attachmentID = image.id
+                $0.caption = "Alt"
+            },
             block(.drawing) { $0.attachmentID = drawing.id },
             block(.pdf) { $0.attachmentID = pdf.id },
             block(.file) { $0.attachmentID = UUID() },
-            block(.audio) { $0.attachmentID = audio.id; $0.output = "Zeile 1\nZeile 2" },
-            block(.web) { $0.url = "https://a.example"; $0.caption = "A" },
+            block(.audio) {
+                $0.attachmentID = audio.id
+                $0.output = "Zeile 1\nZeile 2"
+            },
+            block(.web) {
+                $0.url = "https://a.example"
+                $0.caption = "A"
+            },
             block(.web) { $0.url = "https://b.example" },
-            block(.web) { _ in },
+            block(.web) { _ in }
         ]
         let file = NoteFile(meta: NoteMetadata(title: "T"), body: NoteBody(blocks: blocks), attachments: [image, drawing, pdf, audio])
         let (markdown, files) = MarkdownTransfer.markdown(for: file, filesFolder: "T Dateien")
         let prefix = String(pdf.id.uuidString.prefix(6))
-        XCTAssertEqual(markdown, [
-            "Text", "![[Andere]]", "```python\nprint(1)\n```", "```text\n1\n```", "```sql\nselect 1\n```", "$$\nx^2\n$$",
-            "```mermaid\ngraph TD\n```", "![Alt](T%20Dateien/Bild.png)", "[Zeichnung](T%20Dateien/Skizze.data)",
-            "[\(prefix)-Bild.png](T%20Dateien/\(prefix)-Bild.png)", "[Ton.m4a](T%20Dateien/Ton.m4a)", "> Zeile 1\n> Zeile 2",
-            "[A](https://a.example)", "[https://b.example](https://b.example)",
-        ].joined(separator: "\n\n") + "\n")
+        XCTAssertEqual(
+            markdown,
+            [
+                "Text", "![[Andere]]", "```python\nprint(1)\n```", "```text\n1\n```", "```sql\nselect 1\n```", "$$\nx^2\n$$",
+                "```mermaid\ngraph TD\n```", "![Alt](T%20Dateien/Bild.png)", "[Zeichnung](T%20Dateien/Skizze.data)",
+                "[\(prefix)-Bild.png](T%20Dateien/\(prefix)-Bild.png)", "[Ton.m4a](T%20Dateien/Ton.m4a)", "> Zeile 1\n> Zeile 2",
+                "[A](https://a.example)", "[https://b.example](https://b.example)"
+            ].joined(separator: "\n\n") + "\n")
         XCTAssertEqual(files.map(\.0), ["Bild.png", "Skizze.data", "\(prefix)-Bild.png", "Ton.m4a"])
     }
 
     func testImportCreatesTheRightBlocks() {
-        let note = MarkdownTransfer.note(fromMarkdown: "# T\n\n```python\nprint(1)\n```\n\n```mermaid\ngraph TD\n```\n\n$$\nx\n$$\n\n![a](https://e.example/b.png)\n\n![a](fehlt.png)\n",
-                                         title: "Datei", baseURL: nil)
+        let note = MarkdownTransfer.note(
+            fromMarkdown: "# T\n\n```python\nprint(1)\n```\n\n```mermaid\ngraph TD\n```\n\n$$\nx\n$$\n\n![a](https://e.example/b.png)\n\n![a](fehlt.png)\n",
+            title: "Datei", baseURL: nil)
         XCTAssertEqual(note.meta.title, "T")
         let kinds = note.body.blocks.map(\.kind)
         XCTAssertTrue(kinds.contains(.code) && kinds.contains(.diagram) && kinds.contains(.math) && kinds.contains(.web), "\(kinds)")
@@ -101,10 +117,19 @@ final class MarkdownRoundtripTests: XCTestCase {
 
     func testImportedColorsAndFontsAreNormalized() {
         let body = NSFont.systemFont(ofSize: 14)
-        let s = NSMutableAttributedString(string: "a", attributes: [.foregroundColor: NSColor(srgbRed: 0.01, green: 0.01, blue: 0.01, alpha: 1),
-                                                                    .backgroundColor: NSColor.white, .font: NSFont(name: "Times New Roman", size: 12)!])
-        s.append(NSAttributedString(string: "b", attributes: [.foregroundColor: NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1),
-                                                              .font: NSFont(name: "Menlo", size: 20)!]))
+        let s = NSMutableAttributedString(
+            string: "a",
+            attributes: [
+                .foregroundColor: NSColor(srgbRed: 0.01, green: 0.01, blue: 0.01, alpha: 1),
+                .backgroundColor: NSColor.white, .font: NSFont(name: "Times New Roman", size: 12)!
+            ])
+        s.append(
+            NSAttributedString(
+                string: "b",
+                attributes: [
+                    .foregroundColor: NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1),
+                    .font: NSFont(name: "Menlo", size: 20)!
+                ]))
         RichTextCodec.normalizeImported(s, bodyFont: body)
         XCTAssertEqual(s.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, NSColor.textColor)
         XCTAssertNil(s.attribute(.backgroundColor, at: 0, effectiveRange: nil))

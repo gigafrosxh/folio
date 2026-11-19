@@ -31,7 +31,10 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
         public struct Item: Codable, Equatable, Sendable {
             public var text: String
             public var done: Bool
-            public init(text: String, done: Bool) { self.text = text; self.done = done }
+            public init(text: String, done: Bool) {
+                self.text = text
+                self.done = done
+            }
         }
         public var noteID: UUID
         public var title: String
@@ -70,8 +73,10 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     public var featuredNoteID: UUID?
     public var featuredChecklistID: UUID?
 
-    public init(generated: Date = Date(), libraryName: String, libraryAvailable: Bool = true, showsContent: Bool = false,
-                pinned: [Note] = [], recent: [Note] = [], notes: [Note] = [], checklists: [Checklist] = []) {
+    public init(
+        generated: Date = Date(), libraryName: String, libraryAvailable: Bool = true, showsContent: Bool = false,
+        pinned: [Note] = [], recent: [Note] = [], notes: [Note] = [], checklists: [Checklist] = []
+    ) {
         version = Self.currentVersion
         self.generated = generated
         self.libraryName = libraryName
@@ -111,22 +116,35 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     public func withoutContent() -> WidgetSnapshot {
         var s = self
         s.showsContent = false
-        func strip(_ n: Note) -> Note { var n = n; n.preview = nil; return n }
+        func strip(_ n: Note) -> Note {
+            var n = n
+            n.preview = nil
+            return n
+        }
         s.pinned = pinned.map(strip)
         s.recent = recent.map(strip)
         s.notes = notes.map(strip)
-        s.checklists = checklists.map { var c = $0; c.items = []; return c }
+        s.checklists = checklists.map {
+            var c = $0
+            c.items = []
+            return c
+        }
         return s
     }
 
     /// Example data for the widget gallery.
     public static let placeholder = WidgetSnapshot(
         libraryName: "Folio", showsContent: true,
-        pinned: [Note(id: UUID(), title: "Projektideen", folder: "Notizen", modified: Date(), pinned: true, preview: "Widgets für Folio"),
-                 Note(id: UUID(), title: "Einkauf", folder: "Privat", modified: Date(), pinned: true, preview: "Äpfel, Milch")],
+        pinned: [
+            Note(id: UUID(), title: "Projektideen", folder: "Notizen", modified: Date(), pinned: true, preview: "Widgets für Folio"),
+            Note(id: UUID(), title: "Einkauf", folder: "Privat", modified: Date(), pinned: true, preview: "Äpfel, Milch")
+        ],
         recent: [Note(id: UUID(), title: "Besprechung", folder: "Arbeit", modified: Date(), pinned: false, preview: "Nächste Schritte")],
-        checklists: [Checklist(noteID: UUID(), title: "Einkauf", done: 2, total: 5,
-                               items: [.init(text: "Milch", done: false), .init(text: "Brot", done: false), .init(text: "Äpfel", done: true)])])
+        checklists: [
+            Checklist(
+                noteID: UUID(), title: "Einkauf", done: 2, total: 5,
+                items: [.init(text: "Milch", done: false), .init(text: "Brot", done: false), .init(text: "Äpfel", done: true)])
+        ])
 }
 
 /// Counts the checkboxes Folio writes into text ("☐ " open, "☑ " done).
@@ -140,7 +158,12 @@ public enum ChecklistParser {
             guard isOpen || line.hasPrefix("☑") else { continue }
             total += 1
             let label = String(line.dropFirst()).trimmingCharacters(in: .whitespaces)
-            if isOpen { open.append(.init(text: label, done: false)) } else { done += 1; finished.append(.init(text: label, done: true)) }
+            if isOpen {
+                open.append(.init(text: label, done: false))
+            } else {
+                done += 1
+                finished.append(.init(text: label, done: true))
+            }
         }
         // Open items first: they are what the widget is for.
         return (done, total, Array((open + finished).prefix(maxItems)))

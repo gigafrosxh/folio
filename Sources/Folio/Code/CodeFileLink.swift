@@ -10,8 +10,9 @@ enum CodeFileLink {
     @discardableResult
     static func export(_ block: BlockModel, in doc: NoteDocument) -> String? {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = CodeExport.suggestedFileName(code: block.storage.string, language: block.language,
-                                                                  caption: block.caption.isEmpty ? nil : block.caption)
+        panel.nameFieldStringValue = CodeExport.suggestedFileName(
+            code: block.storage.string, language: block.language,
+            caption: block.caption.isEmpty ? nil : block.caption)
         if let linked = block.linkedFile { panel.directoryURL = URL(fileURLWithPath: linked).deletingLastPathComponent() }
         panel.canCreateDirectories = true
         panel.message = "Der Code-Block bleibt mit der Datei verknüpft; Änderungen lassen sich später vergleichen."
@@ -172,11 +173,12 @@ struct CodeDiffView: View {
     }
 
     private func diffLine(_ line: LineDiff.Line) -> some View {
-        let (sign, color): (String, Color) = switch line.kind {
-        case .added: ("+", .green)
-        case .removed: ("-", .red)
-        case .same: (" ", .clear)
-        }
+        let (sign, color): (String, Color) =
+            switch line.kind {
+            case .added: ("+", .green)
+            case .removed: ("-", .red)
+            case .same: (" ", .clear)
+            }
         return HStack(spacing: 6) {
             Text(line.oldNumber.map(String.init) ?? "").frame(width: 34, alignment: .trailing).foregroundStyle(.secondary)
             Text(line.newNumber.map(String.init) ?? "").frame(width: 34, alignment: .trailing).foregroundStyle(.secondary)
@@ -192,15 +194,29 @@ struct CodeDiffView: View {
 
     private var footer: some View {
         HStack {
-            Button("Verknüpfung lösen") { doc.changeBlock(block, "Verknüpfung lösen") { block.linkedFile = nil }; dismiss() }
+            Button("Verknüpfung lösen") {
+                doc.changeBlock(block, "Verknüpfung lösen") { block.linkedFile = nil }
+                dismiss()
+            }
             Button("Diff kopieren") { copyDiff() }.disabled(state != .differs)
             if let message { Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             Spacer()
-            Button("Aus Datei übernehmen") { if let url { message = CodeFileLink.adopt(block, from: url, in: doc); reload() } }
-                .disabled(state != .differs)
-                .help("Ersetzt den Code des Blocks durch den Inhalt der Datei (rückgängig machbar)")
+            Button("Aus Datei übernehmen") {
+                if let url {
+                    message = CodeFileLink.adopt(block, from: url, in: doc)
+                    reload()
+                }
+            }
+            .disabled(state != .differs)
+            .help("Ersetzt den Code des Blocks durch den Inhalt der Datei (rückgängig machbar)")
             Button("In Datei schreiben") { writeToFile() }
-                .disabled(state == .same || { if case .unreadable = state { return true }; return false }())
+                .disabled(
+                    state == .same
+                        || {
+                            if case .unreadable = state { return true }
+                            return false
+                        }()
+                )
                 .help("Überschreibt die Datei mit dem Code des Blocks")
             Button("Fertig") { dismiss() }.keyboardShortcut(.defaultAction)
         }
@@ -219,7 +235,10 @@ struct CodeDiffView: View {
     }
 
     private func reload() {
-        guard let url else { state = .missing; return }
+        guard let url else {
+            state = .missing
+            return
+        }
         // One bounded read; a large file or a FIFO never blocks the window (#263).
         let code = block.storage.string
         switch CodeExport.readText(at: url) {

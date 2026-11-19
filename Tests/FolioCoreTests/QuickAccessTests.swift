@@ -115,7 +115,7 @@ final class QuickAccessTests: XCTestCase {
             SwitcherEntry(kind: .note, title: "Projektplan", detail: "Arbeit", key: "1"),
             SwitcherEntry(kind: .folder, title: "Projekte", detail: "Arbeit/Projekte", key: "/a/p"),
             SwitcherEntry(kind: .tag, title: "#projekt", detail: "3 Notizen", key: "projekt"),
-            SwitcherEntry(kind: .note, title: "Einkauf", detail: "", key: "2"),
+            SwitcherEntry(kind: .note, title: "Einkauf", detail: "", key: "2")
         ]
         XCTAssertEqual(SwitcherEntry.rank(entries, query: "proj").map(\.kind).first, .note)
         XCTAssertEqual(SwitcherEntry.rank(entries, query: "#proj").map(\.kind), [.tag])

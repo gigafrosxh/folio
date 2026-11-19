@@ -61,7 +61,7 @@ struct ForceSimulation<V: SIMD> where V.Scalar == Double {
             d = nudge(i, j)
             d2 = (d * d).sum()
         }
-        if d2 > 250_000 { return nil }   // far apart: no noticeable push
+        if d2 > 250_000 { return nil }  // far apart: no noticeable push
         return d * (Self.idealDistance * Self.idealDistance / d2)
     }
 

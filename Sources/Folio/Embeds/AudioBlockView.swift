@@ -14,7 +14,8 @@ final class AudioRecorder: ObservableObject {
     private(set) var fileURL: URL?
 
     enum RecordError: LocalizedError {
-        case denied, failed(String)
+        case denied
+        case failed(String)
         var errorDescription: String? {
             switch self {
             case .denied: return "Folio hat keinen Zugriff auf das Mikrofon. Erlaube ihn in Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon."
@@ -36,7 +37,7 @@ final class AudioRecorder: ObservableObject {
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: 48_000,
             AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
         let r: AVAudioRecorder
         do { r = try AVAudioRecorder(url: url, settings: settings) } catch { throw RecordError.failed(error.localizedDescription) }
@@ -160,8 +161,10 @@ struct AudioBlockView: View {
     private var attachment: FolioArchive.Attachment? { block.attachmentID.flatMap { doc.attachments[$0] } }
 
     var body: some View {
-        EmbedCard(title: attachment?.header.filename ?? "Audioaufnahme", icon: "waveform",
-                  height: .constant(0), resizable: false, onCommit: {}) {
+        EmbedCard(
+            title: attachment?.header.filename ?? "Audioaufnahme", icon: "waveform",
+            height: .constant(0), resizable: false, onCommit: {}
+        ) {
             if attachment != nil { headerActions }
         } content: {
             VStack(alignment: .leading, spacing: 10) {
@@ -172,7 +175,10 @@ struct AudioBlockView: View {
                         .font(.caption).foregroundStyle(.red).textSelection(.enabled)
                 }
                 if let transcribing {
-                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text(transcribing).font(.caption).foregroundStyle(.secondary) }
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(transcribing).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 if let transcript = block.output, !transcript.isEmpty { transcriptView(transcript) }
             }
@@ -239,7 +245,9 @@ struct AudioBlockView: View {
     private var playerView: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Button { playback.toggle() } label: {
+                Button {
+                    playback.toggle()
+                } label: {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
@@ -248,9 +256,11 @@ struct AudioBlockView: View {
                 }
                 .buttonStyle(.plain)
                 .help(playback.isPlaying ? "Pause" : "Abspielen")
-                Waveform(peaks: peaks, progress: playback.duration > 0 ? playback.current / playback.duration : 0,
-                         color: theme.accent) { fraction in playback.seek(to: fraction * playback.duration) }
-                    .frame(height: 36)
+                Waveform(
+                    peaks: peaks, progress: playback.duration > 0 ? playback.current / playback.duration : 0,
+                    color: theme.accent
+                ) { fraction in playback.seek(to: fraction * playback.duration) }
+                .frame(height: 36)
                 Text("\(AudioAnalysis.format(playback.current)) / \(AudioAnalysis.format(playback.duration))")
                     .font(.system(size: 11.5, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -261,11 +271,21 @@ struct AudioBlockView: View {
 
     @ViewBuilder
     private var headerActions: some View {
-        Button { playback.skip(-15) } label: { Label("15 s zurück", systemImage: "gobackward.15") }.help("15 Sekunden zurück")
-        Button { playback.skip(15) } label: { Label("15 s vor", systemImage: "goforward.15") }.help("15 Sekunden vor")
+        Button {
+            playback.skip(-15)
+        } label: {
+            Label("15 s zurück", systemImage: "gobackward.15")
+        }.help("15 Sekunden zurück")
+        Button {
+            playback.skip(15)
+        } label: {
+            Label("15 s vor", systemImage: "goforward.15")
+        }.help("15 Sekunden vor")
         Menu {
             ForEach([0.75, 1, 1.25, 1.5, 2], id: \.self) { r in
-                Button { playback.rate = Float(r) } label: {
+                Button {
+                    playback.rate = Float(r)
+                } label: {
                     Text("\(r.formatted())×") + Text(playback.rate == Float(r) ? "  ✓" : "")
                 }
             }
@@ -288,8 +308,12 @@ struct AudioBlockView: View {
         .fixedSize()
         .disabled(transcribing != nil)
         .help("Lokal transkribieren (\(Transcriber.name(of: selectedLocale))) – gedrückt halten: andere Sprache")
-        Button { AttachmentSync.open(block, in: doc) } label: { Label("Öffnen", systemImage: "arrow.up.forward.app") }
-            .help("Im Standardprogramm öffnen")
+        Button {
+            AttachmentSync.open(block, in: doc)
+        } label: {
+            Label("Öffnen", systemImage: "arrow.up.forward.app")
+        }
+        .help("Im Standardprogramm öffnen")
     }
 
     // MARK: Transcript
@@ -322,7 +346,9 @@ struct AudioBlockView: View {
     private func transcriptView(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Button { withAnimation(Motion.quick) { showTranscript.toggle() } } label: {
+                Button {
+                    withAnimation(Motion.quick) { showTranscript.toggle() }
+                } label: {
                     Label("Transkript", systemImage: showTranscript ? "chevron.down" : "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                 }
@@ -330,8 +356,17 @@ struct AudioBlockView: View {
                 Spacer()
                 Button("In Notiz übernehmen") { insertTranscript(text) }
                     .help("Das Transkript als Text unter der Aufnahme einfügen")
-                Button { copy(text) } label: { Image(systemName: "doc.on.doc") }.help("Kopieren")
-                Button { block.output = nil; doc.markDirty() } label: { Image(systemName: "xmark") }.help("Transkript verwerfen")
+                Button {
+                    copy(text)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }.help("Kopieren")
+                Button {
+                    block.output = nil
+                    doc.markDirty()
+                } label: {
+                    Image(systemName: "xmark")
+                }.help("Transkript verwerfen")
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
@@ -437,9 +472,10 @@ struct Waveform: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                onSeek(min(max(v.location.x / geo.size.width, 0), 1))
-            })
+            .gesture(
+                DragGesture(minimumDistance: 0).onChanged { v in
+                    onSeek(min(max(v.location.x / geo.size.width, 0), 1))
+                })
         }
     }
 }

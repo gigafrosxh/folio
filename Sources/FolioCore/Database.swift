@@ -47,8 +47,10 @@ public struct DatabaseConnection: Codable, Sendable, Hashable, Identifiable {
     public var database: String
     public var user: String
 
-    public init(id: UUID = UUID(), name: String = "", driver: DatabaseDriver = .sqlite, path: String = "",
-                host: String = "localhost", port: Int? = nil, database: String = "", user: String = "") {
+    public init(
+        id: UUID = UUID(), name: String = "", driver: DatabaseDriver = .sqlite, path: String = "",
+        host: String = "localhost", port: Int? = nil, database: String = "", user: String = ""
+    ) {
         self.id = id
         self.name = name
         self.driver = driver
@@ -71,7 +73,7 @@ public struct DatabaseConnection: Codable, Sendable, Hashable, Identifiable {
 /// The result of one statement (the last statement when several are sent).
 public struct QueryResult: Sendable, Equatable {
     public var columns: [String]
-    public var rows: [[String?]]          // nil = SQL NULL
+    public var rows: [[String?]]  // nil = SQL NULL
     /// Message for statements without a result set, e.g. "3 Zeilen geändert" or the client's status line.
     public var message: String?
     public var duration: TimeInterval
@@ -124,7 +126,9 @@ public enum DatabaseError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .clientMissing(let c): return "Der Datenbank-Client „\(c)“ ist nicht installiert (z. B. mit Homebrew: brew install \(c == "psql" ? "libpq" : c == "mysql" ? "mysql-client" : c == "sqlcmd" ? "sqlcmd" : c))."
+        case .clientMissing(let c):
+            return
+                "Der Datenbank-Client „\(c)“ ist nicht installiert (z. B. mit Homebrew: brew install \(c == "psql" ? "libpq" : c == "mysql" ? "mysql-client" : c == "sqlcmd" ? "sqlcmd" : c))."
         case .connectionFailed(let m): return "Verbindung fehlgeschlagen: \(m)"
         case .queryFailed(let m): return m
         case .timeout: return "Die Abfrage hat zu lange gedauert und wurde abgebrochen."

@@ -166,8 +166,11 @@ struct FolioApp: App {
         .defaultSize(width: 1000, height: 720)
 
         // Menu bar icon (#85), optional in Settings › Schnellzugriff.
-        MenuBarExtra("Folio", systemImage: "note.text", isInserted: Binding(
-            get: { theme.settings.menuBarIcon && !BackgroundRun.isOn }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })) {
+        MenuBarExtra(
+            "Folio", systemImage: "note.text",
+            isInserted: Binding(
+                get: { theme.settings.menuBarIcon && !BackgroundRun.isOn }, set: { v in if theme.settings.menuBarIcon != v { theme.settings.menuBarIcon = v } })
+        ) {
             MenuBarPanel()
                 .environmentObject(store)
                 .environmentObject(theme)

@@ -77,11 +77,12 @@ public enum RenderScript {
 
         public init?(message body: Any) {
             guard let d = body as? [String: Any], let ok = d["ok"] as? Bool else { return nil }
-            self.init(ok: ok,
-                      width: (d["width"] as? NSNumber)?.doubleValue ?? 0,
-                      height: (d["height"] as? NSNumber)?.doubleValue ?? 0,
-                      error: (d["error"] as? String).map(Self.cleanError),
-                      svg: d["svg"] as? String)
+            self.init(
+                ok: ok,
+                width: (d["width"] as? NSNumber)?.doubleValue ?? 0,
+                height: (d["height"] as? NSNumber)?.doubleValue ?? 0,
+                error: (d["error"] as? String).map(Self.cleanError),
+                svg: d["svg"] as? String)
             x = (d["x"] as? NSNumber)?.doubleValue ?? 0
             y = (d["y"] as? NSNumber)?.doubleValue ?? 0
             pageHeight = (d["pageHeight"] as? NSNumber)?.doubleValue ?? height
@@ -103,18 +104,21 @@ public enum RenderScript {
 public enum RenderSamples {
     public static let math = #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#
     public static let diagram = """
-    flowchart LR
-        Idee --> Notiz
-        Notiz --> Code
-        Notiz --> Diagramm
-    """
+        flowchart LR
+            Idee --> Notiz
+            Notiz --> Code
+            Notiz --> Diagramm
+        """
 
     /// The diagram type a Mermaid source declares (first keyword), e.g. "flowchart" or "sequenceDiagram".
     public static func diagramType(of source: String) -> String? {
         var inFrontMatter = false
         for line in source.components(separatedBy: .newlines) {
             let t = line.trimmingCharacters(in: .whitespaces)
-            if t == "---" { inFrontMatter.toggle(); continue }
+            if t == "---" {
+                inFrontMatter.toggle()
+                continue
+            }
             if inFrontMatter || t.isEmpty || t.hasPrefix("%%") { continue }
             return t.split(whereSeparator: { $0.isWhitespace || $0 == ";" }).first.map(String.init)
         }

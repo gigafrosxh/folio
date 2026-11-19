@@ -35,9 +35,10 @@ struct QuickOpenView: View {
         var notes = recent + others
         if mode != .open, let current = store.currentDocument?.id { notes.removeAll { $0.id == current } }
         var entries = notes.map { ref in
-            SwitcherEntry(kind: .note, title: ref.meta.title.isEmpty ? ref.url.deletingPathExtension().lastPathComponent : ref.meta.title,
-                          detail: store.relativeFolderName(ref.folderURL) + (ref.meta.preview.isEmpty ? "" : " · " + ref.meta.preview),
-                          key: ref.id.uuidString)
+            SwitcherEntry(
+                kind: .note, title: ref.meta.title.isEmpty ? ref.url.deletingPathExtension().lastPathComponent : ref.meta.title,
+                detail: store.relativeFolderName(ref.folderURL) + (ref.meta.preview.isEmpty ? "" : " · " + ref.meta.preview),
+                key: ref.id.uuidString)
         }
         if mode == .open {
             entries += store.allFolderURLs.map { url in
@@ -57,23 +58,40 @@ struct QuickOpenView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: mode == .link ? "link" : mode == .addToChat ? "sparkles" : "magnifyingglass").foregroundStyle(.secondary)
-                TextField(mode == .link ? "Notiz zum Verlinken suchen …" : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : mode == .embed ? "Notiz zum Einbetten suchen …" : "Notiz, Ordner (/) oder Tag (#) öffnen …", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 17))
-                    .focused($focused)
-                    .onSubmit { items.isEmpty ? linkNewNote() : choose(items) }
-                    .onKeyPress(.downArrow) { index = min(index + 1, max(items.count - 1, 0)); return .handled }
-                    .onKeyPress(.upArrow) { index = max(index - 1, 0); return .handled }
-                    .onKeyPress(.escape) { onClose(); return .handled }
-                    .accessibilityLabel("Suche")
+                TextField(
+                    mode == .link
+                        ? "Notiz zum Verlinken suchen …"
+                        : mode == .addToChat ? "Notiz zum Vergleichen hinzufügen …" : mode == .embed ? "Notiz zum Einbetten suchen …" : "Notiz, Ordner (/) oder Tag (#) öffnen …",
+                    text: $query
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 17))
+                .focused($focused)
+                .onSubmit { items.isEmpty ? linkNewNote() : choose(items) }
+                .onKeyPress(.downArrow) {
+                    index = min(index + 1, max(items.count - 1, 0))
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    index = max(index - 1, 0)
+                    return .handled
+                }
+                .onKeyPress(.escape) {
+                    onClose()
+                    return .handled
+                }
+                .accessibilityLabel("Suche")
                 Text(mode == .link ? "↩ verlinken" : mode == .addToChat ? "↩ hinzufügen" : mode == .embed ? "↩ einbetten" : "↩ öffnen").font(.caption).foregroundStyle(.tertiary)
             }
             .padding(14)
             Divider()
             if mode == .link, !query.trimmingCharacters(in: .whitespaces).isEmpty,
-               store.linkIndex.resolve(query) == nil {
+                store.linkIndex.resolve(query) == nil
+            {
                 // [[Titel]] to a note that does not exist yet; clicking it later creates the note (#115).
-                Button { linkNewNote() } label: {
+                Button {
+                    linkNewNote()
+                } label: {
                     Label("„\(query.trimmingCharacters(in: .whitespaces))“ als neue Notiz verlinken", systemImage: "link.badge.plus")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -95,10 +113,16 @@ struct QuickOpenView: View {
                             ForEach(Array(items.enumerated()), id: \.element.id) { i, entry in
                                 row(entry, selected: i == index)
                                     .id(entry.id)
-                                    .onTapGesture { index = i; choose(items) }
+                                    .onTapGesture {
+                                        index = i
+                                        choose(items)
+                                    }
                                     .accessibilityElement(children: .combine)
                                     .accessibilityAddTraits(i == index ? [.isButton, .isSelected] : .isButton)
-                                    .accessibilityAction { index = i; choose(items) }
+                                    .accessibilityAction {
+                                        index = i
+                                        choose(items)
+                                    }
                             }
                         }
                         .padding(6)
@@ -230,7 +254,9 @@ extension NoteLinkInserter {
         guard let doc else { return }
         let body = ThemeManager.shared.bodyAttributes
         let block: BlockModel
-        if let last = doc.blocks.last(where: { $0.kind == .text }) { block = last } else {
+        if let last = doc.blocks.last(where: { $0.kind == .text }) {
+            block = last
+        } else {
             block = .text()
             doc.blocks.append(block)
         }
@@ -239,7 +265,9 @@ extension NoteLinkInserter {
         let s = NSMutableAttributedString()
         if block.storage.length > 0 { s.append(NSAttributedString(string: "\n", attributes: body)) }
         s.append(NSAttributedString(string: ref.meta.title.isEmpty ? "Notiz" : ref.meta.title, attributes: linkAttrs))
-        if let tv = FormattingController.shared.textView(for: block.id), tv.textStorage === block.storage, tv.shouldChangeText(in: NSRange(location: block.storage.length, length: 0), replacementString: s.string) {
+        if let tv = FormattingController.shared.textView(for: block.id), tv.textStorage === block.storage,
+            tv.shouldChangeText(in: NSRange(location: block.storage.length, length: 0), replacementString: s.string)
+        {
             tv.textStorage?.append(s)
             tv.didChangeText()
         } else {
@@ -284,7 +312,9 @@ struct BacklinksView: View {
                     ForEach(unresolved, id: \.self) { key in
                         // The title as written (the index keeps only the folded key).
                         let title = store.notes.first { $0.id == noteID }.flatMap { WikiLink.targets(in: $0.meta.searchText).first { WikiLink.key($0) == key } } ?? key
-                        Button { store.openOrCreate(title: title) } label: {
+                        Button {
+                            store.openOrCreate(title: title)
+                        } label: {
                             Label(title, systemImage: "plus").font(.system(size: 12, weight: .medium))
                                 .padding(.horizontal, 10).padding(.vertical, 5)
                                 .overlay(Capsule().strokeBorder(theme.accent.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
@@ -296,7 +326,10 @@ struct BacklinksView: View {
             }
             // Side by side, or below each other when the editor is narrow; never broken inside a word (#177).
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 14) { noteTools; Spacer() }
+                HStack(spacing: 14) {
+                    noteTools
+                    Spacer()
+                }
                 VStack(alignment: .leading, spacing: 8) { noteTools }
             }
             .buttonStyle(.borderless)
@@ -351,7 +384,9 @@ struct BacklinksView: View {
     }
 
     private func chip(_ ref: NoteRef) -> some View {
-        Button { store.open(noteID: ref.id) } label: {
+        Button {
+            store.open(noteID: ref.id)
+        } label: {
             Label(ref.meta.title.isEmpty ? "Ohne Titel" : ref.meta.title, systemImage: "note.text")
                 .font(.system(size: 12, weight: .medium))
                 .padding(.horizontal, 10).padding(.vertical, 5)
@@ -363,7 +398,8 @@ struct BacklinksView: View {
 
     private func snippet(_ ref: NoteRef) -> String {
         guard let title = store.notes.first(where: { $0.id == noteID })?.meta.title,
-              let r = Mentions.ranges(of: title, in: ref.meta.searchText).first else { return "" }
+            let r = Mentions.ranges(of: title, in: ref.meta.searchText).first
+        else { return "" }
         let ns = ref.meta.searchText as NSString
         let start = max(0, r.location - 30)
         return "…" + ns.substring(with: NSRange(location: start, length: min(ns.length - start, r.length + 60))).replacingOccurrences(of: "\n", with: " ") + "…"
@@ -423,8 +459,9 @@ struct SearchFilterPopover: View {
     }
 
     private func binding(tag: String) -> Binding<Bool> {
-        Binding(get: { store.searchFilter.tags.contains(tag) },
-                set: { on in if on { store.searchFilter.tags.insert(tag) } else { store.searchFilter.tags.remove(tag) } })
+        Binding(
+            get: { store.searchFilter.tags.contains(tag) },
+            set: { on in if on { store.searchFilter.tags.insert(tag) } else { store.searchFilter.tags.remove(tag) } })
     }
 }
 
@@ -534,7 +571,10 @@ struct TagEditSheet: View {
         HStack {
             Spacer()
             if store.tagEdit?.finished == true && started {
-                Button("Fertig") { store.tagEdit = nil; dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Fertig") {
+                    store.tagEdit = nil
+                    dismiss()
+                }.keyboardShortcut(.defaultAction)
             } else {
                 Button("Abbrechen") { dismiss() }.keyboardShortcut(.cancelAction).disabled(started)
                 Button(buttonTitle, role: action == .remove ? .destructive : nil) { run() }
@@ -544,7 +584,10 @@ struct TagEditSheet: View {
         }
     }
 
-    private enum Resulting: Equatable { case invalid, tag(String?) }
+    private enum Resulting: Equatable {
+        case invalid
+        case tag(String?)
+    }
 
     private var resultingTag: Resulting {
         switch action {

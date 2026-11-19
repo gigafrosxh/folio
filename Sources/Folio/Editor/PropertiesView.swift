@@ -24,8 +24,14 @@ struct PropertiesView: View {
             if adding {
                 // One row when there is room, otherwise the buttons get their own line (#242).
                 ViewThatFits(in: .horizontal) {
-                    HStack { addFields; addButtons }
-                    VStack(alignment: .leading, spacing: 6) { HStack { addFields }; HStack { addButtons } }
+                    HStack {
+                        addFields
+                        addButtons
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack { addFields }
+                        HStack { addButtons }
+                    }
                 }
                 .font(.system(size: 12))
             }
@@ -47,7 +53,10 @@ struct PropertiesView: View {
 
     @ViewBuilder private var addButtons: some View {
         Button("Hinzufügen", action: add).disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty).fixedSize()
-        Button("Abbrechen") { adding = false; newName = "" }.fixedSize()
+        Button("Abbrechen") {
+            adding = false
+            newName = ""
+        }.fixedSize()
     }
 
     private func update(_ p: NoteProperty) {
@@ -61,7 +70,9 @@ struct PropertiesView: View {
         guard !name.isEmpty else { return }
         var p = NoteProperty(name: name, kind: newKind)
         switch newKind {
-        case .status: p.options = ["Offen", "In Arbeit", "Erledigt"]; p.value = "Offen"
+        case .status:
+            p.options = ["Offen", "In Arbeit", "Erledigt"]
+            p.value = "Offen"
         case .date: p.value = Self.isoDate.string(from: Date())
         case .checkbox: p.value = "false"
         default: break
@@ -76,9 +87,13 @@ struct PropertiesView: View {
             Text(p.name).font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary).frame(width: 110, alignment: .leading).lineLimit(1)
             editor(p)
             Spacer(minLength: 0)
-            Button { doc.setProperties(properties.filter { $0.id != p.id }) } label: { Image(systemName: "xmark.circle") }
-                .buttonStyle(.borderless).foregroundStyle(.tertiary)
-                .helpLabel("Eigenschaft „\(p.name)“ entfernen")
+            Button {
+                doc.setProperties(properties.filter { $0.id != p.id })
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless).foregroundStyle(.tertiary)
+            .helpLabel("Eigenschaft „\(p.name)“ entfernen")
         }
         .font(.system(size: 12))
         .accessibilityElement(children: .contain)
@@ -88,28 +103,68 @@ struct PropertiesView: View {
     private func editor(_ p: NoteProperty) -> some View {
         switch p.kind {
         case .status:
-            Picker(p.name, selection: Binding(get: { p.value }, set: { var q = p; q.value = $0; update(q) })) {
+            Picker(
+                p.name,
+                selection: Binding(
+                    get: { p.value },
+                    set: {
+                        var q = p
+                        q.value = $0
+                        update(q)
+                    })
+            ) {
                 ForEach(p.options ?? [p.value], id: \.self) { Text($0).tag($0) }
             }
             .labelsHidden().fixedSize()
         case .date:
-            DatePicker(p.name, selection: Binding(get: { Self.isoDate.date(from: p.value) ?? Date() },
-                                                  set: { var q = p; q.value = Self.isoDate.string(from: $0); update(q) }),
-                       displayedComponents: .date)
-                .labelsHidden().fixedSize()
+            DatePicker(
+                p.name,
+                selection: Binding(
+                    get: { Self.isoDate.date(from: p.value) ?? Date() },
+                    set: {
+                        var q = p
+                        q.value = Self.isoDate.string(from: $0)
+                        update(q)
+                    }),
+                displayedComponents: .date
+            )
+            .labelsHidden().fixedSize()
         case .checkbox:
-            Toggle(p.name, isOn: Binding(get: { p.value == "true" }, set: { var q = p; q.value = $0 ? "true" : "false"; update(q) }))
-                .labelsHidden().toggleStyle(.checkbox)
+            Toggle(
+                p.name,
+                isOn: Binding(
+                    get: { p.value == "true" },
+                    set: {
+                        var q = p
+                        q.value = $0 ? "true" : "false"
+                        update(q)
+                    })
+            )
+            .labelsHidden().toggleStyle(.checkbox)
         case .number:
-            TextField(p.name, text: Binding(get: { p.value }, set: { v in
-                var q = p
-                q.value = v.replacingOccurrences(of: ",", with: ".").filter { $0.isNumber || $0 == "." || $0 == "-" }
-                update(q)
-            }))
+            TextField(
+                p.name,
+                text: Binding(
+                    get: { p.value },
+                    set: { v in
+                        var q = p
+                        q.value = v.replacingOccurrences(of: ",", with: ".").filter { $0.isNumber || $0 == "." || $0 == "-" }
+                        update(q)
+                    })
+            )
             .textFieldStyle(.roundedBorder).frame(width: 120).labelsHidden()
         case .text:
-            TextField(p.name, text: Binding(get: { p.value }, set: { var q = p; q.value = $0; update(q) }))
-                .textFieldStyle(.roundedBorder).frame(maxWidth: 320).labelsHidden()
+            TextField(
+                p.name,
+                text: Binding(
+                    get: { p.value },
+                    set: {
+                        var q = p
+                        q.value = $0
+                        update(q)
+                    })
+            )
+            .textFieldStyle(.roundedBorder).frame(maxWidth: 320).labelsHidden()
         }
     }
 }

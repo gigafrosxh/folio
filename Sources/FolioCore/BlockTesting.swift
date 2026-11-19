@@ -88,8 +88,9 @@ public enum BlockTestEvaluator {
         if let expected = test.expectedOutput, let problem = outputProblem(expected: expected, actual: actual, match: test.match, regexTimeout: regexTimeout) {
             messages.append(problem)
         }
-        return BlockTestOutcome(status: messages.isEmpty ? .passed : .failed, messages: messages,
-                                actualOutput: actual, actualExitCode: r.exitCode)
+        return BlockTestOutcome(
+            status: messages.isEmpty ? .passed : .failed, messages: messages,
+            actualOutput: actual, actualExitCode: r.exitCode)
     }
 
     private static func outputProblem(expected: String, actual: String, match: BlockTest.Match, regexTimeout: TimeInterval) -> String? {

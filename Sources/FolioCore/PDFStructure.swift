@@ -109,7 +109,10 @@ public enum PDFStructure {
     }
 
     private static func append(_ run: Run, to runs: inout [Run]) {
-        guard let last = runs.last else { runs.append(run); return }
+        guard let last = runs.last else {
+            runs.append(run)
+            return
+        }
         if last.bold == run.bold, last.italic == run.italic {
             runs[runs.count - 1].text += run.text
         } else {
@@ -156,7 +159,10 @@ public enum PDFStructure {
         var levels: [Int] = []
         for i in lines.indices {
             // A piece on the same row as the line before (a formula PDFKit split) is part of that line.
-            if i > 0, sameRow(lines[i - 1], lines[i]) { levels.append(levels[i - 1]); continue }
+            if i > 0, sameRow(lines[i - 1], lines[i]) {
+                levels.append(levels[i - 1])
+                continue
+            }
             levels.append(level(at: i, of: lines, body: body))
         }
         return levels
@@ -336,9 +342,11 @@ private struct ElementBuilder {
     }
 
     private mutating func flush() {
-        guard let c = current, !c.runs.isEmpty else { current = nil; return }
-        if c.level > 0 { out.append(.heading(level: c.level, runs: c.runs)) }
-        else { out.append(c.list ? .listItem(c.runs) : .paragraph(c.runs)) }
+        guard let c = current, !c.runs.isEmpty else {
+            current = nil
+            return
+        }
+        if c.level > 0 { out.append(.heading(level: c.level, runs: c.runs)) } else { out.append(c.list ? .listItem(c.runs) : .paragraph(c.runs)) }
         current = nil
     }
 
@@ -366,8 +374,11 @@ enum PDFPictures {
     private static func render(_ page: CGPDFPage, rect: CGRect) -> (png: Data, width: Int, height: Int)? {
         let scale: CGFloat = 2
         let width = Int((rect.width * scale).rounded()), height = Int((rect.height * scale).rounded())
-        guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        guard
+            let ctx = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         ctx.scaleBy(x: scale, y: scale)
@@ -426,7 +437,8 @@ private final class PictureScanner {
     private func draw(_ scanner: CGPDFScannerRef) {
         var name: UnsafePointer<CChar>?
         guard CGPDFScannerPopName(scanner, &name), let name,
-              let object = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "XObject", name) else { return }
+            let object = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "XObject", name)
+        else { return }
         var stream: CGPDFStreamRef?
         guard CGPDFObjectGetValue(object, .stream, &stream), let stream, let dict = CGPDFStreamGetDictionary(stream) else { return }
         var subtype: UnsafePointer<CChar>?

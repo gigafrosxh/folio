@@ -50,8 +50,7 @@ struct SQLCMDOutputParser {
 
     private mutating func finishResultSet() {
         guard let result = current else { return }
-        if result.columns == ["__folio_changes"] { changes = result.rows.first?.first ?? nil }
-        else if !result.rows.isEmpty { last = result }
+        if result.columns == ["__folio_changes"] { changes = result.rows.first?.first ?? nil } else if !result.rows.isEmpty { last = result }
         current = nil
     }
 
@@ -59,7 +58,10 @@ struct SQLCMDOutputParser {
         guard let count = current?.columns.count, pending != nil || !line.isEmpty else { return }
         let record = pending.map { $0 + "\n" + line } ?? line
         let fields = record.components(separatedBy: Self.separator)
-        guard fields.count >= count else { pending = record; return }
+        guard fields.count >= count else {
+            pending = record
+            return
+        }
         guard fields.count == count else { throw DatabaseError.queryFailed("Ungültige SQL-Server-Ausgabe.") }
         current?.rows.append(fields.map { $0 == "NULL" ? nil : $0 })
         pending = nil
@@ -94,7 +96,10 @@ struct CSVRecordReader {
     /// Handles one character and says how many were used.
     private mutating func consume(_ c: Character, next: Character?) -> Int {
         if c == "\"" { return consumeQuote(next: next) }
-        if quoted { field.append(c); return 1 }
+        if quoted {
+            field.append(c)
+            return 1
+        }
         switch c {
         case ",": endField()
         case "\n", "\r\n", "\r": endLine()

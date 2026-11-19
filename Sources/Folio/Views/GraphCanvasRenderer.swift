@@ -75,8 +75,10 @@ struct GraphCanvasRenderer {
     }
 
     private func radius(of node: LinkIndex.Node, isFolder: Bool, scale: CGFloat) -> CGFloat {
-        let size = isFolder ? min(9 + sqrt(Double(degree(of: node.id, isFolder: true))) * 2.5, 22)
-                            : min(4 + sqrt(Double(degree(of: node.id, isFolder: false))) * 2.2, 14)
+        let size =
+            isFolder
+            ? min(9 + sqrt(Double(degree(of: node.id, isFolder: true))) * 2.5, 22)
+            : min(4 + sqrt(Double(degree(of: node.id, isFolder: false))) * 2.2, 14)
         return size * max(min(zoom, 1.6), 0.7) * scale
     }
 

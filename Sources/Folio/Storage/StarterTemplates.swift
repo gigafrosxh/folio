@@ -6,39 +6,45 @@ import FolioCore
 enum StarterTemplates {
     static var all: [NoteFile] {
         [
-            make("Meeting", """
-            # Meeting {{datum}}
-            {{wochentag}}, {{uhrzeit}} · #meeting
-            ## Teilnehmende
-            • 
-            ## Themen
-            1. 
-            ## Entscheidungen
-            • 
-            ## Aufgaben
-            ☐ 
-            """),
-            make("Lernnotiz", """
-            # Lernnotiz: Thema
-            {{datum}} · #lernen
-            ## Ziel
-            Was will ich verstehen?
-            ## Notizen
-            • 
-            ## Fragen
-            • 
-            ## Zusammenfassung in drei Sätzen
-            """),
-            make("Projekt", """
-            # Projekt: Name
-            Gestartet am {{datum}} · #projekt
-            ## Ziel
-            ## Meilensteine
-            ☐ 
-            ## Offene Punkte
-            • 
-            ## Links & Ressourcen
-            """),
+            make(
+                "Meeting",
+                """
+                # Meeting {{datum}}
+                {{wochentag}}, {{uhrzeit}} · #meeting
+                ## Teilnehmende
+                • 
+                ## Themen
+                1. 
+                ## Entscheidungen
+                • 
+                ## Aufgaben
+                ☐ 
+                """),
+            make(
+                "Lernnotiz",
+                """
+                # Lernnotiz: Thema
+                {{datum}} · #lernen
+                ## Ziel
+                Was will ich verstehen?
+                ## Notizen
+                • 
+                ## Fragen
+                • 
+                ## Zusammenfassung in drei Sätzen
+                """),
+            make(
+                "Projekt",
+                """
+                # Projekt: Name
+                Gestartet am {{datum}} · #projekt
+                ## Ziel
+                ## Meilensteine
+                ☐ 
+                ## Offene Punkte
+                • 
+                ## Links & Ressourcen
+                """)
         ]
     }
 
@@ -48,8 +54,13 @@ enum StarterTemplates {
         for (i, raw) in text.components(separatedBy: "\n").enumerated() {
             var line = raw
             var attrs = theme.bodyAttributes
-            if line.hasPrefix("## ") { line.removeFirst(3); attrs = TextStyle.subheading.attributes(theme: theme) }
-            else if line.hasPrefix("# ") { line.removeFirst(2); attrs = TextStyle.title.attributes(theme: theme) }
+            if line.hasPrefix("## ") {
+                line.removeFirst(3)
+                attrs = TextStyle.subheading.attributes(theme: theme)
+            } else if line.hasPrefix("# ") {
+                line.removeFirst(2)
+                attrs = TextStyle.title.attributes(theme: theme)
+            }
             if i > 0 { s.append(NSAttributedString(string: "\n", attributes: attrs)) }
             s.append(NSAttributedString(string: line, attributes: attrs))
         }

@@ -28,7 +28,10 @@ struct SafetySettingsView: View {
                         HStack {
                             Button("Ändern …", action: chooseFolder)
                             if !theme.settings.backupFolder.isEmpty {
-                                Button("Standard") { theme.settings.backupFolder = ""; backups.refresh() }
+                                Button("Standard") {
+                                    theme.settings.backupFolder = ""
+                                    backups.refresh()
+                                }
                             }
                             Button("Im Finder zeigen") {
                                 try? FileManager.default.createDirectory(at: backups.directory, withIntermediateDirectories: true)
@@ -51,8 +54,10 @@ struct SafetySettingsView: View {
             } header: {
                 Text("Backups")
             } footer: {
-                Text("Jede Sicherung ist eine Zip-Datei der ganzen Bibliothek und wird nach dem Schreiben geprüft. Ältere werden ausgedünnt: alle der letzten 2 Tage, eine pro Tag für 2 Wochen, eine pro Woche für 3 Monate.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "Jede Sicherung ist eine Zip-Datei der ganzen Bibliothek und wird nach dem Schreiben geprüft. Ältere werden ausgedünnt: alle der letzten 2 Tage, eine pro Tag für 2 Wochen, eine pro Woche für 3 Monate."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
             if !backups.backups.isEmpty {
                 Section("Vorhandene Sicherungen") {
@@ -82,8 +87,10 @@ struct SafetySettingsView: View {
             } header: {
                 Text("Versionen & Papierkorb")
             } footer: {
-                Text("Versionen und Papierkorb liegen im versteckten Ordner „.folio“ der Bibliothek. Versionen werden ausgedünnt: alle der letzten 24 Stunden, stündlich für eine Woche, täglich für 3 Monate, wöchentlich für ein Jahr.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "Versionen und Papierkorb liegen im versteckten Ordner „.folio“ der Bibliothek. Versionen werden ausgedünnt: alle der letzten 24 Stunden, stündlich für eine Woche, täglich für 3 Monate, wöchentlich für ein Jahr."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 LabeledContent("Gefundene Abstürze") {
@@ -99,8 +106,10 @@ struct SafetySettingsView: View {
             } header: {
                 Text("Absturzberichte")
             } footer: {
-                Text("Der Bericht enthält nur technische Angaben, keine Notizinhalte, Titel, Pfade oder Geräte-IDs. Folio sendet ihn nicht; du siehst ihn vorher und entscheidest, ob du ihn sicherst oder kopierst.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(
+                    "Der Bericht enthält nur technische Angaben, keine Notizinhalte, Titel, Pfade oder Geräte-IDs. Folio sendet ihn nicht; du siehst ihn vorher und entscheidest, ob du ihn sicherst oder kopierst."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
