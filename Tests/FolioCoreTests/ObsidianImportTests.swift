@@ -44,3 +44,27 @@ final class ObsidianImportTests: XCTestCase {
         XCTAssertNil(s.files["app.json"])
     }
 }
+
+final class ObsidianEdgeTests: XCTestCase {
+    func testCodeIsLeftAlone() {
+        let md = "# N\n```python\nx = \"![[nicht.png]] und [[Ordner/kein Link]]\"\n```\nInline `![[auch nicht.png]]` hier."
+        let p = ObsidianImport.prepare(md, title: "N", files: [:])
+        XCTAssertTrue(p.markdown.contains("x = \"![[nicht.png]] und [[Ordner/kein Link]]\""), p.markdown)
+        XCTAssertTrue(p.markdown.contains("`![[auch nicht.png]]`"), p.markdown)
+        XCTAssertTrue(p.missing.isEmpty)
+    }
+
+    func testEmptyAndCRLF() {
+        XCTAssertEqual(ObsidianImport.prepare("", title: "Leer", files: [:]).markdown, "# Leer\n\n")
+        let p = ObsidianImport.prepare("---\r\ntags: a\r\n---\r\nText", title: "T", files: [:])
+        XCTAssertEqual(p.tags, ["a"])
+    }
+}
+
+final class ObsidianCodeSplitTests: XCTestCase {
+    func testIdentityKeepsText() {
+        for text in ["a\nb", "a\n```\ncode\n```\nb", "```x\n```", "t `c` u `d", "\n\n```\n[[x]]\n```\n\nend\n", "~~~\nq\n~~~"] {
+            XCTAssertEqual(ObsidianImport.outsideCode(text) { $0 }, text, text.debugDescription)
+        }
+    }
+}

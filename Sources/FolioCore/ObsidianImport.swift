@@ -47,8 +47,8 @@ public enum ObsidianImport {
     public static func prepare(_ markdown: String, title: String, files: [String: String], notePaths: Set<String> = []) -> Prepared {
         var (body, tags, properties) = frontMatter(markdown.replacingOccurrences(of: "\r\n", with: "\n"))
         var missing: [String] = []
-        body = rewriteEmbeds(body, files: files, notePaths: notePaths, missing: &missing)
-        body = cleanLinks(body)
+        // Code stays exactly as written; only the text around it is rewritten (#346).
+        body = outsideCode(body) { cleanLinks(rewriteEmbeds($0, files: files, notePaths: notePaths, missing: &missing)) }
         // Obsidian's title is the file name; Folio's is the first line.
         let firstLine = body.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
         let plainFirst = firstLine.replacingOccurrences(of: #"^#+\s*"#, with: "", options: .regularExpression)
@@ -115,6 +115,52 @@ public enum ObsidianImport {
         var t = s
         if t.count >= 2, let f = t.first, f == t.last, f == "\"" || f == "'" { t = String(t.dropFirst().dropLast()) }
         return t
+    }
+
+    // MARK: Code
+
+    /// Applies `transform` to everything except fenced code blocks and inline code spans.
+    static func outsideCode(_ text: String, _ transform: (String) -> String) -> String {
+        var out = ""
+        var plain: [String] = []
+        var fence: String?
+        let lines = text.components(separatedBy: "\n")
+        for (i, line) in lines.enumerated() {
+            let newline = i < lines.count - 1 ? "\n" : ""
+            let opens = fence == nil ? fenceMarker(line) : nil
+            if fence == nil && opens == nil {
+                plain.append(line)
+                continue
+            }
+            if opens != nil {
+                plain.append("")
+                out += inlineAware(plain.joined(separator: "\n"), transform)
+                plain = []
+                fence = opens
+            } else if line.trimmingCharacters(in: .whitespaces).hasPrefix(fence!) {
+                fence = nil
+                out += line + newline
+                continue
+            }
+            out += line + newline
+        }
+        if !plain.isEmpty { out += inlineAware(plain.joined(separator: "\n"), transform) }
+        return out
+    }
+
+    private static func fenceMarker(_ line: String) -> String? {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        return t.hasPrefix("```") || t.hasPrefix("~~~") ? String(t.prefix(3)) : nil
+    }
+
+    /// Inline `code` spans are kept, the rest is transformed.
+    private static func inlineAware(_ text: String, _ transform: (String) -> String) -> String {
+        let parts = text.components(separatedBy: "`")
+        guard parts.count >= 3 else { return transform(text) }
+        return parts.enumerated().map { i, part in
+            // Odd parts are inside backticks; an unmatched last backtick leaves the tail as text.
+            i % 2 == 1 && i < parts.count - (parts.count % 2 == 0 ? 1 : 0) ? part : transform(part)
+        }.joined(separator: "`")
     }
 
     // MARK: Embeds and links
