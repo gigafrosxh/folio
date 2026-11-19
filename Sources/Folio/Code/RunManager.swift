@@ -175,6 +175,7 @@ final class RunManager: ObservableObject {
             // A regular expression can take seconds; the interface has to keep running (#134).
             block.testOutcome = await Task.detached(priority: .userInitiated) { BlockTestEvaluator.evaluate(test, result: r) }.value
         }
+        block.lastRun = CodeRunStamp(codeHash: CodeDependencies.fingerprint(c.code), succeeded: r.succeeded)
         if c.kernel != nil {
             block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
             block.startedServer = r.serverURL != nil

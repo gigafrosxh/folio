@@ -244,7 +244,7 @@ extension NotePDFExporter {
             case .pdf: appendPDF(block)
             case .file: await appendFile(block)
             case .web: appendWeb(block)
-            case .math, .diagram: await appendRendered(block)
+            case .math, .diagram, .erd: await appendRendered(block)
             case .audio: appendAudio(block)
             }
         }
@@ -339,10 +339,10 @@ extension NotePDFExporter {
         }
 
         private func appendRendered(_ block: BlockModel) async {
-            let kind: RenderScript.Kind = block.kind == .math ? .math : .diagram
+            let kind: RenderScript.Kind = block.kind == .math ? .math : block.kind == .erd ? .erd : .diagram
             let source = block.storage.string
             guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            let options = RenderScript.Options(dark: false, fontSize: kind == .math ? 16 : 13)
+            let options = RenderScript.Options(dark: false, fontSize: kind == .math ? 16 : 13, view: block.mode.isEmpty ? "er" : block.mode)
             if let rendered = try? await OffscreenRenderer.render(kind, source: source, width: width, options: options),
                let image = OffscreenRenderer.image(from: rendered) {
                 appendImage(image)

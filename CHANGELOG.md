@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Abhängigkeiten zwischen Code-Blöcken** (#26): Folio erkennt, welche Namen (Variablen, Funktionen, Importe) ein Block aus einem früheren Block derselben Sitzung nutzt. Der Kopf eines Blocks zeigt „← Block 2“ oder „veraltet“, wenn sich der Code seit dem letzten Lauf geändert hat oder ein Vorgänger neuer, fehlgeschlagen oder nie gelaufen ist. „Abhängigkeiten der Code-Blöcke …“ im Blockmenü zeigt Reihenfolge, Status und Pfeile; „Veraltete Blöcke neu ausführen“ bringt alles von oben nach unten auf den neuen Stand und warnt, wenn ein Block einen Namen nutzt, den erst ein späterer definiert.
+- **Code-Block als Datei exportieren** (#28): „Als Datei exportieren …“ schlägt einen Namen mit passender Endung vor (aus Beschriftung oder erster Funktion/Klasse) und verknüpft den Block mit der Datei.
+- **Diff zur verknüpften Datei** (#31): Ein Chip im Blockkopf zeigt, ob Datei und Block gleich sind. Der Vergleich zeigt die Unterschiede zeilenweise wie `git diff`, kopiert sie als Unified-Diff, schreibt den Block in die Datei oder übernimmt die Datei in den Block (rückgängig machbar).
+- **ER-Diagramme aus ERD-Ultra** (#204): `.erdu`-Dateien lassen sich einfügen (⌃⇧E, Datei-Dialog, Drag & Drop) und zeigen ER-Diagramm, relationales Schema oder SQL-DDL, gezeichnet mit ERD-Ultras eigenem Renderer, hell und dunkel. Die Datei steckt vollständig in der Notiz; ist das Original verknüpft, übernimmt Folio Änderungen aus ERD-Ultra nach dem Speichern innerhalb von etwa einer Sekunde, ohne den Fokus zu wechseln. Kaputte oder zu neue Dateien ersetzen nie den letzten Stand. Export als SVG/PNG/PDF, SQL kopieren, „In ERD-Ultra öffnen“, Markdown-Export als ```` ```erdu ````-Block (wird beim Import wieder ein ER-Block), Namen sind durchsuchbar, PDF-Export enthält das Diagramm. Notizen mit ER-Block öffnen erst ab Folio 1.7.
+
 ## [1.6.7] – 2026-11-17
 
 ### Behoben

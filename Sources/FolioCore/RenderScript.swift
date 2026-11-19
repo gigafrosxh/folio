@@ -7,6 +7,8 @@ import Foundation
 public enum RenderScript {
     public enum Kind: String, Sendable {
         case math, diagram
+        /// ERD-Ultra file (#204); the source is the `.erdu` JSON, `Options.view` picks the drawing.
+        case erd
     }
 
     public struct Options: Sendable, Equatable {
@@ -14,18 +16,21 @@ public enum RenderScript {
         public var fontSize: Double
         /// Formula on its own line (display style) instead of inline style.
         public var displayMode: Bool
+        /// ER blocks: "er", "rel" or "sql".
+        public var view: String
 
-        public init(dark: Bool = false, fontSize: Double = 18, displayMode: Bool = true) {
+        public init(dark: Bool = false, fontSize: Double = 18, displayMode: Bool = true, view: String = "er") {
             self.dark = dark
             self.fontSize = fontSize
             self.displayMode = displayMode
+            self.view = view
         }
     }
 
     /// The call that renders `source`; the source is passed as a JSON string literal, so quotes,
     /// backslashes, line breaks and `</script>` in it can never break out of the call.
     public static func call(_ kind: Kind, source: String, options: Options = Options()) -> String {
-        let opts: [String: Any] = ["dark": options.dark, "fontSize": options.fontSize, "displayMode": options.displayMode]
+        let opts: [String: Any] = ["dark": options.dark, "fontSize": options.fontSize, "displayMode": options.displayMode, "view": options.view]
         return "folioRender(\(jsString(kind.rawValue)), \(jsString(source)), \(json(opts)))"
     }
 
@@ -55,6 +60,8 @@ public enum RenderScript {
         public var error: String?
         /// The rendered SVG (diagrams only), for exporting.
         public var svg: String?
+        /// ER blocks in the SQL view: the generated DDL.
+        public var sql: String?
         /// Height of the whole rendered area (what the view needs to show it).
         public var pageHeight: Double = 0
         /// The page finished loading (first message, before any render).
@@ -79,6 +86,7 @@ public enum RenderScript {
             y = (d["y"] as? NSNumber)?.doubleValue ?? 0
             pageHeight = (d["pageHeight"] as? NSNumber)?.doubleValue ?? height
             ready = d["ready"] as? Bool ?? false
+            sql = d["sql"] as? String
         }
 
         /// KaTeX and Mermaid errors carry long prefixes and the whole source; keep the useful first lines.

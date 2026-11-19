@@ -141,6 +141,10 @@ enum MarkdownTransfer {
                 var b = BlockRecord(kind: .text)
                 b.rtf = RichTextCodec.rtfData(from: attributed(fromMarkdown: text))
                 blocks.append(b)
+            case .code("erdu", let code) where (try? ErduDocument.summary(of: code)) != nil:
+                var b = BlockRecord(kind: .erd)
+                b.code = code
+                blocks.append(b)
             case .code(let lang, let code):
                 var b = BlockRecord(kind: .code)
                 b.code = code

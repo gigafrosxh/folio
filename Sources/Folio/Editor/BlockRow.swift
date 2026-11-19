@@ -94,6 +94,8 @@ struct BlockRow: View {
             AudioBlockView(block: block, doc: doc)
         case .embed:
             EmbedBlockView(block: block, doc: doc)
+        case .erd:
+            ErdBlockView(block: block, doc: doc)
         }
     }
 

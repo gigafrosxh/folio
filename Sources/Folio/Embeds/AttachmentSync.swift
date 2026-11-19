@@ -98,6 +98,8 @@ enum AttachmentSync {
 
     /// Creates the right block for a file: PDF → PDF view, image → image, everything else → Quick Look.
     static func makeBlock(for url: URL, in doc: NoteDocument) throws -> BlockModel {
+        // ERD-Ultra projects become ER blocks (#204); a broken file says why instead of becoming a plain file.
+        if url.pathExtension.lowercased() == ErduDocument.fileExtension { return try ErdBlocks.makeBlock(from: url) }
         guard let content = read(url) else { throw ImportError.unreadable(url.lastPathComponent) }
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
         let kind: BlockKind

@@ -62,23 +62,37 @@ enum LayoutDebug {
         if let pdf = env["FOLIO_EXPORT_PDF"] { exportPDF(to: pdf) }
     }
 
+    private typealias RenderCase = (name: String, kind: RenderScript.Kind, source: String, options: RenderScript.Options)
+
+    private static func renderCases() -> [RenderCase] {
+        var cases: [RenderCase] = [
+            ("math", .math, RenderSamples.math, .init()), ("diagram", .diagram, RenderSamples.diagram, .init()),
+            ("sequence", .diagram, "sequenceDiagram\n  Alice->>Bob: Hallo\n  Bob-->>Alice: Hi", .init()),
+            ("broken", .diagram, "flowchart LR\n  A --> ", .init()), ("brokenmath", .math, "\\frac{1}{", .init()),
+            ("erd-broken", .erd, #"{"format":"erd-ultra","version":9}"#, .init()),
+        ]
+        // FOLIO_RENDER_ERDU=<datei.erdu>: also every view of that ERD-Ultra file, light and dark (#204).
+        guard let path = env["FOLIO_RENDER_ERDU"], let text = try? String(contentsOfFile: path, encoding: .utf8) else { return cases }
+        for view in ["er", "rel", "sql"] {
+            for dark in [false, true] {
+                cases.append(("erd-\(view)\(dark ? "-dark" : "")", .erd, text, .init(dark: dark, fontSize: 13, view: view)))
+            }
+        }
+        return cases
+    }
+
     @MainActor private static func renderSamples(to dir: String) {
         Task { @MainActor in
-            let cases: [(String, RenderScript.Kind, String)] = [
-                ("math", .math, RenderSamples.math), ("diagram", .diagram, RenderSamples.diagram),
-                ("sequence", .diagram, "sequenceDiagram\n  Alice->>Bob: Hallo\n  Bob-->>Alice: Hi"),
-                ("broken", .diagram, "flowchart LR\n  A --> "), ("brokenmath", .math, "\\frac{1}{"),
-            ]
-            for (name, kind, source) in cases {
+            for c in renderCases() {
                 do {
-                    let out = try await OffscreenRenderer.render(kind, source: source)
-                    let base = URL(fileURLWithPath: dir).appendingPathComponent(name)
+                    let out = try await OffscreenRenderer.render(c.kind, source: c.source, width: c.kind == .erd ? 1100 : 760, options: c.options)
+                    let base = URL(fileURLWithPath: dir).appendingPathComponent(c.name)
                     try out.pdf.write(to: base.appendingPathExtension("pdf"))
                     try OffscreenRenderer.png(from: out)?.write(to: base.appendingPathExtension("png"))
                     if let svg = out.svg { try Data(svg.utf8).write(to: base.appendingPathExtension("svg")) }
-                    print("RENDER", name, "ok", out.size)
+                    print("RENDER", c.name, "ok", out.size)
                 } catch {
-                    print("RENDER", name, "error", error.localizedDescription)
+                    print("RENDER", c.name, "error", error.localizedDescription)
                 }
             }
             fflush(stdout)

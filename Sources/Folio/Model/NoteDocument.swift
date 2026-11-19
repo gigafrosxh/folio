@@ -42,6 +42,9 @@ final class BlockModel: ObservableObject, Identifiable {
     var ranInSession = false
     /// Its last run started a server (those are never replayed automatically).
     var startedServer = false
+    /// Code blocks: last run (#26) and the file the code is linked to (#28, #31).
+    @Published var lastRun: CodeRunStamp?
+    @Published var linkedFile: String?
 
     init(kind: BlockKind, id: UUID = UUID()) {
         self.id = id
@@ -61,7 +64,7 @@ final class BlockModel: ObservableObject, Identifiable {
         switch r.kind {
         case .text:
             storage.setAttributedString(RichTextCodec.attributedString(from: r.rtf))
-        case .code, .database, .math, .diagram, .embed:
+        case .code, .database, .math, .diagram, .embed, .erd:
             storage.setAttributedString(NSAttributedString(string: r.code ?? ""))
         default: break
         }
@@ -70,6 +73,8 @@ final class BlockModel: ObservableObject, Identifiable {
         interactive = r.interactive ?? false
         outputCollapsed = r.outputCollapsed ?? false
         test = r.test
+        lastRun = r.lastRun
+        linkedFile = r.linkedFile
         language = r.language ?? language
         output = r.output
         outputIsError = r.outputIsError ?? false
@@ -103,6 +108,8 @@ final class BlockModel: ObservableObject, Identifiable {
         interactive = r.interactive ?? false
         outputCollapsed = r.outputCollapsed ?? false
         test = r.test
+        lastRun = r.lastRun
+        linkedFile = r.linkedFile
         testOutcome = nil
         if let code = r.code, kind != .text, storage.string != code { storage.setAttributedString(NSAttributedString(string: code)) }
         revision += 1
@@ -128,12 +135,17 @@ final class BlockModel: ObservableObject, Identifiable {
             if interactive { r.interactive = true }
             if outputCollapsed { r.outputCollapsed = true }
             r.test = test
+            r.lastRun = lastRun
+            r.linkedFile = linkedFile
         case .database:
             r.code = storage.string
             r.language = "sql"
             r.connection = connection
         case .math, .diagram, .embed:
             r.code = storage.string
+        case .erd:
+            r.code = storage.string
+            r.linkedFile = linkedFile
         case .audio:
             r.output = output
             if !language.isEmpty && language != "python" { r.language = language }
@@ -141,7 +153,7 @@ final class BlockModel: ObservableObject, Identifiable {
         }
         if !url.isEmpty { r.url = url }
         r.attachmentID = attachmentID
-        if ![.text, .code, .math, .diagram, .audio].contains(kind) {
+        if ![.text, .code, .math, .diagram, .audio, .erd].contains(kind) {
             r.height = height
             r.width = width
         }
@@ -167,6 +179,7 @@ final class BlockModel: ObservableObject, Identifiable {
         case .web: return url
         case .audio: return [caption, output ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
         case .embed: return "![[\(storage.string)]]"
+        case .erd: return [caption, ErduDocument.searchText(of: storage.string)].filter { !$0.isEmpty }.joined(separator: "\n")
         // Alt text and the text inside PDFs are found by the search (#43, #46).
         case .image: return [caption, altText].filter { !$0.isEmpty }.joined(separator: "\n")
         case .pdf: return [caption, pdfText ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")

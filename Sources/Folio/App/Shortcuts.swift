@@ -92,7 +92,7 @@ struct KeyCombo: Codable, Hashable {
 
 /// Tools that can be triggered from the keyboard; every one can be rebound in the settings.
 enum ShortcutAction: String, CaseIterable, Identifiable {
-    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll, database, math, diagram, audio
+    case codeBlock, table, drawing, checklist, web, file, playground, link, chat, writingTools, runAll, database, math, diagram, audio, erd
 
     var id: String { rawValue }
 
@@ -113,6 +113,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .math: return "Formel (LaTeX) einfügen"
         case .diagram: return "Diagramm (Mermaid) einfügen"
         case .audio: return "Audio aufnehmen"
+        case .erd: return "ER-Diagramm aus ERD-Ultra einfügen …"
         }
     }
 
@@ -133,6 +134,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .math: return "function"
         case .diagram: return "point.3.connected.trianglepath.dotted"
         case .audio: return "mic"
+        case .erd: return "point.3.filled.connected.trianglepath.dotted"
         }
     }
 
@@ -154,6 +156,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .math: return KeyCombo(key: "m", control: true, shift: true)
         case .diagram: return KeyCombo(key: "g", control: true, shift: true)
         case .audio: return KeyCombo(key: "a", control: true, shift: true)
+        case .erd: return KeyCombo(key: "e", control: true, shift: true)
         }
     }
 }
@@ -264,6 +267,7 @@ final class ShortcutCenter {
         case .math: post("math")
         case .diagram: post("diagram")
         case .audio: post("audio")
+        case .erd: post("erd")
         }
     }
 

@@ -1,0 +1,733 @@
+{
+  "format": "erd-ultra",
+  "version": 1,
+  "app": "ERD-Ultra",
+  "er": {
+    "nodes": [
+      {
+        "kind": "entity",
+        "id": "nmwngqh7y1t7j5",
+        "name": "Mitarbeiter",
+        "x": 377,
+        "y": -76
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y26nvj",
+        "name": "mitarbeiter_id",
+        "x": 177,
+        "y": -76,
+        "attrKind": "key",
+        "dataType": "int"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y492ce",
+        "name": "vorname",
+        "x": 311,
+        "y": -195,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y6mnqz",
+        "name": "nachname",
+        "x": 309,
+        "y": 43,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y8h4ok",
+        "name": "funktion",
+        "x": 423,
+        "y": -201,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yaz0i9",
+        "name": "eintrittsdatum",
+        "x": 218,
+        "y": -155,
+        "attrKind": "normal",
+        "dataType": "date"
+      },
+      {
+        "kind": "entity",
+        "id": "nmwngqh7ycoeeb",
+        "name": "Gehege",
+        "x": 834,
+        "y": -152
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7ydgsf8",
+        "name": "gehege_id",
+        "x": 855,
+        "y": -262,
+        "attrKind": "key",
+        "dataType": "int"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yfe4f8",
+        "name": "bezeichnung",
+        "x": 988,
+        "y": -194,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yhckaz",
+        "name": "flaeche_m2",
+        "x": 693,
+        "y": -207,
+        "attrKind": "normal",
+        "dataType": "decimal(8,2)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yjyojm",
+        "name": "klimazone",
+        "x": 855,
+        "y": -42,
+        "attrKind": "normal",
+        "dataType": "varchar(30)"
+      },
+      {
+        "kind": "entity",
+        "id": "nmwngqh7ylq0q5",
+        "name": "Tier",
+        "x": 1157,
+        "y": -187
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7ymh8s9",
+        "name": "tier_id",
+        "x": 1233,
+        "y": -283,
+        "attrKind": "key",
+        "dataType": "int"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yooirf",
+        "name": "name",
+        "x": 1038,
+        "y": -255,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yqz4yl",
+        "name": "art",
+        "x": 1296,
+        "y": -145,
+        "attrKind": "normal",
+        "dataType": "varchar(50)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7ysjhwo",
+        "name": "geburtsdatum",
+        "x": 1315,
+        "y": -229,
+        "attrKind": "normal",
+        "dataType": "date"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yuptgu",
+        "name": "geschlecht",
+        "x": 1239,
+        "y": -91,
+        "attrKind": "normal",
+        "dataType": "char(1)"
+      },
+      {
+        "kind": "entity",
+        "id": "nmwngqh7ywy0c5",
+        "name": "Säugetier",
+        "x": 1345,
+        "y": 65
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yxvsxt",
+        "name": "fellart",
+        "x": 1465,
+        "y": 87,
+        "attrKind": "normal",
+        "dataType": "varchar(30)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7yzfmpu",
+        "name": "tragzeit_tage",
+        "x": 1383,
+        "y": -16,
+        "attrKind": "normal",
+        "dataType": "smallint"
+      },
+      {
+        "kind": "entity",
+        "id": "nmwngqh7y11pdvl",
+        "name": "Vogel",
+        "x": 1112,
+        "y": 207
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y129ktp",
+        "name": "spannweite_cm",
+        "x": 1112,
+        "y": 291,
+        "attrKind": "normal",
+        "dataType": "smallint"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y14grja",
+        "name": "flugfaehig",
+        "x": 1248,
+        "y": 207,
+        "attrKind": "normal",
+        "dataType": "boolean"
+      },
+      {
+        "kind": "entity",
+        "id": "nmwngqh7y16lko7",
+        "name": "Reptil",
+        "x": 849,
+        "y": 153
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y17bdu1",
+        "name": "min_temperatur_c",
+        "x": 723,
+        "y": 204,
+        "attrKind": "normal",
+        "dataType": "decimal(4,1)"
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y19stdp",
+        "name": "giftig",
+        "x": 788,
+        "y": 80,
+        "attrKind": "normal",
+        "dataType": "boolean"
+      },
+      {
+        "kind": "relationship",
+        "id": "nmwngqh7y1bbnnt",
+        "name": "ist Vorgesetzter von",
+        "x": 589,
+        "y": -271
+      },
+      {
+        "kind": "relationship",
+        "id": "nmwngqh7y1eceey",
+        "name": "leitet",
+        "x": 626,
+        "y": -62
+      },
+      {
+        "kind": "relationship",
+        "id": "nmwngqh7y1hm3ms",
+        "name": "reinigt",
+        "x": 579,
+        "y": 154
+      },
+      {
+        "kind": "attribute",
+        "id": "nmwngqh7y1km7v8",
+        "name": "wochentag",
+        "x": 579,
+        "y": 246,
+        "attrKind": "normal",
+        "dataType": "tinyint"
+      },
+      {
+        "kind": "relationship",
+        "id": "nmwngqh7y1mgjvq",
+        "name": "lebt in",
+        "x": 1003,
+        "y": 1
+      },
+      {
+        "kind": "isa",
+        "id": "nmwngqh7y1pkbhk",
+        "name": "d",
+        "x": 1110,
+        "y": 3,
+        "disjoint": true,
+        "total": true
+      }
+    ],
+    "edges": [
+      {
+        "id": "emwngqh7y3pnv3",
+        "kind": "attr",
+        "from": "nmwngqh7y26nvj",
+        "to": "nmwngqh7y1t7j5"
+      },
+      {
+        "id": "emwngqh7y5jplg",
+        "kind": "attr",
+        "from": "nmwngqh7y492ce",
+        "to": "nmwngqh7y1t7j5"
+      },
+      {
+        "id": "emwngqh7y7ntxr",
+        "kind": "attr",
+        "from": "nmwngqh7y6mnqz",
+        "to": "nmwngqh7y1t7j5"
+      },
+      {
+        "id": "emwngqh7y94q4w",
+        "kind": "attr",
+        "from": "nmwngqh7y8h4ok",
+        "to": "nmwngqh7y1t7j5"
+      },
+      {
+        "id": "emwngqh7yb5sm1",
+        "kind": "attr",
+        "from": "nmwngqh7yaz0i9",
+        "to": "nmwngqh7y1t7j5"
+      },
+      {
+        "id": "emwngqh7ye37a0",
+        "kind": "attr",
+        "from": "nmwngqh7ydgsf8",
+        "to": "nmwngqh7ycoeeb"
+      },
+      {
+        "id": "emwngqh7yg5vm7",
+        "kind": "attr",
+        "from": "nmwngqh7yfe4f8",
+        "to": "nmwngqh7ycoeeb"
+      },
+      {
+        "id": "emwngqh7yimh2w",
+        "kind": "attr",
+        "from": "nmwngqh7yhckaz",
+        "to": "nmwngqh7ycoeeb"
+      },
+      {
+        "id": "emwngqh7ykc5j0",
+        "kind": "attr",
+        "from": "nmwngqh7yjyojm",
+        "to": "nmwngqh7ycoeeb"
+      },
+      {
+        "id": "emwngqh7ynmlhc",
+        "kind": "attr",
+        "from": "nmwngqh7ymh8s9",
+        "to": "nmwngqh7ylq0q5"
+      },
+      {
+        "id": "emwngqh7ypkhwa",
+        "kind": "attr",
+        "from": "nmwngqh7yooirf",
+        "to": "nmwngqh7ylq0q5"
+      },
+      {
+        "id": "emwngqh7yr952r",
+        "kind": "attr",
+        "from": "nmwngqh7yqz4yl",
+        "to": "nmwngqh7ylq0q5"
+      },
+      {
+        "id": "emwngqh7yt9rw3",
+        "kind": "attr",
+        "from": "nmwngqh7ysjhwo",
+        "to": "nmwngqh7ylq0q5"
+      },
+      {
+        "id": "emwngqh7yvhjeb",
+        "kind": "attr",
+        "from": "nmwngqh7yuptgu",
+        "to": "nmwngqh7ylq0q5"
+      },
+      {
+        "id": "emwngqh7yybgre",
+        "kind": "attr",
+        "from": "nmwngqh7yxvsxt",
+        "to": "nmwngqh7ywy0c5"
+      },
+      {
+        "id": "emwngqh7y10ohwt",
+        "kind": "attr",
+        "from": "nmwngqh7yzfmpu",
+        "to": "nmwngqh7ywy0c5"
+      },
+      {
+        "id": "emwngqh7y13ra3c",
+        "kind": "attr",
+        "from": "nmwngqh7y129ktp",
+        "to": "nmwngqh7y11pdvl"
+      },
+      {
+        "id": "emwngqh7y15osu5",
+        "kind": "attr",
+        "from": "nmwngqh7y14grja",
+        "to": "nmwngqh7y11pdvl"
+      },
+      {
+        "id": "emwngqh7y18esoc",
+        "kind": "attr",
+        "from": "nmwngqh7y17bdu1",
+        "to": "nmwngqh7y16lko7"
+      },
+      {
+        "id": "emwngqh7y1azurq",
+        "kind": "attr",
+        "from": "nmwngqh7y19stdp",
+        "to": "nmwngqh7y16lko7"
+      },
+      {
+        "id": "emwngqh7y1co35e",
+        "kind": "role",
+        "from": "nmwngqh7y1bbnnt",
+        "to": "nmwngqh7y1t7j5",
+        "card": "1",
+        "role": "Vorgesetzter"
+      },
+      {
+        "id": "emwngqh7y1dlhbs",
+        "kind": "role",
+        "from": "nmwngqh7y1bbnnt",
+        "to": "nmwngqh7y1t7j5",
+        "card": "n",
+        "role": "Untergebener"
+      },
+      {
+        "id": "emwngqh7y1fg9uv",
+        "kind": "role",
+        "from": "nmwngqh7y1eceey",
+        "to": "nmwngqh7y1t7j5",
+        "card": "1"
+      },
+      {
+        "id": "emwngqh7y1g1dem",
+        "kind": "role",
+        "from": "nmwngqh7y1eceey",
+        "to": "nmwngqh7ycoeeb",
+        "card": "n"
+      },
+      {
+        "id": "emwngqh7y1ichkz",
+        "kind": "role",
+        "from": "nmwngqh7y1hm3ms",
+        "to": "nmwngqh7y1t7j5",
+        "card": "m"
+      },
+      {
+        "id": "emwngqh7y1jj4d5",
+        "kind": "role",
+        "from": "nmwngqh7y1hm3ms",
+        "to": "nmwngqh7ycoeeb",
+        "card": "n"
+      },
+      {
+        "id": "emwngqh7y1l3gse",
+        "kind": "attr",
+        "from": "nmwngqh7y1km7v8",
+        "to": "nmwngqh7y1hm3ms"
+      },
+      {
+        "id": "emwngqh7y1nvnhf",
+        "kind": "role",
+        "from": "nmwngqh7y1mgjvq",
+        "to": "nmwngqh7ycoeeb",
+        "card": "1"
+      },
+      {
+        "id": "emwngqh7y1och2y",
+        "kind": "role",
+        "from": "nmwngqh7y1mgjvq",
+        "to": "nmwngqh7ylq0q5",
+        "card": "n",
+        "total": true
+      },
+      {
+        "id": "emwngqh7y1qzuwh",
+        "kind": "super",
+        "from": "nmwngqh7ylq0q5",
+        "to": "nmwngqh7y1pkbhk",
+        "total": true
+      },
+      {
+        "id": "emwngqh7y1ri6o6",
+        "kind": "sub",
+        "from": "nmwngqh7y1pkbhk",
+        "to": "nmwngqh7ywy0c5"
+      },
+      {
+        "id": "emwngqh7y1slqeq",
+        "kind": "sub",
+        "from": "nmwngqh7y1pkbhk",
+        "to": "nmwngqh7y11pdvl"
+      },
+      {
+        "id": "emwngqh7y1tb977",
+        "kind": "sub",
+        "from": "nmwngqh7y1pkbhk",
+        "to": "nmwngqh7y16lko7"
+      }
+    ],
+    "showLegend": true
+  },
+  "erText": "# ER-Diagramm Tiergarten\nentity Mitarbeiter {\n  key mitarbeiter_id: int\n  vorname: varchar(50)\n  nachname: varchar(50)\n  funktion: varchar(50)\n  eintrittsdatum: date\n}\n\nentity Gehege {\n  key gehege_id: int\n  bezeichnung: varchar(50)\n  flaeche_m2: decimal(8,2)\n  klimazone: varchar(30)\n}\n\nentity Tier {\n  key tier_id: int\n  name: varchar(50)\n  art: varchar(50)\n  geburtsdatum: date\n  geschlecht: char(1)\n}\n\nentity Säugetier { fellart: varchar(30), tragzeit_tage: smallint }\nentity Vogel { spannweite_cm: smallint, flugfaehig: boolean }\nentity Reptil { min_temperatur_c: decimal(4,1), giftig: boolean }\n\nrelationship \"ist Vorgesetzter von\" (Mitarbeiter 1 as Vorgesetzter, Mitarbeiter n as Untergebener)\nrelationship leitet (Mitarbeiter 1, Gehege n)\nrelationship reinigt (Mitarbeiter m, Gehege n) { wochentag: tinyint }\nrelationship \"lebt in\" (Gehege 1, Tier n total)\n\nisa Tier disjoint total { Säugetier, Vogel, Reptil }\n",
+  "rel": {
+    "tables": [
+      {
+        "id": "tmwngqh881uoxva",
+        "name": "mitarbeiter",
+        "x": 0,
+        "y": 0,
+        "columns": [
+          {
+            "name": "mitarbeiter_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true
+          },
+          {
+            "name": "vorname",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "nachname",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "funktion",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "eintrittsdatum",
+            "type": "date"
+          },
+          {
+            "name": "vorgesetzter_id",
+            "type": "int",
+            "ref": {
+              "table": "mitarbeiter",
+              "column": "mitarbeiter_id"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmwngqh881vv24n",
+        "name": "gehege",
+        "x": 370,
+        "y": 0,
+        "columns": [
+          {
+            "name": "gehege_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true
+          },
+          {
+            "name": "bezeichnung",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "flaeche_m2",
+            "type": "decimal(8,2)"
+          },
+          {
+            "name": "klimazone",
+            "type": "varchar(30)"
+          },
+          {
+            "name": "mitarbeiter_id",
+            "type": "int",
+            "ref": {
+              "table": "mitarbeiter",
+              "column": "mitarbeiter_id"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmwngqh881w3bhd",
+        "name": "tier",
+        "x": 740,
+        "y": 0,
+        "columns": [
+          {
+            "name": "tier_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true
+          },
+          {
+            "name": "name",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "art",
+            "type": "varchar(50)"
+          },
+          {
+            "name": "geburtsdatum",
+            "type": "date"
+          },
+          {
+            "name": "geschlecht",
+            "type": "char(1)"
+          },
+          {
+            "name": "gehege_id",
+            "type": "int",
+            "notNull": true,
+            "ref": {
+              "table": "gehege",
+              "column": "gehege_id"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmwngqh881xxnqj",
+        "name": "saeugetier",
+        "x": 1110,
+        "y": 0,
+        "columns": [
+          {
+            "name": "tier_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true,
+            "ref": {
+              "table": "tier",
+              "column": "tier_id"
+            }
+          },
+          {
+            "name": "fellart",
+            "type": "varchar(30)"
+          },
+          {
+            "name": "tragzeit_tage",
+            "type": "smallint"
+          }
+        ],
+        "note": "ist ein Tier"
+      },
+      {
+        "id": "tmwngqh881yx6ba",
+        "name": "vogel",
+        "x": 1110,
+        "y": 178,
+        "columns": [
+          {
+            "name": "tier_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true,
+            "ref": {
+              "table": "tier",
+              "column": "tier_id"
+            }
+          },
+          {
+            "name": "spannweite_cm",
+            "type": "smallint"
+          },
+          {
+            "name": "flugfaehig",
+            "type": "boolean"
+          }
+        ],
+        "note": "ist ein Tier"
+      },
+      {
+        "id": "tmwngqh881zoatw",
+        "name": "reptil",
+        "x": 1110,
+        "y": 356,
+        "columns": [
+          {
+            "name": "tier_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true,
+            "ref": {
+              "table": "tier",
+              "column": "tier_id"
+            }
+          },
+          {
+            "name": "min_temperatur_c",
+            "type": "decimal(4,1)"
+          },
+          {
+            "name": "giftig",
+            "type": "boolean"
+          }
+        ],
+        "note": "ist ein Tier"
+      },
+      {
+        "id": "tmwngqh8820bilr",
+        "name": "reinigt",
+        "x": 740,
+        "y": 256,
+        "columns": [
+          {
+            "name": "mitarbeiter_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true,
+            "ref": {
+              "table": "mitarbeiter",
+              "column": "mitarbeiter_id"
+            }
+          },
+          {
+            "name": "gehege_id",
+            "type": "int",
+            "pk": true,
+            "notNull": true,
+            "ref": {
+              "table": "gehege",
+              "column": "gehege_id"
+            }
+          },
+          {
+            "name": "wochentag",
+            "type": "tinyint"
+          }
+        ]
+      }
+    ]
+  },
+  "relText": "\n",
+  "mapping": {
+    "inheritance": "vertical",
+    "sqlNames": true,
+    "lowercase": true
+  },
+  "gen": {
+    "seed": 42,
+    "defaultRows": 10,
+    "rows": {},
+    "nullRate": 0.1
+  },
+  "dialect": "postgres",
+  "relAutoSync": true
+}

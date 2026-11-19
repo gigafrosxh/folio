@@ -130,6 +130,9 @@ public enum BlockKind: String, Codable, Sendable, CaseIterable {
     case audio
     /// Another note shown read-only (`![[Titel]]`, #120); the title is in `code`. Needs Folio 1.2+.
     case embed
+    /// An ERD-Ultra project (`.erdu` JSON in `code`), shown as ER diagram, schema or SQL (`mode`); optional
+    /// `linkedFile` is the original it follows (#204). Needs Folio 1.7+.
+    case erd
 }
 
 /// One block of a note's body. Fields not used by a block's kind stay nil.
@@ -165,6 +168,10 @@ public struct BlockRecord: Codable, Sendable, Identifiable {
     public var imageEdit: ImageEdit?
     /// PDFs: their text, for the note search (#43). Nil = not indexed yet.
     public var pdfText: String?
+    /// Code blocks: when and with which code the block last ran (#26).
+    public var lastRun: CodeRunStamp?
+    /// Code blocks: path of the file the code was exported to and is compared with (#28, #31).
+    public var linkedFile: String?
 
     public init(id: UUID = UUID(), kind: BlockKind) {
         self.id = id

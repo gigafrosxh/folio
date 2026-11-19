@@ -13,6 +13,7 @@ enum NoteText {
             case .code: return "```\(b.language)\n\(b.storage.string)\n```"
             case .math: return "Formel: \(b.storage.string)"
             case .diagram: return "Diagramm:\n\(b.storage.string)"
+            case .erd: return "ER-Diagramm (ERD-Ultra):\n" + ErduDocument.searchText(of: b.storage.string)
             case .image, .pdf, .file, .audio, .drawing:
                 let name = r.attachmentID.flatMap { id in file.attachments.first { $0.id == id }?.header.filename }
                 return "[\(kindName(r.kind))\(name.map { ": \($0)" } ?? "")]" + (r.output.map { "\n\($0)" } ?? "")

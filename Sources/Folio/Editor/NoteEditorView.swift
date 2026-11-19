@@ -517,6 +517,7 @@ struct NoteEditorView: View {
         case "database": insertBlock(BlockModel(kind: .database))
         case "math": insertBlock(BlockModel(kind: .math))
         case "diagram": insertBlock(BlockModel(kind: .diagram))
+        case "erd": insertErd()
         case "audio": insertBlock(AudioBlockView.recordingBlock())
         case "exportpdf": NotePDFExporter.exportWithPanel(doc)
         case "device": formatting.showDeviceImportMenu(fallbackBlock: doc.blocks.last(where: { $0.kind == .text })?.id)
@@ -535,6 +536,19 @@ struct NoteEditorView: View {
             formatting.focusCodeBlock(block.id)
         } else if let i = doc.blocks.firstIndex(where: { $0.id == block.id }), i + 1 < doc.blocks.count {
             formatting.focus(blockID: doc.blocks[i + 1].id, atEnd: false)
+        }
+    }
+
+    /// ER diagram from an ERD-Ultra file (#204); a broken or newer file is reported, nothing is inserted.
+    private func insertErd() {
+        guard let url = ErdBlocks.pickFile() else { return }
+        do {
+            insertBlock(try ErdBlocks.makeBlock(from: url))
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "„\(url.lastPathComponent)“ lässt sich nicht einbetten."
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
         }
     }
 

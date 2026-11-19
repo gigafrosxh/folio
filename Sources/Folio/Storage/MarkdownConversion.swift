@@ -86,6 +86,8 @@ extension MarkdownTransfer {
         case .database: return ["```sql\n\(code)\n```"]
         case .math: return ["$$\n\(code)\n$$"]
         case .diagram: return ["```mermaid\n\(code)\n```"]
+        // The whole ERD-Ultra file, so the import gets the block back (#204).
+        case .erd: return ["```erdu\n\(code)\n```"]
         // The alt text is the Markdown alt text (#46); the edited picture is exported (#45).
         case .image: return links.part(b.attachmentID, edit: b.imageEdit) { _, path in "![\(altText(b))](\(path))" }
         // Drawings are exported as their PencilKit data; a PNG preview is not available here.

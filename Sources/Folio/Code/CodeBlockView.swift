@@ -14,6 +14,8 @@ struct CodeBlockView: View {
     @State private var interpreter: String?
     @State private var showStdin = false
     @State private var typed = ""
+    @State private var showDependencies = false
+    @State private var showDiff = false
 
     private var codeTheme: CodeTheme { theme.codeTheme(dark: colorScheme == .dark) }
     private var spec: LanguageSpec { Languages.spec(for: block.language) }
@@ -69,6 +71,8 @@ struct CodeBlockView: View {
         .shadow(color: .black.opacity(theme.settings.shadows ? 0.10 : 0), radius: 10, y: 4)
         .environment(\.colorScheme, codeTheme.isDark ? .dark : .light)
         .task(id: block.language + (theme.settings.interpreterOverrides[block.language] ?? "")) { await resolveInterpreter() }
+        .sheet(isPresented: $showDependencies) { dependencySheet }
+        .sheet(isPresented: $showDiff) { CodeDiffView(block: block, doc: doc) }
         .onAppear {
             dbObserver.watch(dbState)
             if usesDatabase, dbState.schema.isEmpty, let c = block.connection { dbState.loadSchema(c) }
@@ -97,6 +101,7 @@ struct CodeBlockView: View {
             if level != .minimal { fileLabel }
             if spec.id == "sql" { connectionMenu(compact: level == .minimal) }
             if level == .full { interpreterLabel }
+            statusChips(level)
             Spacer(minLength: 6)
             if level == .full, let runInfo = runs.info[block.id] {
                 Text(runInfo).font(.system(size: 10.5)).foregroundStyle(runs.server(block.id) != nil ? Color.green : .secondary).lineLimit(1)
@@ -106,6 +111,12 @@ struct CodeBlockView: View {
             sessionMenu(withTools: level == .minimal)
             runControl(iconOnly: level != .full)
         }
+    }
+
+    /// Dependencies (#26) and the linked file (#28, #31).
+    @ViewBuilder private func statusChips(_ level: HeaderLevel) -> some View {
+        if level != .minimal { dependencyBadge }
+        if level == .full { CodeFileLinkChip(block: block, color: Color(nsColor: codeTheme.color(for: .comment))) { showDiff = true } }
     }
 
     /// Long connection names are shortened in the middle so the header keeps its actions; the narrowest
@@ -498,6 +509,50 @@ struct CodeBlockView: View {
             .joined(separator: "\n")
     }
 
+    private var dependencySheet: some View {
+        CodeDependencyView(doc: doc) { id in
+            // Jump to the chosen block once the sheet is gone.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard let tv = FormattingController.shared.codeView(for: id) else { return }
+                tv.window?.makeFirstResponder(tv)
+                tv.scrollToVisible(tv.bounds)
+            }
+        }
+        .environmentObject(theme)
+    }
+
+    /// Shows when the block's result is out of date or what it builds on (#26); hidden for blocks that never ran.
+    @ViewBuilder private var dependencyBadge: some View {
+        let graph = doc.codeDependencyGraph(runs: runs)
+        let status = graph.status[block.id] ?? .notRun
+        let upstream = graph.upstream(of: block.id)
+        if status.isStale || !upstream.isEmpty {
+            Button { showDependencies = true } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: status.isStale ? CodeDependencyStyle.symbol(status) : "arrow.turn.down.right")
+                    Text(status.isStale ? "veraltet" : upstream.map { "Block \(graph.number(of: $0.from) ?? 0)" }.joined(separator: ", "))
+                        .lineLimit(1)
+                }
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(status.isStale ? Color.orange : Color(nsColor: codeTheme.color(for: .comment)))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(Color.primary.opacity(0.06), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .help(dependencyHelp(status: status, upstream: upstream, graph: graph))
+        }
+    }
+
+    private func dependencyHelp(status: CodeDependencies.Status, upstream: [CodeDependencies.Edge], graph: CodeDependencies.Graph) -> String {
+        var lines: [String] = []
+        if case .stale(let reason) = status { lines.append("Ergebnis veraltet: \(reason).") }
+        for e in upstream { lines.append("Nutzt aus Block \(graph.number(of: e.from) ?? 0): \(e.names.joined(separator: ", "))") }
+        lines.append("Klicken für die Übersicht aller Abhängigkeiten.")
+        return lines.joined(separator: "\n")
+    }
+
     private var sessionChip: some View {
         HStack(spacing: 4) {
             Circle().fill(sessionRunning ? Color.green : Color.secondary.opacity(0.5)).frame(width: 6, height: 6)
@@ -520,7 +575,10 @@ struct CodeBlockView: View {
     private func sessionMenu(withTools: Bool) -> some View {
         Menu {
             if withTools { toolItems }
+            fileItems
             Button("Alle Code-Blöcke der Notiz ausführen") { runs.runAll(doc: doc, theme: theme) }
+            Button("Veraltete Blöcke neu ausführen") { runs.runStale(doc: doc, theme: theme) }
+            Button("Abhängigkeiten der Code-Blöcke …") { showDependencies = true }
             if spec.isRunnable && !usesDatabase { runItems }
             if doc.blocks.contains(where: { $0.test != nil }) {
                 Button("Alle Blocktests der Notiz ausführen") { runs.runTests(doc: doc, theme: theme) }
@@ -541,8 +599,22 @@ struct CodeBlockView: View {
         .helpLabel(withTools ? "Code, Sitzung und Ausführung" : "Sitzung und Ausführung")
     }
 
+    /// Export to a file and compare with it (#28, #31).
+    @ViewBuilder private var fileItems: some View {
+        Button(block.linkedFile == nil ? "Als Datei exportieren …" : "Als andere Datei exportieren …") { CodeFileLink.export(block, in: doc) }
+        if let path = block.linkedFile {
+            Button("In „\(URL(fileURLWithPath: path).lastPathComponent)“ schreiben") {
+                CodeFileLink.write(block, to: URL(fileURLWithPath: path), in: doc)
+            }
+            Button("Mit verknüpfter Datei vergleichen …") { showDiff = true }
+            Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+        }
+        Divider()
+    }
+
     @ViewBuilder private var toolItems: some View {
         Button("Code kopieren", action: copyCode)
+
         Button(formatHelp, action: formatCode)
         Button("Code-Block entfernen", role: .destructive) { doc.remove(block.id) }
         Divider()

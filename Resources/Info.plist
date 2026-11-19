@@ -21,6 +21,28 @@
 			</array>
 		</dict>
 	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.gigafrosxh.erdultra.erdu</string>
+			<key>UTTypeDescription</key>
+			<string>ERD-Ultra Projekt</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>erdu</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-erd-ultra</string>
+			</dict>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>Folio</string>
 	<key>CFBundleIconFile</key>

@@ -164,7 +164,38 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
         return try await r.run(kind, source: source, width: width, options: options)
     }
 
+    /// Only the page's answer (for the SQL of an ER block), without drawing a PDF.
+    static func renderResult(_ kind: RenderScript.Kind, source: String, options: RenderScript.Options) async throws -> RenderScript.Result {
+        let r = OffscreenRenderer()
+        defer { r.teardown() }
+        return try await r.result(kind, source: source, width: 760, options: options)
+    }
+
+    private func teardown() {
+        web?.configuration.userContentController.removeScriptMessageHandler(forName: "folio")
+        window?.contentView = nil
+        window = nil
+    }
+
     private func run(_ kind: RenderScript.Kind, source: String, width: CGFloat, options: RenderScript.Options) async throws -> Output {
+        defer { teardown() }
+        let result = try await result(kind, source: source, width: width, options: options)
+        guard let w = window else { throw RenderError.failed("Unbekannter Fehler") }
+        let page = max(result.pageHeight, result.y + result.height)
+        if page > web.frame.height {
+            web.setFrameSize(NSSize(width: width, height: page))
+            w.setContentSize(web.frame.size)
+            try? await Task.sleep(for: .milliseconds(60))
+        }
+        let config = WKPDFConfiguration()
+        let rect = CGRect(x: result.x, y: result.y, width: max(result.width, 1), height: max(result.height, 1))
+        config.rect = rect
+        let pdf = try await web.pdf(configuration: config)
+        return Output(pdf: pdf, size: rect.size, svg: result.svg)
+    }
+
+    /// Loads the page in a hidden window and renders; the window stays until the caller is done with it.
+    private func result(_ kind: RenderScript.Kind, source: String, width: CGFloat, options: RenderScript.Options) async throws -> RenderScript.Result {
         guard WebResources.directory != nil else { throw RenderError.failed("Die Render-Dateien fehlen im App-Paket.") }
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 600), configuration: WebResources.configuration(handler: self))
         web.setValue(false, forKey: "drawsBackground")
@@ -173,11 +204,6 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
         w.isReleasedWhenClosed = false
         w.contentView = web
         window = w
-        defer {
-            web.configuration.userContentController.removeScriptMessageHandler(forName: "folio")
-            window?.contentView = nil
-            window = nil
-        }
         web.load(URLRequest(url: WebResources.pageURL))
         if !isReady { await withCheckedContinuation { readyContinuation = $0 } }
 
@@ -190,17 +216,7 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
             }
         }
         guard result.ok else { throw RenderError.failed(result.error ?? "Unbekannter Fehler") }
-        let page = max(result.pageHeight, result.y + result.height)
-        if page > web.frame.height {
-            web.setFrameSize(NSSize(width: width, height: page))
-            w.setContentSize(web.frame.size)
-            try? await Task.sleep(for: .milliseconds(60))
-        }
-        let config = WKPDFConfiguration()
-        let rect = CGRect(x: result.x, y: result.y, width: max(result.width, 1), height: max(result.height, 1))
-        config.rect = rect
-        let pdf = try await web.pdf(configuration: config)
-        return Output(pdf: pdf, size: rect.size, svg: result.svg)
+        return result
     }
 
     nonisolated func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
