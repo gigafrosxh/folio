@@ -166,10 +166,14 @@ enum MarkdownTransfer {
                     let name = (decoded as NSString).lastPathComponent
                     let a = FolioArchive.Attachment(filename: name, typeIdentifier: UTType(filenameExtension: (name as NSString).pathExtension)?.identifier ?? "public.image", data: data)
                     attachments.append(a)
-                    var b = BlockRecord(kind: .image)
+                    // Not only pictures: PDFs, audio and other files embedded this way (Obsidian, #71) keep their kind.
+                    let type = UTType(filenameExtension: (name as NSString).pathExtension) ?? .data
+                    let kind: BlockKind = type.conforms(to: .image) ? .image : type.conforms(to: .pdf) ? .pdf : type.conforms(to: .audio) ? .audio : .file
+                    var b = BlockRecord(kind: kind)
                     b.attachmentID = a.id
                     b.width = 1
-                    if !alt.isEmpty { b.caption = alt }
+                    if kind == .pdf { b.height = 520 } else if kind == .file { b.height = 420 }
+                    if !alt.isEmpty && kind == .image { b.caption = alt }
                     blocks.append(b)
                 } else if decoded.hasPrefix("http") {
                     var b = BlockRecord(kind: .web)
