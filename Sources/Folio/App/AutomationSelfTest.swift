@@ -25,6 +25,14 @@ enum AutomationSelfTest {
             let text = store.document(for: made.id).map { $0.blocks.map(\.plainText).joined() } ?? ((try? NoteFile.read(from: made.url))?.meta.searchText ?? "")
             check(text.contains("Angehängt per Automation") && text.contains("Zebra"), "Anhängen behält den Inhalt")
         }
+        // Strict lookup and no change to what the user works on (#347).
+        check((try? NoteAutomation.find("")) == nil && (try? NoteAutomation.find(UUID().uuidString)) == nil, "Leeres Ziel und unbekannte ID werden abgelehnt")
+        let selected = store.selectedNoteID
+        _ = try? NoteAutomation.create(title: "Im Hintergrund", text: "x")
+        check(store.selectedNoteID == selected, "Anlegen per Automation wechselt die Auswahl nicht")
+        _ = try? NoteAutomation.create(title: "Doppelt", text: "")
+        _ = try? NoteAutomation.create(title: "Doppelt", text: "")
+        check((try? NoteAutomation.find("Doppelt")) == nil, "Mehrdeutiger Titel wird abgelehnt")
         await intentChecks()
         await appleScriptChecks()
         print("AUTO done"); fflush(stdout)

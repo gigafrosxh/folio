@@ -12,7 +12,9 @@ struct FoldTriangles: View {
     var body: some View {
         let _ = doc.foldRevision
         ForEach(doc.foldHeadings(in: block.id)) { h in
-            if let tv = FormattingController.shared.textView(for: block.id),
+            // The view must show this very block: a copy of the note can have the same block ids (#349).
+            if let tv = FormattingController.shared.textView(for: block.id), tv.textStorage === block.storage,
+               h.section.start.range.location < block.storage.length,
                let y = tv.top(ofCharacterAt: h.section.start.range.location), hovering || h.collapsed {
                 triangle(h, lineHeight: lineHeight(h, in: tv))
                     .offset(x: 14, y: y)
@@ -21,7 +23,8 @@ struct FoldTriangles: View {
     }
 
     private func lineHeight(_ h: NoteDocument.FoldHeading, in tv: NSTextView) -> CGFloat {
-        let font = tv.textStorage?.attribute(.font, at: h.section.start.range.location, effectiveRange: nil) as? NSFont
+        let index = h.section.start.range.location
+        let font = (tv.textStorage.map { index < $0.length } ?? false) ? tv.textStorage?.attribute(.font, at: index, effectiveRange: nil) as? NSFont : nil
         return (font?.boundingRectForFont.height ?? 20)
     }
 

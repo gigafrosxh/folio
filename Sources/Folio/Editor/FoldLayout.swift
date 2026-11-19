@@ -72,7 +72,7 @@ extension FolioTextView {
 
     /// Top of a paragraph in view coordinates (for the fold triangles in the margin).
     func top(ofCharacterAt index: Int) -> CGFloat? {
-        guard let lm = layoutManager, let tc = textContainer, let storage = textStorage, index <= storage.length else { return nil }
+        guard let lm = layoutManager, let tc = textContainer, let storage = textStorage, index < storage.length else { return nil }
         lm.ensureLayout(for: tc)
         let glyph = lm.glyphIndexForCharacter(at: min(index, max(storage.length - 1, 0)))
         let rect = lm.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)

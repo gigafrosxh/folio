@@ -9,24 +9,39 @@ enum NoteAutomation {
         case notFound(String)
         case notCreated(String)
         case empty
+        case ambiguous(String, Int)
 
         var errorDescription: String? {
             switch self {
             case .notFound(let q): return "Keine Notiz „\(q)“ gefunden."
             case .notCreated(let why): return "Die Notiz konnte nicht angelegt werden: \(why)"
             case .empty: return "Es wurde kein Text übergeben."
+            case .ambiguous(let q, let n): return "„\(q)“ passt auf mehrere Notizen (\(n == 2 ? "mindestens 2" : "\(n)")). Gib den genauen Titel oder die ID an."
             }
         }
     }
 
-    /// A new note; its title is the first line. Returns the note.
+    /// A new note in the library's top folder; its title is the first line. Written straight to disk: the selection,
+    /// the editor and the keyboard stay where the user is (#347).
     static func create(title: String, text: String = "") throws -> NoteRef {
         let store = NoteStore.shared
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty || !text.isEmpty else { throw Failure.empty }
-        guard let ref = store.createNote(titled: clean.isEmpty ? "Neue Notiz" : clean, body: text) else {
-            throw Failure.notCreated(store.lastError ?? "unbekannter Fehler")
+        let theme = ThemeManager.shared
+        let rich = NSMutableAttributedString(string: clean.isEmpty ? "Neue Notiz" : clean, attributes: TextStyle.title.attributes(theme: theme))
+        rich.append(NSAttributedString(string: "\n" + text, attributes: theme.bodyAttributes))
+        var block = BlockRecord(kind: .text)
+        block.rtf = RichTextCodec.rtfData(from: rich)
+        let draft = NoteFile(meta: NoteMetadata(title: clean), body: NoteBody(blocks: [block]))
+        let file = NoteDocument(file: draft, url: URL(fileURLWithPath: "/dev/null")).makeFile()
+        let url = store.uniqueURL(in: store.rootURL, base: NoteStore.sanitize(file.meta.title.isEmpty ? "Neue Notiz" : file.meta.title))
+        do {
+            try file.write(to: url)
+        } catch {
+            throw Failure.notCreated(error.localizedDescription)
         }
+        store.reload()
+        guard let ref = store.notes.first(where: { $0.id == file.meta.id }) else { throw Failure.notCreated("nicht in der Bibliothek") }
         return ref
     }
 
@@ -44,13 +59,22 @@ enum NoteAutomation {
         }.prefix(limit))
     }
 
-    /// A note by id (UUID text) or exact title, else the best search hit.
+    /// A note by id (UUID text, only as an id), exact title, else a search with exactly one hit. Empty or ambiguous
+    /// references are refused, so a command never acts on some other note (#347).
     static func find(_ reference: String) throws -> NoteRef {
         let store = NoteStore.shared
-        if let id = UUID(uuidString: reference), let ref = store.notes.first(where: { $0.id == id }) { return ref }
-        if let ref = store.notes.first(where: { $0.meta.title.caseInsensitiveCompare(reference) == .orderedSame }) { return ref }
-        if let ref = search(reference, limit: 1).first { return ref }
-        throw Failure.notFound(reference)
+        let ref = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ref.isEmpty else { throw Failure.notFound("") }
+        if let id = UUID(uuidString: ref) {
+            guard let note = store.notes.first(where: { $0.id == id }) else { throw Failure.notFound(ref) }
+            return note
+        }
+        let exact = store.notes.filter { $0.meta.title.caseInsensitiveCompare(ref) == .orderedSame }
+        if exact.count == 1 { return exact[0] }
+        if exact.count > 1 { throw Failure.ambiguous(ref, exact.count) }
+        let hits = search(ref, limit: 2)
+        guard hits.count == 1 else { throw hits.isEmpty ? Failure.notFound(ref) : Failure.ambiguous(ref, hits.count) }
+        return hits[0]
     }
 
     static func open(_ ref: NoteRef) {

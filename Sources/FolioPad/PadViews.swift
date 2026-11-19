@@ -18,7 +18,8 @@ struct PadRootView: View {
             PadNoteList(search: $search)
         } detail: {
             if let doc = library.document {
-                PadEditor(doc: doc).id(doc.url)
+                // A reloaded note is a new document: fresh editors, so no old text is typed into it (#348).
+                PadEditor(doc: doc).id(ObjectIdentifier(doc))
             } else {
                 ContentUnavailableView("Keine Notiz ausgewählt", systemImage: "note.text",
                                        description: Text("Wähle links eine Notiz oder lege mit ⌘N eine neue an."))
