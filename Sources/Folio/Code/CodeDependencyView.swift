@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import FolioCore
 
@@ -6,25 +7,98 @@ extension NoteDocument {
     @MainActor
     func codeDependencyGraph(runs: RunManager? = nil) -> CodeDependencies.Graph {
         let runs = runs ?? RunManager.shared
-        let items = blocks.filter { $0.kind == .code && !($0.language == "sql" && $0.connection != nil) }.map { b in
-            CodeDependencies.Item(id: b.id, language: b.language,
-                                  session: b.mode != "isolated" && KernelManager.supportsSharing(b.language) ? b.language : nil,
-                                  code: b.storage.string, lastRun: b.lastRun, running: runs.isRunning(b.id))
+        return runs.dependencyGraph(for: self)
+    }
+}
+
+@MainActor
+extension BlockModel {
+    func dependencyItem(runs: RunManager) -> CodeDependencies.Item {
+        let lang = Languages.spec(for: language).id
+        return CodeDependencies.Item(id: id, language: lang, session: runs.runsInSession(self, language: lang) ? lang : nil,
+                                     code: storage.string, lastRun: lastRun, running: runs.isRunning(id),
+                                     stdin: stdin, interactive: interactive, isolated: mode == "isolated")
+    }
+}
+
+/// One lazily rebuilt graph per open document. Observe character edits directly because the editor
+/// mutates NSTextStorage in place. Attribute-only syntax highlighting does not change dependencies.
+@MainActor
+final class CodeDependencyCache {
+    var graph: CodeDependencies.Graph?
+    private weak var doc: NoteDocument?
+    private var structure: AnyCancellable?
+    private var inputs: Set<AnyCancellable> = []
+
+    init(doc: NoteDocument) {
+        self.doc = doc
+        structure = doc.$blocks.sink { [weak self] in self?.observe($0) }
+    }
+
+    private func observe(_ blocks: [BlockModel]) {
+        graph = nil
+        inputs.removeAll()
+        for block in blocks where block.kind == .code {
+            watch(block.$language)
+            watch(block.$mode)
+            watch(block.$interactive)
+            watch(block.$stdin)
+            watch(block.$connection)
+            watch(block.$lastRun)
+            NotificationCenter.default.publisher(for: NSTextStorage.didProcessEditingNotification, object: block.storage)
+                .sink { [weak self, weak block] _ in
+                    if block?.storage.editedMask.contains(.editedCharacters) == true { self?.invalidate() }
+                }.store(in: &inputs)
         }
-        return CodeDependencies.build(items)
+    }
+
+    private func watch<P: Publisher>(_ publisher: P) where P.Failure == Never {
+        publisher.dropFirst().sink { [weak self] _ in self?.invalidate() }.store(in: &inputs)
+    }
+
+    private func invalidate() {
+        graph = nil
+        doc?.objectWillChange.send()
     }
 }
 
 extension RunManager {
-    /// Runs again, top to bottom, every block whose result is out of date; a rerun makes the blocks that build on it
-    /// stale, so they follow when their turn comes (#26).
-    func runStale(doc: NoteDocument, theme: ThemeManager) {
+    func dependencyGraph(for doc: NoteDocument) -> CodeDependencies.Graph {
+        let cache = dependencyCaches.object(forKey: doc) ?? CodeDependencyCache(doc: doc)
+        if let graph = cache.graph { return graph }
+        let items = doc.blocks.filter { $0.kind == .code && !($0.connection != nil && Languages.spec(for: $0.language).id == "sql") }
+            .map { $0.dependencyItem(runs: self) }
+        let graph = CodeDependencies.build(items)
+        cache.graph = graph
+        dependencyCaches.setObject(cache, forKey: doc)
+        return graph
+    }
+
+    /// Replaying a prerequisite also invalidates other saved results that used it.
+    func stalePlan(doc: NoteDocument) -> [UUID] {
+        let graph = dependencyGraph(for: doc)
+        let blocks = Dictionary(doc.blocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var pending = graph.staleInOrder
+        var needed = Set(pending)
+        while let id = pending.popLast() {
+            let missing = graph.upstream(of: id).map(\.from).filter { source in
+                guard let block = blocks[source] else { return false }
+                return !ranInCurrentSession(block, doc: doc)
+            }
+            let affected = graph.downstream(of: id).map(\.to).filter { blocks[$0]?.lastRun != nil }
+            for next in missing + affected where needed.insert(next).inserted { pending.append(next) }
+        }
+        return graph.items.map(\.id).filter { needed.contains($0) }
+    }
+
+    @discardableResult
+    func runStale(doc: NoteDocument, theme: ThemeManager) -> Task<Void, Never> {
         Task {
-            for id in doc.codeDependencyGraph(runs: self).items.map(\.id) {
-                guard doc.codeDependencyGraph(runs: self).status[id]?.isStale == true,
-                      let block = doc.blocks.first(where: { $0.id == id }) else { continue }
-                await start(block: block, doc: doc, theme: theme)?.value
-                if block.outputIsError { break }
+            for id in stalePlan(doc: doc) {
+                guard let block = doc.blocks.first(where: { $0.id == id }),
+                      let task = start(block: block, doc: doc, theme: theme) else { break }
+                await task.value
+                if block.lastRun?.succeeded != true { break }
             }
         }
     }

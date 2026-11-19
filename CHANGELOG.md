@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Update aus dem Zufallsordner** (#259): Startet macOS Folio wegen des Download-Merkmals aus einem schreibgeschützten Zufallsordner (App Translocation), ersetzt der Updater jetzt die App am Originalort; geht das nicht, erklärt er, was zu tun ist.
+- **Abhängigkeiten der Code-Blöcke** (#262): Ein Ergebnis wird auch veraltet, wenn ein Vorgänger einen genutzten Namen nicht mehr definiert, ein anderer Block ihn jetzt liefert oder sich Eingabe, Sitzungsmodus oder Sprache geändert haben; ein fehlgeschlagener Start ersetzt einen alten Erfolg. „Veraltete neu ausführen“ führt nötige Vorgänger zuerst aus, die in der laufenden Sitzung noch fehlen. Ein Graph pro Notiz statt einer Berechnung in jedem Blockkopf; interaktive Blöcke zählen wie bei der Ausführung nicht zur gemeinsamen Sitzung. Laufstempel aus 1.7.0–1.7.2 gelten bis zum nächsten Lauf als veraltet.
+- **Verknüpfte Dateien** (#263): Diff und ER-Block lesen höchstens 5 bzw. 8 MB und nur normale Dateien, nicht mehr auf dem Hauptthread blockierend. `.erdu`-Dateien mit falsch aufgebautem Inhalt ersetzen den letzten Stand nicht mehr. Eine Notiz von einem anderen Mac folgt ihrem gespeicherten Pfad erst, wenn du „Der Datei folgen“ wählst. Der Vergleich arbeitet byte-genau (auch bei unterschiedlich kodierten Umlauten).
+- **iPad: flüssigeres Sichern** (#264): Das automatische Sichern komprimiert die Notiz im Hintergrund.
+
 ## [1.7.2] – 2026-11-19
 
 ### Behoben

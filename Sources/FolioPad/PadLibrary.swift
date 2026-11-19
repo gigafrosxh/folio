@@ -99,7 +99,17 @@ final class PadLibrary: ObservableObject {
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
-            self?.saveNow()
+            await self?.autosave()
+        }
+    }
+
+    private func autosave() async {
+        guard let doc = document else { return }
+        do {
+            let outcome = try await doc.saveInBackground(history: NoteHistory(library: root))
+            handle(outcome, of: doc, selectCopy: document === doc)
+        } catch {
+            message = "Sichern fehlgeschlagen: \(error.localizedDescription) Die Änderungen bleiben offen."
         }
     }
 
@@ -110,22 +120,26 @@ final class PadLibrary: ObservableObject {
         saveTask?.cancel()
         guard let doc = document, doc.isDirty else { return .saved }
         do {
-            let outcome = try doc.save(history: NoteHistory(library: root))
-            if case .savedAsCopy(let copy) = outcome {
-                message = "Die Notiz wurde inzwischen anderswo geändert. Deine Fassung liegt als „\(copy.deletingPathExtension().lastPathComponent)“ daneben."
-                reload()
-                if selectCopy {
-                    setSelection(copy)
-                    open(copy)
-                }
-                return .copied(copy)
-            }
-            if let i = notes.firstIndex(where: { $0.url == doc.url }) { notes[i].meta = doc.file.meta }
-            return .saved
+            return handle(try doc.save(history: NoteHistory(library: root)), of: doc, selectCopy: selectCopy)
         } catch {
             message = "Sichern fehlgeschlagen: \(error.localizedDescription) Die Änderungen bleiben offen."
             return .failed
         }
+    }
+
+    @discardableResult
+    private func handle(_ outcome: PadDocument.SaveOutcome, of doc: PadDocument, selectCopy: Bool) -> SaveResult {
+        if case .savedAsCopy(let copy) = outcome {
+            message = "Die Notiz wurde inzwischen anderswo geändert. Deine Fassung liegt als „\(copy.deletingPathExtension().lastPathComponent)“ daneben."
+            reload()
+            if selectCopy {
+                setSelection(copy)
+                open(copy)
+            }
+            return .copied(copy)
+        }
+        if let i = notes.firstIndex(where: { $0.url == doc.url }) { notes[i].meta = doc.file.meta }
+        return .saved
     }
 
     // MARK: Create, delete

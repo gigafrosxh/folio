@@ -19,6 +19,7 @@ enum ErdBlocks {
         block.mode = ErduDocument.View.er.rawValue
         block.caption = url.deletingPathExtension().lastPathComponent
         block.linkedFile = url.path
+        approve(block)
         return block
     }
 
@@ -34,7 +35,8 @@ enum ErdBlocks {
 
     /// Takes in a changed file; returns nil when nothing changed, else a message (also for errors).
     static func pull(_ url: URL, into block: BlockModel, doc: NoteDocument) -> String? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        // Bounded and only regular files: a huge file or a FIFO never stalls the editor (#263).
+        guard case .success(let data) = CodeExport.boundedData(at: url, limit: ErduDocument.maxSize) else { return nil }
         do {
             let (text, _) = try ErduDocument.validate(data)
             guard text != block.storage.string else { return nil }
@@ -47,6 +49,26 @@ enum ErdBlocks {
             // A half-written or newer file never replaces the last good state.
             return "\(url.lastPathComponent): \(error.localizedDescription) Der letzte Stand bleibt sichtbar."
         }
+    }
+
+    // MARK: Following a linked file only where it was linked (#263)
+
+    /// A note imported from elsewhere carries its path, which may name a different local file: it is followed only
+    /// after it was linked on this Mac (insert, relink or "Folgen" in the block).
+    private static let approvedKey = "erdFollowApproved"
+
+    static func isApproved(_ block: BlockModel) -> Bool {
+        guard let path = block.linkedFile else { return false }
+        return (UserDefaults.standard.stringArray(forKey: approvedKey) ?? []).contains(block.id.uuidString + "|" + path)
+    }
+
+    static func approve(_ block: BlockModel) {
+        guard let path = block.linkedFile else { return }
+        var list = UserDefaults.standard.stringArray(forKey: approvedKey) ?? []
+        let key = block.id.uuidString + "|" + path
+        guard !list.contains(key) else { return }
+        list.append(key)
+        UserDefaults.standard.set(Array(list.suffix(2_000)), forKey: approvedKey)
     }
 
     static func modificationDate(_ url: URL) -> Date? {
@@ -68,7 +90,11 @@ struct ErdBlockView: View {
 
     private var view: ErduDocument.View { ErduDocument.View(rawValue: block.mode) ?? .er }
     /// The file ERD-Ultra edits: the copy handed to it when there is one (the original may be missing), else the original.
-    private var watchedFile: URL? { editingCopy ?? block.linkedFile.map { URL(fileURLWithPath: $0) } }
+    private var watchedFile: URL? {
+        editingCopy ?? (ErdBlocks.isApproved(block) || approvedHere ? block.linkedFile.map { URL(fileURLWithPath: $0) } : nil)
+    }
+    /// Set when the user allows following the stored path in this block (updates the view at once).
+    @State private var approvedHere = false
 
     /// Fixed name inside the block's own cache folder: the caption comes from the note and never becomes a path (#261).
     private var copyURL: URL {
@@ -126,6 +152,14 @@ struct ErdBlockView: View {
             Label(error, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red)
                 .padding(.horizontal, 12).padding(.bottom, 6)
         }
+        if let path = block.linkedFile, !ErdBlocks.isApproved(block), !approvedHere {
+            HStack(spacing: 8) {
+                Label("Verknüpft mit \(path) – auf diesem Mac noch nicht freigegeben.", systemImage: "link.badge.plus")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                Button("Der Datei folgen") { ErdBlocks.approve(block); approvedHere = true }.controlSize(.small)
+            }
+            .padding(.horizontal, 12).padding(.bottom, 6)
+        }
         if fileMissing, let path = block.linkedFile {
             Label("Originaldatei nicht gefunden: \(path)", systemImage: "questionmark.folder").font(.caption).foregroundStyle(.orange)
                 .padding(.horizontal, 12).padding(.bottom, 6)
@@ -180,6 +214,8 @@ struct ErdBlockView: View {
     private func relink() {
         guard let url = ErdBlocks.pickFile() else { return }
         doc.changeBlock(block, "Mit Datei verknüpfen") { block.linkedFile = url.path }
+        ErdBlocks.approve(block)
+        approvedHere = true
         message = ErdBlocks.pull(url, into: block, doc: doc) ?? "Verknüpft mit \(url.lastPathComponent)."
     }
 
@@ -190,6 +226,8 @@ struct ErdBlockView: View {
         if let original, FileManager.default.fileExists(atPath: original.path) {
             url = original
             editingCopy = nil
+            ErdBlocks.approve(block)   // opening it here is the user's own choice
+            approvedHere = true
         } else {
             // No original: hand ERD-Ultra a copy and follow it. An existing copy may hold edits not yet taken in;
             // it is read first and never overwritten with the older block content (#261).

@@ -29,7 +29,7 @@ struct PadRootView: View {
             Text(library.message ?? "")
         }
         .onChange(of: scenePhase) { if scenePhase != .active { library.saveNow() } }
-        .task { PadSelfTest.run(library) }
+        .task { await PadSelfTest.run(library) }
     }
 
     @Environment(\.scenePhase) private var scenePhase

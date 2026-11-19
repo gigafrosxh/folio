@@ -13,7 +13,7 @@ final class PadSelfTest {
 
     private init(_ library: PadLibrary) { self.library = library }
 
-    static func run(_ library: PadLibrary) {
+    static func run(_ library: PadLibrary) async {
         let env = ProcessInfo.processInfo.environment
         if let title = env["FOLIO_PAD_OPEN"], let entry = library.notes.first(where: { $0.meta.title == title }) {
             library.selectedNote = entry.url
@@ -22,7 +22,7 @@ final class PadSelfTest {
         let test = PadSelfTest(library)
         // It edits and trashes notes: only ever in a test library (#260).
         guard env["FOLIO_LIBRARY"] != nil else { test.check(false, "FOLIO_PAD_SELFTEST braucht FOLIO_LIBRARY"); return test.finish() }
-        test.runAll()
+        await test.runAll()
     }
 
     private func check(_ ok: Bool, _ what: String) {
@@ -35,9 +35,10 @@ final class PadSelfTest {
         fflush(stdout)
     }
 
-    private func runAll() {
+    private func runAll() async {
         guard let url = newNote() else { return finish() }
         editAndSave(url)
+        await autosave(url)
         displayScale()
         otherBlocksStay(except: url)
         conflict(url)
@@ -72,6 +73,15 @@ final class PadSelfTest {
         let bold = saved.flatMap { PadDocument(file: $0).attributedText(of: $0.body.blocks[0]) }
         let font = bold?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
         check(font?.fontDescriptor.symbolicTraits.contains(.traitBold) == true, "Formatierung (fett) bleibt erhalten")
+    }
+
+    /// Autosave after a pause, compressed off the main thread (#264).
+    private func autosave(_ url: URL) async {
+        guard let doc = library.document else { return }
+        doc.setCode("print(2)", of: doc.blocks[1].id)
+        library.changed()
+        try? await Task.sleep(for: .seconds(3))
+        check(!doc.isDirty && (try? NoteFile.read(from: url))?.body.blocks.last?.code == "print(2)", "Automatisch gesichert (im Hintergrund komprimiert)")
     }
 
     /// Shown larger, saved at the Mac's size (#258).

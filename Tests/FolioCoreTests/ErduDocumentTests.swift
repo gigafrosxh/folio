@@ -25,6 +25,10 @@ final class ErduDocumentTests: XCTestCase {
         XCTAssertThrowsError(try ErduDocument.validate(Data([0xff, 0xfe, 0x00]))) { XCTAssertEqual($0 as? ErduDocument.Failure, .notJSON) }
         XCTAssertThrowsError(try ErduDocument.validate(Data(count: ErduDocument.maxSize + 1))) { XCTAssertEqual($0 as? ErduDocument.Failure, .tooLarge) }
         XCTAssertEqual(ErduDocument.searchText(of: "kaputt"), "")
+        // Wrong types inside are rejected too (#263).
+        XCTAssertThrowsError(try ErduDocument.validate(Data(#"{"format":"erd-ultra","version":1,"er":{"nodes":"x"},"rel":{"tables":[]}}"#.utf8)))
+        XCTAssertThrowsError(try ErduDocument.validate(Data(#"{"format":"erd-ultra","version":1,"er":{"nodes":[{"kind":"entity"}]},"rel":{"tables":[]}}"#.utf8)))
+        XCTAssertThrowsError(try ErduDocument.validate(Data(#"{"format":"erd-ultra","version":1,"er":{"nodes":[]},"rel":{"tables":[{"name":"t"}]}}"#.utf8)))
     }
 
     func testBlockRoundTrip() throws {

@@ -46,10 +46,10 @@ enum CodeFileLink {
 
     /// Replaces the block's code with the file's content (undoable).
     static func adopt(_ block: BlockModel, from url: URL, in doc: NoteDocument) -> String {
-        guard let data = try? Data(contentsOf: url), data.count <= 5 << 20, let text = String(data: data, encoding: .utf8) else {
+        guard case .success(let text) = CodeExport.readText(at: url) else {
             return "Die Datei konnte nicht als Text gelesen werden."
         }
-        var code = text.replacingOccurrences(of: "\r\n", with: "\n")
+        var code = text
         if code.hasSuffix("\n") { code.removeLast() }
         doc.changeBlock(block, "Code aus Datei übernehmen") {
             block.storage.setAttributedString(NSAttributedString(string: code))
@@ -209,8 +209,7 @@ struct CodeDiffView: View {
     /// Only if the file still holds what the comparison shows; otherwise the new state is shown first (#261).
     private func writeToFile() {
         guard let url else { return }
-        let current = (try? Data(contentsOf: url)).flatMap { String(data: $0, encoding: .utf8) }?.replacingOccurrences(of: "\r\n", with: "\n")
-        guard current == fileText else {
+        guard case .success(let current) = CodeExport.readText(at: url), current == fileText else {
             reload()
             message = "Die Datei wurde inzwischen geändert – bitte den neuen Stand prüfen."
             return
@@ -221,8 +220,16 @@ struct CodeDiffView: View {
 
     private func reload() {
         guard let url else { state = .missing; return }
-        state = CodeExport.compare(code: block.storage.string, fileAt: url)
-        fileText = (try? Data(contentsOf: url)).flatMap { String(data: $0, encoding: .utf8) }?.replacingOccurrences(of: "\r\n", with: "\n")
+        // One bounded read; a large file or a FIFO never blocks the window (#263).
+        let code = block.storage.string
+        switch CodeExport.readText(at: url) {
+        case .success(let text):
+            fileText = text
+            state = CodeExport.compare(code: code, fileAt: url) == .same ? .same : .differs
+        case .failure(let e):
+            fileText = nil
+            state = e.state
+        }
     }
 
     private func copyDiff() {

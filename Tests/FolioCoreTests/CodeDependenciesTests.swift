@@ -2,9 +2,10 @@ import XCTest
 @testable import FolioCore
 
 final class CodeDependenciesTests: XCTestCase {
-    private func item(_ code: String, _ lang: String = "python", session: Bool = true, ran: Date? = nil, ok: Bool = true, ranCode: String? = nil) -> CodeDependencies.Item {
-        CodeDependencies.Item(id: UUID(), language: lang, session: session ? lang : nil, code: code,
-                              lastRun: ran.map { CodeRunStamp(ranAt: $0, codeHash: CodeDependencies.fingerprint(ranCode ?? code), succeeded: ok) })
+    private func item(_ code: String, _ lang: String = "python", session: Bool = true, ran: Date? = nil, ok: Bool = true) -> CodeDependencies.Item {
+        var item = CodeDependencies.Item(id: UUID(), language: lang, session: session ? lang : nil, code: code, lastRun: nil)
+        if let ran { item.lastRun = CodeRunStamp(ranAt: ran, codeHash: item.fingerprint, succeeded: ok, upstream: []) }
+        return item
     }
 
     func testPythonDefinitionsAndUses() {
@@ -63,30 +64,80 @@ final class CodeDependenciesTests: XCTestCase {
 
     func testStatus() {
         let t0 = Date(timeIntervalSince1970: 1000)
-        let a = item("x = 1", ran: t0), b = item("print(x)", ran: t0.addingTimeInterval(5))
+        let a = item("x = 1", ran: t0)
+        var b = item("print(x)")
+        b.lastRun = CodeDependencies.build([a, b]).runStamp(for: b, succeeded: true)
+        b.lastRun?.ranAt = t0.addingTimeInterval(5)
         var g = CodeDependencies.build([a, b])
         XCTAssertEqual(g.status[a.id], .ok)
         XCTAssertEqual(g.status[b.id], .ok)
 
         // Upstream ran again later → downstream is stale.
-        let a2 = item("x = 1", ran: t0.addingTimeInterval(10))
+        var a2 = a
+        a2.lastRun?.ranAt = t0.addingTimeInterval(10)
         g = CodeDependencies.build([a2, b])
-        XCTAssertEqual(g.status[b.id], .stale("Block 1 wurde danach neu ausgeführt"))
+        XCTAssertEqual(g.status[b.id], .stale("Abhängigkeiten seit der letzten Ausführung geändert"))
         XCTAssertEqual(g.staleInOrder, [b.id])
 
         // Code changed since the run → stale, and it propagates.
-        let a3 = item("x = 2", ran: t0, ranCode: "x = 1")
+        var a3 = a
+        a3.code = "x = 2"
         g = CodeDependencies.build([a3, b])
-        XCTAssertEqual(g.status[a3.id], .stale("Code seit der letzten Ausführung geändert"))
+        XCTAssertEqual(g.status[a3.id], .stale("Code oder Ausführungseinstellungen geändert"))
         XCTAssertEqual(g.status[b.id], .stale("Block 1 ist veraltet"))
 
         // Upstream never ran.
-        g = CodeDependencies.build([item("x = 1"), b])
+        var unrun = item("x = 1")
+        unrun.id = a.id
+        b.lastRun = CodeDependencies.build([unrun, b]).runStamp(for: b, succeeded: true)
+        g = CodeDependencies.build([unrun, b])
         XCTAssertEqual(g.status[b.id], .stale("Block 1 wurde nicht ausgeführt"))
 
         // Failed run.
         g = CodeDependencies.build([item("boom()", ran: t0, ok: false)])
         XCTAssertEqual(g.status.values.first, .failed)
+    }
+
+    func testSavedDependenciesDetectRemovedAndReboundNames() throws {
+        let time = Date()
+        let source = item("x = 1\ny = 2", ran: time)
+        let replacement = item("x = 2", ran: time)
+        var use = item("print(x, y)")
+        let graph = CodeDependencies.build([source, use])
+        let stamp = graph.runStamp(for: use, succeeded: true)
+        use.lastRun = try JSONDecoder().decode(CodeRunStamp.self, from: JSONEncoder().encode(stamp))
+        XCTAssertEqual(use.lastRun?.upstream?.first?.names, ["x", "y"])
+        XCTAssertEqual(CodeDependencies.build([source, use]).status[use.id], .ok)
+        XCTAssertTrue(CodeDependencies.build([use]).status[use.id]!.isStale)
+        XCTAssertTrue(CodeDependencies.build([source, replacement, use]).status[use.id]!.isStale)
+        var renamed = source
+        renamed.code = "y = 2"
+        let renamedHash = renamed.fingerprint
+        renamed.lastRun?.codeHash = renamedHash
+        XCTAssertTrue(CodeDependencies.build([renamed, use]).status[use.id]!.isStale)
+        var restored = source
+        restored.lastRun?.ranAt = time.addingTimeInterval(-1)
+        XCTAssertTrue(CodeDependencies.build([restored, use]).status[use.id]!.isStale)
+    }
+
+    func testRunInputsInvalidateSavedResult() {
+        var block = item("print(1)", ran: Date())
+        let original = block
+        for change: (inout CodeDependencies.Item) -> Void in [
+            { $0.stdin = " " }, { $0.interactive = true }, { $0.isolated = true }, { $0.language = "swift" }
+        ] {
+            block = original
+            change(&block)
+            XCTAssertTrue(CodeDependencies.build([block]).status[block.id]!.isStale)
+        }
+    }
+
+    func testLegacyStampDecodesWithUnknownDependencies() throws {
+        let json = Data(#"{"ranAt":0,"codeHash":"abc","succeeded":true}"#.utf8)
+        var block = item("print(1)")
+        block.lastRun = try JSONDecoder().decode(CodeRunStamp.self, from: json)
+        XCTAssertNil(block.lastRun?.upstream)
+        XCTAssertTrue(CodeDependencies.build([block]).status[block.id]!.isStale)
     }
 
     func testFingerprintIgnoresTrailingWhitespaceAndCRLF() {

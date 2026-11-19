@@ -8,6 +8,14 @@ import FolioCore
 final class RunManager: ObservableObject {
     static let shared = RunManager()
 
+    let dependencyCaches = NSMapTable<NoteDocument, CodeDependencyCache>.weakToStrongObjects()
+    private let successfulSessions = NSMapTable<BlockModel, Kernel>.weakToWeakObjects()
+
+    func ranInCurrentSession(_ block: BlockModel, doc: NoteDocument) -> Bool {
+        guard let kernel = KernelManager.shared.existing(note: doc.id, language: Languages.spec(for: block.language).id) else { return false }
+        return block.lastRun?.succeeded == true && successfulSessions.object(forKey: block) === kernel
+    }
+
     struct Run {
         var runner: CodeRun
         var kernel: Kernel?
@@ -36,21 +44,26 @@ final class RunManager: ObservableObject {
         guard runs[block.id] == nil else { return nil }
         let lang = Languages.spec(for: block.language)
         let shared = runsInSession(block, language: lang.id)
+        let stamp = dependencyGraph(for: doc).runStamp(for: block.dependencyItem(runs: self), succeeded: false)
+        successfulSessions.removeObject(forKey: block)
+        // Not runnable (plain text, JSON …): skipped as before; "run all" must not write errors into such blocks.
         guard lang.isRunnable || shared else { return nil }
         var kernel: Kernel?
         if shared {
-            kernel = openKernel(for: block, doc: doc, language: lang.id)
+            kernel = openKernel(for: block, doc: doc, language: lang.id, stamp: stamp)
             guard kernel != nil else { return nil }
         }
         let runner = CodeRun()
+        dependencyCaches.object(forKey: doc)?.graph = nil
         begin(block, runner: runner, kernel: kernel)
-        let context = makeContext(block: block, doc: doc, theme: theme, language: lang, runner: runner, kernel: kernel)
+        let context = makeContext(block: block, doc: doc, theme: theme, language: lang, runner: runner, kernel: kernel, stamp: stamp)
         if block.interactive { announceInputWhenReady(block.id, runner: runner) }
         return Task { await self.execute(context) }
     }
 
     /// Everything a started run needs until it has finished.
     private struct RunContext {
+        let stamp: CodeRunStamp
         let block: BlockModel
         let doc: NoteDocument
         let language: LanguageSpec
@@ -70,19 +83,28 @@ final class RunManager: ObservableObject {
     }
 
     /// Typed input needs its own process; prepared input works in Python sessions too.
-    private func runsInSession(_ block: BlockModel, language: String) -> Bool {
+    func runsInSession(_ block: BlockModel, language: String) -> Bool {
         let needsOwnProcess = block.interactive || (preparedInput(of: block) != nil && language != "python")
         return block.mode != "isolated" && KernelManager.supportsSharing(language) && !needsOwnProcess
     }
 
-    private func openKernel(for block: BlockModel, doc: NoteDocument, language: String) -> Kernel? {
+    private func openKernel(for block: BlockModel, doc: NoteDocument, language: String, stamp: CodeRunStamp) -> Kernel? {
         do {
             return try KernelManager.shared.kernel(note: doc.id, language: language, environment: doc.meta.environment)
         } catch {
-            block.output = error.localizedDescription
-            block.outputIsError = true
+            failStart(block, doc: doc, stamp: stamp, message: error.localizedDescription)
             return nil
         }
+    }
+
+    private func failStart(_ block: BlockModel, doc: NoteDocument, stamp: CodeRunStamp, message: String) {
+        block.lastRun = stamp
+        block.output = message
+        block.outputIsError = true
+        block.ranInSession = false
+        info[block.id] = nil
+        if block.test != nil { block.testOutcome = .notRun(message) }
+        doc.markDirty()
     }
 
     private func begin(_ block: BlockModel, runner: CodeRun, kernel: Kernel?) {
@@ -95,7 +117,7 @@ final class RunManager: ObservableObject {
         block.testOutcome = nil
     }
 
-    private func makeContext(block: BlockModel, doc: NoteDocument, theme: ThemeManager, language: LanguageSpec, runner: CodeRun, kernel: Kernel?) -> RunContext {
+    private func makeContext(block: BlockModel, doc: NoteDocument, theme: ThemeManager, language: LanguageSpec, runner: CodeRun, kernel: Kernel?, stamp: CodeRunStamp) -> RunContext {
         let env = doc.meta.environment
         let noteOverride = env?.interpreters[language.id].flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let timeout = env?.timeout ?? theme.settings.runTimeout
@@ -103,7 +125,7 @@ final class RunManager: ObservableObject {
                                     maxMemoryMB: Int(theme.settings.maxMemoryMB), killOrphans: theme.settings.killOrphans)
         let options = RunOptions(stdin: preparedInput(of: block), interactive: block.interactive, workingDirectory: env?.workingDirectoryURL,
                                  environment: env?.variables ?? [:], limits: limits)
-        return RunContext(block: block, doc: doc, language: language, runner: runner, kernel: kernel, code: block.storage.string,
+        return RunContext(stamp: stamp, block: block, doc: doc, language: language, runner: runner, kernel: kernel, code: block.storage.string,
                           override: noteOverride ?? theme.settings.interpreterOverrides[language.id], timeout: timeout, limits: limits, options: options,
                           onOutput: outputHandler(for: block, runner: runner, limit: limits.maxOutputBytes), onServer: serverHandler(for: block.id))
     }
@@ -147,18 +169,16 @@ final class RunManager: ObservableObject {
         do {
             await finish(c, with: try await perform(c))
         } catch {
-            c.block.output = error.localizedDescription
-            c.block.outputIsError = true
-            info[c.block.id] = nil
-            if c.block.test != nil { c.block.testOutcome = .notRun(error.localizedDescription) }
+            failStart(c.block, doc: c.doc, stamp: c.stamp, message: error.localizedDescription)
         }
         runs[c.block.id] = nil
+        dependencyCaches.object(forKey: c.doc)?.graph = nil
         c.doc.markDirty()
     }
 
     private func perform(_ c: RunContext) async throws -> RunResult {
         if let kernel = c.kernel {
-            return await kernel.execute(c.code, timeout: c.timeout, stdin: preparedInput(of: c.block), limits: c.limits, onOutput: c.onOutput, onServer: c.onServer)
+            return await kernel.execute(c.code, timeout: c.timeout, stdin: c.options.stdin, limits: c.limits, onOutput: c.onOutput, onServer: c.onServer)
         }
         return try await c.runner.run(code: c.code, language: c.language, override: c.override, options: c.options, onOutput: c.onOutput, onServer: c.onServer)
     }
@@ -175,7 +195,10 @@ final class RunManager: ObservableObject {
             // A regular expression can take seconds; the interface has to keep running (#134).
             block.testOutcome = await Task.detached(priority: .userInitiated) { BlockTestEvaluator.evaluate(test, result: r) }.value
         }
-        block.lastRun = CodeRunStamp(codeHash: CodeDependencies.fingerprint(c.code), succeeded: r.succeeded)
+        var stamp = c.stamp
+        stamp.succeeded = r.succeeded
+        block.lastRun = stamp
+        if r.succeeded, let kernel = c.kernel { successfulSessions.setObject(kernel, forKey: block) }
         if c.kernel != nil {
             block.ranInSession = r.succeeded || (stopped && r.serverURL != nil)
             block.startedServer = r.serverURL != nil

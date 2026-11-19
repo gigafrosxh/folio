@@ -65,8 +65,7 @@ public enum ErduDocument {
         let version = (root["version"] as? NSNumber)?.intValue ?? 0
         guard version >= 1 else { throw Failure.notErdu }
         guard version <= supportedVersion else { throw Failure.newerVersion(version) }
-        let nodes = ((root["er"] as? [String: Any])?["nodes"] as? [[String: Any]]) ?? []
-        let tables = ((root["rel"] as? [String: Any])?["tables"] as? [[String: Any]]) ?? []
+        let (nodes, tables) = try structure(of: root)
         var names: [String] = nodes.filter { ["entity", "relationship", "attribute"].contains($0["kind"] as? String ?? "") }
             .compactMap { $0["name"] as? String }
         for table in tables {
@@ -78,6 +77,18 @@ public enum ErduDocument {
         return Summary(entities: nodes.filter { $0["kind"] as? String == "entity" }.count,
                        relationships: nodes.filter { $0["kind"] as? String == "relationship" }.count,
                        tables: tables.count, dialect: root["dialect"] as? String, names: names)
+    }
+
+    /// The parts the renderer draws, checked for the types it expects: a file with `er.nodes` as a string (or a table
+    /// without columns) would otherwise be taken in and then fail to draw (#263).
+    static func structure(of root: [String: Any]) throws -> (nodes: [[String: Any]], tables: [[String: Any]]) {
+        guard let er = root["er"] as? [String: Any], let nodes = er["nodes"] as? [[String: Any]],
+              (er["edges"] == nil || er["edges"] is [[String: Any]]),
+              let rel = root["rel"] as? [String: Any], let tables = rel["tables"] as? [[String: Any]] else { throw Failure.notErdu }
+        let nodesOK = nodes.allSatisfy { $0["kind"] is String && $0["id"] is String && $0["x"] is NSNumber && $0["y"] is NSNumber }
+        let tablesOK = tables.allSatisfy { $0["name"] is String && $0["columns"] is [[String: Any]] }
+        guard nodesOK, tablesOK else { throw Failure.notErdu }
+        return (nodes, tables)
     }
 
     /// Search text of a block: the names, one per line; empty for broken files.

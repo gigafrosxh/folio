@@ -6,7 +6,7 @@ public enum CodeExport {
     }
 
     // ArchiveLimits govern compressed notes, not source files.
-    private static let maximumFileSize = 5 * 1024 * 1024
+    public static let maximumFileSize = 5 * 1024 * 1024
 
     public static func suggestedFileName(code: String, language: String, caption: String?) -> String {
         let caption = caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -45,32 +45,49 @@ public enum CodeExport {
         try fileContents(code: code).write(to: url, options: .atomic)
     }
 
-    public static func compare(code: String, fileAt url: URL) -> LinkState {
+    /// Reads at most `limit` bytes of a regular file; anything else (missing, too large, a FIFO or device that could
+    /// block, a folder) is reported as a `LinkState` instead of being read (#263).
+    public static func boundedData(at url: URL, limit: Int = maximumFileSize) -> Result<Data, LinkStateError> {
         do {
             let target = url.resolvingSymlinksInPath()
             let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
-            if let size = attributes[.size] as? NSNumber, size.int64Value > maximumFileSize {
-                return .unreadable("Datei ist zu groß")
-            }
-            guard attributes[.type] as? FileAttributeType == .typeRegular else {
-                return .unreadable("Keine reguläre Datei")
-            }
+            guard attributes[.type] as? FileAttributeType == .typeRegular else { return .failure(.init(.unreadable("Keine reguläre Datei"))) }
+            if let size = attributes[.size] as? NSNumber, size.int64Value > Int64(limit) { return .failure(.init(.unreadable("Datei ist zu groß"))) }
             let handle = try FileHandle(forReadingFrom: target)
             defer { try? handle.close() }
-            let data = try handle.read(upToCount: maximumFileSize + 1) ?? Data()
-            guard data.count <= maximumFileSize else { return .unreadable("Datei ist zu groß") }
-            guard let text = String(data: data, encoding: .utf8) else {
-                return .unreadable("Datei ist kein gültiger UTF-8-Text")
-            }
-            let lhs = code.replacingOccurrences(of: "\r\n", with: "\n")
-            let rhs = text.replacingOccurrences(of: "\r\n", with: "\n")
-            return lhs == rhs || lhs + "\n" == rhs || rhs + "\n" == lhs ? .same : .differs
+            let data = try handle.read(upToCount: limit + 1) ?? Data()
+            guard data.count <= limit else { return .failure(.init(.unreadable("Datei ist zu groß"))) }
+            return .success(data)
         } catch {
             let error = error as NSError
             if error.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError, NSFileReadNoSuchFileError].contains(error.code) {
-                return .missing
+                return .failure(.init(.missing))
             }
-            return .unreadable(error.localizedDescription)
+            return .failure(.init(.unreadable(error.localizedDescription)))
+        }
+    }
+
+    public struct LinkStateError: Error, Equatable {
+        public var state: LinkState
+        public init(_ state: LinkState) { self.state = state }
+    }
+
+    /// The file as text with LF line ends, or why it cannot be shown.
+    public static func readText(at url: URL) -> Result<String, LinkStateError> {
+        boundedData(at: url).flatMap { data in
+            guard let text = String(data: data, encoding: .utf8) else { return .failure(.init(.unreadable("Datei ist kein gültiger UTF-8-Text"))) }
+            return .success(text.replacingOccurrences(of: "\r\n", with: "\n"))
+        }
+    }
+
+    public static func compare(code: String, fileAt url: URL) -> LinkState {
+        switch readText(at: url) {
+        case .failure(let e): return e.state
+        case .success(let rhs):
+            // Byte-exact: Swift's == treats composed and decomposed "é" as equal (#265).
+            let lhs = Array(code.replacingOccurrences(of: "\r\n", with: "\n").utf8)
+            let r = Array(rhs.utf8)
+            return lhs == r || lhs + [0x0A] == r || r + [0x0A] == lhs ? .same : .differs
         }
     }
 }

@@ -72,3 +72,11 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertNotNil(r.dmgURL)
     }
 }
+
+final class UpdatePathsTests: XCTestCase {
+    func testTranslocationIsRecognised() {
+        XCTAssertTrue(UpdatePaths.isTranslocated("/private/var/folders/dp/x/T/AppTranslocation/80349E44/d/Folio.app"))
+        XCTAssertFalse(UpdatePaths.isTranslocated("/Applications/Folio.app"))
+        XCTAssertFalse(UpdatePaths.isTranslocated("/Volumes/ExterneSSD/Applications/Folio.app"))
+    }
+}

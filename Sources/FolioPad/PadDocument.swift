@@ -83,23 +83,44 @@ final class PadDocument: ObservableObject, Identifiable {
 
     func save(history: NoteHistory) throws -> SaveOutcome {
         guard isDirty else { return .unchanged }
+        let snapshot = prepared()
+        return try write(snapshot, data: try snapshot.encoded(), revision: revision, history: history)
+    }
+
+    /// Autosave: compressing the note (with all attachments) runs off the main thread; checking for changes made
+    /// elsewhere, keeping the previous version and writing stay on it, so they never race with each other (#264).
+    func saveInBackground(history: NoteHistory) async throws -> SaveOutcome {
+        guard isDirty else { return .unchanged }
+        let snapshot = prepared()
+        let rev = revision
+        let data = try await Task.detached(priority: .utility) { try snapshot.encoded() }.value
+        // Saved meanwhile (e.g. when switching notes): nothing left to do.
+        guard isDirty else { return .unchanged }
+        return try write(snapshot, data: data, revision: rev, history: history)
+    }
+
+    private func prepared() -> NoteFile {
         Self.refreshMeta(&file)
         file.meta.modified = Date()
-        let data = try file.encoded()
+        return file
+    }
+
+    private func write(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory) throws -> SaveOutcome {
         let fm = FileManager.default
         if fm.fileExists(atPath: url.path), Self.modificationDate(url) != diskDate {
             // Changed elsewhere since it was opened: keep both.
             let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
             // New ids for note, blocks and attachments: both files may be open on the Mac at once (#260).
-            try NoteIdentity.renewed(file).encoded().write(to: copy, options: .atomic)
+            try NoteIdentity.renewed(snapshot).encoded().write(to: copy, options: .atomic)
             isDirty = false
             return .savedAsCopy(copy)
         }
         // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
-        if fm.fileExists(atPath: url.path) { try history.record(try Data(contentsOf: url), noteID: file.meta.id, force: true) }
+        if fm.fileExists(atPath: url.path) { try history.record(try Data(contentsOf: url), noteID: snapshot.meta.id, force: true) }
         try data.write(to: url, options: .atomic)
         diskDate = Self.modificationDate(url)
-        isDirty = false
+        // Edits made while compressing stay unsaved and are written by the next save.
+        if revision == rev { isDirty = false }
         return .saved
     }
 

@@ -35,7 +35,7 @@ struct CodeBlockView: View {
                            onFocus: { FormattingController.shared.didFocus(nil, blockID: block.id) },
                            onFormat: formatCode,
                            linkedPrelude: linkedPrelude,
-                           liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: block.language) : nil })
+                           liveKernel: { isLinked ? KernelManager.shared.existing(note: doc.id, language: spec.id) : nil })
                 .frame(height: height)
                 .padding(.bottom, 2)
                 .onChange(of: block.diagnostics) { markDiagnostics() }
@@ -493,10 +493,10 @@ struct CodeBlockView: View {
     @State private var formatterName: String?
 
     /// Linked blocks run in the note's shared session for their language (variables carry over).
-    private var isLinked: Bool { block.mode != "isolated" && KernelManager.supportsSharing(block.language) }
+    private var isLinked: Bool { runs.runsInSession(block, language: spec.id) }
     private var sessionRunning: Bool {
         _ = kernels.alive
-        return KernelManager.shared.isRunning(note: doc.id, language: block.language)
+        return KernelManager.shared.isRunning(note: doc.id, language: spec.id)
     }
 
     /// Code of the linked blocks above this one (same language), for autocomplete.
@@ -504,7 +504,7 @@ struct CodeBlockView: View {
         if usesDatabase { return dbState.completionWords }
         guard isLinked, let index = doc.blocks.firstIndex(where: { $0.id == block.id }) else { return "" }
         return doc.blocks[..<index]
-            .filter { $0.kind == .code && $0.language == block.language && $0.mode != "isolated" }
+            .filter { $0.kind == .code && Languages.spec(for: $0.language).id == spec.id && runs.runsInSession($0, language: spec.id) }
             .map(\.storage.string)
             .joined(separator: "\n")
     }
@@ -585,7 +585,7 @@ struct CodeBlockView: View {
                     .disabled(runs.testingNotes.contains(doc.id))
             }
             Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
-            if KernelManager.supportsSharing(block.language) { kernelItems }
+            if KernelManager.supportsSharing(spec.id) { kernelItems }
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 12))
@@ -649,7 +649,7 @@ struct CodeBlockView: View {
         Toggle("Mit anderen \(spec.name)-Blöcken verknüpft", isOn: Binding(
             get: { block.mode != "isolated" },
             set: { v in doc.changeBlock(block, "Sitzung ändern") { block.mode = v ? "" : "isolated" } }))
-        Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: block.language) }
+        Button("\(spec.name)-Sitzung neu starten") { KernelManager.shared.restart(note: doc.id, language: spec.id) }
             .disabled(!sessionRunning)
     }
 

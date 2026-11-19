@@ -164,3 +164,11 @@ public enum UpdateChecker {
         return c < l
     }
 }
+
+/// Paths the updater has to treat specially (#259).
+public enum UpdatePaths {
+    /// Whether macOS runs the app from an App Translocation copy (quarantined download started in place).
+    public static func isTranslocated(_ path: String) -> Bool {
+        path.contains("/AppTranslocation/")
+    }
+}

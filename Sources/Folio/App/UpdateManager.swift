@@ -34,9 +34,12 @@ final class UpdateManager: ObservableObject {
     var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0" }
 
     /// The running app bundle, if Folio runs as an .app (not via `swift run`).
+    /// The installed app. A downloaded app that still carries the quarantine flag is started by macOS from a read-only
+    /// random folder (App Translocation); the update then goes to the original location instead (#259).
     var appBundleURL: URL? {
         let url = Bundle.main.bundleURL
-        return url.pathExtension == "app" ? url : nil
+        guard url.pathExtension == "app" else { return nil }
+        return AppTranslocation.isTranslocated(url) ? AppTranslocation.originalURL(of: url) : url
     }
 
     func check(silently: Bool = false) {
@@ -64,6 +67,10 @@ final class UpdateManager: ObservableObject {
         guard let dmgURL = release.dmgURL else { state = .failed("Das Release enthält kein Installationsabbild."); return }
         guard let app = appBundleURL else {
             state = .failed("Folio läuft nicht aus einer App (z. B. über swift run) und kann sich nicht selbst ersetzen.")
+            return
+        }
+        if AppTranslocation.isTranslocated(app) {
+            state = .failed(AppTranslocation.advice)
             return
         }
         guard FileManager.default.isWritableFile(atPath: app.deletingLastPathComponent().path) else {

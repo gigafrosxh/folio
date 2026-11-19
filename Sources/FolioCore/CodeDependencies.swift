@@ -2,12 +2,21 @@ import Foundation
 
 /// When and with which code a block last ran (#26). Saved with the block, so "veraltet" survives a restart.
 public struct CodeRunStamp: Codable, Sendable, Equatable {
+    public struct Upstream: Codable, Sendable, Equatable {
+        public var block: UUID
+        public var names: [String]
+        public var ranAt: Date?
+    }
+
     public var ranAt: Date
-    /// `CodeDependencies.fingerprint` of the code that ran.
+    /// Includes execution inputs for new stamps. Older stamps contain only the code hash.
     public var codeHash: String
+    /// Nil for legacy stamps. An empty array records a run without dependencies.
+    public var upstream: [Upstream]?
     public var succeeded: Bool
 
-    public init(ranAt: Date = Date(), codeHash: String, succeeded: Bool) {
+    public init(ranAt: Date = Date(), codeHash: String, succeeded: Bool, upstream: [Upstream]? = nil) {
+        self.upstream = upstream
         self.ranAt = ranAt
         self.codeHash = codeHash
         self.succeeded = succeeded
@@ -27,15 +36,28 @@ public enum CodeDependencies {
         public var session: String?
         public var code: String
         public var lastRun: CodeRunStamp?
+        public var stdin: String?
+        public var interactive: Bool
+        public var isolated: Bool
         public var running: Bool
 
-        public init(id: UUID, language: String, session: String?, code: String, lastRun: CodeRunStamp?, running: Bool = false) {
+        public init(id: UUID, language: String, session: String?, code: String, lastRun: CodeRunStamp?, running: Bool = false,
+                    stdin: String? = nil, interactive: Bool = false, isolated: Bool = false) {
             self.id = id
             self.language = language
             self.session = session
             self.code = code
             self.lastRun = lastRun
+            self.stdin = stdin
+            self.interactive = interactive
+            self.isolated = isolated
             self.running = running
+        }
+
+        public var fingerprint: String {
+            // Length prefixes preserve arbitrary stdin, including trailing whitespace and delimiters.
+            let fields = [CodeDependencies.fingerprint(code), language, stdin ?? "", String(interactive), String(isolated)]
+            return CodeDependencies.hash(fields.map { "\($0.utf8.count):\($0)" }.joined())
         }
     }
 
@@ -45,6 +67,10 @@ public enum CodeDependencies {
         /// The block that uses them.
         public var to: UUID
         public var names: [String]
+
+        fileprivate func snapshot(source: Item?) -> CodeRunStamp.Upstream {
+            CodeRunStamp.Upstream(block: from, names: names, ranAt: source?.lastRun?.ranAt)
+        }
     }
 
     public enum Status: Sendable, Equatable {
@@ -82,6 +108,12 @@ public enum CodeDependencies {
 
         public func upstream(of id: UUID) -> [Edge] { edges.filter { $0.to == id } }
         public func downstream(of id: UUID) -> [Edge] { edges.filter { $0.from == id } }
+        public func runStamp(for item: Item, succeeded: Bool) -> CodeRunStamp {
+            let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let upstream = upstream(of: item.id).map { $0.snapshot(source: byID[$0.from]) }
+            return CodeRunStamp(codeHash: item.fingerprint, succeeded: succeeded, upstream: upstream)
+        }
+
         /// Blocks to run again, in note order, so that every result is up to date.
         public var staleInOrder: [UUID] { items.map(\.id).filter { status[$0]?.isStale == true } }
         /// Number (1-based, in note order) of a block, for labels like "Block 2".
@@ -122,9 +154,10 @@ public enum CodeDependencies {
         var result: [UUID: Status] = [:]
         let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let number = Dictionary(items.enumerated().map { ($1.id, $0 + 1) }, uniquingKeysWith: { a, _ in a })
+        let incoming = Dictionary(grouping: edges, by: \.to)
         // Edges always point downwards, so one pass in note order sees every predecessor first.
         for item in items {
-            result[item.id] = ownStatus(item) ?? upstreamStatus(item, edges: edges, byID: byID, number: number, known: result)
+            result[item.id] = ownStatus(item) ?? upstreamStatus(item, incoming: incoming[item.id] ?? [], byID: byID, number: number, known: result)
         }
         return result
     }
@@ -133,13 +166,18 @@ public enum CodeDependencies {
     private static func ownStatus(_ item: Item) -> Status? {
         if item.running { return .running }
         guard let run = item.lastRun else { return .notRun }
-        if run.codeHash != fingerprint(item.code) { return .stale("Code seit der letzten Ausführung geändert") }
+        if run.upstream == nil {
+            return run.succeeded ? .stale("Abhängigkeiten der letzten Ausführung unbekannt") : .failed
+        }
+        if run.codeHash != item.fingerprint { return .stale("Code oder Ausführungseinstellungen geändert") }
         return nil
     }
 
-    private static func upstreamStatus(_ item: Item, edges: [Edge], byID: [UUID: Item], number: [UUID: Int], known: [UUID: Status]) -> Status {
+    private static func upstreamStatus(_ item: Item, incoming: [Edge], byID: [UUID: Item], number: [UUID: Int], known: [UUID: Status]) -> Status {
         guard let run = item.lastRun else { return .notRun }
-        for edge in edges where edge.to == item.id {
+        let current = incoming.map { $0.snapshot(source: byID[$0.from]) }
+        if run.upstream != current { return .stale("Abhängigkeiten seit der letzten Ausführung geändert") }
+        for edge in incoming {
             if let reason = staleReason(source: byID[edge.from], status: known[edge.from], label: "Block \(number[edge.from] ?? 0)", ranAt: run.ranAt) {
                 return .stale(reason)
             }
@@ -162,8 +200,12 @@ public enum CodeDependencies {
     public static func fingerprint(_ code: String) -> String {
         var normalized = code.replacingOccurrences(of: "\r\n", with: "\n")
         while let last = normalized.last, last.isWhitespace { normalized.removeLast() }
+        return hash(normalized)
+    }
+
+    fileprivate static func hash(_ text: String) -> String {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in normalized.utf8 {
+        for byte in text.utf8 {
             hash ^= UInt64(byte)
             hash = hash &* 0x0000_0100_0000_01b3
         }
@@ -181,7 +223,7 @@ public enum SymbolScan {
     private static let cacheLock = NSLock()
     nonisolated(unsafe) private static var cache: [String: Symbols] = [:]
 
-    /// `scan`, remembered per language and code: every block header asks for the graph on each redraw.
+    /// Reuse symbol scans for unchanged blocks across graph revisions.
     public static func cachedScan(_ code: String, language: String) -> Symbols {
         let key = language + "\u{1}" + CodeDependencies.fingerprint(code) + "\u{1}\(code.utf8.count)"
         cacheLock.lock()
