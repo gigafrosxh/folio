@@ -44,9 +44,19 @@ public struct CompletionContext: Sendable, Equatable {
         let start = Self.identifierStart(in: ns, before: off)
         prefix = ns.substring(with: NSRange(location: start, length: off - start))
         receiver = Self.receiver(in: ns, before: start)
-        let lines = ns.substring(to: off).components(separatedBy: "\n")
-        line = lines.count - 1
-        column = ((lines.last ?? "") as NSString).length
+        // Counting line breaks instead of splitting the text: no copy of every line on each key (#222).
+        var lineCount = 0, lastBreak = -1
+        let chunk = 4096
+        var buffer = [unichar](repeating: 0, count: chunk)
+        var pos = 0
+        while pos < off {
+            let n = min(chunk, off - pos)
+            ns.getCharacters(&buffer, range: NSRange(location: pos, length: n))
+            for i in 0..<n where buffer[i] == 10 { lineCount += 1; lastBreak = pos + i }
+            pos += n
+        }
+        line = lineCount
+        column = off - lastBreak - 1
     }
 
     private static func isIdentifier(_ c: unichar) -> Bool {

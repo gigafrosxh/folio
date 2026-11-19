@@ -89,3 +89,28 @@ final class PassageSplitTests: XCTestCase {
         XCTAssertEqual(passages.map(\.index), [0, 1])
     }
 }
+
+final class HighlightDiffTests: XCTestCase {
+    private let py = Languages.spec(for: "python")
+
+    private func span(_ a: String, _ b: String) -> NSRange? {
+        HighlightDiff.span(oldText: a as NSString, newText: b as NSString,
+                           oldTokens: SyntaxHighlighter.tokens(in: a, language: py), newTokens: SyntaxHighlighter.tokens(in: b, language: py))
+    }
+
+    func testTypingAtEndTouchesOnlyTheEnd() {
+        let base = (0..<100).map { "x\($0) = \($0)  # Kommentar" }.joined(separator: "\n")
+        let r = span(base, base + "y")!
+        XCTAssertGreaterThan(r.location, (base as NSString).length - 40)
+    }
+
+    func testOpeningAStringRecoloursWhatFollows() {
+        let a = "a = 1\nb = 2\nc = 3"
+        let r = span(a, "\"\"\"a = 1\nb = 2\nc = 3")!
+        XCTAssertEqual(NSMaxRange(r), ("\"\"\"a = 1\nb = 2\nc = 3" as NSString).length, "the open string colours the rest")
+    }
+
+    func testNoChange() {
+        XCTAssertNil(span("a = 1", "a = 1"))
+    }
+}

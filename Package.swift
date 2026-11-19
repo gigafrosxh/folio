@@ -54,6 +54,13 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
+        // Benchmarks on synthetic libraries (#219): scripts/benchmark.sh.
+        .executableTarget(
+            name: "folio-bench",
+            dependencies: ["FolioCore"],
+            path: "Sources/folio-bench",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         // Command-line inspector for .folio files.
         .executableTarget(
             name: "folio-dump",

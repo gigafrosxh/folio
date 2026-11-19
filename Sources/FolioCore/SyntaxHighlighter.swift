@@ -110,3 +110,42 @@ public enum SyntaxHighlighter {
         }
     }
 }
+
+/// Which part of a code block has to be coloured again after an edit (#221). Recolouring the whole block on every key
+/// made AppKit lay out every line again (55 ms per key at 3,000 lines).
+public enum HighlightDiff {
+    /// The changed text plus every token that appeared, vanished or changed, in the new text's coordinates; nil when
+    /// nothing has to be recoloured.
+    public static func span(oldText: NSString, newText: NSString, oldTokens: [Token], newTokens: [Token]) -> NSRange? {
+        let oldLen = oldText.length, newLen = newText.length
+        var prefix = 0
+        let limit = min(oldLen, newLen)
+        while prefix < limit, oldText.character(at: prefix) == newText.character(at: prefix) { prefix += 1 }
+        var suffix = 0
+        while suffix < limit - prefix, oldText.character(at: oldLen - 1 - suffix) == newText.character(at: newLen - 1 - suffix) { suffix += 1 }
+        let delta = newLen - oldLen
+        var lower = prefix, upper = newLen - suffix
+        let changedText = lower < upper || oldLen != newLen
+        // Old tokens moved into new coordinates; tokens that touched the edit are dropped (they count as changed).
+        var moved = Set<TokenKey>()
+        for t in oldTokens {
+            if NSMaxRange(t.range) <= prefix { moved.insert(TokenKey(t.range, t.kind)) }
+            else if t.range.location >= oldLen - suffix { moved.insert(TokenKey(NSRange(location: t.range.location + delta, length: t.range.length), t.kind)) }
+            else { lower = min(lower, t.range.location); upper = max(upper, min(NSMaxRange(t.range) + max(delta, 0), newLen)) }
+        }
+        let fresh = Set(newTokens.map { TokenKey($0.range, $0.kind) })
+        for k in fresh.symmetricDifference(moved) {
+            lower = min(lower, k.location)
+            upper = max(upper, min(k.location + k.length, newLen))
+        }
+        guard changedText || lower < upper else { return nil }
+        lower = max(0, min(lower, newLen))
+        upper = max(lower, min(upper, newLen))
+        return NSRange(location: lower, length: upper - lower)
+    }
+
+    private struct TokenKey: Hashable {
+        var location: Int, length: Int, kind: TokenKind
+        init(_ r: NSRange, _ kind: TokenKind) { location = r.location; length = r.length; self.kind = kind }
+    }
+}

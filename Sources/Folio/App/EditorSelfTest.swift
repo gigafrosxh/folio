@@ -34,6 +34,7 @@ enum EditorSelfTest {
         duplicateChecks(store: store)
         await focusModeChecks()
         await FoldSelfTest.run(store: store)
+        await HighlightSelfTest.run(store: store)
         print("EDIT done"); fflush(stdout)
     }
 

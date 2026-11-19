@@ -631,7 +631,7 @@ struct CodeEditorView: NSViewRepresentable {
             tv.insertionPointColor = codeTheme.foregroundColor
             tv.selectedTextAttributes = [.backgroundColor: codeTheme.color(for: .keyword).withAlphaComponent(0.25)]
             tv.typingAttributes = [.font: font, .foregroundColor: codeTheme.foregroundColor]
-            context.coordinator.highlight(tv)
+            context.coordinator.highlight(tv, full: true)
             tv.reportHeight()
         }
         container.gutter.needsDisplay = true
@@ -671,17 +671,36 @@ struct CodeEditorView: NSViewRepresentable {
             tv.schedulePrediction()
         }
 
-        func highlight(_ tv: NSTextView) {
+        /// Text and tokens of the last colouring, to recolour only what an edit changed (#221).
+        private var lastText: NSString?
+        private var lastTokens: [Token] = []
+        private var lastStyle = ""
+
+        /// Colours the block; after an edit only the changed lines (a full pass when language, theme or font changed).
+        func highlight(_ tv: NSTextView, full forceFull: Bool = false) {
             guard let ts = tv.textStorage else { return }
             let theme = parent.codeTheme
-            let full = NSRange(location: 0, length: ts.length)
+            let text = ts.string as NSString
             let tokens = SyntaxHighlighter.tokens(in: ts.string, language: Languages.spec(for: parent.block.language))
+            let style = parent.block.language + "|" + parent.font.description + "|" + theme.foregroundColor.description
+            var span = NSRange(location: 0, length: ts.length)
+            if !forceFull, style == lastStyle, let old = lastText {
+                guard let changed = HighlightDiff.span(oldText: old, newText: text, oldTokens: lastTokens, newTokens: tokens) else {
+                    lastText = text.copy() as? NSString
+                    return
+                }
+                span = text.paragraphRange(for: changed)
+            }
+            lastText = text.copy() as? NSString
+            lastTokens = tokens
+            lastStyle = style
             ts.beginEditing()
-            ts.setAttributes([.font: parent.font, .foregroundColor: theme.foregroundColor], range: full)
+            ts.setAttributes([.font: parent.font, .foregroundColor: theme.foregroundColor], range: span)
             let italic = NSFontManager.shared.convert(parent.font, toHaveTrait: .italicFontMask)
-            for t in tokens where NSMaxRange(t.range) <= ts.length {
-                ts.addAttribute(.foregroundColor, value: theme.color(for: t.kind), range: t.range)
-                if t.kind == .comment { ts.addAttribute(.font, value: italic, range: t.range) }
+            for t in tokens where NSMaxRange(t.range) <= ts.length && NSIntersectionRange(t.range, span).length > 0 {
+                let r = NSIntersectionRange(t.range, span)
+                ts.addAttribute(.foregroundColor, value: theme.color(for: t.kind), range: r)
+                if t.kind == .comment { ts.addAttribute(.font, value: italic, range: r) }
             }
             ts.endEditing()
         }
