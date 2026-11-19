@@ -25,10 +25,8 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
      Beispiel: `1.1.0 → 1.1.1 (P0) → Test → neues P0 → 1.1.2 (P0) → 1.1.3 (P1) → 1.1.4 (P2) → 1.1.5 (P3)`.
    - **Release Candidates nur vor einer Hauptversion** (`2.0.0-rc.1 …` → `2.0.0`), nie danach: Nach SemVer ist `2.0.0-rc.1`
      älter als `2.0.0`, der Update-Knopf würde es nie anbieten (vom Nutzer so bestätigt).
-9. **Übergabe bei knappem Kontingent:** Bevor Claudes Kontingent ausgeht, bekommt Codex im Terminal den Auftrag, genau
-   dort weiterzumachen (Version, offene Issues, letzter Commit). Geht Codex' Kontingent aus, schreibt Codex in den
-   Projekt-Thread, wo Claude weitermachen soll. Der Auftrag wird auch dann geschickt, wenn der andere gerade kein
-   Kontingent hat – er wird dann eingeplant.
+9. **Kein Codex mehr** (Vorgabe des Nutzers vom 19.11.2026): Claude baut, testet und reviewt alles selbst; keine Übergaben
+   an Codex. Bugs aus dem Test eines Releases werden als weitere Patches behoben, bevor der nächste Meilenstein beginnt.
 
 ## Aufbau
 
