@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.8.3] – 2026-11-19
+
 ### Behoben
 - **Eingeklappter Abschnitt am Notizende** (#345): Endet ein Textblock in einem eingeklappten Abschnitt, bleibt darunter keine leere Zeile mehr stehen, und die Höhe springt nicht mehr, wenn das Fenster neu gesetzt wird. Eine Folio-Notiz außerhalb der Bibliothek, die auf das Dock-Symbol gezogen wird, nennt jetzt den richtigen Weg (in den Bibliotheksordner legen).
 
