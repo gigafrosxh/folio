@@ -92,6 +92,10 @@ final class NoteStore: ObservableObject {
     /// Symbolic links in the library that were not followed (outside the library or a loop) (#56).
     @Published internal(set) var skippedLinks: [String] = []
     let scanner = LibraryScanner()
+    /// Counts reloads; a background read that is not the newest one is dropped (#220).
+    var reloadGeneration = 0
+    /// How long applying the last reload took on the main thread (benchmark #219/#220).
+    var lastApplyMs = 0.0
     /// Last result of `filteredNotes` and what it was computed from (it is read on every redraw) (#62).
     var filterMemo: (key: String, notes: [NoteRef])?
     var notesVersion = 0
@@ -167,7 +171,7 @@ final class NoteStore: ObservableObject {
         ThemeManager.shared.settings.libraryPath = url.path
         prepareRoot()
         loadOrganization()
-        reload()
+        reloadInBackground()
         purgeTrash()
         return true
     }
@@ -181,18 +185,61 @@ final class NoteStore: ObservableObject {
         }
     }
 
+    /// Everything a reload reads from disk; built off the main thread by `reloadInBackground` (#220).
+    struct LibrarySnapshot: @unchecked Sendable {
+        var root: URL
+        var scan: LibraryScanner.Result
+        /// Built here too: each ref lowercases its note's text for the search, which is the costly part (#220).
+        var refs: [NoteRef]
+        var damaged: [DamagedNote]
+        var trash: [TrashItem]
+        var templates: [NoteRef]
+    }
+
+    nonisolated static func readLibrary(_ root: URL, scanner: LibraryScanner) -> LibrarySnapshot {
+        let result = scanner.scan(root)
+        let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
+        let dir = LibraryData.folder(root, "templates")
+        let templates = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == FolioArchive.fileExtension }
+            .compactMap { url in (try? NoteFile.readMetadata(at: url)).map { NoteRef(meta: $0, url: url) } }
+        return LibrarySnapshot(root: root, scan: result, refs: result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }, damaged: damaged, trash: LibraryTrash(library: root).items(), templates: templates)
+    }
+
+    /// Reads the library now. Callers that use the notes right afterwards need this; everything else should use
+    /// `reloadInBackground`, which keeps the main thread free while the disk is read (#220).
     func reload() {
-        let result = scanner.scan(rootURL)
+        reloadGeneration += 1
+        apply(Self.readLibrary(rootURL, scanner: scanner))
+    }
+
+    /// Reads the library off the main thread and applies the result there. Only the newest read is applied, and only
+    /// while the library is still the same, so quick changes never leave an older state behind.
+    @discardableResult
+    func reloadInBackground() -> Task<Void, Never> {
+        reloadGeneration += 1
+        let generation = reloadGeneration, root = rootURL, scanner = self.scanner
+        return Task {
+            let snapshot = await Task.detached(priority: .userInitiated) { NoteStore.readLibrary(root, scanner: scanner) }.value
+            guard generation == reloadGeneration, root == rootURL else { return }
+            apply(snapshot)
+        }
+    }
+
+    private func apply(_ snapshot: LibrarySnapshot) {
+        let started = DispatchTime.now().uptimeNanoseconds
+        defer { lastApplyMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000 }
+        let result = snapshot.scan
         func nodes(_ fs: [LibraryScanner.Folder]) -> [FolderNode] {
             fs.map { FolderNode(url: $0.url, name: $0.name, children: $0.children.isEmpty ? nil : nodes($0.children)) }
         }
         folders = orderedFolders(nodes(result.folders), parent: "")
-        notes = renewingDuplicateIDs(result.notes.map { NoteRef(meta: $0.meta, url: $0.url) })
-        let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
+        notes = renewingDuplicateIDs(snapshot.refs)
+        let damaged = snapshot.damaged
         damagedNotes = damaged
         skippedLinks = result.skippedLinks.map { "\($0.url.lastPathComponent): \($0.reason)" }
-        trashItems = trash.items()
-        templates = Self.scanTemplates(LibraryData.folder(rootURL, "templates"))
+        trashItems = snapshot.trash
+        templates = snapshot.templates
         if sidebarSelection == .damaged, damaged.isEmpty { sidebarSelection = .all }
         indexPDFsInLibrary()
         let known = Set(notes.map(\.id)).union(templates.map(\.id))
@@ -205,6 +252,7 @@ final class NoteStore: ObservableObject {
     /// Copies of a note file with the same id get a new identity, so each shows up as its own note (#166). The file
     /// Folio already knew under the id keeps it. A copy that cannot be rewritten stays hidden and is reported.
     private func renewingDuplicateIDs(_ found: [NoteRef]) -> [NoteRef] {
+        guard Set(found.map(\.id)).count != found.count else { return found }
         let known = Dictionary(notes.map { ($0.id, $0.url) }, uniquingKeysWith: { a, _ in a })
         let resolution = NoteIdentity.resolve(found.map { ($0.url, $0.id) }, known: known)
         guard !resolution.renew.isEmpty else { return found }

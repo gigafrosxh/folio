@@ -15,6 +15,11 @@ public enum NoteIdentity {
     /// one, the oldest file keeps the id; the path decides when the dates are equal.
     public static func resolve(_ notes: [(url: URL, id: UUID)], known: [UUID: URL] = [:], created: (URL) -> Date = creationDate) -> Resolution {
         var resolution = Resolution(keep: [], renew: [])
+        // The usual case, every id once: nothing to decide (this ran on each reload of the library, #220).
+        if Set(notes.map(\.id)).count == notes.count {
+            resolution.keep = notes.map(\.url).sorted { $0.path < $1.path }
+            return resolution
+        }
         for group in Dictionary(grouping: notes, by: \.id).values {
             let urls = group.map(\.url)
             let keeper = keeper(of: urls, known: known[group[0].id], created: created)

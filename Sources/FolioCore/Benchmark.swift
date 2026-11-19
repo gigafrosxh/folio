@@ -90,6 +90,16 @@ public enum Benchmark {
         public var p95Ms: Double
         public var minMs: Double
         public var peakMemoryMB: Double
+
+        public init(scenario: String, size: Int, runs: Int, medianMs: Double, p95Ms: Double, minMs: Double, peakMemoryMB: Double) {
+            self.scenario = scenario
+            self.size = size
+            self.runs = runs
+            self.medianMs = medianMs
+            self.p95Ms = p95Ms
+            self.minMs = minMs
+            self.peakMemoryMB = peakMemoryMB
+        }
     }
 
     /// Runs `body` `runs` times (after one warm-up unless `cold`) and reports median, p95 and minimum.

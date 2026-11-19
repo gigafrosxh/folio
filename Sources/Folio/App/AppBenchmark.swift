@@ -6,6 +6,9 @@ import FolioCore
 /// text and code blocks (#220, #221, #222). Never touches a real library.
 @MainActor
 enum AppBenchmark {
+    /// Main-thread time of the last applied background reload, measured inside NoteStore.
+    static var lastApplyMs: Double { NoteStore.shared.lastApplyMs }
+
     static func run(report: URL) async {
         let env = ProcessInfo.processInfo.environment
         guard let lib = env["FOLIO_LIBRARY"] else { return }
@@ -21,6 +24,16 @@ enum AppBenchmark {
             print(String(format: "BENCH %@ %d median %.2f ms p95 %.2f ms", r.scenario, r.size, r.medianMs, r.p95Ms)); fflush(stdout)
         }
         record(Benchmark.measure("app-reload-mainthread", size: store.notes.count, runs: 5) { store.reload() })
+        // Background reload: only applying the result runs on the main thread (#220).
+        var applyTimes: [Double] = []
+        for _ in 0..<5 {
+            let t = store.reloadInBackground()
+            await t.value
+            applyTimes.append(lastApplyMs)
+        }
+        applyTimes.sort()
+        record(Benchmark.Result(scenario: "app-reload-hintergrund-hauptthreadanteil", size: store.notes.count, runs: 5,
+                                medianMs: applyTimes[2], p95Ms: applyTimes[4], minMs: applyTimes[0], peakMemoryMB: Benchmark.peakMemoryMB()))
         record(Benchmark.measure("app-suche-gefiltert", size: store.notes.count, runs: 5) { _ = store.computeFilteredNotes() })
         let ids = Array(store.notes.prefix(20).map(\.id))
         var i = 0

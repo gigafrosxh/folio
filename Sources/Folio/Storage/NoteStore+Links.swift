@@ -6,9 +6,15 @@ extension NoteStore {
     /// Updates `linkIndex` for notes that are new, changed, renamed or gone – never a full rebuild.
     func refreshLinkIndex() {
         var seen = Set<UUID>()
+        // Folder names once per folder, not per note: this runs on every reload (#220).
+        var folderNames: [URL: String] = [:]
         for ref in notes {
             seen.insert(ref.id)
-            let folder = relativeFolderName(ref.folderURL)
+            let folder = folderNames[ref.folderURL] ?? {
+                let name = relativeFolderName(ref.folderURL)
+                folderNames[ref.folderURL] = name
+                return name
+            }()
             let stamp = "\(ref.meta.modified.timeIntervalSince1970)|\(ref.meta.title)|\(folder)|\(ref.meta.links.count)|\(ref.meta.tags.joined(separator: ","))"
             if linkIndexStamps[ref.id] != stamp {
                 linkIndex.update(ref.meta, folder: folder)

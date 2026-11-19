@@ -95,7 +95,7 @@ struct SidebarView: View {
                     Button("Apple Notizen importieren…") { showImport = true }
                     Button("Markdown importieren…") { MarkdownTransfer.importWithPanel() }
                     Button("Bibliothek im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([store.rootURL]) }
-                    Button("Neu laden") { store.reload() }
+                    Button("Neu laden") { store.reloadInBackground() }
                     if !store.skippedLinks.isEmpty {
                         Section("Nicht gefolgte Verknüpfungen (aus Sicherheitsgründen)") {
                             ForEach(store.skippedLinks, id: \.self) { Text($0) }

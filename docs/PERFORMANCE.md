@@ -29,5 +29,15 @@ Jeder Wert ist Median und p95 aus mehreren Läufen (nach einem Aufwärmlauf; „
 | Tippen in 3000 Zeilen Code | 55,6 ms | 18 ms (#221: nur geänderte Zeilen neu färben) |
 | Completion-Kontext, 100k Zeichen | 1,96 ms | 0,03 ms (#222: Zeilen zählen statt teilen) |
 
-Folgerungen: Das Neuladen blockiert den Hauptthread linear mit der Bibliotheksgröße (#220). Im Code-Editor kostet jetzt
+| Neuladen der Bibliothek, 1.000 Notizen | vorher | nachher |
+| --- | --- | --- |
+| synchron (Start, Aktionen, die gleich danach auf die Liste zugreifen) | 95 ms | 55 ms |
+| im Hintergrund, Anteil auf dem Hauptthread („Neu laden“, Bibliothek wechseln) | 95 ms | 2,3 ms |
+
+Beim Neuladen kosteten vor allem die Prüfung auf doppelte Notiz-IDs (Pfade vergleichen für jede Notiz) und die Ordnernamen
+für den Link-Index auf dem Hauptthread Zeit (#220). Das Lesen der Dateien läuft jetzt im Hintergrund; nur der neueste
+Lesevorgang wird übernommen.
+
+Folgerungen: Das synchrone Neuladen wächst weiter linear mit der Bibliotheksgröße, wird aber nur noch beim Start und dort
+gebraucht, wo eine Aktion die Liste sofort braucht. Im Code-Editor kostet jetzt
 vor allem das Zerlegen des ganzen Blocks in Tokens (15 ms bei 100k Zeichen).
