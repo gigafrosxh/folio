@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.9.3] – 2026-11-19
+
 ### Behoben
 - **Review-Funde 1.8/1.9** (#350):
   - Suchen klappt eingeklappte Abschnitte auf, damit Treffer sichtbar sind und Ersetzen rückgängig gemacht werden kann; ein Cursor am Ende eines eingeklappten letzten Absatzes klappt ihn auf.
