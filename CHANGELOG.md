@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.9.1] – 2026-11-19
+
 ### Behoben
 - **Obsidian-Import und Code** (#346): `[[…]]` und `![[…]]` in Codeblöcken und Inline-Code werden nicht mehr umgeschrieben; importierter Code bleibt Zeichen für Zeichen wie im Vault.
 
