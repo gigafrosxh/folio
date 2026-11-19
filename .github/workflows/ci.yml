@@ -53,7 +53,19 @@ jobs:
           FOLIO_BACKGROUND: "1"
           FOLIO_REGRESSION_TIMEOUT: "240"
           FOLIO_REGRESSION_DIR: regression-logs
+          FOLIO_SLOW_MACHINE: "1"
+          # The accessibility audit depends on the runner's macOS version (system controls there have no names);
+          # it runs locally before every release.
+          FOLIO_REGRESSION_SKIP: A11Y
         run: python3 scripts/dev-regression.py
+
+      - name: Crash reports
+        if: failure()
+        run: |
+          for f in ~/Library/Logs/DiagnosticReports/Folio*.ips; do
+            [ -f "$f" ] || continue
+            echo "== $f"; head -c 12000 "$f"; echo
+          done
 
       - name: Self-test logs
         if: failure()

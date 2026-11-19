@@ -15,6 +15,10 @@ if os.environ.get("FOLIO_REGRESSION_DIR"):
     RUN.mkdir(parents=True, exist_ok=True)
 else:
     RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
+# FOLIO_REGRESSION_SKIP=A11Y,… leaves suites out (printed, never counted as passed).
+SKIP = {s.strip() for s in os.environ.get("FOLIO_REGRESSION_SKIP", "").split(",") if s.strip()}
+for s in sorted(SKIP):
+    print(f"SKIP suite {s} (FOLIO_REGRESSION_SKIP)", flush=True)
 # Slower machines (CI runners) get more time per suite.
 TIMEOUT = float(os.environ.get("FOLIO_REGRESSION_TIMEOUT", "60"))
 print(f"Test libraries and logs: {RUN}", flush=True)
@@ -22,7 +26,7 @@ failed = False
 # FOLIO_BACKGROUND=1 shows no window and takes no focus; the keyboard test needs the focus and is left out.
 BACKGROUND = "FOLIO_BACKGROUND" in os.environ
 for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), ("ORG", "ORG"), ("EDITOR", "EDIT"), ("KEY", "KEY"), ("QUICK", "QUICK"), ("LINK", "LINK"), ("AUTO", "AUTO"), ("A11Y", "A11Y")]
-                     if not (BACKGROUND and f == "KEY")]:
+                     if not (BACKGROUND and f == "KEY") and f not in SKIP]:
     library = RUN / flag
     library.mkdir()
     log = RUN / f"{flag}.log"
