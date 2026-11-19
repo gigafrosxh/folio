@@ -11,6 +11,11 @@ struct FolioCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     private var f: FormattingController { .shared }
 
+    private func fold(_ collapse: Bool) {
+        guard let doc = store.currentDocument, let s = doc.headingAtCursor(), !s.content.isEmpty else { NSSound.beep(); return }
+        if doc.collapsedHeadings.contains(s.heading) != collapse { doc.toggleFold(s.heading) }
+    }
+
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("Nach Updates suchen …") { NotificationCenter.default.post(name: .folioShowUpdates, object: nil) }
@@ -85,6 +90,16 @@ struct FolioCommands: Commands {
             Button("Terminal ein-/ausblenden") { NotificationCenter.default.post(name: .folioToggleTerminal, object: nil) }
                 .keyboardShortcut("`", modifiers: [.control])
             Button("Ausführungsumgebung der Notiz …") { NotificationCenter.default.post(name: .folioRunEnvironment, object: nil) }
+            Divider()
+            // Folding headings (#205): the heading the cursor is in, or all of them.
+            Button("Abschnitt einklappen") { fold(true) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+            Button("Abschnitt ausklappen") { fold(false) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+            Button("Alle Abschnitte einklappen") { store.currentDocument?.foldAll(true) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option, .control])
+            Button("Alle Abschnitte ausklappen") { store.currentDocument?.foldAll(false) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option, .control])
         }
         // After "New": a .saveItem group disappears once the app has a second scene (note windows).
         CommandGroup(after: .newItem) {

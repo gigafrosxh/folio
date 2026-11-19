@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import FolioCore
 import FolioWidgetData
 
@@ -35,6 +36,46 @@ enum QuickAccessSelfTest {
         WidgetFeed.shared.update()
     }
 
+    /// Dock drop and Services menu (#90, #91), without any dialog.
+    private static func dropChecks(_ store: NoteStore) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("folio-drop-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir.appendingPathComponent("Ordner"), withIntermediateDirectories: true)
+        let text = dir.appendingPathComponent("Plan.txt")
+        try? Data("Plan".utf8).write(to: text)
+        let image = NSImage(size: NSSize(width: 4, height: 4))
+        image.lockFocus(); NSColor.red.setFill(); NSRect(x: 0, y: 0, width: 4, height: 4).fill(); image.unlockFocus()
+        let png = dir.appendingPathComponent("Rot.png")
+        if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) { try? rep.representation(using: .png, properties: [:])?.write(to: png) }
+        let count = store.notes.count
+        let problem = DropCapture.open([text, png, dir.appendingPathComponent("Ordner")])
+        check(problem?.contains("Ordner") == true && problem?.contains("Plan") == false, "Ablegen: Ordner gemeldet, Rest übernommen")
+        let dropped = store.notes.first { $0.meta.title.hasPrefix("Abgelegt am") }
+        check(store.notes.count == count + 1 && dropped != nil, "Ablegen: neue Notiz für die Datei")
+        if let dropped, let file = try? NoteFile.read(from: dropped.url) {
+            check(file.body.blocks.contains { $0.kind == .file } && file.attachments.contains { $0.header.filename == "Plan.txt" }, "Ablegen: Datei als Anhang")
+        }
+        let inbox = store.notes.first { $0.meta.title == "Inbox" }.flatMap { try? NoteFile.read(from: $0.url) }
+        check(inbox?.body.blocks.contains { $0.kind == .image } == true, "Ablegen: Bild in der Inbox")
+        let pb = NSPasteboard(name: NSPasteboard.Name("folio-selftest-\(UUID().uuidString)"))
+        pb.clearContents()
+        pb.setString("Aus dem Dienste-Menü", forType: .string)
+        check(DropCapture.capture(pasteboard: pb) == nil, "Dienste-Menü: Auswahl gespeichert")
+        check(store.notes.first { $0.meta.title == "Inbox" }.map { $0.meta.searchText.contains("Aus dem Dienste-Menü") } == true, "Dienste-Menü: Text in der Inbox")
+        pb.releaseGlobally()
+    }
+
+    /// FOLIO_MENUBAR_SNAPSHOT=<png>: the menu bar panel with a favorite, for a visual check (#92).
+    private static func menuBarSnapshot(_ store: NoteStore) {
+        if let first = store.notes.first { store.organization.favorites = [first.id] }
+        guard let path = ProcessInfo.processInfo.environment["FOLIO_MENUBAR_SNAPSHOT"] else { return }
+        let renderer = ImageRenderer(content: MenuBarPanel().environmentObject(store).environmentObject(ThemeManager.shared))
+        renderer.scale = 2
+        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return check(false, "Menüleisten-Bild") }
+        try? png.write(to: URL(fileURLWithPath: path))
+        check(true, "Menüleisten-Bild gesichert")
+    }
+
     static func run() async {
         let store = NoteStore.shared
         let service = CaptureService.shared
@@ -52,6 +93,8 @@ enum QuickAccessSelfTest {
         globalShortcutChecks()
         savedChatChecks(store: store, target: target, other: other)
         await widgetChecks(store)
+        dropChecks(store)
+        menuBarSnapshot(store)
         print("QUICK done"); fflush(stdout)
     }
 

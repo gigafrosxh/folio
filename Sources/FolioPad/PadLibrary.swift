@@ -3,7 +3,8 @@ import Foundation
 import SwiftUI
 import FolioCore
 
-/// The note library on the iPad: `Documents/Folio` (visible in the Files app), or `FOLIO_LIBRARY` for tests.
+/// The note library on iPad and iPhone (#214, #213): `Documents/Folio` (visible in the Files app), a folder the user
+/// picked (e.g. the Mac library in iCloud Drive, kept as a security-scoped bookmark), or `FOLIO_LIBRARY` for tests.
 ///
 /// Safety as on the Mac: before a note is overwritten its previous state goes to `.folio/history`; a note changed on
 /// disk since it was opened (e.g. by the Mac through a shared folder) is never overwritten but saved as a copy;
@@ -16,7 +17,11 @@ final class PadLibrary: ObservableObject {
         var id: URL { url }
     }
 
-    let root: URL
+    private(set) var root: URL
+    /// The folder came from the document picker; access has to be started and stopped.
+    private var scoped = false
+    private static let bookmarkKey = "libraryBookmark"
+    var isCustomLibrary: Bool { scoped }
     @Published private(set) var folders: [LibraryScanner.Folder] = []
     @Published private(set) var notes: [Entry] = []
     @Published private(set) var unreadable = 0
@@ -38,12 +43,61 @@ final class PadLibrary: ObservableObject {
             self.root = root
         } else if let env = ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] {
             self.root = URL(fileURLWithPath: env, isDirectory: true)
+        } else if let picked = Self.restoredBookmark() {
+            self.root = picked
+            scoped = picked.startAccessingSecurityScopedResource()
         } else {
-            self.root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Folio", isDirectory: true)
+            self.root = Self.defaultRoot
         }
         try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
         reload()
         if notes.isEmpty { createWelcomeNote() }
+    }
+
+    static var defaultRoot: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Folio", isDirectory: true)
+    }
+
+    private static func restoredBookmark() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        return try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale)
+    }
+
+    /// Uses another folder as the library, e.g. the Mac's library in iCloud Drive or a shared folder (#213).
+    /// The open note is saved first; nothing in either folder is moved or changed.
+    func useLibrary(_ url: URL?) {
+        guard saveNow() == .saved else { return }
+        if scoped { root.stopAccessingSecurityScopedResource() }
+        scoped = false
+        if let url {
+            scoped = url.startAccessingSecurityScopedResource()
+            if let data = try? url.bookmarkData() { UserDefaults.standard.set(data, forKey: Self.bookmarkKey) }
+            root = url
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+            root = Self.defaultRoot
+            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        }
+        scanner.clearCache()
+        setSelection(nil)
+        document = nil
+        selectedFolder = nil
+        reload()
+    }
+
+    /// Picks up changes made elsewhere (the Mac through a shared folder): the list, and the open note when it has no
+    /// unsaved edits here. With unsaved edits the next save notices the change and keeps both versions (#213).
+    func refreshFromDisk() {
+        reload()
+        guard let doc = document, !doc.isDirty, doc.changedOnDisk else { return }
+        if FileManager.default.fileExists(atPath: doc.url.path) {
+            open(doc.url)
+        } else {
+            message = "„\(doc.file.meta.title)“ wurde anderswo gelöscht oder verschoben."
+            setSelection(nil)
+            document = nil
+        }
     }
 
     func reload() {

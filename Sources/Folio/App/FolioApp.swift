@@ -28,6 +28,8 @@ enum BackgroundRun {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let services = FolioServices()
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         if BackgroundRun.isOn { MainActor.assumeIsolated { BackgroundRun.start() } }
     }
@@ -48,6 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             BackupManager.shared.start()
             CaptureService.shared.start()
+            // „Dienste › Zu Folio hinzufügen“ and text dropped on the Dock icon (#90, #91).
+            NSApp.servicesProvider = services
+            NSUpdateDynamicServices()
             WidgetFeed.shared.start()
             if !BackgroundRun.isOn { QuickAccessSettings.apply() }
         }
@@ -83,10 +88,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// folio:// links from other apps, Shortcuts or the browser (#89).
+    /// folio:// links from other apps, Shortcuts or the browser (#89); files dropped on the Dock icon (#91).
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated {
-            for url in urls { DeepLinks.handle(url) }
+            for url in urls where !url.isFileURL { DeepLinks.handle(url) }
+            let files = urls.filter(\.isFileURL)
+            if !files.isEmpty { DropCapture.report(DropCapture.open(files)) }
         }
     }
 

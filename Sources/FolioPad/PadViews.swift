@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import PencilKit
+import UniformTypeIdentifiers
 import FolioCore
 
 /// Sidebar (folders) · note list · editor, like the Mac window; collapses to fewer columns in narrow windows
@@ -28,7 +29,16 @@ struct PadRootView: View {
         } message: {
             Text(library.message ?? "")
         }
-        .onChange(of: scenePhase) { if scenePhase != .active { library.saveNow() } }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active { library.refreshFromDisk() } else { library.saveNow() }
+        }
+        // While open, changes from the Mac show up within a few seconds (#213).
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                if scenePhase == .active { library.refreshFromDisk() }
+            }
+        }
         .task { await PadSelfTest.run(library) }
     }
 
@@ -37,6 +47,7 @@ struct PadRootView: View {
 
 struct PadSidebar: View {
     @EnvironmentObject var library: PadLibrary
+    @State private var picking = false
 
     var body: some View {
         List(selection: $library.selectedFolder) {
@@ -53,7 +64,22 @@ struct PadSidebar: View {
             }
         }
         .navigationTitle("Folio")
-        .refreshable { library.reload() }
+        .refreshable { library.refreshFromDisk() }
+        .toolbar {
+            Menu {
+                Button("Ordner als Bibliothek wählen …", systemImage: "folder.badge.gearshape") { picking = true }
+                if library.isCustomLibrary {
+                    Button("Bibliothek auf diesem Gerät verwenden", systemImage: "iphone") { library.useLibrary(nil) }
+                }
+            } label: { Label("Bibliothek", systemImage: "books.vertical") }
+        }
+        .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
+            if case .success(let url) = result { library.useLibrary(url) }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Text(library.root.lastPathComponent).font(.caption2).foregroundStyle(.tertiary).padding(.bottom, 6)
+                .accessibilityLabel("Bibliothek: \(library.root.lastPathComponent)")
+        }
     }
 }
 

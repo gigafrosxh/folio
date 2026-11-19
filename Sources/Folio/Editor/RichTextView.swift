@@ -58,6 +58,11 @@ final class FolioTextView: NSTextView {
     var blockID: UUID?
     var isFirstBlock = false
     var onHeightChange: ((CGFloat) -> Void)?
+    /// Folded headings (#205): layout of hidden paragraphs, and the note's reactions to edits and the cursor.
+    let foldLayout = FoldLayout()
+    var onWillEdit: ((NSRange) -> Void)?
+    var onReturnAtFold: ((NSRange) -> Bool)?
+    var onSelectionChange: ((NSRange) -> Void)?
     var onFocus: (() -> Void)?
     var onDeleteBackwardAtStart: (() -> Void)?
     var onPasteFiles: (([URL]) -> Bool)?
@@ -203,6 +208,11 @@ final class FolioTextView: NSTextView {
         }
     }
 
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        onWillEdit?(affectedCharRange)
+        return super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+    }
+
     override func didChangeText() {
         super.didChangeText()
         indentListParagraph()
@@ -270,6 +280,7 @@ final class FolioTextView: NSTextView {
     // MARK: Keys
 
     override func insertNewline(_ sender: Any?) {
+        if onReturnAtFold?(selectedRange()) == true { return }
         let ns = string as NSString
         let para = ns.paragraphRange(for: NSRange(location: selectedRange().location, length: 0))
         let line = ns.substring(with: para).trimmingCharacters(in: .newlines)
@@ -629,6 +640,13 @@ final class FolioTextView: NSTextView {
     }
 }
 
+/// What the note does around folded headings (#205); empty for text views outside the editor.
+struct FoldHooks {
+    var willEdit: ((NSRange) -> Void)?
+    var returnAtFold: ((NSRange) -> Bool)?
+    var selection: ((NSRange) -> Void)?
+}
+
 /// SwiftUI wrapper around `FolioTextView` that grows with its content.
 struct RichTextView: NSViewRepresentable {
     @ObservedObject var block: BlockModel
@@ -641,6 +659,7 @@ struct RichTextView: NSViewRepresentable {
     var onPasteFiles: ([URL]) -> Bool
     var onPasteImage: (Data) -> Void
     var onPasteURL: (URL) -> Bool
+    var fold = FoldHooks()
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -653,6 +672,7 @@ struct RichTextView: NSViewRepresentable {
         lm.addTextContainer(tc)
 
         let tv = FolioTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 30), textContainer: tc)
+        lm.delegate = tv.foldLayout
         tv.blockID = block.id
         tv.isRichText = true
         tv.allowsUndo = true
@@ -704,6 +724,9 @@ struct RichTextView: NSViewRepresentable {
             if abs(h - height) > 0.5 { DispatchQueue.main.async { height = h } }
         }
         tv.onFocus = onFocus
+        tv.onWillEdit = fold.willEdit
+        tv.onReturnAtFold = fold.returnAtFold
+        tv.onSelectionChange = fold.selection
         tv.onDeleteBackwardAtStart = onDeleteEmpty
         tv.onPasteFiles = onPasteFiles
         tv.onPasteImage = onPasteImage
@@ -813,6 +836,7 @@ struct RichTextView: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             FormattingController.shared.selectionChanged()
+            if let tv = notification.object as? FolioTextView { tv.onSelectionChange?(tv.selectedRange()) }
             if let tv = notification.object as? FolioTextView, tv.suggestion != nil,
                tv.selectedRange().length > 0 || !tv.isSuggestionAnchoredAtCursor {
                 tv.clearSuggestion()

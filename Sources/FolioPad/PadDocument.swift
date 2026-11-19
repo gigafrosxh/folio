@@ -33,6 +33,9 @@ final class PadDocument: ObservableObject, Identifiable {
 
     var blocks: [BlockRecord] { file.body.blocks }
 
+    /// The file on disk is not the one this document was read from (or saved last).
+    var changedOnDisk: Bool { Self.modificationDate(url) != diskDate }
+
     func attachment(_ id: UUID?) -> FolioArchive.Attachment? {
         guard let id else { return nil }
         return file.attachments.first { $0.id == id }

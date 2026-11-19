@@ -213,9 +213,16 @@ final class NoteDocument: ObservableObject, Identifiable {
         if blocks.last?.kind != .text { blocks.append(.text()) }
     }
 
+    var cachedOutline: NoteOutline?
+    /// Counts fold changes, so rows and the editor redraw (#205).
+    @Published var foldRevision = 0
+
     // MARK: Saving
 
     func markDirty() {
+        cachedOutline = nil
+        // Hidden ranges move with the text; only notes with folded headings pay for this.
+        if store?.organization.collapsedHeadings[id.uuidString] != nil { applyFolds() }
         keepModifiedOnSave = false
         isDirty = true
         saveTask?.cancel()
@@ -372,7 +379,7 @@ final class NoteDocument: ObservableObject, Identifiable {
     }
 
     /// Runs a structural change and registers its undo.
-    private func undoable(_ actionName: String, _ change: () -> Void) {
+    func undoable(_ actionName: String, _ change: () -> Void) {
         let before = snapshot()
         change()
         guard let um = undoManager else { return }

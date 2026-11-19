@@ -39,6 +39,8 @@ final class PadSelfTest {
         guard let url = newNote() else { return finish() }
         editAndSave(url)
         await autosave(url)
+        macChangeArrives(url)
+        switchLibrary()
         displayScale()
         otherBlocksStay(except: url)
         conflict(url)
@@ -90,6 +92,33 @@ final class PadSelfTest {
         check(!doc.isDirty && (try? NoteFile.read(from: url))?.body.blocks.last?.code == "print(2)", "Automatisch gesichert (im Hintergrund komprimiert)")
     }
 
+    /// A change made on the Mac (shared folder) shows up in the open note when it has no edits here (#213).
+    private func macChangeArrives(_ url: URL) {
+        library.selectedNote = url
+        guard library.document?.isDirty == false else { return check(false, "Mac-Änderung: Dokument ungeändert offen") }
+        changeOnDisk(url, to: "Auf dem Mac geschrieben")
+        library.refreshFromDisk()
+        let shown = library.document.map { PadDocument.plainText($0.blocks[0]) }
+        check(shown == "Auf dem Mac geschrieben", "Änderung vom Mac erscheint in der offenen Notiz")
+        check(library.notes.contains { $0.url == url && $0.meta.title == "Auf dem Mac geschrieben" }, "Änderung vom Mac erscheint in der Liste")
+    }
+
+    /// Another folder as library and back; nothing in either folder changes (#213).
+    private func switchLibrary() {
+        let original = library.root
+        let other = FileManager.default.temporaryDirectory.appendingPathComponent("folio-other-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        var note = NoteFile(meta: NoteMetadata(title: "Andere Bibliothek"), body: NoteBody(blocks: [PadDocument.textRecord("Andere Bibliothek")]))
+        PadDocument.refreshMeta(&note)
+        try? note.write(to: other.appendingPathComponent("Andere.folio"))
+        let before = library.notes.count
+        library.useLibrary(other)
+        check(library.notes.map(\.meta.title) == ["Andere Bibliothek"], "Anderer Ordner als Bibliothek")
+        library.useLibrary(original)
+        check(library.notes.count == before && library.root == original, "Zurück zur Testbibliothek")
+        UserDefaults.standard.removeObject(forKey: "libraryBookmark")
+    }
+
     /// Shown larger, saved at the Mac's size (#258).
     private func displayScale() {
         let size = { (s: NSAttributedString) in (s.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0 }
@@ -118,6 +147,7 @@ final class PadSelfTest {
     private func changeOnDisk(_ url: URL, to text: String) {
         guard var foreign = try? NoteFile.read(from: url) else { return check(false, "Datei lesbar") }
         foreign.body.blocks[0] = PadDocument.textRecord(text)
+        PadDocument.refreshMeta(&foreign)   // as the Mac would when it saves
         Thread.sleep(forTimeInterval: 1.1)
         try? foreign.write(to: url)
     }

@@ -20,6 +20,9 @@ struct MenuBarPanel: View {
     }
 
     private var pinned: [NoteRef] { Array(store.notes.filter(\.meta.pinned).prefix(5)) }
+    /// Favorites in their own order (#92, #15); notes that are gone are skipped.
+    private var favorites: [NoteRef] { Array(store.organization.favorites.prefix(8).compactMap { id in store.notes.first { $0.id == id } }) }
+    @AppStorage("folio.focusMode") private var focusMode = false
     private var recent: [NoteRef] { Array(store.recent.ids.prefix(6).compactMap { id in store.notes.first { $0.id == id } }) }
 
     var body: some View {
@@ -36,20 +39,14 @@ struct MenuBarPanel: View {
             .padding(8)
             .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
 
-            if !query.isEmpty {
-                section("Treffer", results.isEmpty ? [] : results, highlight: index)
-                if results.isEmpty { Text("Keine Notiz gefunden.").font(.caption).foregroundStyle(.secondary) }
-            } else {
-                if !pinned.isEmpty { section("Angepinnt", pinned, highlight: nil) }
-                if !recent.isEmpty { section("Zuletzt geöffnet", recent, highlight: nil) }
-                if pinned.isEmpty && recent.isEmpty { Text("Noch keine Notizen geöffnet.").font(.caption).foregroundStyle(.secondary) }
-            }
+            noteSections
 
             if !service.pending.isEmpty {
                 Label("\(service.pending.count) Erfassung\(service.pending.count == 1 ? "" : "en") warten aufs Speichern", systemImage: "clock.arrow.circlepath")
                     .font(.caption).foregroundStyle(.orange)
             }
             Divider()
+            quickActions
             HStack {
                 Button {
                     dismiss()
@@ -66,6 +63,35 @@ struct MenuBarPanel: View {
         .tint(theme.accent)
         .onAppear { focused = true; query = ""; index = 0; QuickAccessSettings.opener = openWindow }
         .onChange(of: query) { index = 0 }
+    }
+
+    @ViewBuilder private var noteSections: some View {
+        if !query.isEmpty {
+            section("Treffer", results, highlight: index)
+            if results.isEmpty { Text("Keine Notiz gefunden.").font(.caption).foregroundStyle(.secondary) }
+        } else {
+            if !favorites.isEmpty { section("Favoriten", favorites, highlight: nil) }
+            if !pinned.isEmpty { section("Angepinnt", pinned, highlight: nil) }
+            if !recent.isEmpty { section("Zuletzt geöffnet", recent, highlight: nil) }
+            if favorites.isEmpty && pinned.isEmpty && recent.isEmpty { Text("Noch keine Notizen geöffnet.").font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    /// New note and focus mode straight from the menu bar (#92).
+    private var quickActions: some View {
+        HStack {
+            Button {
+                showMain()
+                if store.createNote() == nil { NSSound.beep() }
+            } label: { Label("Neue Notiz", systemImage: "plus") }
+                .helpLabel("Neue Notiz im Hauptfenster")
+            Spacer()
+            Toggle(isOn: $focusMode) { Label("Fokusmodus", systemImage: "rectangle.center.inset.filled") }
+                .toggleStyle(.button)
+                .helpLabel(focusMode ? "Fokusmodus beenden" : "Fokusmodus: nur die Notiz zeigen")
+                .onChange(of: focusMode) { if focusMode { showMain() } }
+        }
+        .buttonStyle(.borderless)
     }
 
     private func section(_ title: String, _ notes: [NoteRef], highlight: Int?) -> some View {

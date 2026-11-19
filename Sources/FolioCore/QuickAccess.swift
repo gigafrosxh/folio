@@ -348,3 +348,35 @@ public struct SwitcherEntry: Identifiable, Hashable, Sendable {
         .map(\.0)
     }
 }
+
+/// What was dropped on the Dock icon or handed over by the Services menu (#90, #91).
+public enum DropClassifier {
+    public struct Groups: Equatable, Sendable {
+        /// Folio notes: opened, never copied.
+        public var notes: [URL] = []
+        /// Pictures: become image blocks of the capture.
+        public var images: [URL] = []
+        /// Everything else (PDF, audio, documents, ERD-Ultra …): attachment blocks in a new note.
+        public var files: [URL] = []
+        /// Folders and unreadable entries are left alone and reported.
+        public var skipped: [URL] = []
+        public init() {}
+    }
+
+    public static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "heic", "heif", "tif", "tiff", "webp", "bmp"]
+
+    public static func classify(_ urls: [URL], isDirectory: (URL) -> Bool = { url in
+        var dir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &dir) && dir.boolValue
+    }) -> Groups {
+        var g = Groups()
+        for url in urls where url.isFileURL {
+            let ext = url.pathExtension.lowercased()
+            if ext == FolioArchive.fileExtension { g.notes.append(url) }
+            else if isDirectory(url) { g.skipped.append(url) }
+            else if imageExtensions.contains(ext) { g.images.append(url) }
+            else { g.files.append(url) }
+        }
+        return g
+    }
+}

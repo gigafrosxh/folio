@@ -45,8 +45,10 @@ enum TextStyle: String, CaseIterable, Identifiable {
     func paragraphStyle(theme: ThemeManager) -> NSParagraphStyle {
         let p = (theme.bodyParagraphStyle.mutableCopy() as! NSMutableParagraphStyle)
         switch self {
-        case .title: p.paragraphSpacing = 6
-        case .heading, .subheading: p.paragraphSpacingBefore = 6; p.paragraphSpacing = 4
+        case .title: p.headerLevel = 1; p.paragraphSpacing = 6
+        case .heading, .subheading:
+            p.headerLevel = self == .heading ? 2 : 3
+            p.paragraphSpacingBefore = 6; p.paragraphSpacing = 4
         case .quote: p.firstLineHeadIndent = 18; p.headIndent = 18
         default: break
         }

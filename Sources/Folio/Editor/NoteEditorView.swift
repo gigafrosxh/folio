@@ -122,9 +122,11 @@ struct NoteEditorView: View {
             PropertiesView(doc: doc)
                 .padding(.leading, BlockRow.gutter)
             tagRow
-            ForEach(doc.blocks) { block in
+            let hidden = doc.foldRevision >= 0 ? doc.hiddenBlockIDs : []
+            ForEach(doc.blocks.filter { !hidden.contains($0.id) }) { block in
                 BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
                     .transition(Motion.blockTransition)
+                if let note = foldNote(after: block) { note }
             }
             BacklinksView(noteID: doc.id)
                 .padding(.top, 8)
@@ -133,6 +135,23 @@ struct NoteEditorView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { focusEnd() }
         }
+    }
+
+    /// „… (3 Absätze, 1 Bild)“ under the last visible part of a collapsed section; a click expands it (#205).
+    private func foldNote(after block: BlockModel) -> AnyView? {
+        guard doc.foldRevision >= 0, block.kind == .text else { return nil }
+        let collapsed = doc.foldHeadings(in: block.id).filter(\.collapsed)
+        guard !collapsed.isEmpty else { return nil }
+        return AnyView(VStack(alignment: .leading, spacing: 2) {
+            ForEach(collapsed) { h in
+                Button { doc.toggleFold(h.section.heading) } label: {
+                    Text("▸ \(h.section.heading.title.prefix(40)) … (\(h.summary))").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Abschnitt ausklappen")
+            }
+        }
+        .padding(.leading, BlockRow.gutter))
     }
 
     @ViewBuilder private var tagRow: some View {

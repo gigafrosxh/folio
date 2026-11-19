@@ -133,6 +133,7 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
     public var folderOrder: [String: [String]] = [:]
     public var smartViews: [SmartView] = []
     /// The daily note of each day (yyyy-MM-dd → note id), found again even when its title changed (#208).
+    public var collapsedHeadings: [String: Set<NoteOutline.Heading>] = [:]
     public var dailyNotes: [String: UUID] = [:]
 
     public init() {}
@@ -146,6 +147,7 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
         folderOrder = (try c.decodeIfPresent([String: [String]].self, forKey: .folderOrder) ?? [:]).mapValues(ManualOrder.unique)
         var ids = Set<UUID>()
         smartViews = (try c.decodeIfPresent([SmartView].self, forKey: .smartViews) ?? []).filter { ids.insert($0.id).inserted }
+        collapsedHeadings = try c.decodeIfPresent([String: Set<NoteOutline.Heading>].self, forKey: .collapsedHeadings) ?? [:]
         dailyNotes = (try? c.decodeIfPresent([String: UUID].self, forKey: .dailyNotes)) ?? [:]
     }
 
@@ -162,6 +164,7 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
             out.folderOrder.merge(other.folderOrder) { mine, _ in mine }
             let have = Set(smartViews.map(\.id))
             out.smartViews += other.smartViews.filter { !have.contains($0.id) }
+            out.collapsedHeadings.merge(other.collapsedHeadings) { $0.union($1) }
             out.dailyNotes = other.dailyNotes.merging(dailyNotes) { _, mine in mine }
             return out
         }
@@ -177,6 +180,7 @@ public struct LibraryOrganization: Codable, Equatable, Sendable {
             if let b = base.smartViews.first(where: { $0.id == id }), views[i] == b, let t = other.smartViews.first(where: { $0.id == id }) { views[i] = t }
         }
         out.smartViews = views
+        out.collapsedHeadings = Self.mergeMap(mine: collapsedHeadings, theirs: other.collapsedHeadings, base: base.collapsedHeadings)
         out.dailyNotes = other.dailyNotes.merging(dailyNotes) { _, mine in mine }
         return out
     }

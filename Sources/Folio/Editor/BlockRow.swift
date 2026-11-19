@@ -22,6 +22,7 @@ struct BlockRow: View {
         HStack(alignment: .top, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 Color.clear
+                if block.kind == .text { FoldTriangles(block: block, doc: doc, hovering: hovering) }
                 if block.kind != .text && hovering {
                     blockControls
                         .padding(.top, 6)
@@ -70,8 +71,12 @@ struct BlockRow: View {
                          onDeleteEmpty: { deleteEmptyText() },
                          onPasteFiles: { actions.pasteFiles($0, block.id) },
                          onPasteImage: { actions.pasteImage($0, block.id) },
-                         onPasteURL: { actions.pasteURL($0, block.id) })
+                         onPasteURL: { actions.pasteURL($0, block.id) },
+                         fold: FoldHooks(willEdit: { [doc, id = block.id] in doc.prepareEdit(in: id, range: $0) },
+                                         returnAtFold: { [doc, id = block.id] in doc.insertAfterFold(blockID: id, selection: $0) },
+                                         selection: { [doc, id = block.id] in doc.revealSelection(in: id, range: $0) }))
                 .frame(height: height)
+                .onAppear { DispatchQueue.main.async { doc.applyFolds() } }
         case .code:
             CodeBlockView(block: block, doc: doc)
         case .pdf:

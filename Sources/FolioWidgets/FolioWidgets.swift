@@ -105,20 +105,20 @@ struct QuickCaptureWidget: Widget {
 
 struct ChecklistWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "de.daniel.folio.checklist", provider: SnapshotProvider()) { entry in
+        AppIntentConfiguration(kind: "de.daniel.folio.checklist", intent: PickChecklistIntent.self, provider: ConfiguredProvider.checklist) { entry in
             FamilyReader { family in
                 SnapshotView(entry: entry) { ChecklistWidgetView(checklist: $0.featuredChecklist, snapshot: $0, size: family.size) }
             }
         }
         .configurationDisplayName("Checkliste")
-        .description("Fortschritt einer Checkliste. Welche, wählst du in Folio über „Im Widget zeigen“.")
+        .description("Fortschritt einer Checkliste. Welche, wählst du mit „Widget bearbeiten“ oder in Folio über „Im Widget zeigen“.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
 struct NoteOfTheDayWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "de.daniel.folio.daily", provider: SnapshotProvider()) { entry in
+        AppIntentConfiguration(kind: "de.daniel.folio.daily", intent: PickNoteIntent.self, provider: ConfiguredProvider.note) { entry in
             FamilyReader { family in
                 SnapshotView(entry: entry) {
                     NoteOfTheDayWidgetView(note: $0.featuredNote(on: entry.date), snapshot: $0, hideContent: !$0.showsContent, size: family.size)
@@ -126,7 +126,7 @@ struct NoteOfTheDayWidget: Widget {
             }
         }
         .configurationDisplayName("Notiz des Tages")
-        .description("Jeden Tag eine andere Notiz oder die in Folio gewählte. Inhalte nur, wenn du sie in Folio erlaubst.")
+        .description("Jeden Tag eine andere Notiz, die mit „Widget bearbeiten“ oder die in Folio gewählte. Inhalte nur, wenn du sie in Folio erlaubst.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

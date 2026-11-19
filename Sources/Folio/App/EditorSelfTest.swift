@@ -33,6 +33,7 @@ enum EditorSelfTest {
         tabChecks(store: store, ref: ref, other: other)
         duplicateChecks(store: store)
         await focusModeChecks()
+        await FoldSelfTest.run(store: store)
         print("EDIT done"); fflush(stdout)
     }
 

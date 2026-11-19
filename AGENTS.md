@@ -278,6 +278,18 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
   `simctl boot` startet keine Simulator-App und stiehlt keinen Fokus.
 - **Vorgabe des Nutzers:** Für Tests angelegte Simulatoren (iPad oder iPhone) danach wieder löschen (`xcrun simctl delete <udid>`).
 
+### Ab 1.8.0
+
+- iPhone (#213): `FolioPad` ist universell (`UIDeviceFamily` 1 und 2), Bibliotheksordner per `useLibrary` (Security-Scoped
+  Bookmark), `refreshFromDisk` alle 3 s und beim Aktivieren. Selbsttest wie beim iPad, auch auf „iPhone 17 Pro“.
+- Einklappen (#205): Kern `NoteOutline` (Abschnitte über Blöcke), App `NoteFolding.swift` (Zustand in
+  `organization.collapsedHeadings`, ausgeblendete Bereiche), `FoldLayout.swift` (NSLayoutManager-Delegate: Glyphen `.null`,
+  Zeilenhöhe 0), `FoldTriangles.swift`. Selbsttest im EDITOR-Lauf (`FoldSelfTest`).
+- Dienste/Dock (#90, #91): `DropCapture.swift`, `DropClassifier` (Kern), `NSServices` und eine Dokumenttyp-Rolle „Viewer/Alternate“
+  in `Info.plist`. Selbsttest im QUICK-Lauf.
+- Widget-Konfiguration (#122): `Sources/FolioWidgets/WidgetIntents.swift`; `scripts/widget-intents-metadata.sh` erzeugt
+  `Metadata.appintents` (swiftc `-emit-const-values-path` + `appintentsmetadataprocessor`) und wird von `build-app.sh` aufgerufen.
+
 ### KI ab 1.6.0
 
 - Ollama-Erreichbarkeit: `OllamaStatus` (App) prüft beim Öffnen des Chats und vor jeder Frage; `AIAvailability` meldet dann `.ollamaDown`, und der Chat zeigt Fundstellen.

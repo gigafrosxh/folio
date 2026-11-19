@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Neu
+- **Folio für iPhone** (#213): Die iPad-App läuft jetzt auch auf dem iPhone (eine App für beide, Notizliste und Editor als Navigation). Als Bibliothek lässt sich ein beliebiger Ordner wählen, z. B. die Mac-Bibliothek in iCloud Drive; Änderungen vom Mac erscheinen nach wenigen Sekunden, auch in der offenen Notiz, wenn sie hier ungeändert ist. Gleichzeitige Änderungen führen weiter zu einer Kopie „(iPad)“, nie zu stillem Überschreiben. Vorerst nur im Simulator (kein Entwicklerkonto).
+- **Überschriften einklappen** (#205): ▸/▾ links neben Titel, Überschriften und Unterüberschriften blendet alles bis zur nächsten Überschrift gleicher oder höherer Ebene aus – Text, Bilder, Diagramme, Code und Unterabschnitte, auch über mehrere Blöcke. ⌥-Klick klappt alle derselben Ebene; „Darstellung › Abschnitt einklappen/ausklappen“ (⌥⌘←/⌥⌘→) und „Alle …“ (⌃⌥⌘←/⌃⌥⌘→). Ein Hinweis zeigt, was eingeklappt ist („3 Absätze, 1 Bild“). Springt die Suche, ein Link oder der Cursor in einen eingeklappten Abschnitt, klappt er auf; eine eingeklappte Überschrift klappt vor dem Bearbeiten auf. Reine Darstellung: Die Notizdatei, Versionen, Suche und Export bleiben unverändert; der Zustand liegt in `.folio/organization.json`.
+- **Dienste-Menü** (#90): „Dienste › Zu Folio hinzufügen“ legt markierten Text, Links oder Bilder aus jeder App in der Inbox ab. Die Zwischenablage wird nie von selbst gelesen.
+- **Ablegen auf dem Dock-Symbol** (#91): Text, Links und Bilder landen in der Inbox, andere Dateien (PDF, Audio, Dokumente, ERD-Ultra …) in einer neuen Notiz „Abgelegt am …“, Folio-Notizen werden geöffnet. Ordner und unlesbare Dateien werden gemeldet, nichts Bestehendes wird verändert.
+- **Menüleiste** (#92): Favoriten stehen oben im Menüleisten-Fenster, dazu „Neue Notiz“ und ein Schalter für den Fokusmodus.
+- **„Widget bearbeiten“** (#122): Notiz des Tages und Checkliste lassen sich direkt am Widget wählen. Die nötigen App-Intents-Daten erzeugt jetzt das Build-Skript, ganz ohne Xcode-Projekt.
+
 ## [1.7.4] – 2026-11-19
 
 ### Behoben
