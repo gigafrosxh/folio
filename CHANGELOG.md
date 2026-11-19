@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.7.0] – 2026-11-19
+
 ### Neu
 - **Abhängigkeiten zwischen Code-Blöcken** (#26): Folio erkennt, welche Namen (Variablen, Funktionen, Importe) ein Block aus einem früheren Block derselben Sitzung nutzt. Der Kopf eines Blocks zeigt „← Block 2“ oder „veraltet“, wenn sich der Code seit dem letzten Lauf geändert hat oder ein Vorgänger neuer, fehlgeschlagen oder nie gelaufen ist. „Abhängigkeiten der Code-Blöcke …“ im Blockmenü zeigt Reihenfolge, Status und Pfeile; „Veraltete Blöcke neu ausführen“ bringt alles von oben nach unten auf den neuen Stand und warnt, wenn ein Block einen Namen nutzt, den erst ein späterer definiert.
 - **Code-Block als Datei exportieren** (#28): „Als Datei exportieren …“ schlägt einen Namen mit passender Endung vor (aus Beschriftung oder erster Funktion/Klasse) und verknüpft den Block mit der Datei.
