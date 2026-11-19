@@ -68,7 +68,7 @@ extension NoteStore {
             reloadDocument(doc.id)
         case .keepBoth:
             // Own version into the history first, so it survives whatever happens next (#182).
-            if let data = try? mine.encoded() { try? history.record(data, noteID: doc.id, force: true) }
+            if let data = try? mine.encoded() { _ = try? history.record(data, noteID: doc.id, force: true) }
             let stamp = Date().formatted(date: .numeric, time: .shortened).replacingOccurrences(of: ":", with: ".")
             guard saveAsNewNote(mine, in: doc.url.deletingLastPathComponent(), suffix: "(Konflikt \(stamp))") != nil else {
                 // The copy could not be written: keep the own changes in the editor and the conflict open.

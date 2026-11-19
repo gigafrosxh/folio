@@ -18,6 +18,8 @@ final class PadSelfTest {
         if let title = env["FOLIO_PAD_OPEN"], let entry = library.notes.first(where: { $0.meta.title == title }) {
             library.selectedNote = entry.url
         }
+        // FOLIO_PAD_LIST=1: show the note list of the whole library (for screenshots on the iPhone).
+        if env["FOLIO_PAD_LIST"] != nil, env["FOLIO_PAD_OPEN"] == nil { library.selectedFolder = library.root }
         guard env["FOLIO_PAD_SELFTEST"] != nil else { return }
         let test = PadSelfTest(library)
         // It edits and trashes notes: only ever in a test library (#260).

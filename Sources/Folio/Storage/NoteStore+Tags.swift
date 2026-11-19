@@ -48,7 +48,7 @@ extension NoteStore {
             let data = try Data(contentsOf: ref.url)
             var file = try NoteFile.decode(data)
             guard Self.renameTag(tag, to: newTag, in: &file) else { return false }
-            try? history.record(data, noteID: file.meta.id, force: true)
+            _ = try? history.record(data, noteID: file.meta.id, force: true)
             let updated = NoteDocument(file: file, url: ref.url).makeFile()
             try updated.write(to: ref.url)
             if let i = notes.firstIndex(where: { $0.id == ref.id }) { notes[i].meta = updated.meta }

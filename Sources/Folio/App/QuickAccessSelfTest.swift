@@ -138,7 +138,7 @@ enum QuickAccessSelfTest {
         // Library not writable: the capture waits and is delivered later (#93)
         let root = store.rootURL
         try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
-        var r = service.save(CaptureItem(text: "Wartet auf Schreibrechte"))
+        let r = service.save(CaptureItem(text: "Wartet auf Schreibrechte"))
         check(r.ok && service.pending.count == 1, "Ohne Schreibrecht wartet die Erfassung (\(r.message))")
         service.retryPending()
         check(service.pending.count == 1, "Erneuter Versuch ohne Schreibrecht bleibt in der Warteschlange")

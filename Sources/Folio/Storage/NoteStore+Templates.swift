@@ -169,7 +169,7 @@ extension NoteStore {
         guard notes.contains(where: { $0.id == id }), savedBeforeDeleting(id), let ref = notes.first(where: { $0.id == id }) else { return }
         let wasSelected = selectedNoteID == id
         let tabsBefore = tabs
-        if let data = try? Data(contentsOf: ref.url) { try? history.record(data, noteID: id, force: true) }
+        if let data = try? Data(contentsOf: ref.url) { _ = try? history.record(data, noteID: id, force: true) }
         do {
             try trash.moveToTrash(ref.url, title: ref.meta.title.isEmpty ? nil : ref.meta.title)
         } catch {

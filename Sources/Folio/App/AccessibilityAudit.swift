@@ -34,7 +34,7 @@ enum AccessibilityAudit {
                             let sub = el.accessibilitySubrole()?.rawValue ?? ""
                             let ident = el.accessibilityIdentifier()
                             let kids = (el.accessibilityChildren() ?? []).compactMap { ($0 as? NSAccessibilityProtocol)?.accessibilityRole()?.rawValue }
-                            info = "\(type(of: el)) \(sub) \(ident) Kinder: \(kids) Größe \(el.accessibilityFrame().size)"
+                            info = "\(type(of: el)) \(sub) \(ident ?? "-") Kinder: \(kids) Größe \(el.accessibilityFrame().size)"
                         }
                         findings.append(Finding(role: role.rawValue, help: info, frame: el.accessibilityFrame()))
                     }

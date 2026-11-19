@@ -15,7 +15,10 @@ SRCS=("$PWD"/Sources/FolioWidgets/*.swift)
 cat > "$WORK/protocols.json" <<'JSON'
 ["AppIntent","EntityQuery","AppEntity","TransientEntity","AppEnum","AppShortcutProviding","AppShortcutsProvider","AnyResolverProviding","AppIntentsPackage","DynamicOptionsProvider","WidgetConfigurationIntent","EntityStringQuery","EntityPropertyQuery","IntentValueQuery"]
 JSON
-xcrun swiftc -parse-as-library -module-name FolioWidgets -target "$TARGET" -sdk "$SDK" -I "$BIN_DIR" -swift-version 6 \
+# SwiftPM's own build system puts modules into <bin>/Modules, the swift-build based one next to the products (#266).
+MODULE_DIR="$(dirname "$(find "$BIN_DIR" -maxdepth 2 -name FolioWidgetData.swiftmodule -print -quit)")"
+[[ -n "$MODULE_DIR" && "$MODULE_DIR" != "." ]] || { echo "FolioWidgetData.swiftmodule nicht in $BIN_DIR gefunden" >&2; exit 1; }
+xcrun swiftc -parse-as-library -module-name FolioWidgets -target "$TARGET" -sdk "$SDK" -I "$MODULE_DIR" -swift-version 6 \
   -wmo -c "${SRCS[@]}" -o "$WORK/intents.o" \
   -Xfrontend -const-gather-protocols-file -Xfrontend "$WORK/protocols.json" -emit-const-values-path "$WORK/intents.swiftconstvalues"
 printf '%s\n' "${SRCS[@]}" > "$WORK/sources.txt"

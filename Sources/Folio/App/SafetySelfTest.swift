@@ -30,7 +30,7 @@ enum SafetySelfTest {
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nErster Stand", attributes: body))
         doc.markDirty(); doc.saveNow()
         await wait(0.5)
-        try? store.history.record(Data(contentsOf: doc.url), noteID: doc.id, force: true)
+        _ = try? store.history.record(Data(contentsOf: doc.url), noteID: doc.id, force: true)
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nZweiter Stand", attributes: body))
         doc.markDirty(); doc.saveNow()
         await wait(0.5)

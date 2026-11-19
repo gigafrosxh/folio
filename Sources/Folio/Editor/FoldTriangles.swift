@@ -12,7 +12,7 @@ struct FoldTriangles: View {
     var body: some View {
         let _ = doc.foldRevision
         ForEach(doc.foldHeadings(in: block.id)) { h in
-            if let tv = FormattingController.shared.textView(for: block.id) as? FolioTextView,
+            if let tv = FormattingController.shared.textView(for: block.id),
                let y = tv.top(ofCharacterAt: h.section.start.range.location), hovering || h.collapsed {
                 triangle(h, lineHeight: lineHeight(h, in: tv))
                     .offset(x: 14, y: y)
