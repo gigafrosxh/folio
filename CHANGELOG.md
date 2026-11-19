@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.8.1] – 2026-11-19
+
 ### Behoben
 - **CI-Build** (#266): Das Skript für die Widget-Intents findet `FolioWidgetData` jetzt mit beiden Build-Systemen von SwiftPM. Dazu einige Compiler-Warnungen aufgeräumt.
 
