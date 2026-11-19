@@ -42,6 +42,23 @@ jobs:
       - name: App bundle
         run: ./scripts/build-app.sh
 
+      - name: App self-tests (#223)
+        # The app's own self-tests, headless: FOLIO_BACKGROUND=1 shows no window and takes no focus, every suite runs
+        # against a fresh throwaway library. The keyboard test needs real focus and stays a local test.
+        env:
+          FOLIO_BACKGROUND: "1"
+          FOLIO_REGRESSION_TIMEOUT: "240"
+          FOLIO_REGRESSION_DIR: regression-logs
+        run: python3 scripts/dev-regression.py
+
+      - name: Self-test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-test-logs
+          path: regression-logs/*.log
+          if-no-files-found: ignore
+
       - name: Cache complexity check
         uses: actions/cache@v4
         with:

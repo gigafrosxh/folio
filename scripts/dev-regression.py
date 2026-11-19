@@ -9,7 +9,14 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 # FOLIO_BINARY tests another build, e.g. a copy from scripts/make-test-app.sh; a release identity refuses to start.
 BINARY = os.environ.get("FOLIO_BINARY", str(ROOT / ".build/debug/Folio"))
-RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
+# FOLIO_REGRESSION_DIR keeps libraries and logs in a known folder (CI uploads it, #223).
+if os.environ.get("FOLIO_REGRESSION_DIR"):
+    RUN = Path(os.environ["FOLIO_REGRESSION_DIR"]).resolve()
+    RUN.mkdir(parents=True, exist_ok=True)
+else:
+    RUN = Path(tempfile.mkdtemp(prefix="folio-dev-regression-"))
+# Slower machines (CI runners) get more time per suite.
+TIMEOUT = float(os.environ.get("FOLIO_REGRESSION_TIMEOUT", "60"))
 print(f"Test libraries and logs: {RUN}", flush=True)
 failed = False
 # FOLIO_BACKGROUND=1 shows no window and takes no focus; the keyboard test needs the focus and is left out.
@@ -33,7 +40,7 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
         proc = subprocess.Popen([BINARY, "-ApplePersistenceIgnoreState", "YES"], env=env,
                                 stdout=output, stderr=subprocess.STDOUT)
         try:
-            deadline = time.monotonic() + 60
+            deadline = time.monotonic() + TIMEOUT
             while proc.poll() is None and time.monotonic() < deadline:
                 current = log.read_text(errors="replace")
                 if f"{prefix} done" in current or (flag == "A11Y" and "A11Y checked" in current):
