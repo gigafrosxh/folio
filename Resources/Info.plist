@@ -34,31 +34,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>Zu Folio hinzufügen</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>addToFolio</string>
-			<key>NSPortName</key>
-			<string>Folio</string>
-			<key>NSSendTypes</key>
-			<array>
-				<string>public.utf8-plain-text</string>
-				<string>public.plain-text</string>
-				<string>NSStringPboardType</string>
-				<string>public.url</string>
-				<string>public.file-url</string>
-				<string>public.image</string>
-			</array>
-			<key>NSRequiredContext</key>
-			<dict/>
-		</dict>
-	</array>
 	<key>CFBundleExecutable</key>
 	<string>Folio</string>
 	<key>CFBundleIconFile</key>
@@ -72,7 +47,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.7.4</string>
+	<string>1.8.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -85,7 +60,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>90</string>
+	<string>91</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
@@ -105,6 +80,31 @@
 	<string>Folio zeigt Webseiten aus deinem lokalen Netzwerk (z. B. localhost oder Entwicklungsserver) in Notizen an.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Folio nimmt mit dem Mikrofon Audio auf und speichert es in deiner Notiz.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Zu Folio hinzufügen</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>addToFolio</string>
+			<key>NSPortName</key>
+			<string>Folio</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.utf8-plain-text</string>
+				<string>public.plain-text</string>
+				<string>NSStringPboardType</string>
+				<string>public.url</string>
+				<string>public.file-url</string>
+				<string>public.image</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Folio transkribiert Audioaufnahmen lokal auf deinem Mac. Es wird nichts hochgeladen.</string>
 	<key>UTExportedTypeDeclarations</key>

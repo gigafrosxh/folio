@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.8.0] – 2026-11-19
+
 ### Neu
 - **Folio für iPhone** (#213): Die iPad-App läuft jetzt auch auf dem iPhone (eine App für beide, Notizliste und Editor als Navigation). Als Bibliothek lässt sich ein beliebiger Ordner wählen, z. B. die Mac-Bibliothek in iCloud Drive; Änderungen vom Mac erscheinen nach wenigen Sekunden, auch in der offenen Notiz, wenn sie hier ungeändert ist. Gleichzeitige Änderungen führen weiter zu einer Kopie „(iPad)“, nie zu stillem Überschreiben. Vorerst nur im Simulator (kein Entwicklerkonto).
 - **Überschriften einklappen** (#205): ▸/▾ links neben Titel, Überschriften und Unterüberschriften blendet alles bis zur nächsten Überschrift gleicher oder höherer Ebene aus – Text, Bilder, Diagramme, Code und Unterabschnitte, auch über mehrere Blöcke. ⌥-Klick klappt alle derselben Ebene; „Darstellung › Abschnitt einklappen/ausklappen“ (⌥⌘←/⌥⌘→) und „Alle …“ (⌃⌥⌘←/⌃⌥⌘→). Ein Hinweis zeigt, was eingeklappt ist („3 Absätze, 1 Bild“). Springt die Suche, ein Link oder der Cursor in einen eingeklappten Abschnitt, klappt er auf; eine eingeklappte Überschrift klappt vor dem Bearbeiten auf. Reine Darstellung: Die Notizdatei, Versionen, Suche und Export bleiben unverändert; der Zustand liegt in `.folio/organization.json`.
