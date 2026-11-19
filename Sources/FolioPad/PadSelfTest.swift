@@ -41,6 +41,14 @@ enum PadSelfTest {
         let font = bold?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
         check(font?.fontDescriptor.symbolicTraits.contains(.traitBold) == true, "Formatierung (fett) bleibt erhalten")
 
+        // Shown larger, saved at the Mac's size (#258).
+        let mac = NSAttributedString(string: "x", attributes: [.font: UIFont.systemFont(ofSize: 13)])
+        let shown = PadTextView.scaled(mac, by: PadTextView.displayScale)
+        let back = PadTextView.scaled(shown, by: 1 / PadTextView.displayScale)
+        let shownSize = (shown.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0
+        let backSize = (back.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize ?? 0
+        check(shownSize > 13 && abs(backSize - 13) < 0.11, "Schrift größer angezeigt (\(shownSize) pt), mit 13 pt gesichert")
+
         // Blocks the iPad cannot edit stay byte for byte.
         if let other = library.notes.first(where: { ($0.meta.kinds ?? []).contains { $0 != "text" } && $0.url != url }),
            let before = try? NoteFile.read(from: other.url) {

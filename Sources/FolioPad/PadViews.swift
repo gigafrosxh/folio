@@ -195,7 +195,7 @@ struct PadTextView: UIViewRepresentable {
         v.backgroundColor = .clear
         v.textContainerInset = .zero
         v.textContainer.lineFragmentPadding = 0
-        v.attributedText = Self.adapted(text)
+        v.attributedText = Self.scaled(Self.adapted(text), by: Self.displayScale)
         v.delegate = context.coordinator
         v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return v
@@ -206,6 +206,22 @@ struct PadTextView: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
         let width = proposal.width ?? 600
         return CGSize(width: width, height: uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height)
+    }
+
+    /// The Mac writes text at about 13 pt, which reads like fine print on the iPad (#258). The editor shows it at the
+    /// body text size and scales back before saving, so the note's stored sizes stay as the Mac wrote them.
+    static var displayScale: CGFloat { max(1, UIFont.preferredFont(forTextStyle: .body).pointSize / 13) }
+
+    static func scaled(_ s: NSAttributedString, by factor: CGFloat) -> NSAttributedString {
+        guard factor != 1 else { return s }
+        let m = NSMutableAttributedString(attributedString: s)
+        m.enumerateAttribute(.font, in: NSRange(location: 0, length: m.length)) { value, range, _ in
+            let font = (value as? UIFont) ?? UIFont.systemFont(ofSize: 13)
+            // Rounded to tenths so that showing and saving again gives back the same size.
+            let size = (font.pointSize * factor * 10).rounded() / 10
+            m.addAttribute(.font, value: font.withSize(size), range: range)
+        }
+        return m
     }
 
     /// Mac text is black on white; on the iPad it follows light and dark mode.
@@ -222,7 +238,7 @@ struct PadTextView: UIViewRepresentable {
         var onChange: (NSAttributedString) -> Void
         init(onChange: @escaping (NSAttributedString) -> Void) { self.onChange = onChange }
         func textViewDidChange(_ v: UITextView) {
-            onChange(v.attributedText)
+            onChange(PadTextView.scaled(v.attributedText, by: 1 / PadTextView.displayScale))
             v.invalidateIntrinsicContentSize()
         }
     }
