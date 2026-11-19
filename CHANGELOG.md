@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.9.0] – 2026-11-19
+
 ### Neu
 - **Import aus Obsidian** (#71): „Ablage › Obsidian-Vault importieren …“ übernimmt alle Markdown-Notizen eines Vaults in einen neuen Ordner mit denselben Unterordnern. Der Dateiname wird zum Titel, `[[Links]]` (auch mit Alias oder Abschnitt) bleiben Links, `![[Bild.png]]` und andere eingebettete Dateien werden zu Blöcken (auch aus anderen Ordnern des Vaults), das Front Matter zu Tags und Eigenschaften. Der Vault wird nur gelesen, nichts in der Bibliothek überschrieben; fehlende Anhänge werden gemeldet. Beim Markdown-Import werden eingebettete PDFs, Audio- und andere Dateien jetzt als passende Blöcke übernommen statt als Bild.
 - **Kurzbefehle und AppleScript** (#70): Aktionen „Notiz erstellen“, „Notizen suchen“, „Notiz öffnen“ und „An Notiz anhängen“ in der Kurzbefehle-App; dieselben Befehle per AppleScript (`create note`, `search notes`, `open note`, `append to note`). Nichts wird gelöscht oder überschrieben. Anleitung: `docs/AUTOMATION.md`.
