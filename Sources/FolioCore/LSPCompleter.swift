@@ -7,11 +7,11 @@
     public final class LSPCompleter: CompletionProvider, @unchecked Sendable {
         public static let shared = LSPCompleter()
 
-        struct ServerSpec {
+        struct ServerSpec: Sendable {
             var commands: [[String]]  // alternatives, first installed wins
             var languageID: String
             /// Extra files for the scratch workspace (path → contents) and the path of the code file.
-            var workspace: (String) -> (files: [String: String], main: String)
+            var workspace: @Sendable (String) -> (files: [String: String], main: String)
         }
 
         static let specs: [String: ServerSpec] = [

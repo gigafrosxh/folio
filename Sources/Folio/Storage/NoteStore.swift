@@ -139,7 +139,7 @@ final class NoteStore: ObservableObject {
     var trash: LibraryTrash { LibraryTrash(library: rootURL) }
     var watchTimer: Timer?
 
-    static let defaultFolderName = "Notizen"
+    static let defaultFolderName = LibraryFiles.defaultFolderName
 
     private init() {
         // FOLIO_LIBRARY overrides the library folder (used for debugging without touching real notes).
@@ -183,14 +183,10 @@ final class NoteStore: ObservableObject {
         return true
     }
 
-    func prepareRoot() {
-        let fm = FileManager.default
-        try? fm.createDirectory(at: rootURL, withIntermediateDirectories: true)
-        let defaultFolder = rootURL.appendingPathComponent(Self.defaultFolderName, isDirectory: true)
-        if (try? fm.contentsOfDirectory(atPath: rootURL.path))?.filter({ !$0.hasPrefix(".") }).isEmpty ?? true {
-            try? fm.createDirectory(at: defaultFolder, withIntermediateDirectories: true)
-        }
-    }
+    /// File-system side of the library (#216).
+    var files: LibraryFiles { LibraryFiles(root: rootURL) }
+
+    func prepareRoot() { files.prepare() }
 
     /// Everything a reload reads from disk; built off the main thread by `reloadInBackground` (#220).
     struct LibrarySnapshot: @unchecked Sendable {
@@ -204,15 +200,7 @@ final class NoteStore: ObservableObject {
     }
 
     nonisolated static func readLibrary(_ root: URL, scanner: LibraryScanner) -> LibrarySnapshot {
-        let result = scanner.scan(root)
-        let damaged = result.unreadable.map { DamagedNote(url: $0, report: FolioDiagnostics.diagnose(at: $0)) }
-        let dir = LibraryData.folder(root, "templates")
-        let templates = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == FolioArchive.fileExtension }
-            .compactMap { url in (try? NoteFile.readMetadata(at: url)).map { NoteRef(meta: $0, url: url) } }
-        return LibrarySnapshot(
-            root: root, scan: result, refs: result.notes.map { NoteRef(meta: $0.meta, url: $0.url) }, damaged: damaged, trash: LibraryTrash(library: root).items(),
-            templates: templates)
+        LibraryFiles(root: root).read(scanner: scanner)
     }
 
     /// Reads the library now. Callers that use the notes right afterwards need this; everything else should use
@@ -261,23 +249,9 @@ final class NoteStore: ObservableObject {
     /// Copies of a note file with the same id get a new identity, so each shows up as its own note (#166). The file
     /// Folio already knew under the id keeps it. A copy that cannot be rewritten stays hidden and is reported.
     private func renewingDuplicateIDs(_ found: [NoteRef]) -> [NoteRef] {
-        guard Set(found.map(\.id)).count != found.count else { return found }
         let known = Dictionary(notes.map { ($0.id, $0.url) }, uniquingKeysWith: { a, _ in a })
-        let resolution = NoteIdentity.resolve(found.map { ($0.url, $0.id) }, known: known)
-        guard !resolution.renew.isEmpty else { return found }
-        let renew = Set(resolution.renew)
-        var refs = found.filter { !renew.contains($0.url) }
-        var failed: [String] = []
-        for url in resolution.renew {
-            do {
-                let file = NoteIdentity.renewed(try NoteFile.read(from: url))
-                try file.write(to: url)
-                refs.append(NoteRef(meta: file.meta, url: url))
-            } catch {
-                failed.append(url.lastPathComponent)
-            }
-        }
-        if !failed.isEmpty { lastError = "Diese Kopien haben dieselbe Kennung wie eine andere Notiz und konnten nicht angepasst werden: \(failed.joined(separator: ", "))" }
+        let (refs, failure) = files.renewingDuplicateIDs(found, known: known)
+        if let failure { lastError = failure.localizedDescription }
         return refs
     }
 
@@ -498,11 +472,11 @@ final class NoteStore: ObservableObject {
 
     @discardableResult
     func createFolder(named name: String, in parent: URL? = nil) -> URL? {
-        let dir = (parent ?? rootURL).appendingPathComponent(Self.sanitize(name), isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
-        } catch {
-            lastError = "Ordner konnte nicht angelegt werden: \(error.localizedDescription)"
+        let dir: URL
+        switch files.createFolder(named: name, in: parent) {
+        case .success(let url): dir = url
+        case .failure(let failure):
+            lastError = failure.localizedDescription
             return nil
         }
         reload()
@@ -511,15 +485,15 @@ final class NoteStore: ObservableObject {
     }
 
     func renameFolder(_ url: URL, to name: String) {
-        let target = url.deletingLastPathComponent().appendingPathComponent(Self.sanitize(name), isDirectory: true)
-        guard target != url else { return }
+        guard url.deletingLastPathComponent().appendingPathComponent(Self.sanitize(name), isDirectory: true) != url else { return }
         for doc in documents.values { doc.saveNow() }
         // Taken while the folder still exists: paths of missing folders do not resolve the same way.
         let oldPath = relativeFolderName(url)
-        do {
-            try FileManager.default.moveItem(at: url, to: target)
-        } catch {
-            lastError = "Umbenennen fehlgeschlagen: \(error.localizedDescription)"
+        let target: URL
+        switch files.renameFolder(url, to: name) {
+        case .success(let renamed): target = renamed
+        case .failure(let failure):
+            lastError = failure.localizedDescription
             return
         }
         for doc in documents.values where doc.url.path.hasPrefix(url.path + "/") {
@@ -539,11 +513,9 @@ final class NoteStore: ObservableObject {
         }
         for doc in documents.values { doc.saveNow() }
         let inside = documents.values.filter { $0.url.path.hasPrefix(url.path + "/") }.map(\.id)
-        do {
-            try trash.moveToTrash(url)
-        } catch {
+        if case .failure(let failure) = files.trashFolder(url) {
             // Nothing was moved: the notes stay open as they are.
-            lastError = "Ordner konnte nicht gelöscht werden: \(error.localizedDescription)"
+            lastError = failure.localizedDescription
             return
         }
         // Closed only once the folder really is in the trash.
@@ -555,22 +527,7 @@ final class NoteStore: ObservableObject {
 
     // MARK: Helpers
 
-    static func sanitize(_ name: String) -> String {
-        let bad = CharacterSet(charactersIn: "/:\\\0").union(.newlines).union(.controlCharacters)
-        var s = name.components(separatedBy: bad).joined(separator: "-").trimmingCharacters(in: .whitespaces)
-        while s.hasPrefix(".") { s.removeFirst() }
-        if s.isEmpty { s = "Ohne Titel" }
-        return String(s.prefix(80))
-    }
+    static func sanitize(_ name: String) -> String { LibraryFiles.sanitize(name) }
 
-    func uniqueURL(in dir: URL, base: String) -> URL {
-        let fm = FileManager.default
-        var url = dir.appendingPathComponent(base).appendingPathExtension(FolioArchive.fileExtension)
-        var n = 2
-        while fm.fileExists(atPath: url.path) {
-            url = dir.appendingPathComponent("\(base) \(n)").appendingPathExtension(FolioArchive.fileExtension)
-            n += 1
-        }
-        return url
-    }
+    func uniqueURL(in dir: URL, base: String) -> URL { LibraryFiles.uniqueURL(in: dir, base: base) }
 }

@@ -266,7 +266,29 @@ final class UpdateManager: ObservableObject {
 private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     let target: URL
     let onProgress: @Sendable (Int64, Int64) -> Void
-    var continuation: CheckedContinuation<URL, Error>?
+    /// Set by the caller, finished from URLSession's delegate queue; taken under a lock so it is resumed once (#218).
+    private let lock = NSLock()
+    private var pending: CheckedContinuation<URL, Error>?
+    var continuation: CheckedContinuation<URL, Error>? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return pending
+        }
+        set {
+            lock.lock()
+            pending = newValue
+            lock.unlock()
+        }
+    }
+
+    private func take() -> CheckedContinuation<URL, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        let c = pending
+        pending = nil
+        return c
+    }
 
     init(target: URL, onProgress: @escaping @Sendable (Int64, Int64) -> Void) {
         self.target = target
@@ -283,22 +305,19 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unc
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
-            continuation?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen (HTTP \(status))."))
-            continuation = nil
+            take()?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen (HTTP \(status))."))
             return
         }
         do {
             try FileManager.default.moveItem(at: location, to: target)
-            continuation?.resume(returning: target)
+            take()?.resume(returning: target)
         } catch {
-            continuation?.resume(throwing: error)
+            take()?.resume(throwing: error)
         }
-        continuation = nil
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let error else { return }
-        continuation?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen: \(error.localizedDescription)"))
-        continuation = nil
+        take()?.resume(throwing: UpdateManager.InstallError.step("Download fehlgeschlagen: \(error.localizedDescription)"))
     }
 }

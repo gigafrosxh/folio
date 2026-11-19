@@ -70,3 +70,13 @@ swift format lint --strict -r Sources Tests   # prüfen, wie die CI
 ```
 
 Die CI bricht bei Abweichungen ab. `Resources/Web` (KaTeX, Mermaid, ERD-Ultra) und erzeugte Dateien sind ausgenommen.
+
+## Bibliothek: Zuständigkeiten (#216)
+
+- `NoteStore` (MainActor): UI-Zustand – Auswahl, Tabs, Split, offene Dokumente, Fehlermeldungen, Suche/Filter.
+- `LibraryFiles` (ohne UI, auch im Hintergrund nutzbar): Bibliothek lesen, doppelte Notiz-IDs reparieren, Ordner
+  anlegen/umbenennen/in den Papierkorb, freie Dateinamen. Gibt typisierte Ergebnisse (`Result`, `Failure`) zurück;
+  `NoteStore` entscheidet, was angezeigt wird.
+- `FolioCore`: Dateiformat, Scanner, Papierkorb, Versionen, Organisation – plattformunabhängig und getestet.
+
+Datenfluss: Ansicht → `NoteStore` → `LibraryFiles` / `FolioCore` → Dateisystem.

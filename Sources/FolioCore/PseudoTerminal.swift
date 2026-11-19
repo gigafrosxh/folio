@@ -8,8 +8,33 @@
         private let master: FileHandle
         private let lock = NSLock()
         private var exited = false
-        public var onOutput: (@Sendable (String) -> Void)?
-        public var onExit: (@Sendable (Int32) -> Void)?
+        // Set on the main thread, called from the reading thread: guarded by `lock` (#218).
+        private var outputHandler: (@Sendable (String) -> Void)?
+        private var exitHandler: (@Sendable (Int32) -> Void)?
+        public var onOutput: (@Sendable (String) -> Void)? {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return outputHandler
+            }
+            set {
+                lock.lock()
+                outputHandler = newValue
+                lock.unlock()
+            }
+        }
+        public var onExit: (@Sendable (Int32) -> Void)? {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return exitHandler
+            }
+            set {
+                lock.lock()
+                exitHandler = newValue
+                lock.unlock()
+            }
+        }
         public let pid: pid_t
         public var isRunning: Bool {
             lock.lock()

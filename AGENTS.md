@@ -297,6 +297,19 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
 - Teilen (#50): Ziel `FolioShare` (Share-Extension, `Resources/Share/`), öffnet nur `folio://capture`-Links (`WebClip` im Kern).
   Nicht im echten Teilen-Menü geprüft (dafür müsste die App installiert sein).
 
+### Ab 1.10.0 (Qualität und Performance)
+
+- Formatierung (#215): `.swift-format` (4 Leerzeichen, 180 Spalten); vor jedem Commit `swift format -i -r Sources Tests`,
+  die CI prüft mit `swift format lint --strict -r Sources Tests`.
+- Benchmarks (#219): `scripts/benchmark.sh` (Kern `folio-bench`, App `FOLIO_BENCH`), Ergebnisse und Ausgangswerte in
+  `docs/PERFORMANCE.md`. Nur synthetische Bibliotheken.
+- Neuladen (#220): `NoteStore.reload()` synchron (Start und Aktionen, die die Liste sofort brauchen), sonst
+  `reloadInBackground()`; Dateisystem-Logik in `Storage/LibraryFiles.swift` (#216, typisierte Ergebnisse, getestet).
+- Code-Editor (#221, #222): Färbung nur für geänderte Zeilen (`HighlightDiff`), Selbsttest im EDITOR-Lauf.
+- CI (#223): App-Selbsttests laufen headless in `.github/workflows/ci.yml` (`FOLIO_REGRESSION_DIR`, `FOLIO_REGRESSION_TIMEOUT`).
+- Einstellungen (#217): eine Datei pro Tab in `Views/Settings/`.
+- Nebenläufigkeit (#218): Inventar und offene Warnungen in `docs/CONCURRENCY.md`.
+
 ### KI ab 1.6.0
 
 - Ollama-Erreichbarkeit: `OllamaStatus` (App) prüft beim Öffnen des Chats und vor jeder Frage; `AIAvailability` meldet dann `.ollamaDown`, und der Chat zeigt Fundstellen.
