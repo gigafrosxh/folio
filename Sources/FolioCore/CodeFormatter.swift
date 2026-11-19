@@ -90,6 +90,7 @@ public enum CodeFormatter {
         }
     }
 
+    #if os(macOS)
     /// Name of the formatter that would be used, if one is installed.
     public static func available(for language: LanguageSpec, locator: InterpreterLocator = .shared) -> String? {
         tools[language.id]?.first { locator.find($0[0]) != nil }?[0]
@@ -121,6 +122,7 @@ public enum CodeFormatter {
         if !code.hasSuffix("\n"), result.hasSuffix("\n") { result.removeLast() }
         return result
     }
+    #endif
 }
 
 extension CodeStyle {

@@ -89,7 +89,7 @@ public enum CodeDependencies {
     }
 
     public static func build(_ items: [Item]) -> Graph {
-        let symbols = items.map { SymbolScan.scan($0.code, language: $0.language) }
+        let symbols = items.map { SymbolScan.cachedScan($0.code, language: $0.language) }
         var edges: [Edge] = []
         var warnings: [OrderWarning] = []
         for i in items.indices where items[i].session != nil {
@@ -176,6 +176,23 @@ public enum SymbolScan {
     public struct Symbols: Sendable, Equatable {
         public var defines: Set<String>
         public var uses: Set<String>
+    }
+
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: Symbols] = [:]
+
+    /// `scan`, remembered per language and code: every block header asks for the graph on each redraw.
+    public static func cachedScan(_ code: String, language: String) -> Symbols {
+        let key = language + "\u{1}" + CodeDependencies.fingerprint(code) + "\u{1}\(code.utf8.count)"
+        cacheLock.lock()
+        if let hit = cache[key] { cacheLock.unlock(); return hit }
+        cacheLock.unlock()
+        let symbols = scan(code, language: language)
+        cacheLock.lock()
+        if cache.count > 2_000 { cache.removeAll() }
+        cache[key] = symbols
+        cacheLock.unlock()
+        return symbols
     }
 
     public static func scan(_ code: String, language: String) -> Symbols {

@@ -252,6 +252,32 @@ Jede Version folgt Regel 8 (ab 1.1 ohne RC, Bugfixes als Patch-Versionen).
   Unbekannte Titeländerungen und instabile Titel beim erneuten Öffnen bleiben Fehler.
 - Details und Grenzen: `docs/RELEASE-1.0.0-rc.1.md`. Developer ID fehlt weiterhin; #63 bleibt offen.
 
+### Code ab 1.7.0
+
+- Abhängigkeiten (#26): `Sources/FolioCore/CodeDependencies.swift` (`SymbolScan` findet Definitionen/Nutzungen per Sprache,
+  `CodeDependencies.build` liefert Kanten, Status und Reihenfolge-Warnungen). `BlockRecord.lastRun` (`CodeRunStamp`, Fingerabdruck
+  des Codes) setzt `RunManager.finish`. App: `CodeDependencyView.swift` (Übersicht, `RunManager.runStale`), Chip im Blockkopf.
+- Export/Diff (#28, #31): `CodeExport` und `LineDiff` (Kern, von Codex), `BlockRecord.linkedFile` (Pfad); App: `CodeFileLink.swift`.
+- ER-Block (#204): `BlockKind.erd`, `.erdu`-JSON steht vollständig in `code`, Ansicht in `mode` (`er`/`rel`/`sql`), Original in
+  `linkedFile`. Prüfung und Suchnamen: `ErduDocument`. Gezeichnet wird mit ERD-Ultras Renderer `Resources/Web/erd/erdu-render.js`
+  (Bauanleitung `Tools/ErduEmbed/README.md`, Quelle im Klon von erd-ultra; noch nicht in dessen Repo gepusht). App:
+  `ErdBlockView.swift` (fragt die Datei etwa jede Sekunde ab, kaputte Dateien ersetzen nie den letzten Stand).
+  Sichtprüfung: `FOLIO_RENDER_TEST=<ordner> FOLIO_RENDER_ERDU=Tests/FolioCoreTests/Fixtures/tiergarten.erdu`.
+
+### iPad ab 1.7.0 (#214)
+
+- Ziel `FolioPad` (`Sources/FolioPad`, nur iPadOS; auf macOS ein leerer Platzhalter). Bauen und im Simulator starten:
+  `scripts/build-ipad.sh [<udid>]` → `build/FolioPad.app` (Bundle-ID `de.daniel.folio.pad`). Kein Entwicklerkonto: nur Simulator.
+- Bibliothek: `Documents/Folio` der App (Dateien-App), `FOLIO_LIBRARY` gilt auch hier (per `SIMCTL_CHILD_FOLIO_LIBRARY`).
+  Text und Code sind bearbeitbar, alle anderen Blöcke bleiben beim Sichern unverändert; vor jedem Überschreiben eine Version in
+  `.folio/history`, bei fremder Änderung eine Kopie „(iPad)“. Noch kein Abgleich mit dem Mac (#213).
+- Selbsttest: `SIMCTL_CHILD_FOLIO_LIBRARY=<kopie> SIMCTL_CHILD_FOLIO_PAD_SELFTEST=1 xcrun simctl launch --console-pty <udid> de.daniel.folio.pad`
+  (gibt `PAD ok|FAIL …` aus), `SIMCTL_CHILD_FOLIO_PAD_OPEN=<Titel>` öffnet eine Notiz für Bildschirmfotos (`simctl io <udid> screenshot`).
+- Achtung: Im Standard-Gerätesatz (`~/Library/Developer/CoreSimulator/Devices` auf der externen SSD) bleibt `simctl create` hängen
+  (keine Schreibrechte für CoreSimulatorService). Einen eigenen Satz nehmen: `xcrun simctl --set <tmp-ordner> create/boot/install/launch …`;
+  `simctl boot` startet keine Simulator-App und stiehlt keinen Fokus.
+- **Vorgabe des Nutzers:** Für Tests angelegte Simulatoren (iPad oder iPhone) danach wieder löschen (`xcrun simctl delete <udid>`).
+
 ### KI ab 1.6.0
 
 - Ollama-Erreichbarkeit: `OllamaStatus` (App) prüft beim Öffnen des Chats und vor jeder Frage; `AIAvailability` meldet dann `.ollamaDown`, und der Chat zeigt Fundstellen.

@@ -97,6 +97,7 @@ for line in sys.stdin:
 """#)
 }
 
+#if os(macOS)
 /// A running interpreter that keeps variables between runs.
 public final class Kernel: @unchecked Sendable {
     public let language: KernelLanguage
@@ -353,6 +354,8 @@ private final class LockedBool: @unchecked Sendable {
     func set() { lock.lock(); v = true; lock.unlock() }
     var value: Bool { lock.lock(); defer { lock.unlock() }; return v }
 }
+
+#endif
 
 /// One step of reading the session's output stream. Each stream ends a request with a line of
 /// `0x1E <request id> : <status>`; text before it is program output (#142).

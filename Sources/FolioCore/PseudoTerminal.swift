@@ -1,3 +1,4 @@
+#if os(macOS)
 import Darwin
 import Foundation
 import FolioTerminal
@@ -78,3 +79,4 @@ public final class PseudoTerminal: @unchecked Sendable {
         if isRunning { ServerDetector.terminateTree(pid) }
     }
 }
+#endif

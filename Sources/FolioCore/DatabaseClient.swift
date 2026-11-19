@@ -4,6 +4,7 @@ import FoundationXML
 #endif
 
 public enum DatabaseClient {
+    #if os(macOS)
     nonisolated(unsafe) static var clientOverrides: [DatabaseDriver: String] = [:]
     public static func clientPath(for driver: DatabaseDriver, locator: InterpreterLocator = .shared) -> String? {
         clientOverrides[driver] ?? locator.find(driver.client)
@@ -179,6 +180,8 @@ public enum DatabaseClient {
         }
         return tables
     }
+
+    #endif
 
     static func parseSQLCMD(_ output: String) throws -> QueryResult {
         var parser = SQLCMDOutputParser(output)

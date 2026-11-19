@@ -1,4 +1,10 @@
 #include "FolioTerminal.h"
+#include <errno.h>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__APPLE__) && TARGET_OS_OSX
 #include <util.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -25,3 +31,12 @@ pid_t folio_spawn_terminal(int *master, char *const argv[], char *const envp[], 
     }
     return pid;
 }
+
+#else
+// iOS cannot spawn child processes or allocate a pseudo-terminal.
+pid_t folio_spawn_terminal(int *master, char *const argv[], char *const envp[], const char *directory, unsigned short columns, unsigned short rows) {
+    if (master) *master = -1;
+    errno = ENOSYS;
+    return -1;
+}
+#endif

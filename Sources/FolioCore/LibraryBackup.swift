@@ -43,6 +43,7 @@ public enum LibraryBackup {
         }.sorted { $0.date > $1.date }
     }
 
+    #if os(macOS)
     /// Zips the library into `directory`. Written under a temporary name first, so an interrupted
     /// backup never looks like a finished one.
     public static func create(library: URL, in directory: URL, date: Date = Date()) throws -> BackupInfo {
@@ -93,6 +94,8 @@ public enum LibraryBackup {
         return target
     }
 
+    #endif
+
     /// Removes backups the retention policy no longer needs; returns them.
     @discardableResult
     public static func prune(in directory: URL, policy: RetentionPolicy = .backups, now: Date = Date()) -> [URL] {
@@ -103,6 +106,7 @@ public enum LibraryBackup {
         }
     }
 
+    #if os(macOS)
     static func unpack(_ zip: URL, to folder: URL) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try run("/usr/bin/ditto", ["-x", "-k", zip.path, folder.path], cwd: nil)
@@ -126,4 +130,5 @@ public enum LibraryBackup {
             throw BackupError.tool(text.isEmpty ? "\((exe as NSString).lastPathComponent) Status \(p.terminationStatus)" : text)
         }
     }
+    #endif
 }

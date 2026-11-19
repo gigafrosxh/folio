@@ -1,5 +1,6 @@
 import Foundation
 
+#if os(macOS)
 /// Combines the completion sources: a language server when one is installed, runtime introspection
 /// (Python, Java, JavaScript), and finally keywords plus words already in the code.
 public final class CompletionEngine: @unchecked Sendable {
@@ -41,6 +42,8 @@ public final class CompletionEngine: @unchecked Sendable {
         return "Schlüsselwörter und Wörter im Code"
     }
 }
+
+#endif
 
 // MARK: When the list opens (#141)
 

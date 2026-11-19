@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// Completions from Language Server Protocol servers installed on the Mac (sourcekit-lsp, clangd,
@@ -369,3 +370,4 @@ private final class Once: @unchecked Sendable {
         body()
     }
 }
+#endif

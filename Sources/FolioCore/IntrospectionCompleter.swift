@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Darwin
 
@@ -334,3 +335,4 @@ private final class IntrospectionBuffer: @unchecked Sendable {
     func append(_ bytes: Data) { lock.lock(); defer { lock.unlock() }; data.append(bytes.prefix(max(0, 2_000_000 - data.count))) }
     var value: Data { lock.lock(); defer { lock.unlock() }; return data }
 }
+#endif

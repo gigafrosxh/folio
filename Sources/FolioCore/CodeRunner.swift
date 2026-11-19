@@ -1,6 +1,7 @@
 import Foundation
 import Darwin
 
+#if os(macOS)
 /// Finds executables the way the user's shell would, even when the app was launched from Finder
 /// (whose PATH is only /usr/bin:/bin:/usr/sbin:/sbin).
 public final class InterpreterLocator: @unchecked Sendable {
@@ -79,6 +80,8 @@ public final class InterpreterLocator: @unchecked Sendable {
     }
 }
 
+#endif
+
 public struct RunResult: Sendable {
     public var stdout: String
     public var stderr: String
@@ -138,6 +141,7 @@ public struct RunOptions: Sendable {
     }
 }
 
+#if os(macOS)
 /// Runs a snippet with an installed interpreter or compiler.
 public final class CodeRun: @unchecked Sendable {
     private let lock = NSLock()
@@ -570,3 +574,4 @@ private final class LockedFlag: @unchecked Sendable {
     func set() { lock.lock(); flag = true; lock.unlock() }
     var value: Bool { lock.lock(); defer { lock.unlock() }; return flag }
 }
+#endif

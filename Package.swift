@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Folio",
-    platforms: [.macOS("15.2")],
+    platforms: [.macOS("15.2"), .iOS("18.0")],
     products: [
         .executable(name: "Folio", targets: ["Folio"]),
         .executable(name: "FolioWidgets", targets: ["FolioWidgets"]),
@@ -37,6 +37,13 @@ let package = Package(
             // Like Xcode for app extensions: start in NSExtensionMain, which then runs the @main WidgetBundle.
             // With Swift's own entry point the extension crashed at launch (#123).
             linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
+        ),
+        // Folio for iPad (#214): iPadOS only; on macOS the target is an empty placeholder. Built by scripts/build-ipad.sh.
+        .executableTarget(
+            name: "FolioPad",
+            dependencies: ["FolioCore"],
+            path: "Sources/FolioPad",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         // Command-line inspector for .folio files.
         .executableTarget(

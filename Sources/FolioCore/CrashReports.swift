@@ -35,6 +35,7 @@ public enum CrashReports {
         public var unreadable = 0
     }
 
+    #if os(macOS)
     public static func defaultFolders(environment: [String: String] = ProcessInfo.processInfo.environment) -> [URL] {
         if let override = environment["FOLIO_CRASH_REPORTS"] { return [URL(fileURLWithPath: override, isDirectory: true)] }
         let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
@@ -63,6 +64,8 @@ public enum CrashReports {
         scan.reports = Array(scan.reports.prefix(limit))
         return scan
     }
+
+    #endif
 
     private static func mentionsFolio(_ fileName: String) -> Bool { fileName.lowercased().hasPrefix("folio") }
 
