@@ -105,9 +105,21 @@ final class PadDocument: ObservableObject, Identifiable {
         return file
     }
 
+    /// Check, keep the previous version and replace in one coordinated step, so another app (Files, a sync service)
+    /// cannot write in between (#265).
     private func write(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory) throws -> SaveOutcome {
+        var outcome: Result<SaveOutcome, Error> = .failure(CocoaError(.fileWriteUnknown))
+        var coordinationError: NSError?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
+            outcome = Result { try self.writeCoordinated(snapshot, data: data, revision: rev, history: history, at: target) }
+        }
+        if let coordinationError { throw coordinationError }
+        return try outcome.get()
+    }
+
+    private func writeCoordinated(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory, at target: URL) throws -> SaveOutcome {
         let fm = FileManager.default
-        if fm.fileExists(atPath: url.path), Self.modificationDate(url) != diskDate {
+        if fm.fileExists(atPath: target.path), Self.modificationDate(target) != diskDate {
             // Changed elsewhere since it was opened: keep both.
             let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
             // New ids for note, blocks and attachments: both files may be open on the Mac at once (#260).
@@ -116,9 +128,9 @@ final class PadDocument: ObservableObject, Identifiable {
             return .savedAsCopy(copy)
         }
         // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
-        if fm.fileExists(atPath: url.path) { try history.record(try Data(contentsOf: url), noteID: snapshot.meta.id, force: true) }
-        try data.write(to: url, options: .atomic)
-        diskDate = Self.modificationDate(url)
+        if fm.fileExists(atPath: target.path) { try history.record(try Data(contentsOf: target), noteID: snapshot.meta.id, force: true) }
+        try data.write(to: target, options: .atomic)
+        diskDate = Self.modificationDate(target)
         // Edits made while compressing stay unsaved and are written by the next save.
         if revision == rev { isDirty = false }
         return .saved
@@ -151,13 +163,28 @@ final class PadDocument: ObservableObject, Identifiable {
     /// Title, preview, tags and search text the same way the Mac derives them (first text line is the title).
     static func refreshMeta(_ file: inout NoteFile) {
         let text = file.body.blocks.filter { $0.kind == .text }.map(plainText).joined(separator: "\n")
-        let lines = text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        // Same rules as the Mac: no list markers or capture date lines in the title (#265).
+        let lines = NoteTitle.lines(of: text)
         if let first = lines.first { file.meta.title = String(first.prefix(120)) }
         file.meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
         file.meta.tags = TagParser.tags(in: text)
         file.meta.searchText = file.body.blocks.map(plainText).joined(separator: "\n")
         file.meta.wikiLinks = WikiLink.targets(in: file.meta.searchText)
-        file.meta.kinds = Array(Set(file.body.blocks.map(\.kind.rawValue))).sorted()
+        file.meta.kinds = Array(Set(file.body.blocks.filter { $0.kind != .text || !plainText($0).isEmpty }.map(\.kind.rawValue))).sorted()
+        file.meta.links = noteLinks(file)
+    }
+
+    /// `folio://note/<id>` links in the text, for backlinks and the graph on the Mac (#265).
+    static func noteLinks(_ file: NoteFile) -> [UUID] {
+        var links: [UUID] = []
+        for b in file.body.blocks where b.kind == .text {
+            guard let rtf = b.rtf, let s = try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil) else { continue }
+            s.enumerateAttribute(.link, in: NSRange(location: 0, length: s.length)) { value, _, _ in
+                let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+                if let id = url.flatMap(NoteLink.id(from:)), id != file.meta.id, !links.contains(id) { links.append(id) }
+            }
+        }
+        return links
     }
 
     static func freeURL(in folder: URL, title: String) -> URL {

@@ -99,4 +99,9 @@ final class LineDiffTests: XCTestCase {
         XCTAssertEqual(lines.filter { $0.kind != .added }.map { $0.text + "\n" }.joined(), old)
         XCTAssertEqual(lines.filter { $0.kind != .removed }.map { $0.text + "\n" }.joined(), new)
     }
+
+    func testUnicodeNormalisationCounts() {
+        let composed = "name = \"Caf\u{00E9}\"\n", decomposed = "name = \"Cafe\u{0301}\"\n"
+        XCTAssertEqual(LineDiff.stats(LineDiff.diff(old: composed, new: decomposed)).added, 1)
+    }
 }

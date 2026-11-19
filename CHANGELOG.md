@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Kleinere Fehler aus dem 1.7-Review** (#265): Der Zeilen-Diff erkennt unterschiedlich kodierte Umlaute als Änderung. Das iPad bildet Titel, Vorschau und Notiz-Links nach denselben Regeln wie der Mac (keine Listenzeichen oder Erfassungs-Datumszeilen im Titel, Links für Rückverweise und Graph) und sichert koordiniert mit anderen Apps (Dateien-App, Synchronisierung). Die Rückskalierung der Schrift nutzt den beim Anzeigen verwendeten Faktor (seit 1.7.2), interaktive Blöcke zählen im Abhängigkeitsgraphen nicht zur Sitzung (seit 1.7.3).
+
 ## [1.7.3] – 2026-11-19
 
 ### Behoben

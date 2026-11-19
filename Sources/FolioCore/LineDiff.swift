@@ -46,7 +46,8 @@ public enum LineDiff {
     }
 
     public static func diff(old: String, new: String) -> [Line] {
-        let a = split(old), b = split(new)
+        // Lines compare byte for byte: Swift's == treats composed and decomposed "é" as equal (#265).
+        let a = split(old).map(ByteLine.init), b = split(new).map(ByteLine.init)
         var prefix = 0
         while prefix < min(a.count, b.count), a[prefix] == b[prefix] { prefix += 1 }
         var suffix = 0
@@ -58,7 +59,7 @@ public enum LineDiff {
             + middleKinds(left, right) + Array(repeating: .same, count: suffix)
         var i = 0, j = 0
         return kinds.map { kind in
-            let raw = kind == .added ? b[j] : a[i]
+            let raw = (kind == .added ? b[j] : a[i]).text
             let line = Line(kind: kind, text: raw.hasSuffix("\n") ? String(raw.dropLast()) : raw,
                             oldNumber: kind == .added ? nil : i + 1,
                             newNumber: kind == .removed ? nil : j + 1,
@@ -70,7 +71,14 @@ public enum LineDiff {
     }
 
     // Bound both time and memory; large replacements retain their common prefix and suffix.
-    private static func middleKinds(_ a: [String], _ b: [String]) -> [Line.Kind] {
+    private struct ByteLine: Equatable {
+        let text: String
+        let bytes: [UInt8]
+        init(_ text: String) { self.text = text; bytes = Array(text.utf8) }
+        static func == (l: ByteLine, r: ByteLine) -> Bool { l.bytes == r.bytes }
+    }
+
+    private static func middleKinds<T: Equatable>(_ a: [T], _ b: [T]) -> [Line.Kind] {
         guard !a.isEmpty, !b.isEmpty, a.count <= 1_000_000 / b.count else {
             return Array(repeating: .removed, count: a.count) + Array(repeating: .added, count: b.count)
         }
@@ -86,7 +94,7 @@ public enum LineDiff {
         return trace(a, b, lengths: lengths, width: width)
     }
 
-    private static func trace(_ a: [String], _ b: [String], lengths: [Int], width: Int) -> [Line.Kind] {
+    private static func trace<T: Equatable>(_ a: [T], _ b: [T], lengths: [Int], width: Int) -> [Line.Kind] {
         var result: [Line.Kind] = []
         var i = 0, j = 0
         while i < a.count && j < b.count {

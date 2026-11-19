@@ -55,6 +55,12 @@ final class PadSelfTest {
         let file = try? NoteFile.read(from: url)
         check(file?.meta.title == "Pad-Selbsttest", "neue Notiz: Titel aus erster Zeile")
         check(file?.meta.tags == ["ipad"], "neue Notiz: Tag erkannt")
+        // Same title rules as the Mac (#265).
+        if let doc = library.document {
+            doc.setText(NSAttributedString(string: "— 19. Nov. 2026, 13:00 —\n• Punkt eins\nRest"), of: doc.blocks[0].id)
+            library.saveNow()
+            check((try? NoteFile.read(from: url))?.meta.title == "Punkt eins", "Titel ohne Listenzeichen und Datumszeile")
+        }
         return url
     }
 

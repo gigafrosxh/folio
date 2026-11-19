@@ -275,17 +275,9 @@ final class NoteDocument: ObservableObject, Identifiable {
 
     /// Builds the file representation and refreshes title, preview and tags.
     /// A text line without leading list marker (•, ☐, ☑, „1.“, „1“ + Tab …) and with single spaces.
-    static func plainLine(_ line: String) -> String {
-        // Bullets and checkboxes before any space; numbers only as "1." / "1)" or followed by a tab,
-        // so "10 km/h" keeps its number.
-        var s = line.replacingOccurrences(of: #"^[\t ]*(?:[•◦▪‣☐☑✓✔︎–\-*][\t ]+|\d{1,3}[.)][\t ]+|\d{1,3}\t+)"#, with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: #"[\t ]+"#, with: " ", options: .regularExpression)
-        return s.trimmingCharacters(in: .whitespaces)
-    }
+    static func plainLine(_ line: String) -> String { NoteTitle.plainLine(line) }
 
-    static func isCaptureSeparator(_ line: String) -> Bool {
-        line.hasPrefix("— ") && line.hasSuffix(" —") && line.count < 60
-    }
+    static func isCaptureSeparator(_ line: String) -> Bool { NoteTitle.isCaptureSeparator(line) }
 
     func makeFile() -> NoteFile {
         let textBlocks = blocks.filter { $0.kind == .text }
