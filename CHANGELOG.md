@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.9.4] – 2026-11-19
+
 ### Behoben
 - **Kleinere Review-Funde 1.8/1.9** (#351):
   - „An Notiz anhängen“ (Kurzbefehle, AppleScript) meldet, ob der Text gesichert ist, wartet oder nur im offenen Editor steht.
