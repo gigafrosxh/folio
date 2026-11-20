@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """Prints the crashed thread of every Folio crash report (.ips) with symbols, for CI logs (#223)."""
-import glob, json, os, sys
+import glob, json, os, sys, time
 
-for path in sorted(glob.glob(os.path.expanduser("~/Library/Logs/DiagnosticReports/Folio*.ips"))):
+# ReportCrash writes the report a little after the process died; wait up to a minute for it.
+pattern = os.path.expanduser("~/Library/Logs/DiagnosticReports/Folio*.ips")
+for _ in range(60):
+    if glob.glob(pattern):
+        break
+    time.sleep(1)
+if not glob.glob(pattern):
+    print("Kein Absturzbericht gefunden.")
+for path in sorted(glob.glob(pattern)):
     with open(path, errors="replace") as f:
         text = f.read()
     header, _, body = text.partition("\n")
