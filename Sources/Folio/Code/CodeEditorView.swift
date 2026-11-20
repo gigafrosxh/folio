@@ -24,11 +24,29 @@ final class CodeTextView: NSTextView {
         // SwiftUI may ask for a size while the text storage is between beginEditing and endEditing (find and
         // replace all); layout then throws, so answer with the last height until the edit ends (#223).
         if let storage = lm.textStorage, !storage.editedMask.isEmpty { return lastContentHeight ?? 20 }
+        // SwiftUI asks again and again at the same few widths (ViewThatFits in the block header measures several
+        // times per pass). Measuring rewraps the live text container, which invalidates the layout and asks
+        // SwiftUI for yet another pass; on slow Macs that never settled (#223). Same text, same width: same answer.
+        let key = HeightKey(
+            width: Int(width.rounded()), text: lm.textStorage?.string.hashValue ?? 0,
+            length: lm.textStorage?.length ?? 0, font: font?.pointSize ?? 0, ghost: suggestion?.count ?? 0)
+        if let cached = heightCache[key] { return cached }
         let h = measureContentHeight(forWidth: width, lm: lm, tc: tc)
+        if heightCache.count > 16 { heightCache.removeAll() }
+        heightCache[key] = h
         lastContentHeight = h
         return h
     }
 
+    private struct HeightKey: Hashable {
+        var width: Int
+        var text: Int
+        var length: Int
+        var font: CGFloat
+        var ghost: Int
+    }
+
+    private var heightCache: [HeightKey: CGFloat] = [:]
     private var lastContentHeight: CGFloat?
 
     private func measureContentHeight(forWidth width: CGFloat, lm: NSLayoutManager, tc: NSTextContainer) -> CGFloat {

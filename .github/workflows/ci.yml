@@ -59,7 +59,10 @@ jobs:
           # The accessibility audit depends on the runner's macOS version (system controls there have no names);
           # it runs locally before every release.
           FOLIO_REGRESSION_SKIP: A11Y
-        run: python3 scripts/dev-regression.py
+        # Runs the test copy of the bundle (own bundle ID), so the AppleScript part of AUTO (Folio.sdef) is tested too.
+        run: |
+          BIN="$(scripts/make-test-app.sh build/Folio.app "$RUNNER_TEMP/folio-test")"
+          FOLIO_BINARY="$BIN" python3 scripts/dev-regression.py
 
       - name: Crash reports
         if: failure()
