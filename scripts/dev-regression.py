@@ -50,6 +50,14 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
                 if f"{prefix} done" in current or (flag == "A11Y" and "A11Y checked" in current):
                     break
                 time.sleep(0.25)
+            if proc.poll() is None and f"{prefix} done" not in log.read_text(errors="replace"):
+                # Timed out: record where the app hangs (main thread and helpers) before stopping it.
+                print(f"TIMEOUT {flag} after {TIMEOUT:.0f} s, sampling", flush=True)
+                sample = RUN / f"{flag}-sample.txt"
+                subprocess.run(["sample", str(proc.pid), "3", "-file", str(sample)], capture_output=True)
+                if sample.exists():
+                    lines = sample.read_text(errors="replace").splitlines()
+                    print("\n".join(lines[:120]), flush=True)
         finally:
             proc.terminate()
             try:

@@ -21,6 +21,17 @@ final class CodeTextView: NSTextView {
 
     func contentHeight(forWidth width: CGFloat) -> CGFloat {
         guard let lm = layoutManager, let tc = textContainer else { return 20 }
+        // SwiftUI may ask for a size while the text storage is between beginEditing and endEditing (find and
+        // replace all); layout then throws, so answer with the last height until the edit ends (#223).
+        if let storage = lm.textStorage, !storage.editedMask.isEmpty { return lastContentHeight ?? 20 }
+        let h = measureContentHeight(forWidth: width, lm: lm, tc: tc)
+        lastContentHeight = h
+        return h
+    }
+
+    private var lastContentHeight: CGFloat?
+
+    private func measureContentHeight(forWidth width: CGFloat, lm: NSLayoutManager, tc: NSTextContainer) -> CGFloat {
         let w = max(width - textContainerInset.width * 2, 10)
         // SwiftUI also asks for sizes at widths the view never gets; measure at that width, then put the
         // container back to the real width so the visible text never stays wrapped at a probe width.
