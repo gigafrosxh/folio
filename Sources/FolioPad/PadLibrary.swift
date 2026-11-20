@@ -107,40 +107,47 @@
         /// The open note is saved first; nothing in either folder is moved or changed.
         func useLibrary(_ url: URL?) {
             guard saveNow() == .saved else { return }
-            if let url {
-                // Check access, readability and the bookmark first; only then leave the current library (#350).
-                // A picked folder needs security-scoped access (only folders inside the app's own container work without),
-                // must be readable and writable, and gets a bookmark (#338).
-                let access = url.startAccessingSecurityScopedResource()
-                let ownContainer = url.standardizedFileURL.path.hasPrefix(Self.defaultRoot.deletingLastPathComponent().standardizedFileURL.path)
-                let usable = (access || ownContainer) && Self.isUsable(url)
-                let bookmark = usable ? try? url.bookmarkData() : nil
-                guard usable, let bookmark else {
-                    if access { url.stopAccessingSecurityScopedResource() }
-                    message = "Der Ordner „\(url.lastPathComponent)“ lässt sich nicht als Bibliothek verwenden (kein Lese- oder Schreibzugriff). Die bisherige Bibliothek bleibt."
-                    return
-                }
-                if scoped { root.stopAccessingSecurityScopedResource() }
-                scoped = access
-                UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
-                root = url
-            } else {
-                do {
-                    try FileManager.default.createDirectory(at: Self.defaultRoot, withIntermediateDirectories: true)
-                } catch {
-                    message = "Die Bibliothek auf dem Gerät lässt sich nicht anlegen: \(error.localizedDescription) Die bisherige Bibliothek bleibt."
-                    return
-                }
-                if scoped { root.stopAccessingSecurityScopedResource() }
-                scoped = false
-                UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
-                root = Self.defaultRoot
-            }
+            guard url.map(adoptPickedFolder) ?? adoptDefaultLibrary() else { return }
             scanner.clearCache()
             setSelection(nil)
             document = nil
             selectedFolder = nil
             reload()
+        }
+
+        /// Checks access, readability and the bookmark first; only then leaves the current library (#350). A picked folder
+        /// needs security-scoped access (only folders inside the app's own container work without), must be readable and
+        /// writable, and gets a bookmark (#338).
+        private func adoptPickedFolder(_ url: URL) -> Bool {
+            let access = url.startAccessingSecurityScopedResource()
+            let ownContainer = url.standardizedFileURL.path.hasPrefix(Self.defaultRoot.deletingLastPathComponent().standardizedFileURL.path)
+            let usable = (access || ownContainer) && Self.isUsable(url)
+            let bookmark = usable ? try? url.bookmarkData() : nil
+            guard usable, let bookmark else {
+                if access { url.stopAccessingSecurityScopedResource() }
+                message = "Der Ordner „\(url.lastPathComponent)“ lässt sich nicht als Bibliothek verwenden (kein Lese- oder Schreibzugriff). Die bisherige Bibliothek bleibt."
+                return false
+            }
+            if scoped { root.stopAccessingSecurityScopedResource() }
+            scoped = access
+            UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+            root = url
+            return true
+        }
+
+        /// Back to the library on the device; it is created first, and a failure keeps the current one (#339).
+        private func adoptDefaultLibrary() -> Bool {
+            do {
+                try FileManager.default.createDirectory(at: Self.defaultRoot, withIntermediateDirectories: true)
+            } catch {
+                message = "Die Bibliothek auf dem Gerät lässt sich nicht anlegen: \(error.localizedDescription) Die bisherige Bibliothek bleibt."
+                return false
+            }
+            if scoped { root.stopAccessingSecurityScopedResource() }
+            scoped = false
+            UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+            root = Self.defaultRoot
+            return true
         }
 
         /// Picks up changes made elsewhere (the Mac through a shared folder): the list, and the open note when it has no
