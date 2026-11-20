@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.5] – 2026-11-20
+
 ### Geändert (Aufbau)
 - **Gemeinsames Sichern** (#310): Die Schritte beim sicheren Speichern (Reihenfolge, Konfliktkopie, gelöschte Notiz, Vorversion) liegen als `NoteSaveTransaction` im Kern; das iPad nutzt sie, der Mac teilt sich Dateistempel, Versionen und Revisionen.
 - **Gemeinsame Metadaten** (#311): Titel, Vorschau, Tags, Suchtext, Links und Blockarten entstehen auf Mac und iPad mit denselben Regeln (`NoteMetaBuilder`). Dadurch findet die Suche auf dem iPad jetzt auch Bildbeschriftungen und PDF-Titel wie auf dem Mac.
