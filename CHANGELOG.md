@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.0] – 2026-11-20
+
 ### Geändert
 - **Schnellere Bibliothek** (#220): Die Bibliothek wird im Hintergrund gelesen; Neuladen blockiert die Oberfläche nicht mehr.
 - **Schnellerer Code-Editor** (#221, #222): Färbung, Höhenberechnung und Code-Vervollständigung arbeiten bei langen Blöcken nur noch mit dem, was sich geändert hat. Der Editor merkt sich gemessene Höhen, damit sich das Layout nicht aufschaukelt.
