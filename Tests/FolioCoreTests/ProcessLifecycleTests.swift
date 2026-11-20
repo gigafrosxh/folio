@@ -123,16 +123,17 @@ final class ProcessLifecycleTests: XCTestCase {
         let timed = await k.execute("import time\ntime.sleep(20)", timeout: 1)
         XCTAssertTrue(timed.timedOut)
         XCTAssertFalse(timed.cancelled)
-        // Every waiting request returns when the interpreter ends (#293).
+        // Every waiting request returns when the interpreter ends (#293): one runs, two wait behind it.
         async let a = k.execute("import time\ntime.sleep(20)")
+        try await Task.sleep(for: .milliseconds(500))
         async let b = k.execute("print(1)")
         async let c = k.execute("print(2)")
-        try await Task.sleep(for: .milliseconds(500))
+        try await Task.sleep(for: .milliseconds(300))
         kill(k.pid, SIGKILL)
         let begun = Date()
         let results = await [a, b, c]
         XCTAssertLessThan(Date().timeIntervalSince(begun), 5)
-        XCTAssertTrue(results.allSatisfy { !$0.succeeded })
+        XCTAssertTrue(results.allSatisfy { !$0.succeeded }, results.map(\.stderr).joined(separator: " | "))
         // Requests after the end fail right away (#292, #293).
         let after = await k.execute("print(3)")
         XCTAssertFalse(after.succeeded)
