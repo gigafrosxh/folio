@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.1] – 2026-11-20
+
 ### Sicherheit
 - **Papierkorb** (#280, #281): Wiederherstellen und Löschen bleiben strikt in der Bibliothek, auch bei manipulierten Papierkorb-Angaben oder symbolischen Ordner-Links nach draußen; ein ungültiges Ziel wird abgelehnt und der Eintrag bleibt im Papierkorb.
 - **Sicherungen entpacken** (#282): Folio prüft das Inhaltsverzeichnis einer ZIP-Sicherung vorher (keine absoluten Pfade oder `..`, begrenzte Anzahl und Größe, freier Speicher) und entfernt Links, die aus der Sicherung hinauszeigen.
