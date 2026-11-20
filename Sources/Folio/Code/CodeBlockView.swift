@@ -4,6 +4,7 @@ import SwiftUI
 import FolioCore
 
 struct CodeBlockView: View {
+    @State private var headerWidth: CGFloat = 0
     @ObservedObject var block: BlockModel
     @ObservedObject var doc: NoteDocument
     @EnvironmentObject var theme: ThemeManager
@@ -83,20 +84,32 @@ struct CodeBlockView: View {
 
     /// Narrow editors (#240): the header first drops the interpreter and run info, then folds the tools into a
     /// menu, so it never forces the window layout wider than the window.
+    ///
+    /// The level comes from the measured width instead of ViewThatFits: on macOS 26, ViewThatFits around this row
+    /// kept re-measuring the code editor below it and the layout never settled (#223).
     private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            headerRow(.full)
-            headerRow(.compact)
-            headerRow(.minimal)
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 8)
-        .padding(.vertical, 7)
-        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
+        headerRow(HeaderLevel(width: headerWidth))
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .clipped()
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.width
+            } action: { w in
+                if HeaderLevel(width: w) != HeaderLevel(width: headerWidth) || headerWidth == 0 { headerWidth = w }
+            }
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+            .padding(.vertical, 7)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) { Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) }
     }
 
-    enum HeaderLevel { case full, compact, minimal }
+    enum HeaderLevel {
+        case full, compact, minimal
+
+        init(width: CGFloat) {
+            self = width == 0 || width >= 600 ? .full : width >= 400 ? .compact : .minimal
+        }
+    }
 
     private func headerRow(_ level: HeaderLevel) -> some View {
         HStack(spacing: 8) {

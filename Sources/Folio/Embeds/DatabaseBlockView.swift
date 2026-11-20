@@ -156,20 +156,27 @@ struct DatabaseBlockView: View {
 
     /// Full header when there is room; narrower blocks drop the labels and fold the tools into a menu, so the
     /// block never forces the window layout wider than the window (#254, #255).
+    /// Picked from the block width rather than ViewThatFits, which kept re-measuring the editor below it on
+    /// macOS 26 (#223).
     private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            headerRow(compact: false)
-            headerRow(compact: true)
-            HStack(spacing: 8) {
-                connectionIcon
-                Spacer(minLength: 4)
-                toolsMenu
-                runButton(iconOnly: true)
+        Group {
+            if blockWidth >= 560 {
+                headerRow(compact: false)
+            } else if blockWidth >= 300 {
+                headerRow(compact: true)
+            } else {
+                HStack(spacing: 8) {
+                    connectionIcon
+                    Spacer(minLength: 4)
+                    toolsMenu
+                    runButton(iconOnly: true)
+                }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        .clipped()
     }
 
     private func headerRow(compact: Bool) -> some View {
