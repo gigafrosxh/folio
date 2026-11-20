@@ -13,7 +13,11 @@ enum BackgroundRun {
     @MainActor static func start() {
         // Never restore windows or ask about it after an earlier crash of a test run: the prompt would block every
         // background run (#195). Registered defaults are not written to disk.
-        UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
+        // An AppKit exception in a test run is logged (with its reason) instead of ending the run, so the log says what
+        // happened; the run still fails through the check that follows (#223).
+        UserDefaults.standard.register(defaults: [
+            "ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false, "NSApplicationCrashOnExceptions": false
+        ])
         NSApp.setActivationPolicy(.accessory)
         let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, true, 0) { _, _ in
             MainActor.assumeIsolated {

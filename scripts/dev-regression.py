@@ -66,7 +66,11 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
             failed = True
             print(f"FAIL: {log}", flush=True)
         continue
-    if f"{prefix} done" not in text or f"{prefix} FAIL" in text:
+    # AppKit exceptions (logged instead of crashing in background runs) fail the suite and are shown.
+    exceptions = [l for l in text.splitlines() if "Exception" in l and ("***" in l or "NSInternalInconsistency" in l)]
+    for l in exceptions[:5]:
+        print(f"{prefix} EXCEPTION {l}", flush=True)
+    if exceptions or f"{prefix} done" not in text or f"{prefix} FAIL" in text:
         failed = True
         print(f"FAIL: {log}", flush=True)
 raise SystemExit(1 if failed else 0)
