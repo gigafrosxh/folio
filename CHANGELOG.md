@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.4] – 2026-11-20
+
 ### Behoben
 - **Eingefügter Text mit Bildern** (#358): Text aus Notizen, TextEdit oder Pages, der zusammen mit Bildern eingefügt wird, bekommt jetzt ebenfalls die Folio-Schrift und -Textfarbe und behält Größe und Stil; bisher blieb er im Dunkelmodus schwarz.
 
