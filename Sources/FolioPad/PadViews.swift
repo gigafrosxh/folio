@@ -178,7 +178,11 @@
             switch block.kind {
             case .text:
                 PadTextView(text: doc.attributedText(of: block)) {
-                    doc.setText($0, of: block.id)
+                    // Text that cannot be stored keeps the block as it was and says so (#270).
+                    guard doc.setText($0, of: block.id) else {
+                        library.message = "Diese Änderung lässt sich nicht speichern; der Absatz bleibt beim letzten Stand."
+                        return
+                    }
                     library.changed()
                 }
                 .frame(minHeight: 30)

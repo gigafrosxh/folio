@@ -8,11 +8,22 @@ public struct BackupInfo: Identifiable, Hashable, Sendable {
     public var id: URL { url }
 }
 
-/// Result of checking a backup: it unpacks, and every note in it decodes with a valid checksum.
+/// Result of checking a backup: it unpacks, every note in it decodes with a valid checksum, and every note the
+/// manifest lists is there (#324).
 public struct BackupCheck: Sendable, Equatable {
     public var notes: Int
     public var damaged: [String]
-    public var isValid: Bool { damaged.isEmpty }
+    /// Notes the manifest lists that are missing from the archive (or, for older backups, how many are missing).
+    public var missing: [String] = []
+    public var isValid: Bool { damaged.isEmpty && missing.isEmpty }
+
+    /// What is wrong, for the settings: damaged and missing notes, at most three names each.
+    public var problems: String {
+        var parts: [String] = []
+        if !damaged.isEmpty { parts.append("\(damaged.count) Notiz(en) beschädigt: \(damaged.prefix(3).joined(separator: ", "))") }
+        if !missing.isEmpty { parts.append("es fehlen \(missing.prefix(3).joined(separator: ", "))\(missing.count > 3 ? " …" : "")") }
+        return parts.joined(separator: "; ")
+    }
 }
 
 /// Rotating local backups of the note library as zip files ("Folio-Backup-<stamp>.zip").
@@ -59,8 +70,13 @@ public enum LibraryBackup {
             }
             // A small manifest first, so even an empty library gives a valid archive.
             try fm.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let notes = LibraryTrash.noteFiles(in: library).filter { !$0.path.contains("/\(LibraryData.folderName)/") }.count
-            let info: [String: Any] = ["library": library.path, "created": ISO8601DateFormatter().string(from: date), "notes": notes]
+            let base = library.standardizedFileURL.path
+            let files = LibraryTrash.noteFiles(in: library).filter { !$0.path.contains("/\(LibraryData.folderName)/") }
+                .map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }.sorted()
+            // The note list lets the check find notes missing from the archive, not only damaged ones (#324).
+            let info: [String: Any] = [
+                "library": library.path, "created": ISO8601DateFormatter().string(from: date), "notes": files.count, "files": files
+            ]
             try JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]).write(to: manifest)
             try run("/usr/bin/zip", ["-q", "-j", partial.path, manifest.path], cwd: nil)
             try run(
@@ -82,16 +98,33 @@ public enum LibraryBackup {
             try unpack(backup, to: temp)
             let notes = LibraryTrash.noteFiles(in: temp)
             let base = temp.standardizedFileURL.path
-            let damaged = notes.filter { (try? NoteFile.read(from: $0)) == nil }
-                .map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }
-            return BackupCheck(notes: notes.count, damaged: damaged)
+            let paths = notes.map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }
+            let damaged = zip(notes, paths).filter { (try? NoteFile.read(from: $0.0)) == nil }.map(\.1)
+            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: temp.appendingPathComponent(manifestName), found: paths))
         }
 
-        /// Restores a backup into a new folder `name` inside `parent` (never over existing notes).
+        /// What the manifest lists but the archive lacks. Older backups only stored the number of notes; a missing
+        /// or unreadable manifest fails the check, since then nothing says what should be there (#324).
+        static func missing(manifest: URL, found: [String]) -> [String] {
+            guard let data = try? Data(contentsOf: manifest),
+                let info = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return [manifestName] }
+            if let files = info["files"] as? [String] { return files.filter { !Set(found).contains($0) } }
+            if let count = info["notes"] as? Int, count > found.count { return ["\(count - found.count) von \(count) Notizen"] }
+            return []
+        }
+
+        /// Restores a backup into a new folder `name` inside `parent` (never over existing notes). Unpacked into a hidden
+        /// staging folder next to it first and moved into place only when complete, so a failure leaves nothing
+        /// half-restored behind (#325).
         public static func restore(_ backup: URL, into parent: URL, name: String) throws -> URL {
+            let fm = FileManager.default
+            let staging = parent.appendingPathComponent(".folio-restore-\(UUID().uuidString)", isDirectory: true)
+            defer { try? fm.removeItem(at: staging) }
+            try unpack(backup, to: staging)
+            try? fm.removeItem(at: staging.appendingPathComponent(manifestName))
             let target = LibraryTrash.uniqueURL(parent.appendingPathComponent(name, isDirectory: true))
-            try unpack(backup, to: target)
-            try? FileManager.default.removeItem(at: target.appendingPathComponent(manifestName))
+            try fm.moveItem(at: staging, to: target)
             return target
         }
 

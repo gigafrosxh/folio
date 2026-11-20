@@ -10,6 +10,9 @@
         enum SaveOutcome {
             case saved, unchanged
             case savedAsCopy(URL)
+            /// The note was deleted elsewhere after it was opened; the edits went to this new file instead of silently
+            /// bringing the note back (#269).
+            case deletedElsewhere(URL)
         }
 
         let url: URL
@@ -17,15 +20,18 @@
         @Published private(set) var isDirty = false
         /// Counts edits, so a second window can tell that its editor shows an older state (#260).
         @Published private(set) var revision = 0
-        /// Modification date of the file when it was read; a different date at save time means someone else changed it.
-        private var diskDate: Date?
+        /// The file as it was read (or saved last): date, size and checksum. Anything else at save time means someone
+        /// else changed it, even within the same second (#271).
+        private var diskStamp: FileStamp?
+        /// Which edit state is on disk; overlapping autosaves never write an older snapshot (#267, #268).
+        private var saves = SaveRevisions()
 
         nonisolated var id: URL { url }
 
         init(url: URL) throws {
             self.url = url
             file = try NoteFile.read(from: url)
-            diskDate = Self.modificationDate(url)
+            diskStamp = FileStamp.of(url)
         }
 
         /// A note already in memory (read-only use, e.g. the self-test).
@@ -37,7 +43,7 @@
         var blocks: [BlockRecord] { file.body.blocks }
 
         /// The file on disk is not the one this document was read from (or saved last).
-        var changedOnDisk: Bool { Self.modificationDate(url) != diskDate }
+        var changedOnDisk: Bool { FileStamp.of(url) != diskStamp }
 
         func attachment(_ id: UUID?) -> FolioArchive.Attachment? {
             guard let id else { return nil }
@@ -53,11 +59,20 @@
             return s
         }
 
-        func setText(_ text: NSAttributedString, of id: UUID) {
-            guard let i = file.body.blocks.firstIndex(where: { $0.id == id }) else { return }
-            let range = NSRange(location: 0, length: text.length)
-            file.body.blocks[i].rtf = try? text.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+        /// Returns false when the text cannot be stored as RTF; the block then keeps its previous content instead of
+        /// losing it (#270).
+        @discardableResult
+        func setText(_ text: NSAttributedString, of id: UUID) -> Bool {
+            guard let i = file.body.blocks.firstIndex(where: { $0.id == id }) else { return false }
+            guard let rtf = Self.rtf(text) else { return false }
+            file.body.blocks[i].rtf = rtf
             markChanged()
+            return true
+        }
+
+        /// RTF for a text, nil when encoding fails (also used by the self-test to inject a failure).
+        static var rtf: (NSAttributedString) -> Data? = { text in
+            try? text.data(from: NSRange(location: 0, length: text.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         }
 
         func setCode(_ code: String, of id: UUID) {
@@ -105,7 +120,7 @@
             return try write(snapshot, data: data, revision: rev, history: history)
         }
 
-        private func prepared() -> NoteFile {
+        func prepared() -> NoteFile {
             Self.refreshMeta(&file)
             file.meta.modified = Date()
             return file
@@ -113,7 +128,7 @@
 
         /// Check, keep the previous version and replace in one coordinated step, so another app (Files, a sync service)
         /// cannot write in between (#265).
-        private func write(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory) throws -> SaveOutcome {
+        func write(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory) throws -> SaveOutcome {
             var outcome: Result<SaveOutcome, Error> = .failure(CocoaError(.fileWriteUnknown))
             var coordinationError: NSError?
             NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
@@ -125,20 +140,30 @@
 
         private func writeCoordinated(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory, at target: URL) throws -> SaveOutcome {
             let fm = FileManager.default
-            if fm.fileExists(atPath: target.path), Self.modificationDate(target) != diskDate {
+            // A newer snapshot was written meanwhile (saves finishing in reverse order): this one is outdated (#267).
+            guard saves.mayWrite(rev) else { return .unchanged }
+            // Deleted elsewhere since it was opened: never recreate it silently; the edits go to a new file (#269).
+            if !fm.fileExists(atPath: target.path), diskStamp != nil {
+                let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
+                try NoteIdentity.renewed(snapshot).encoded().write(to: copy, options: .atomic)
+                if saves.didWrite(rev, current: revision) { isDirty = false }
+                return .deletedElsewhere(copy)
+            }
+            if fm.fileExists(atPath: target.path), FileStamp.of(target) != diskStamp {
                 // Changed elsewhere since it was opened: keep both.
                 let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
                 // New ids for note, blocks and attachments: both files may be open on the Mac at once (#260).
                 try NoteIdentity.renewed(snapshot).encoded().write(to: copy, options: .atomic)
-                isDirty = false
+                // Edits made after the snapshot are not in the copy and stay unsaved (#268).
+                if saves.didWrite(rev, current: revision) { isDirty = false }
                 return .savedAsCopy(copy)
             }
             // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
             if fm.fileExists(atPath: target.path) { try history.record(try Data(contentsOf: target), noteID: snapshot.meta.id, force: true) }
             try data.write(to: target, options: .atomic)
-            diskDate = Self.modificationDate(target)
+            diskStamp = FileStamp.of(target)
             // Edits made while compressing stay unsaved and are written by the next save.
-            if revision == rev { isDirty = false }
+            if saves.didWrite(rev, current: revision) { isDirty = false }
             return .saved
         }
 

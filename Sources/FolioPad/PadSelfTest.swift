@@ -44,13 +44,18 @@
             guard let url = newNote() else { return finish() }
             editAndSave(url)
             await autosave(url)
+            savesInReverseOrder(url)
             await macChangeArrives(url)
             switchLibrary()
             displayScale()
             otherBlocksStay(except: url)
+            editDuringConflictCopy(url)
             conflict(url)
             conflictWhileSwitching(url)
             failedSave(url)
+            unstorableText(url)
+            sameSecondChange(url)
+            deletedElsewhere()
             trash(url)
             finish()
         }
@@ -98,6 +103,82 @@
             library.changed()
             try? await Task.sleep(for: .seconds(3))
             check(!doc.isDirty && (try? NoteFile.read(from: url))?.body.blocks.last?.code == "print(2)", "Automatisch gesichert (im Hintergrund komprimiert)")
+        }
+
+        /// Two saves finishing in reverse order: the older snapshot never replaces the newer one on disk (#267).
+        private func savesInReverseOrder(_ url: URL) {
+            guard let doc = library.document, doc.url == url else { return check(false, "Reihenfolge: Dokument offen") }
+            let history = NoteHistory(library: library.root)
+            doc.setCode("print('alt')", of: doc.blocks[1].id)
+            let older = doc.prepared(), olderRev = doc.revision
+            doc.setCode("print('neu')", of: doc.blocks[1].id)
+            let newer = doc.prepared(), newerRev = doc.revision
+            let first = try? doc.write(newer, data: newer.encoded(), revision: newerRev, history: history)
+            let second = try? doc.write(older, data: older.encoded(), revision: olderRev, history: history)
+            let onDisk = (try? NoteFile.read(from: url))?.body.blocks.last?.code
+            check(first.map { "\($0)" } == "saved" && second.map { "\($0)" } == "unchanged", "Älteres Sichern nach neuerem wird verworfen")
+            check(onDisk == "print('neu')" && !doc.isDirty, "Neueste Fassung bleibt auf der Platte (#267)")
+        }
+
+        /// Editing while a conflict copy is written: the newer edit stays unsaved instead of being dropped (#268).
+        private func editDuringConflictCopy(_ url: URL) {
+            guard let doc = library.document, doc.url == url else { return check(false, "Konfliktkopie: Dokument offen") }
+            changeOnDisk(url, to: "Extern geändert (Revision)")
+            doc.setCode("print('im Snapshot')", of: doc.blocks[1].id)
+            let snapshot = doc.prepared(), rev = doc.revision
+            doc.setCode("print('danach')", of: doc.blocks[1].id)
+            let outcome = try? doc.write(snapshot, data: snapshot.encoded(), revision: rev, history: NoteHistory(library: library.root))
+            guard case .savedAsCopy(let copy) = outcome else { return check(false, "Konfliktkopie angelegt") }
+            check((try? NoteFile.read(from: copy))?.body.blocks.last?.code == "print('im Snapshot')", "Konfliktkopie enthält den Snapshot")
+            check(doc.isDirty, "Neuere Eingabe bleibt ungesichert statt verloren (#268)")
+            try? FileManager.default.removeItem(at: copy)
+            library.reload()
+        }
+
+        /// Text that cannot be encoded as RTF keeps the block's previous content (#270).
+        private func unstorableText(_ url: URL) {
+            library.selectedNote = url
+            guard let doc = library.document else { return check(false, "RTF-Fehler: Dokument offen") }
+            let before = doc.blocks[0].rtf
+            let encode = PadDocument.rtf
+            PadDocument.rtf = { _ in nil }
+            let accepted = doc.setText(NSAttributedString(string: "geht verloren"), of: doc.blocks[0].id)
+            PadDocument.rtf = encode
+            check(!accepted && doc.blocks[0].rtf == before, "RTF-Fehler: bisheriger Text bleibt erhalten (#270)")
+        }
+
+        /// A change elsewhere with the same modification date is still noticed (size and checksum differ) (#271).
+        private func sameSecondChange(_ url: URL) {
+            library.selectedNote = url
+            library.saveNow()
+            guard let doc = library.document, !doc.changedOnDisk,
+                let date = PadDocument.modificationDate(url), var foreign = try? NoteFile.read(from: url)
+            else { return check(false, "Gleiche Sekunde: Ausgangslage") }
+            foreign.body.blocks[0] = PadDocument.textRecord("Gleichzeitig geändert, gleiche Sekunde")
+            try? foreign.write(to: url)
+            try? FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+            check(doc.changedOnDisk, "Fremde Änderung mit gleichem Datum wird erkannt (#271)")
+            library.reload()
+            library.selectedNote = nil
+            library.selectedNote = url
+        }
+
+        /// A note deleted elsewhere is not silently recreated when it is saved here (#269).
+        private func deletedElsewhere() {
+            library.createNote(text: "Wird anderswo gelöscht")
+            guard let url = library.selectedNote, let doc = library.document else { return check(false, "Gelöscht: Notiz offen") }
+            try? FileManager.default.removeItem(at: url)
+            doc.setText(NSAttributedString(string: "Auf dem iPad weitergeschrieben"), of: doc.blocks[0].id)
+            let result = library.saveNow()
+            check(!FileManager.default.fileExists(atPath: url.path), "Gelöscht: Notiz nicht still neu angelegt (#269)")
+            if case .copied(let copy) = result {
+                check(FileManager.default.fileExists(atPath: copy.path) && library.message?.contains("gelöscht") == true, "Gelöscht: Änderungen in neuer Datei, Hinweis gezeigt")
+                try? FileManager.default.removeItem(at: copy)
+            } else {
+                check(false, "Gelöscht: Änderungen in neuer Datei")
+            }
+            library.message = nil
+            library.reload()
         }
 
         /// A change made on the Mac (shared folder) shows up in the open note when it has no edits here (#213).

@@ -224,6 +224,16 @@
 
         @discardableResult
         private func handle(_ outcome: PadDocument.SaveOutcome, of doc: PadDocument, selectCopy: Bool) -> SaveResult {
+            if case .deletedElsewhere(let copy) = outcome {
+                message =
+                    "Die Notiz wurde anderswo gelöscht. Deine Änderungen liegen jetzt in „\(copy.deletingPathExtension().lastPathComponent)“; lösche die Notiz, wenn du sie nicht mehr brauchst."
+                reload()
+                if selectCopy {
+                    setSelection(copy)
+                    open(copy)
+                }
+                return .copied(copy)
+            }
             if case .savedAsCopy(let copy) = outcome {
                 message = "Die Notiz wurde inzwischen anderswo geändert. Deine Fassung liegt als „\(copy.deletingPathExtension().lastPathComponent)“ daneben."
                 reload()

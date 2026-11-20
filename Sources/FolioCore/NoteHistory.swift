@@ -59,22 +59,43 @@ public struct NoteHistory: Sendable {
         }
         let dir = folder(for: noteID)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent(Stamp.string(date)).appendingPathExtension(FolioArchive.fileExtension)
-        try data.write(to: url, options: .atomic)
+        let url = try Self.writeNew(data, in: dir, stamp: Stamp.string(date))
         prune(noteID: noteID, now: date)
         return NoteVersion(url: url, date: date, size: Int64(data.count))
     }
 
-    /// Two encoded notes have the same content when body and attachments match (the metadata always
-    /// differs because of the modification date).
+    /// Writes a version under a name no other version has, even for the same millisecond: "<stamp>", then
+    /// "<stamp>-2" … Created exclusively, so two saves at once never replace each other (#279).
+    static func writeNew(_ data: Data, in dir: URL, stamp: String) throws -> URL {
+        for n in 1...1000 {
+            let name = n == 1 ? stamp : "\(stamp)-\(n)"
+            let url = dir.appendingPathComponent(name).appendingPathExtension(FolioArchive.fileExtension)
+            // O_EXCL: the name is claimed only if nothing was there, also against a second save at the same moment.
+            let fd = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+            if fd < 0 {
+                if errno == EEXIST { continue }
+                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
+            }
+            close(fd)
+            try data.write(to: url, options: .atomic)
+            return url
+        }
+        throw CocoaError(.fileWriteFileExists)
+    }
+
+    /// Two encoded notes have the same content when body, attachments (data and name, type) and the metadata that
+    /// is not just a timestamp match (#274).
     static func sameContent(_ a: Data, _ b: Data) -> Bool {
         guard let x = try? FolioArchive.decode(a), let y = try? FolioArchive.decode(b),
-            x.attachments.map(\.data) == y.attachments.map(\.data)
+            x.attachments.map(\.data) == y.attachments.map(\.data),
+            x.attachments.map(\.header) == y.attachments.map(\.header)
         else { return false }
-        // Properties (status, dates …) live in the metadata; a change to them is a new version (#209).
-        let px = (try? JSONDecoder().decode(NoteMetadata.self, from: x.meta))?.properties
-        let py = (try? JSONDecoder().decode(NoteMetadata.self, from: y.meta))?.properties
-        guard px == py else { return false }
+        // Properties, environment, pinning … live in the metadata; a change to them is a new version (#209, #274).
+        // Title, preview, tags, links and search text follow from the body; dates are only timestamps.
+        guard let mx = try? JSONDecoder().decode(NoteMetadata.self, from: x.meta),
+            let my = try? JSONDecoder().decode(NoteMetadata.self, from: y.meta),
+            mx.properties == my.properties, mx.environment == my.environment, mx.pinned == my.pinned, mx.unreadable == my.unreadable
+        else { return false }
         // JSONEncoder does not promise a key order, so equal bodies can differ byte for byte (#98).
         return x.body == y.body || canonical(x.body) == canonical(y.body)
     }

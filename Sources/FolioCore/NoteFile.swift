@@ -22,6 +22,13 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
     public var wikiLinks: [String]?
     /// Structured properties such as Status or Fällig (#121); nil = none.
     public var properties: [NoteProperty]?
+    /// Optional fields that were present but unreadable (damaged, or written by a newer Folio): kept exactly as they
+    /// were and written back on save instead of being dropped, and named by the diagnosis (#278).
+    public var unreadable: [String: JSONValue] = [:]
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, preview, tags, created, modified, pinned, searchText, links, kinds, environment, wikiLinks, properties
+    }
 
     public init(
         id: UUID = UUID(), title: String = "", preview: String = "", tags: [String] = [],
@@ -49,9 +56,44 @@ public struct NoteMetadata: Codable, Hashable, Sendable {
         searchText = try c.decodeIfPresent(String.self, forKey: .searchText) ?? ""
         links = try c.decodeIfPresent([UUID].self, forKey: .links) ?? []
         kinds = try c.decodeIfPresent([String].self, forKey: .kinds)
-        environment = try? c.decodeIfPresent(RunEnvironment.self, forKey: .environment)
-        wikiLinks = try? c.decodeIfPresent([String].self, forKey: .wikiLinks)
-        properties = try? c.decodeIfPresent([NoteProperty].self, forKey: .properties)
+        // A missing field is normal (older notes); an unreadable one is kept and reported (#278).
+        var unreadable: [String: JSONValue] = [:]
+        func lenient<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? {
+            do { return try c.decodeIfPresent(type, forKey: key) } catch {
+                unreadable[key.stringValue] = (try? c.decode(JSONValue.self, forKey: key)) ?? .null
+                return nil
+            }
+        }
+        environment = lenient(RunEnvironment.self, .environment)
+        wikiLinks = lenient([String].self, .wikiLinks)
+        properties = lenient([NoteProperty].self, .properties)
+        self.unreadable = unreadable
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(preview, forKey: .preview)
+        try c.encode(tags, forKey: .tags)
+        try c.encode(created, forKey: .created)
+        try c.encode(modified, forKey: .modified)
+        try c.encode(pinned, forKey: .pinned)
+        try c.encode(searchText, forKey: .searchText)
+        try c.encode(links, forKey: .links)
+        try c.encodeIfPresent(kinds, forKey: .kinds)
+        try encode(environment, .environment, into: &c)
+        try encode(wikiLinks, .wikiLinks, into: &c)
+        try encode(properties, .properties, into: &c)
+    }
+
+    /// A value set in Folio wins; otherwise an unreadable original goes back as it was (#278).
+    private func encode<T: Encodable>(_ value: T?, _ key: CodingKeys, into c: inout KeyedEncodingContainer<CodingKeys>) throws {
+        if let value {
+            try c.encode(value, forKey: key)
+        } else if let original = unreadable[key.stringValue] {
+            try c.encode(original, forKey: key)
+        }
     }
 }
 

@@ -85,7 +85,7 @@ final class BackupManager: ObservableObject {
                 status = "Gesichert und geprüft: \(check.notes) Notiz\(check.notes == 1 ? "" : "en"), \(ByteCountFormatter.string(fromByteCount: info.size, countStyle: .file))."
             } else {
                 status = nil
-                lastError = "Gesichert, aber \(check.damaged.count) Notiz(en) sind schon in der Bibliothek beschädigt: \(check.damaged.prefix(3).joined(separator: ", "))."
+                lastError = "Gesichert, aber die Prüfung schlägt fehl: \(check.problems)."
             }
         case .failure(let error):
             status = nil
@@ -107,7 +107,7 @@ final class BackupManager: ObservableObject {
                     BackupManager.shared.status = "Sicherung in Ordnung: \(check.notes) Notizen lassen sich vollständig lesen."
                 case .success(let check):
                     BackupManager.shared.status = nil
-                    BackupManager.shared.lastError = "In der Sicherung sind \(check.damaged.count) Notiz(en) beschädigt: \(check.damaged.prefix(3).joined(separator: ", "))."
+                    BackupManager.shared.lastError = "Die Sicherung ist nicht vollständig in Ordnung: \(check.problems)."
                 case .failure(let error):
                     BackupManager.shared.status = nil
                     BackupManager.shared.lastError = error.localizedDescription

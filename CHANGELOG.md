@@ -7,6 +7,18 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben (Datensicherheit)
+- **iPad: überlappendes Sichern** (#267): Endet ein älterer Sicherungsvorgang nach einem neueren, wird er verworfen; auf der Platte bleibt immer die neueste Fassung.
+- **iPad: Konfliktkopie** (#268): Eingaben, die während des Anlegens einer Konfliktkopie dazukommen, bleiben ungesichert offen und gehen nicht mehr verloren.
+- **iPad: anderswo gelöschte Notiz** (#269): Wird eine geöffnete Notiz anderswo gelöscht, legt Folio sie beim Sichern nicht still wieder an, sondern sichert die Änderungen in eine neue Datei und sagt Bescheid.
+- **iPad: Text, der sich nicht speichern lässt** (#270): Der Absatz behält seinen bisherigen Inhalt, statt leer zu werden, und Folio meldet es.
+- **iPad: fremde Änderungen** (#271): Änderungen anderer Apps werden auch erkannt, wenn das Änderungsdatum gleich bleibt (Größe und Prüfsumme der Datei).
+- **Notizdateien** (#272, #273, #276, #277): Folio sichert nur noch, was es auch wieder öffnen kann (sonst bleibt die alte Datei), erkennt manipulierte Längenangaben, unbekannte Formatkennungen und überzählige oder fehlende Bytes vor der Prüfsumme als Formatfehler.
+- **Schnelle Notizliste** (#275): Beim Einlesen der Liste wird nur der Kopf einer Notiz geprüft; das ist jetzt ausdrücklich so gekennzeichnet, die vollständige Prüfung erfolgt beim Öffnen.
+- **Unlesbare Zusatzangaben** (#278): Beschädigte oder neuere optionale Angaben einer Notiz (z. B. Ausführungsumgebung) gehen beim Sichern nicht mehr verloren, sondern bleiben unverändert erhalten; die Diagnose nennt sie.
+- **Versionen** (#274, #279): Eine geänderte Ausführungsumgebung, Anheftung oder ein umbenannter Anhang ergibt eine neue Version; zwei Versionen im selben Millisekunden-Zeitpunkt überschreiben sich nicht mehr.
+- **Sicherungen** (#324, #325): Die Prüfung vergleicht mit der Notizliste im Manifest und meldet fehlende Notizen; das Wiederherstellen entpackt zuerst in einen versteckten Ordner und lässt bei einem Fehler nichts Halbfertiges zurück.
+
 ## [1.10.7] – 2026-11-20
 
 ### Behoben

@@ -120,6 +120,10 @@ private struct DiagnosisReader {
             add(.error, "Die Datei stammt von einer neueren Folio-Version (Format \(version)). Aktualisiere Folio.")
             return false
         }
+        guard flags & ~FolioArchive.knownFlags == 0 else {
+            add(.error, "Die Datei nutzt Funktionen, die diese Folio-Version nicht kennt (Kennung \(flags)). Aktualisiere Folio.")
+            return false
+        }
         compressed = flags & 1 == 1
         return true
     }
@@ -138,6 +142,10 @@ private struct DiagnosisReader {
             let raw = try r.readSection(compressed: compressed)
             if let meta = try? JSONDecoder().decode(NoteMetadata.self, from: raw) {
                 report.meta = meta
+                if !meta.unreadable.isEmpty {
+                    let names = meta.unreadable.keys.sorted().joined(separator: ", ")
+                    add(.warning, "Einige Zusatzangaben sind unlesbar (\(names)); Folio behält sie unverändert bei.")
+                }
             } else {
                 add(.warning, "Titel, Tags und Datum sind unlesbar; die Notiz bekommt neue Angaben.")
             }
@@ -239,6 +247,25 @@ public struct FileFingerprint: Equatable, Sendable {
         let tail = (try? handle.read(upToCount: 4)) ?? Data()
         var r = ByteReader(tail)
         return FileFingerprint(size: Int64(end), checksum: (try? r.read()) ?? 0)
+    }
+}
+
+/// What a note file looked like when it was read or written: modification date plus size and the archive's own
+/// CRC-32. A change by someone else shows even when the date stayed the same (#271); reading it costs 4 bytes.
+public struct FileStamp: Equatable, Sendable {
+    public var date: Date?
+    public var fingerprint: FileFingerprint?
+
+    public init(date: Date?, fingerprint: FileFingerprint?) {
+        self.date = date
+        self.fingerprint = fingerprint
+    }
+
+    /// The file's current stamp; nil when it does not exist.
+    public static func of(_ url: URL) -> FileStamp? {
+        guard let fingerprint = FileFingerprint.of(url) else { return nil }
+        let date = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        return FileStamp(date: date, fingerprint: fingerprint)
     }
 }
 
