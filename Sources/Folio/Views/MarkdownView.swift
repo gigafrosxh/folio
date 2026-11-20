@@ -74,7 +74,7 @@ struct MarkdownView: View {
     }
 
     /// A line that is a block of its own, or nil for paragraph text.
-    private static func block(for line: String, indent: Int) -> Block? {
+    private nonisolated static func block(for line: String, indent: Int) -> Block? {
         if let m = line.range(of: #"^#{1,6} "#, options: .regularExpression) { return .heading(line[m].count - 1, String(line[m.upperBound...])) }
         if line == "---" || line == "***" { return .rule }
         if let m = line.range(of: #"^[-*+] "#, options: .regularExpression) { return .bullet(indent, String(line[m.upperBound...])) }

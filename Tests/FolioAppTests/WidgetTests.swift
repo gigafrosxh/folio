@@ -20,7 +20,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// Every click target in a widget is a link Folio understands (#78–#82).
-    func testWidgetLinksOpenFolio() {
+    @MainActor func testWidgetLinksOpenFolio() {
         let n = note("A")
         guard case .success(.openNote(let id, _)) = FolioURL.parse(n.link) else { return XCTFail("note link") }
         XCTAssertEqual(id, n.id)

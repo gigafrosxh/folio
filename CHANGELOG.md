@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben (Qualität)
+- **Code-Block in Datei schreiben** (#326): Scheitert das Schreiben oder Exportieren, zeigt Folio den Fehler, statt ihn zu verschlucken.
+- **Versionen vor Änderungen** (#327, #328, #329): Beim Umbenennen oder Entfernen eines Tags wird eine Notiz nur geändert, wenn ihre Vorversion gesichert ist (sonst wird sie als fehlgeschlagen gemeldet); wo die Version nur eine Zugabe ist (Konfliktkopie, Papierkorb), ist das jetzt ausdrücklich so gekennzeichnet.
+- **Compiler-Warnungen** (#330–#335, #318): Der Build ist ohne Warnungen – auch die übrigen Hauptthread-Hinweise beim Formel-/Diagramm-Rendern, im Markdown-Viewer und in den Tests sind behoben, die veraltete Apple-Intelligence-Option ist ersetzt, und der Sicherheits-Selbsttest prüft, dass die Ausgangsversion wirklich gesichert wurde.
+
+### Geändert
+- **Release-Skript**: Die Komplexitätsprüfung nutzt das schon gebaute Prüfwerkzeug und prüft damit den exportierten Stand, das spart mehrere Minuten pro Release.
+
 ## [1.11.7] – 2026-11-20
 
 ### Geändert (CI und Releases)

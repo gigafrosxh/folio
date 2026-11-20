@@ -22,7 +22,7 @@ enum WebResources {
         return FileManager.default.fileExists(atPath: repo.path) ? repo : nil
     }()
 
-    static func configuration(handler: WKScriptMessageHandler) -> WKWebViewConfiguration {
+    @MainActor static func configuration(handler: WKScriptMessageHandler) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler.shared, forURLScheme: scheme)
         config.userContentController.add(WeakMessageHandler(handler), name: "folio")
@@ -227,19 +227,17 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
         return result
     }
 
-    nonisolated func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+    /// WebKit delivers script messages on the main thread; the handler is main-actor isolated like the class (#318).
+    func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
         let body = message.body as? [String: Any] ?? [:]
-        let result = RenderScript.Result(message: body as Any)
-        MainActor.assumeIsolated {
-            guard let result else { return }
-            if result.ready {
-                isReady = true
-                readyContinuation?.resume()
-                readyContinuation = nil
-            } else {
-                continuation?.resume(returning: result)
-                continuation = nil
-            }
+        guard let result = RenderScript.Result(message: body as Any) else { return }
+        if result.ready {
+            isReady = true
+            readyContinuation?.resume()
+            readyContinuation = nil
+        } else {
+            continuation?.resume(returning: result)
+            continuation = nil
         }
     }
 

@@ -48,7 +48,7 @@ enum TextPredictor {
         #if canImport(FoundationModels)
             if #available(macOS 26.0, *), case .available = status {
                 let session = SessionPool.take(.text, instructions: instructions)
-                let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 20)
+                let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 20)
                 guard let response = try? await session.respond(to: trimmed, options: options),
                     let text = clean(response.content, context: context)
                 else { return nil }
@@ -89,7 +89,7 @@ enum TextPredictor {
                 let prompt = "Language: \(name)\n" + String(before.suffix(900)) + "<CURSOR>" + String(after.prefix(200))
                 if let hit = cache[prompt] { return hit }
                 let session = SessionPool.take(.code, instructions: codeInstructions(for: name))
-                let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 60)
+                let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 60)
                 guard let response = try? await session.respond(to: prompt, options: options),
                     let code = cleanCode(response.content, linePrefix: linePrefix, after: after)
                 else { return nil }

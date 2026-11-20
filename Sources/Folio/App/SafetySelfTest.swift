@@ -38,7 +38,9 @@ enum SafetySelfTest {
         doc.markDirty()
         doc.saveNow()
         await wait(0.5)
-        _ = try? store.history.record(Data(contentsOf: doc.url), noteID: doc.id, force: true)
+        // The opened state must become a version; the checks below rely on it (#332).
+        let recorded = (try? store.history.record(Data(contentsOf: doc.url), noteID: doc.id, force: true)) != nil
+        check(recorded, "Ausgangsstand als Version gesichert")
         doc.blocks[0].storage.setAttributedString(NSAttributedString(string: "Sicherheitstest\nZweiter Stand", attributes: body))
         doc.markDirty()
         doc.saveNow()

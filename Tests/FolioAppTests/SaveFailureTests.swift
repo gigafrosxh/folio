@@ -117,7 +117,7 @@ final class SaveFailureTests: XCTestCase {
         let (id, url) = (doc.id, doc.url)
         type(doc, " UNGESICHERT_144")
         let root = store.rootURL
-        try await locked {
+        await locked {
             XCTAssertEqual(store.unsavedAfterSaving().map(\.id), [id], "the quit question sees the note (#189)")
 
             XCTAssertFalse(store.setLibrary(root.appendingPathComponent("../andere-\(UUID().uuidString.prefix(4))").standardizedFileURL))

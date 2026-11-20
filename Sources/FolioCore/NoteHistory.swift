@@ -80,6 +80,13 @@ public struct NoteHistory: Sendable {
         return NoteVersion(url: target, date: date, size: size)
     }
 
+    /// Keeps a version where it is a convenience, not the safety net (the safe copy is written elsewhere): a failure
+    /// is accepted on purpose and only reported as false (#327, #329).
+    @discardableResult
+    public func recordBestEffort(_ data: Data, noteID: UUID) -> Bool {
+        (try? record(data, noteID: noteID, force: true)) != nil
+    }
+
     /// Writes a version under a name no other version has, even for the same millisecond: "<stamp>", then
     /// "<stamp>-2" … Created exclusively, so two saves at once never replace each other (#279).
     static func writeNew(_ data: Data, in dir: URL, stamp: String) throws -> URL {

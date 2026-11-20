@@ -70,6 +70,7 @@ final class StoreOperationTests: XCTestCase {
 }
 
 /// Release notes in the update window (#151).
+@MainActor
 final class MarkdownViewBlockTests: XCTestCase {
     func testBlocks() {
         let blocks = MarkdownView.blocks(of: "# Titel\nText eins\nzwei\n\n- a\n  - b\n2) c\n> Zitat\n---\n```\nx  y\n```\n```\noffen")

@@ -1,6 +1,7 @@
 import XCTest
 @testable import Folio
 
+@MainActor
 final class WordLabelTests: XCTestCase {
     func testSingularAndPlural() {
         XCTAssertEqual(NoteStatusPill.wordLabel(0), "0 Wörter")

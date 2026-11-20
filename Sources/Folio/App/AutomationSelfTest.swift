@@ -20,7 +20,7 @@ enum AutomationSelfTest {
         check((try? NoteAutomation.find("automatisch angelegt"))?.id == made?.id, "Finden über den Titel")
         check((try? NoteAutomation.find("gibt es nicht xyz")) == nil, "Unbekannte Notiz wird gemeldet")
         if let made {
-            try? NoteAutomation.append("Angehängt per Automation", to: made)
+            check((try? NoteAutomation.append("Angehängt per Automation", to: made)) != nil, "Anhängen ohne Fehler")
             try? await Task.sleep(for: .seconds(0.5))
             let text = store.document(for: made.id).map { $0.blocks.map(\.plainText).joined() } ?? ((try? NoteFile.read(from: made.url))?.meta.searchText ?? "")
             check(text.contains("Angehängt per Automation") && text.contains("Zebra"), "Anhängen behält den Inhalt")
@@ -40,7 +40,7 @@ enum AutomationSelfTest {
     }
 
     private static func intentChecks() async {
-        var create = CreateNoteIntent()
+        let create = CreateNoteIntent()
         create.noteTitle = "Aus Kurzbefehl"
         create.text = "Giraffe"
         _ = try? await create.perform()

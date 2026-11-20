@@ -78,8 +78,10 @@ public final class LibraryScanner: @unchecked Sendable {
     private func readMetadata(_ paths: [URL]) -> ([NoteMetadata?], Int) {
         var metas = [NoteMetadata?](repeating: nil, count: paths.count)
         var hits = [Bool](repeating: false, count: paths.count)
-        metas.withUnsafeMutableBufferPointer { out in
-            hits.withUnsafeMutableBufferPointer { hitOut in
+        metas.withUnsafeMutableBufferPointer { metaBuffer in
+            hits.withUnsafeMutableBufferPointer { hitBuffer in
+                // Each iteration writes only its own index, so the buffers are never shared between threads.
+                nonisolated(unsafe) let out = metaBuffer, hitOut = hitBuffer
                 DispatchQueue.concurrentPerform(iterations: paths.count) { i in
                     (out[i], hitOut[i]) = metadata(of: paths[i])
                 }

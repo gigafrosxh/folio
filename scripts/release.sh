@@ -50,8 +50,9 @@ check_commit() {
     (cd "$WORK/src" && FOLIO_LIBRARY="$WORK/testlib" swift test) >"$CHECK_LOG" 2>&1 \
         || fail_checks "Unit-Tests sind rot, kein Release."
     echo "Prüfe $(git rev-parse --short "$rev"): Komplexität …"
-    (cd "$WORK/src" && swift run -c release --package-path Tools/ComplexityCheck complexity-check \
-        --baseline Tools/ComplexityCheck/baseline.json Sources) >>"$CHECK_LOG" 2>&1 \
+    # The checker tool is built once in the repository; it reads the exported sources and baseline.
+    swift run -c release --package-path "$ROOT/Tools/ComplexityCheck" complexity-check \
+        --baseline "$WORK/src/Tools/ComplexityCheck/baseline.json" "$WORK/src/Sources" >>"$CHECK_LOG" 2>&1 \
         || fail_checks "Die Komplexitätsprüfung schlägt fehl, kein Release."
 }
 

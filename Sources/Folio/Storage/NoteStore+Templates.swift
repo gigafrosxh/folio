@@ -172,7 +172,8 @@ extension NoteStore {
         guard notes.contains(where: { $0.id == id }), savedBeforeDeleting(id), let ref = notes.first(where: { $0.id == id }) else { return }
         let wasSelected = selectedNoteID == id
         let tabsBefore = tabs
-        if let data = try? Data(contentsOf: ref.url) { _ = try? history.record(data, noteID: id, force: true) }
+        // Best effort: the trash keeps the file itself, the version is extra (#329).
+        if let data = try? Data(contentsOf: ref.url) { history.recordBestEffort(data, noteID: id) }
         do {
             try trash.moveToTrash(ref.url, title: ref.meta.title.isEmpty ? nil : ref.meta.title)
         } catch {

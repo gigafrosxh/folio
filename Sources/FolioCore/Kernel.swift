@@ -112,7 +112,7 @@ public enum KernelLanguages {
                 id: String, onOutput: (@Sendable (String) -> Void)?, outDone: Bool, errDone: Bool,
                 stdout: OutputLimiter, stderr: OutputLimiter, status: String, finish: (() -> Void)?
             )? = nil
-        private var queue: [() -> Void] = []
+        private var queue: [@Sendable () -> Void] = []
         private var busy = false
         /// Set once when the interpreter has ended; later requests fail at once (#293).
         private var ended = false
@@ -271,7 +271,7 @@ public enum KernelLanguages {
         ) async -> Reply {
             let job = Job(message: message, timeout: timeout, keepRunning: keepRunning, limits: limits, memoryHit: memoryHit, onOutput: onOutput)
             return await withCheckedContinuation { cont in
-                let start: () -> Void = { [weak self] in
+                let start: @Sendable () -> Void = { [weak self] in
                     guard let self, self.process.isRunning else {
                         self?.release()
                         cont.resume(returning: ("", "Die Sitzung läuft nicht mehr.", "error", false, false))
@@ -285,7 +285,7 @@ public enum KernelLanguages {
         }
 
         /// One request at a time; the others wait their turn. False when the session has ended.
-        private func enqueue(_ start: @escaping () -> Void) -> Bool {
+        private func enqueue(_ start: @escaping @Sendable () -> Void) -> Bool {
             lock.lock()
             if ended {
                 lock.unlock()

@@ -33,6 +33,17 @@ enum CodeFileLink {
         return write(block, to: url, in: doc)
     }
 
+    static let failurePrefix = "Sichern fehlgeschlagen"
+
+    /// Shows a failed write as an alert; success and cancel stay quiet (#326).
+    static func reportFailure(_ message: String?) {
+        guard let message, message.hasPrefix(failurePrefix) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Datei nicht geschrieben"
+        alert.informativeText = message
+        alert.runModal()
+    }
+
     /// Writes the block to `url` (atomically) and links it. Returns a status message.
     @discardableResult
     static func write(_ block: BlockModel, to url: URL, in doc: NoteDocument) -> String {

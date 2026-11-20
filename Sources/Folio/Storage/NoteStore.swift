@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import FolioCore
 /// The note library: a folder tree on disk where every note is one `.folio` file.
+/// Its state is changed only by `NoteStore` and its extensions (the `NoteStore+…` files); the views read it (#335).
 /// Folders are real directories, so the library can be browsed, synced and backed up like any files.
 @MainActor
 final class NoteStore: ObservableObject {
@@ -10,11 +11,11 @@ final class NoteStore: ObservableObject {
     var quarantineFolder: URL { LibraryData.folder(rootURL, "damaged") }
     static let shared = NoteStore()
 
-    @Published internal(set) var rootURL: URL
-    @Published internal(set) var folders: [FolderNode] = [] {
+    @Published var rootURL: URL
+    @Published var folders: [FolderNode] = [] {
         didSet { libraryVersion += 1 }
     }
-    @Published internal(set) var notes: [NoteRef] = [] {
+    @Published var notes: [NoteRef] = [] {
         didSet {
             notesVersion += 1
             libraryVersion += 1
@@ -29,9 +30,9 @@ final class NoteStore: ObservableObject {
         didSet { if oldValue != selectedNoteID { openSelected(replacing: oldValue) } }
     }
     /// Open notes, shared by tabs, the split view and note windows (one document per note).
-    @Published internal(set) var documents: [UUID: NoteDocument] = [:]
+    @Published var documents: [UUID: NoteDocument] = [:]
     /// Tabs of the main window (note ids, left to right).
-    @Published internal(set) var tabs: [UUID] = []
+    @Published var tabs: [UUID] = []
     /// Note shown on the right of the split view.
     @Published var splitNoteID: UUID? {
         didSet {
@@ -40,11 +41,11 @@ final class NoteStore: ObservableObject {
         }
     }
     /// Notes open in their own windows.
-    @Published internal(set) var windowNoteIDs: [UUID] = []
+    @Published var windowNoteIDs: [UUID] = []
     /// The note whose editor had focus last (menus and shortcuts act on it).
     @Published var focusedNoteID: UUID?
     /// Notes that could not be opened, with their diagnosis.
-    @Published internal(set) var failures: [UUID: DamagedNote] = [:]
+    @Published var failures: [UUID: DamagedNote] = [:]
     /// The next selection opens a new tab instead of replacing the active one.
     var nextSelectionInNewTab = false
 
@@ -89,7 +90,7 @@ final class NoteStore: ObservableObject {
         didSet { UserDefaults.standard.set(includeSubfolders, forKey: "folio.includeSubfolders") }
     }
     /// Recently opened notes, newest first.
-    @Published internal(set) var recent: RecentList = {
+    @Published var recent: RecentList = {
         if let d = UserDefaults.standard.data(forKey: "folio.recent"), let r = try? JSONDecoder().decode(RecentList.self, from: d) { return r }
         return RecentList()
     }()
@@ -97,11 +98,11 @@ final class NoteStore: ObservableObject {
         didSet { if let d = try? JSONEncoder().encode(recent) { UserDefaults.standard.set(d, forKey: "folio.recent") } }
     }
     /// Note templates.
-    @Published internal(set) var templates: [NoteRef] = [] {
+    @Published var templates: [NoteRef] = [] {
         didSet { libraryVersion += 1 }
     }
     /// Symbolic links in the library that were not followed (outside the library or a loop) (#56).
-    @Published internal(set) var skippedLinks: [String] = []
+    @Published var skippedLinks: [String] = []
     let scanner = LibraryScanner()
     /// Counts reloads; a background read that is not the newest one is dropped (#220).
     var reloadGeneration = 0
@@ -113,7 +114,7 @@ final class NoteStore: ObservableObject {
     var filterMemo: (key: String, notes: [NoteRef])?
     var notesVersion = 0
     /// Links between notes (#119), updated per changed note when `notes` changes.
-    internal(set) var linkIndex = LinkIndex()
+    var linkIndex = LinkIndex()
     /// What each note looked like when it went into `linkIndex`.
     var linkIndexStamps: [UUID: String] = [:]
     /// Block kinds of notes saved before 0.15 (read once, when a type filter needs them).
@@ -134,11 +135,11 @@ final class NoteStore: ObservableObject {
     /// The organization file as Folio last read or wrote it; anything else on disk was changed by someone else (#175).
     var organizationOnDisk: Data?
     /// Items in Folio's trash.
-    @Published internal(set) var trashItems: [TrashItem] = [] {
+    @Published var trashItems: [TrashItem] = [] {
         didSet { libraryVersion += 1 }
     }
     /// Note files in the library that cannot be read at all.
-    @Published internal(set) var damagedNotes: [DamagedNote] = []
+    @Published var damagedNotes: [DamagedNote] = []
     /// The selected note could not be opened; the editor shows the diagnosis instead.
     var openFailure: DamagedNote? { selectedNoteID.flatMap { failures[$0] } }
     /// An external change collided with unsaved edits; the window asks what to do.

@@ -169,7 +169,7 @@ public enum Benchmark {
         return [
             "os": info.operatingSystemVersionString, "cpus": "\(info.activeProcessorCount)",
             "memory_gb": String(format: "%.0f", Double(info.physicalMemory) / 1_073_741_824),
-            "model": String(cString: model)
+            "model": String(decoding: model.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         ]
     }
 }

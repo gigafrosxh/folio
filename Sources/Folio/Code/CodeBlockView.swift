@@ -656,10 +656,13 @@ struct CodeBlockView: View {
 
     /// Export to a file and compare with it (#28, #31).
     @ViewBuilder private var fileItems: some View {
-        Button(block.linkedFile == nil ? "Als Datei exportieren …" : "Als andere Datei exportieren …") { CodeFileLink.export(block, in: doc) }
+        Button(block.linkedFile == nil ? "Als Datei exportieren …" : "Als andere Datei exportieren …") {
+            CodeFileLink.reportFailure(CodeFileLink.export(block, in: doc))
+        }
         if let path = block.linkedFile {
             Button("In „\(URL(fileURLWithPath: path).lastPathComponent)“ schreiben …") {
-                _ = CodeFileLink.confirmAndWrite(block, to: URL(fileURLWithPath: path), in: doc)
+                // Success, cancel and "already the same" need no answer; a failed write is shown (#326).
+                CodeFileLink.reportFailure(CodeFileLink.confirmAndWrite(block, to: URL(fileURLWithPath: path), in: doc))
             }
             Button("Mit verknüpfter Datei vergleichen …") { showDiff = true }
             Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }

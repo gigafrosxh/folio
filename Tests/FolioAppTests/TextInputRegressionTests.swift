@@ -52,7 +52,8 @@ final class TextInputRegressionTests: XCTestCase {
 
     func testReturnOnEmbedLineAsksForEmbedBlock() {
         let tv = makeView("![[Andere]]")
-        var received: String?
+        nonisolated(unsafe) var received: String?
+        // Posted and delivered synchronously on this thread (queue nil).
         let token = NotificationCenter.default.addObserver(forName: .folioInsert, object: nil, queue: nil) { received = $0.object as? String }
         defer { NotificationCenter.default.removeObserver(token) }
         tv.insertNewline(nil)

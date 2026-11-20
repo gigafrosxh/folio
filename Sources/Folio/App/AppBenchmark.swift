@@ -15,7 +15,7 @@ enum AppBenchmark {
         let size = Int(env["FOLIO_BENCH_SIZE"] ?? "1000") ?? 1000
         let store = NoteStore.shared
         if store.notes.isEmpty {
-            try? Benchmark.generateLibrary(at: URL(fileURLWithPath: lib), count: size) {
+            _ = try? Benchmark.generateLibrary(at: URL(fileURLWithPath: lib), count: size) {
                 RichTextCodec.rtfData(from: NSAttributedString(string: $0, attributes: ThemeManager.shared.bodyAttributes))
             }
             store.reload()
