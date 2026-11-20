@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.0] – 2026-11-20
+
 ### Behoben (Datensicherheit)
 - **iPad: überlappendes Sichern** (#267): Endet ein älterer Sicherungsvorgang nach einem neueren, wird er verworfen; auf der Platte bleibt immer die neueste Fassung.
 - **iPad: Konfliktkopie** (#268): Eingaben, die während des Anlegens einer Konfliktkopie dazukommen, bleiben ungesichert offen und gehen nicht mehr verloren.
