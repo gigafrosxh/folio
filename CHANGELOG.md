@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.5] – 2026-11-20
+
 ### Behoben
 - **Eingefügter grauer Text** (#359): Dunkelgrauer Fließtext von Webseiten (etwa #333 oder #444) wird beim Einfügen zu Folios Textfarbe und ist im Dunkelmodus lesbar; mittlere Grautöne und echte Farben bleiben erhalten.
 
