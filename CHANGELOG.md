@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.7] – 2026-11-20
+
 ### Geändert (CI und Releases)
 - **Release prüft genau den veröffentlichten Stand** (#315): Tests und Komplexitätsprüfung laufen in einem Export des Release-Commits, nicht in der Arbeitskopie; `scripts/release.sh --check` prüft den committeten Stand ohne Release.
 - **Unterbrochene Releases fortsetzen** (#319): Der Tag entsteht erst nach Tests und Installer; ein abgebrochener Lauf setzt mit demselben Aufruf fort, ein vorhandenes Release bekommt die fehlenden Dateien.
