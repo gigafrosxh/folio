@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.8] – 2026-11-20
+
 ### Behoben (Qualität)
 - **Code-Block in Datei schreiben** (#326): Scheitert das Schreiben oder Exportieren, zeigt Folio den Fehler, statt ihn zu verschlucken.
 - **Versionen vor Änderungen** (#327, #328, #329): Beim Umbenennen oder Entfernen eines Tags wird eine Notiz nur geändert, wenn ihre Vorversion gesichert ist (sonst wird sie als fehlgeschlagen gemeldet); wo die Version nur eine Zugabe ist (Konfliktkopie, Papierkorb), ist das jetzt ausdrücklich so gekennzeichnet.
