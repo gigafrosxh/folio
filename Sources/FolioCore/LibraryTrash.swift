@@ -21,6 +21,8 @@ public struct TrashItem: Codable, Identifiable, Hashable, Sendable {
 public struct LibraryTrash: Sendable {
     public let library: URL
     public let directory: URL
+    /// File operations; tests swap in failing ones (#314).
+    public let fs: any FileOperations
 
     public enum TrashError: LocalizedError {
         case missing(String)
@@ -33,9 +35,10 @@ public struct LibraryTrash: Sendable {
         }
     }
 
-    public init(library: URL) {
+    public init(library: URL, fs: any FileOperations = LocalFileOperations()) {
         self.library = library.standardizedFileURL
         directory = LibraryData.folder(library, "trash")
+        self.fs = fs
     }
 
     private func info(_ id: UUID) -> URL { directory.appendingPathComponent(id.uuidString).appendingPathComponent("info.json") }
@@ -63,14 +66,15 @@ public struct LibraryTrash: Sendable {
             title: title ?? source.deletingPathExtension().lastPathComponent,
             noteCount: notes.count, noteIDs: ids)
         let holder = directory.appendingPathComponent(item.id.uuidString, isDirectory: true)
-        try fm.createDirectory(at: holder, withIntermediateDirectories: true)
+        try fs.createDirectory(holder)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(item).write(to: info(item.id), options: .atomic)
+        // A failure at any step leaves the note where it was and no half entry in the trash.
         do {
-            try fm.moveItem(at: source, to: contentURL(of: item))
+            try fs.write(try encoder.encode(item), to: info(item.id))
+            try fs.moveItem(source, to: contentURL(of: item))
         } catch {
-            try? fm.removeItem(at: holder)
+            try? fs.removeItem(holder)
             throw error
         }
         return item
@@ -100,10 +104,10 @@ public struct LibraryTrash: Sendable {
         // symbolic links, or the item stays in the trash (#280).
         guard let original = target(for: item.originalPath) else { throw TrashError.outsideLibrary }
         let parent = original.deletingLastPathComponent()
-        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        try fs.createDirectory(parent)
         let target = Self.uniqueURL(original)
-        try fm.moveItem(at: content, to: target)
-        try? fm.removeItem(at: directory.appendingPathComponent(item.id.uuidString))
+        try fs.moveItem(content, to: target)
+        try? fs.removeItem(directory.appendingPathComponent(item.id.uuidString))
         return target
     }
 

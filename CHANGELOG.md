@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert (Aufbau)
+- **Gemeinsames Sichern** (#310): Die Schritte beim sicheren Speichern (Reihenfolge, Konfliktkopie, gelöschte Notiz, Vorversion) liegen als `NoteSaveTransaction` im Kern; das iPad nutzt sie, der Mac teilt sich Dateistempel, Versionen und Revisionen.
+- **Gemeinsame Metadaten** (#311): Titel, Vorschau, Tags, Suchtext, Links und Blockarten entstehen auf Mac und iPad mit denselben Regeln (`NoteMetaBuilder`). Dadurch findet die Suche auf dem iPad jetzt auch Bildbeschriftungen und PDF-Titel wie auf dem Mac.
+- **Editor** (#312): Einfügen und Ablegen sowie die Listenmarker liegen in eigenen Dateien; der Text-Editor ist rund ein Viertel kürzer.
+- **Plattformgrenzen** (#313): `docs/PLATFORMS.md` legt fest, was im Kern auf allen Plattformen läuft und was nur auf dem Mac; die CI prüft macOS und den iOS-Simulator.
+- **Dateioperationen** (#314): Papierkorb und Sichern laufen über eine schmale Schnittstelle, sodass Tests Fehler an jeder Stelle gezielt auslösen können.
+
 ## [1.11.4] – 2026-11-20
 
 ### Verbessert (Leistung)

@@ -173,18 +173,23 @@ final class BlockModel: ObservableObject, Identifiable {
         if kind == .pdf { r.pdfText = pdfText }
     }
 
-    var plainText: String {
-        switch kind {
-        case .text, .code, .database, .math, .diagram: return storage.string
-        case .web: return url
-        case .audio: return [caption, output ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
-        case .embed: return "![[\(storage.string)]]"
-        case .erd: return [caption, ErduDocument.searchText(of: storage.string)].filter { !$0.isEmpty }.joined(separator: "\n")
-        // Alt text and the text inside PDFs are found by the search (#43, #46).
-        case .image: return [caption, altText].filter { !$0.isEmpty }.joined(separator: "\n")
-        case .pdf: return [caption, pdfText ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
-        default: return caption
+    var plainText: String { metaBlock.searchText }
+
+    /// This block for the shared metadata builder (#311).
+    var metaBlock: NoteMetaBuilder.Block {
+        NoteMetaBuilder.Block(
+            kind: kind, content: storage.string, caption: caption, altText: altText, url: url, pdfText: pdfText ?? "", output: output ?? "",
+            noteLinks: kind == .text ? noteLinks : [])
+    }
+
+    /// `folio://note/<id>` links in the text.
+    private var noteLinks: [UUID] {
+        var links: [UUID] = []
+        storage.enumerateAttribute(.link, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+            let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+            if let id = url.flatMap(NoteLink.id(from:)), !links.contains(id) { links.append(id) }
         }
+        return links
     }
 }
 
@@ -287,27 +292,9 @@ final class NoteDocument: ObservableObject, Identifiable {
     static func isCaptureSeparator(_ line: String) -> Bool { NoteTitle.isCaptureSeparator(line) }
 
     func makeFile() -> NoteFile {
-        let textBlocks = blocks.filter { $0.kind == .text }
-        let fullText = textBlocks.map(\.storage.string).joined(separator: "\n")
-        // List markers, checkboxes and indentation are formatting, not part of the title or preview (#96).
-        // Quick capture's date lines ("— 20. Okt. 2026, 19:31 —") separate entries; they are no title (#95).
-        let lines = fullText.split(whereSeparator: \.isNewline).map { Self.plainLine(String($0)) }
-            .filter { !$0.isEmpty && !Self.isCaptureSeparator($0) }
-        // A note without any text (only an image, code …) keeps the title it has (#97).
-        if let first = lines.first { meta.title = String(first.prefix(120)) }
-        meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
-        meta.tags = TagParser.tags(in: fullText)
-        meta.searchText = blocks.map(\.plainText).joined(separator: "\n")
-        meta.wikiLinks = WikiLink.targets(in: meta.searchText)
-        meta.kinds = Array(Set(blocks.filter { $0.kind != .text || $0.storage.length > 0 }.map(\.kind.rawValue))).sorted()
-        var links: [UUID] = []
-        for b in textBlocks {
-            b.storage.enumerateAttribute(.link, in: NSRange(location: 0, length: b.storage.length)) { value, _, _ in
-                let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
-                if let id = url.flatMap(NoteLink.id(from:)), id != meta.id, !links.contains(id) { links.append(id) }
-            }
-        }
-        meta.links = links
+        // Title (no list markers, no capture date lines, #95, #96, #97), preview, tags, search text, kinds and links:
+        // the same rules as on the iPad, from the shared builder (#311).
+        NoteMetaBuilder.apply(blocks.map(\.metaBlock), to: &meta)
         if !keepModifiedOnSave { meta.modified = Date() }
 
         let used = Set(blocks.compactMap(\.attachmentID))

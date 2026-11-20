@@ -168,34 +168,19 @@
             return try outcome.get()
         }
 
+        /// The steps are the shared `NoteSaveTransaction` (#310); here only the document's own state is updated.
         private func writeCoordinated(_ snapshot: NoteFile, data: Data, revision rev: Int, history: NoteHistory, at target: URL) throws -> SaveOutcome {
-            let fm = FileManager.default
-            // A newer snapshot was written meanwhile (saves finishing in reverse order): this one is outdated (#267).
-            guard saves.mayWrite(rev) else { return .unchanged }
-            // Deleted elsewhere since it was opened: never recreate it silently; the edits go to a new file (#269).
-            if !fm.fileExists(atPath: target.path), diskStamp != nil {
-                let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
-                try NoteIdentity.renewed(snapshot).encoded().write(to: copy, options: .atomic)
-                if saves.didWrite(rev, current: revision) { isDirty = false }
-                return .deletedElsewhere(copy)
+            let transaction = NoteSaveTransaction(history: history, copySuffix: " (iPad)")
+            let result = try transaction.save(snapshot, data: data, to: target, expected: diskStamp, revision: rev, current: revision, revisions: &saves)
+            if result.clean { isDirty = false }
+            switch result.outcome {
+            case .saved:
+                diskStamp = result.stamp
+                return .saved
+            case .unchanged: return .unchanged
+            case .savedAsCopy(let copy): return .savedAsCopy(copy)
+            case .deletedElsewhere(let copy): return .deletedElsewhere(copy)
             }
-            if fm.fileExists(atPath: target.path), FileStamp.of(target) != diskStamp {
-                // Changed elsewhere since it was opened: keep both.
-                let copy = Self.freeURL(in: url.deletingLastPathComponent(), title: url.deletingPathExtension().lastPathComponent + " (iPad)")
-                // New ids for note, blocks and attachments: both files may be open on the Mac at once (#260).
-                try NoteIdentity.renewed(snapshot).encoded().write(to: copy, options: .atomic)
-                // Edits made after the snapshot are not in the copy and stay unsaved (#268).
-                if saves.didWrite(rev, current: revision) { isDirty = false }
-                return .savedAsCopy(copy)
-            }
-            // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
-            // Copied, not read into memory, and skipped without unpacking when unchanged (#304).
-            if fm.fileExists(atPath: target.path) { try history.recordFile(at: target, noteID: snapshot.meta.id) }
-            try data.write(to: target, options: .atomic)
-            diskStamp = FileStamp.of(target)
-            // Edits made while compressing stay unsaved and are written by the next save.
-            if saves.didWrite(rev, current: revision) { isDirty = false }
-            return .saved
         }
 
         // MARK: Helpers
@@ -208,59 +193,34 @@
         }
 
         static func plainText(_ b: BlockRecord) -> String {
-            switch b.kind {
-            case .text:
-                guard let rtf = b.rtf else { return "" }
-                return (try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil))?.string ?? ""
-            case .code, .database, .math, .diagram: return b.code ?? ""
-            case .erd: return ErduDocument.searchText(of: b.code ?? "")
-            case .web: return b.url ?? ""
-            case .image, .audio: return [b.caption, b.altText, b.output].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
-            case .pdf: return b.pdfText ?? ""
-            case .embed: return "![[\(b.code ?? "")]]"
-            case .file, .drawing: return b.caption ?? ""
-            }
+            guard b.kind == .text else { return NoteMetaBuilder.Block(record: b).searchText }
+            guard let rtf = b.rtf else { return "" }
+            return (try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil))?.string ?? ""
         }
 
         /// Title, preview, tags and search text the same way the Mac derives them (first text line is the title).
         static func refreshMeta(_ file: inout NoteFile) {
-            let text = file.body.blocks.filter { $0.kind == .text }.map(plainText).joined(separator: "\n")
-            // Same rules as the Mac: no list markers or capture date lines in the title (#265).
-            let lines = NoteTitle.lines(of: text)
-            if let first = lines.first { file.meta.title = String(first.prefix(120)) }
-            file.meta.preview = lines.dropFirst().prefix(3).joined(separator: " ").prefix(200).description
-            file.meta.tags = TagParser.tags(in: text)
-            file.meta.searchText = file.body.blocks.map(plainText).joined(separator: "\n")
-            file.meta.wikiLinks = WikiLink.targets(in: file.meta.searchText)
-            file.meta.kinds = Array(Set(file.body.blocks.filter { $0.kind != .text || !plainText($0).isEmpty }.map(\.kind.rawValue))).sorted()
-            file.meta.links = noteLinks(file)
+            // The same rules as the Mac, from the shared builder (#311).
+            let blocks = file.body.blocks.map { b in
+                b.kind == .text ? NoteMetaBuilder.Block(record: b, text: plainText(b), noteLinks: noteLinks(in: b, of: file.meta.id)) : NoteMetaBuilder.Block(record: b)
+            }
+            NoteMetaBuilder.apply(blocks, to: &file.meta)
         }
 
-        /// `folio://note/<id>` links in the text, for backlinks and the graph on the Mac (#265).
-        static func noteLinks(_ file: NoteFile) -> [UUID] {
+        /// `folio://note/<id>` links in a text block, for backlinks and the graph on the Mac (#265).
+        static func noteLinks(in b: BlockRecord, of id: UUID) -> [UUID] {
+            guard let rtf = b.rtf, let s = try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil) else {
+                return []
+            }
             var links: [UUID] = []
-            for b in file.body.blocks where b.kind == .text {
-                guard let rtf = b.rtf, let s = try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil) else {
-                    continue
-                }
-                s.enumerateAttribute(.link, in: NSRange(location: 0, length: s.length)) { value, _, _ in
-                    let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
-                    if let id = url.flatMap(NoteLink.id(from:)), id != file.meta.id, !links.contains(id) { links.append(id) }
-                }
+            s.enumerateAttribute(.link, in: NSRange(location: 0, length: s.length)) { value, _, _ in
+                let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+                if let target = url.flatMap(NoteLink.id(from:)), target != id, !links.contains(target) { links.append(target) }
             }
             return links
         }
 
-        static func freeURL(in folder: URL, title: String) -> URL {
-            let base = title.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
-            var url = folder.appendingPathComponent(base).appendingPathExtension(FolioArchive.fileExtension)
-            var n = 2
-            while FileManager.default.fileExists(atPath: url.path) {
-                url = folder.appendingPathComponent("\(base) \(n)").appendingPathExtension(FolioArchive.fileExtension)
-                n += 1
-            }
-            return url
-        }
+        static func freeURL(in folder: URL, title: String) -> URL { NoteSaveTransaction.freeURL(in: folder, title: title) }
 
         static func modificationDate(_ url: URL) -> Date? {
             (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
