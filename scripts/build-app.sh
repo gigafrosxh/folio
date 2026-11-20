@@ -53,7 +53,7 @@ APPEX="$APP/Contents/PlugIns/FolioWidgets.appex"
 mkdir -p "$APPEX/Contents/MacOS"
 cp "$BIN_DIR/FolioWidgets" "$APPEX/Contents/MacOS/FolioWidgets"
 # Extensions must start in NSExtensionMain; with Swift's own main WidgetKit kills them at launch (#123).
-nm -u "$APPEX/Contents/MacOS/FolioWidgets" | grep -q _NSExtensionMain || { echo "FolioWidgets ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
+nm -u "$APPEX/Contents/MacOS/FolioWidgets" | grep _NSExtensionMain >/dev/null || { echo "FolioWidgets ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
 # „Widget bearbeiten“ (#122): App Intents metadata for the configurable widgets.
 scripts/intents-metadata.sh "$BIN_DIR" "$APPEX/Contents/Resources"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
@@ -65,7 +65,7 @@ codesign --force --sign - --entitlements Resources/Widgets/FolioWidgets.entitlem
 SHAREX="$APP/Contents/PlugIns/FolioShare.appex"
 mkdir -p "$SHAREX/Contents/MacOS"
 cp "$BIN_DIR/FolioShare" "$SHAREX/Contents/MacOS/FolioShare"
-nm -u "$SHAREX/Contents/MacOS/FolioShare" | grep -q _NSExtensionMain || { echo "FolioShare ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
+nm -u "$SHAREX/Contents/MacOS/FolioShare" | grep _NSExtensionMain >/dev/null || { echo "FolioShare ist nicht mit -e _NSExtensionMain gelinkt" >&2; exit 1; }
 sed -e "s/VERSION/$VERSION/" -e "s/BUILD/$BUILD/" Resources/Share/Info.plist >"$SHAREX/Contents/Info.plist"
 /usr/bin/plutil -lint "$SHAREX/Contents/Info.plist" >/dev/null
 codesign --force --sign - --entitlements Resources/Share/FolioShare.entitlements "$SHAREX"
