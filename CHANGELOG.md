@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.6] – 2026-11-20
+
 ### Behoben
 - **Eingefügte Listen** (#363): Aufzählungen und nummerierte Listen aus Webseiten, Pages oder Word werden beim Einfügen zu Folio-Listen mit „• “ bzw. „1. “ und Tab-Einrückung je Unterebene; bisher gingen Aufzählungszeichen und Einrückung verloren.
 
