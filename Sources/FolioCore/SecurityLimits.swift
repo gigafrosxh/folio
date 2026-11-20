@@ -9,8 +9,11 @@ public enum ArchiveLimits {
     /// way they like, so a short silent recording or an empty drawing always opens.
     public static let ratioCheckedAbove: UInt64 = 128 << 20
     public static let maxRatio: UInt64 = 1_000
-    /// Most bytes one note may unpack to in total.
-    public static let maxTotal: UInt64 = 4 << 30
+    /// Most bytes one note may unpack to in total: 4 GB, but never more than half the Mac's memory, so even a valid
+    /// huge note cannot push the system into swapping (#283). Saving uses the same budget (#272).
+    public static let maxTotal: UInt64 = min(4 << 30, ProcessInfo.processInfo.physicalMemory / 2)
+    /// Largest attachment header (name, type, id as JSON); checked before it is read (#284).
+    public static let maxAttachmentHeader: UInt32 = 64 << 10
     /// Most attachments one note may have.
     public static let maxAttachments: UInt32 = 100_000
 
@@ -25,16 +28,28 @@ public enum ArchiveLimits {
 public enum SecretRedaction {
     public static let mask = "••••••"
 
-    /// Every occurrence of a secret is replaced; secrets shorter than 3 characters are left alone, they would hide
-    /// ordinary text.
+    /// Every occurrence of a secret of 3 or more characters is replaced. Shorter ones would hide ordinary text, so they
+    /// are replaced only where they stand as a value: after `=` or `:` (`password=ab`, `"pwd": "ab"`) (#285).
+    /// Passwords in connection URLs (`postgres://user:pass@host`) are always hidden (#286).
     public static func redact(_ text: String, secrets: [String]) -> String {
-        secrets.filter { $0.count >= 3 }.sorted { $0.count > $1.count }
+        var out = secrets.filter { $0.count >= 3 }.sorted { $0.count > $1.count }
             .reduce(text) { $0.replacingOccurrences(of: $1, with: mask) }
+        for short in Set(secrets.filter { !$0.isEmpty && $0.count < 3 }) {
+            let pattern = #"([=:]\s*["']?)"# + NSRegularExpression.escapedPattern(for: short) + #"(?=$|[\s"',;&)\]}])"#
+            out = out.replacingOccurrences(of: pattern, with: "$1" + mask, options: .regularExpression)
+        }
+        return out.replacingOccurrences(of: #"(://[^:/@\s]+:)[^@\s]+@"#, with: "$1" + mask + "@", options: .regularExpression)
     }
 
-    /// The values of environment variables that hold passwords (`PGPASSWORD`, `MYSQL_PWD`, `SQLCMDPASSWORD` …).
+    /// Words in variable names that mark a secret (#286): passwords, tokens, API and access keys, credentials.
+    static let secretNameParts = ["PASSWORD", "PASSWD", "SECRET", "TOKEN", "API_KEY", "APIKEY", "ACCESS_KEY", "PRIVATE_KEY", "CREDENTIAL", "AUTH"]
+
+    /// The values of environment variables that hold secrets (`PGPASSWORD`, `MYSQL_PWD`, `GITHUB_TOKEN`, `OPENAI_API_KEY` …).
     public static func secrets(in environment: [String: String]) -> [String] {
-        environment.filter { key, _ in key.uppercased().contains("PASSWORD") || key.uppercased().hasSuffix("PWD") }.map(\.value)
+        environment.filter { key, _ in
+            let k = key.uppercased()
+            return k.hasSuffix("PWD") || secretNameParts.contains { k.contains($0) }
+        }.map(\.value)
     }
 }
 

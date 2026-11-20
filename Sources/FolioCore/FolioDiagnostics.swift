@@ -207,6 +207,7 @@ private struct DiagnosisReader {
 
     private mutating func readAttachment() throws -> FolioArchive.Attachment {
         let headerLength: UInt32 = try r.read()
+        guard headerLength <= ArchiveLimits.maxAttachmentHeader else { throw FolioFormatError.tooLarge }
         let header = try JSONDecoder().decode(FolioArchive.AttachmentHeader.self, from: Data(try r.readBytes(Int(headerLength))))
         return FolioArchive.Attachment(header: header, data: try r.readSection(compressed: compressed))
     }

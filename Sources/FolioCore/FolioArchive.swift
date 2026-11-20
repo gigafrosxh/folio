@@ -82,6 +82,7 @@ public struct FolioArchive: Sendable {
         let encoder = JSONEncoder()
         for attachment in attachments {
             let header = try encoder.encode(attachment.header)
+            guard header.count <= ArchiveLimits.maxAttachmentHeader else { throw FolioFormatError.tooLarge }
             w.append(UInt32(header.count))
             w.append(header)
             try w.appendSection(attachment.data)
@@ -122,6 +123,7 @@ public struct FolioArchive: Sendable {
         let decoder = JSONDecoder()
         for _ in 0..<count {
             let headerLength: UInt32 = try r.read()
+            guard headerLength <= ArchiveLimits.maxAttachmentHeader else { throw FolioFormatError.tooLarge }
             let header = try decoder.decode(AttachmentHeader.self, from: Data(try r.readBytes(Int(headerLength))))
             let content = try r.readSection(compressed: compressed)
             attachments.append(Attachment(header: header, data: content))

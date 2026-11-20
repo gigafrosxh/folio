@@ -28,7 +28,7 @@ public struct LibraryTrash: Sendable {
         public var errorDescription: String? {
             switch self {
             case .missing(let name): return "„\(name)“ ist nicht mehr im Papierkorb."
-            case .outsideLibrary: return "Nur Notizen und Ordner der Bibliothek können in den Papierkorb."
+            case .outsideLibrary: return "Nur Notizen und Ordner der Bibliothek können in den Papierkorb oder aus ihm zurück."
             }
         }
     }
@@ -51,7 +51,8 @@ public struct LibraryTrash: Sendable {
         let fm = FileManager.default
         let source = url.standardizedFileURL
         let root = library.path.hasSuffix("/") ? library.path : library.path + "/"
-        guard source.path.hasPrefix(root) else { throw TrashError.outsideLibrary }
+        // Checked on the real path too: a symbolic folder link must not lead out of the library (#281).
+        guard source.path.hasPrefix(root), isInside(source) else { throw TrashError.outsideLibrary }
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: source.path, isDirectory: &isDir) else { throw TrashError.missing(source.lastPathComponent) }
         let notes = isDir.boolValue ? Self.noteFiles(in: source) : [source]
@@ -95,7 +96,9 @@ public struct LibraryTrash: Sendable {
         let fm = FileManager.default
         let content = contentURL(of: item)
         guard fm.fileExists(atPath: content.path) else { throw TrashError.missing(item.title) }
-        let original = library.appendingPathComponent(item.originalPath)
+        // The stored path comes from a file anyone could edit: it must stay inside the library, also through
+        // symbolic links, or the item stays in the trash (#280).
+        guard let original = target(for: item.originalPath) else { throw TrashError.outsideLibrary }
         let parent = original.deletingLastPathComponent()
         try fm.createDirectory(at: parent, withIntermediateDirectories: true)
         let target = Self.uniqueURL(original)
@@ -129,6 +132,29 @@ public struct LibraryTrash: Sendable {
         var count = 0
         for item in items() where (try? deletePermanently(item, history: history)) != nil { count += 1 }
         return count
+    }
+
+    /// The place inside the library a trashed item goes back to; nil for an absolute path, `..` or a path whose
+    /// existing folders lead out of the library through a symbolic link (#280, #281).
+    func target(for relativePath: String) -> URL? {
+        let parts = relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        guard !relativePath.hasPrefix("/"), !parts.isEmpty, !parts.contains(where: { $0 == ".." || $0 == "." }) else { return nil }
+        let url = parts.reduce(library) { $0.appendingPathComponent(String($1)) }
+        return isInside(url) ? url : nil
+    }
+
+    /// Whether `url` (its folder resolved through symbolic links, as far as it exists) lies inside the library.
+    func isInside(_ url: URL) -> Bool {
+        let root = library.resolvingSymlinksInPath().standardizedFileURL.path
+        var folder = url.deletingLastPathComponent().standardizedFileURL
+        var rest: [String] = []
+        while !FileManager.default.fileExists(atPath: folder.path), folder.path != "/" {
+            rest.insert(folder.lastPathComponent, at: 0)
+            folder = folder.deletingLastPathComponent()
+        }
+        let resolved = rest.reduce(folder.resolvingSymlinksInPath().standardizedFileURL) { $0.appendingPathComponent($1) }
+        let path = resolved.appendingPathComponent(url.lastPathComponent).path
+        return path.hasPrefix(root + "/")
     }
 
     static func noteFiles(in folder: URL) -> [URL] {

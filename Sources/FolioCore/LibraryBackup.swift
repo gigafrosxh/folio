@@ -36,10 +36,13 @@ public enum LibraryBackup {
     public enum BackupError: LocalizedError {
         case tool(String)
         case noLibrary
+        /// The archive is not a plausible Folio backup: unsafe paths, links out of it, too many or too large files (#282).
+        case unsafeArchive(String)
         public var errorDescription: String? {
             switch self {
             case .tool(let m): return "Die Sicherung ist fehlgeschlagen: \(m)"
             case .noLibrary: return "Der Bibliotheksordner fehlt."
+            case .unsafeArchive(let m): return "Diese Sicherung wird nicht entpackt: \(m)"
             }
         }
     }
@@ -141,9 +144,78 @@ public enum LibraryBackup {
     }
 
     #if os(macOS)
+        /// Most files and bytes a backup may unpack to (#282); the free space of the target counts too.
+        static let maxEntries = 500_000
+        static let maxUnpacked: UInt64 = 256 << 30
+
+        /// Unpacks only after checking the archive's table of contents (no absolute paths, no `..`, limited number
+        /// and size of files) and afterwards that no symbolic link leads out of the folder (#282).
         static func unpack(_ zip: URL, to folder: URL) throws {
+            let entries = try contents(of: zip)
+            let free =
+                (try? folder.deletingLastPathComponent().resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+                .volumeAvailableCapacityForImportantUsage.map { UInt64(max($0, 0)) } ?? maxUnpacked
+            try check(entries, freeSpace: free)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try run("/usr/bin/ditto", ["-x", "-k", zip.path, folder.path], cwd: nil)
+            // Links out of the backup (e.g. a folder link the library had) are dropped; the library never follows
+            // them either (#56).
+            for link in linksOutside(folder) { try? FileManager.default.removeItem(at: link) }
+        }
+
+        struct Entry: Equatable {
+            var size: UInt64
+            var path: String
+        }
+
+        /// The archive's table of contents as `unzip -l` lists it.
+        static func contents(of zip: URL) throws -> [Entry] {
+            let listing = try output("/usr/bin/unzip", ["-l", zip.path])
+            let lines = listing.components(separatedBy: "\n")
+            guard let start = lines.firstIndex(where: { $0.hasPrefix("---") }) else { throw BackupError.unsafeArchive("kein lesbares ZIP-Archiv.") }
+            let body = lines[(start + 1)...].prefix { !$0.hasPrefix("---") }
+            return try body.map { line in
+                let parts = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
+                guard parts.count == 4, let size = UInt64(parts[0]) else { throw BackupError.unsafeArchive("unlesbares Inhaltsverzeichnis.") }
+                return Entry(size: size, path: String(parts[3].drop { $0 == " " }))
+            }
+        }
+
+        static func check(_ entries: [Entry], freeSpace: UInt64) throws {
+            guard entries.count <= maxEntries else { throw BackupError.unsafeArchive("zu viele Dateien (\(entries.count)).") }
+            if let bad = entries.first(where: { $0.path.hasPrefix("/") || $0.path.split(separator: "/").contains("..") }) {
+                throw BackupError.unsafeArchive("„\(bad.path)“ liegt außerhalb des Sicherungsordners.")
+            }
+            let total = entries.reduce(UInt64(0)) { $0.addingReportingOverflow($1.size).partialValue }
+            guard total <= min(maxUnpacked, freeSpace) else {
+                throw BackupError.unsafeArchive("sie würde \(ByteCountFormatter.string(fromByteCount: Int64(clamping: total), countStyle: .file)) belegen.")
+            }
+        }
+
+        /// Symbolic links in `folder` whose target lies outside it.
+        static func linksOutside(_ folder: URL) -> [URL] {
+            let root = folder.resolvingSymlinksInPath().standardizedFileURL.path
+            let e = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isSymbolicLinkKey])
+            var links: [URL] = []
+            while let url = e?.nextObject() as? URL {
+                guard (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true else { continue }
+                if !url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(root + "/") { links.append(url) }
+            }
+            return links
+        }
+
+        private static func output(_ exe: String, _ args: [String]) throws -> String {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: exe)
+            p.arguments = args
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            do { try p.run() } catch { throw BackupError.tool(error.localizedDescription) }
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { throw BackupError.unsafeArchive("kein lesbares ZIP-Archiv.") }
+            return String(decoding: data, as: UTF8.self)
         }
 
         private static func run(_ exe: String, _ args: [String], cwd: URL?, allowNothingToDo: Bool = false) throws {
