@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.3] – 2026-11-20
+
 ### Behoben (iPad und iPhone)
 - **Notizwechsel bei großen Notizen** (#303): Eine Notiz mit vielen Anhängen wird beim Wechsel im Hintergrund gesichert; die Oberfläche friert nicht ein, und bei einem Fehler bleiben die Änderungen offen.
 - **Automatisches Sichern** (#336): Schnelles Tippen startet keine parallelen Komprimierungen mehr; Sicherungen laufen nacheinander und fassen Änderungen zusammen.
