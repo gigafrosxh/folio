@@ -648,7 +648,8 @@ final class FolioTextView: NSTextView {
         else { return false }
         let (text, images) = Self.separatingPictures(of: rich)
         guard !images.isEmpty else { return false }
-        if text.length > 0 { insertText(text, replacementRange: selectedRange()) }
+        // Same look as other pasted rich text: Folio's typeface and text colour (#357, #358).
+        if text.length > 0 { insertPasted(PasteStyle.adopt(text, body: bodyAttributes())) }
         images.forEach { onPasteImage?($0) }
         return true
     }

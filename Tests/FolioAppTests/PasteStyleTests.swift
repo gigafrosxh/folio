@@ -70,4 +70,35 @@ final class PasteStyleTests: XCTestCase {
         tv.undoManager?.undo()
         XCTAssertFalse(tv.string.contains("Gross"), "Einfügen lässt sich rückgängig machen")
     }
+
+    /// #358: rich text with pictures (Notes, TextEdit, Pages) gets the same treatment as plain rich text.
+    func testRichTextWithPicturesTakesFolioLook() throws {
+        let tv = FolioTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        tv.isRichText = true
+        tv.bodyAttributes = { ThemeManager.shared.bodyAttributes }
+        var pasted: [Data] = []
+        tv.onPasteImage = { pasted.append($0) }
+        let image = NSImage(size: NSSize(width: 4, height: 4))
+        image.lockFocus()
+        NSColor.red.setFill()
+        NSRect(x: 0, y: 0, width: 4, height: 4).fill()
+        image.unlockFocus()
+        let attachment = NSTextAttachment(fileWrapper: FileWrapper(regularFileWithContents: try XCTUnwrap(image.tiffRepresentation)))
+        attachment.fileWrapper?.preferredFilename = "bild.tiff"
+        let rich = NSMutableAttributedString(
+            string: "Schwarzer Text ", attributes: [.font: try XCTUnwrap(NSFont(name: "Georgia", size: 18)), .foregroundColor: NSColor.black])
+        rich.append(NSAttributedString(attachment: attachment))
+        let rtfd = try XCTUnwrap(rich.rtfd(from: NSRange(location: 0, length: rich.length), documentAttributes: [:]))
+        let pb = NSPasteboard(name: NSPasteboard.Name("folio-test-\(UUID().uuidString)"))
+        pb.clearContents()
+        pb.setData(rtfd, forType: .rtfd)
+        tv.paste(from: pb)
+        pb.releaseGlobally()
+        XCTAssertEqual(pasted.count, 1, "Bild wird als Block eingefügt")
+        XCTAssertTrue(tv.string.hasPrefix("Schwarzer Text"))
+        let attrs = try XCTUnwrap(tv.textStorage).attributes(at: 0, effectiveRange: nil)
+        XCTAssertEqual(attrs[.foregroundColor] as? NSColor, .textColor, "Schwarz der Quelle wird Folios Textfarbe")
+        XCTAssertNotEqual((attrs[.font] as? NSFont)?.familyName, "Georgia", "Folio-Schrift statt Georgia")
+        XCTAssertEqual((attrs[.font] as? NSFont)?.pointSize ?? 0, 18, accuracy: 0.1, "Größe bleibt")
+    }
 }
