@@ -114,6 +114,12 @@ public enum KernelLanguages {
             )? = nil
         private var queue: [() -> Void] = []
         private var busy = false
+        /// Set once when the interpreter has ended; later requests fail at once (#293).
+        private var ended = false
+        /// Requests stopped with `interrupt()` by the user (not by the time limit) (#296).
+        private var cancelledIDs = Set<String>()
+        /// Output callbacks run one after another, in the order the output arrived, and before the request returns (#298).
+        private let delivery = DispatchQueue(label: "folio.kernel.output")
 
         public var isAlive: Bool { process.isRunning }
         public var pid: pid_t { process.processIdentifier }
@@ -158,8 +164,17 @@ public enum KernelLanguages {
             try? FileManager.default.removeItem(at: scriptURL)
         }
 
-        /// Stops the code that is running right now (like Ctrl-C), keeping the session's variables.
+        /// Stops the code that is running right now (like Ctrl-C), keeping the session's variables. The run reports
+        /// `cancelled` (#296).
         public func interrupt() {
+            lock.lock()
+            if let id = current?.id { cancelledIDs.insert(id) }
+            lock.unlock()
+            signalInterrupt()
+        }
+
+        /// Ctrl-C without marking the run as cancelled by the user (the time limit uses this).
+        private func signalInterrupt() {
             guard process.isRunning else { return }
             // Programs started by the code (e.g. `sleep` in a shell session) get the interrupt too.
             for child in ServerDetector.descendants(of: process.processIdentifier) { kill(child, SIGINT) }
@@ -188,18 +203,27 @@ public enum KernelLanguages {
             let memoryHit = LockedBool()
             var message = ["op": "exec", "code": code]
             if let stdin { message["stdin"] = stdin }
-            let (out, err, status, timedOut) = await send(
+            let (out, err, status, timedOut, cancelled) = await send(
                 message, timeout: timeout, keepRunning: { server.value }, limits: limits, memoryHit: memoryHit,
-                onOutput: { chunk in
+                onOutput: { [pid] chunk in
                     onOutput?(chunk)
+                    // Only a real listening port lifts the time limit, not an address in the output (#291).
                     if let url = ServerDetector.url(inOutput: chunk), !server.value {
-                        server.set()
-                        onServer?(url)
+                        DispatchQueue.global().async {
+                            for _ in 0..<6 where !server.value {
+                                if ServerDetector.listeningPort(ofProcessTree: pid) != nil {
+                                    server.set()
+                                    onServer?(url)
+                                    return
+                                }
+                                Thread.sleep(forTimeInterval: 0.5)
+                            }
+                        }
                     }
                 })
             var result = RunResult(
                 stdout: out, stderr: err, exitCode: status == "ok" ? 0 : 1, duration: Date().timeIntervalSince(start),
-                command: "\(language.id)-Sitzung", timedOut: timedOut, cancelled: false)
+                command: "\(language.id)-Sitzung", timedOut: timedOut, cancelled: cancelled)
             if server.value { result.serverURL = ServerDetector.url(inOutput: out + err) }
             result.memoryExceeded = memoryHit.value
             result.fileName = "<block>"
@@ -207,16 +231,25 @@ public enum KernelLanguages {
         }
 
         /// Names visible in the session (no receiver) or members of `receiver`, evaluated without side effects.
+        /// While code runs the session is busy; completion then answers at once with nothing, so the editor falls back
+        /// to its static suggestions instead of waiting behind a long run (#297).
         public func complete(receiver: String?) async -> [String] {
-            guard language.supportsCompletion, isAlive else { return [] }
-            let (out, _, status, _) = await send(["op": "complete", "receiver": receiver ?? ""], timeout: 2, keepRunning: { false }, onOutput: nil)
+            guard language.supportsCompletion, isAlive, !isBusy else { return [] }
+            let (out, _, status, _, _) = await send(["op": "complete", "receiver": receiver ?? ""], timeout: 2, keepRunning: { false }, onOutput: nil)
             guard status == "ok", let line = out.split(separator: "\n").last,
                 let data = line.data(using: .utf8), let names = try? JSONSerialization.jsonObject(with: data) as? [String]
             else { return [] }
             return names
         }
 
-        private typealias Reply = (String, String, String, Bool)
+        public var isBusy: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return busy
+        }
+
+        /// stdout, stderr, status, timed out, cancelled by the user.
+        private typealias Reply = (String, String, String, Bool, Bool)
         private typealias ReplyContinuation = CheckedContinuation<Reply, Never>
 
         /// One request to the session process (#142).
@@ -238,22 +271,26 @@ public enum KernelLanguages {
         ) async -> Reply {
             let job = Job(message: message, timeout: timeout, keepRunning: keepRunning, limits: limits, memoryHit: memoryHit, onOutput: onOutput)
             return await withCheckedContinuation { cont in
-                enqueue { [weak self] in
+                let start: () -> Void = { [weak self] in
                     guard let self, self.process.isRunning else {
-                        self?.lock.lock()
-                        self?.busy = false
-                        self?.lock.unlock()
-                        cont.resume(returning: ("", "Die Sitzung läuft nicht mehr.", "error", false))
+                        self?.release()
+                        cont.resume(returning: ("", "Die Sitzung läuft nicht mehr.", "error", false, false))
                         return
                     }
                     self.begin(job, cont: cont)
                 }
+                // Once the interpreter has ended, nothing waits in a queue that no one empties (#293).
+                if !enqueue(start) { cont.resume(returning: ("", "Die Sitzung läuft nicht mehr.", "error", false, false)) }
             }
         }
 
-        /// One request at a time; the others wait their turn.
-        private func enqueue(_ start: @escaping () -> Void) {
+        /// One request at a time; the others wait their turn. False when the session has ended.
+        private func enqueue(_ start: @escaping () -> Void) -> Bool {
             lock.lock()
+            if ended {
+                lock.unlock()
+                return false
+            }
             if busy {
                 queue.append(start)
                 lock.unlock()
@@ -262,6 +299,16 @@ public enum KernelLanguages {
                 lock.unlock()
                 start()
             }
+            return true
+        }
+
+        /// Frees the session for the next request after one that never started.
+        private func release() {
+            lock.lock()
+            let next = queue.isEmpty ? nil : queue.removeFirst()
+            busy = next != nil
+            lock.unlock()
+            if let next { DispatchQueue.global().async(execute: next) }
         }
 
         private func begin(_ job: Job, cont: ReplyContinuation) {
@@ -271,12 +318,32 @@ public enum KernelLanguages {
             lock.unlock()
             var msg = job.message
             msg["id"] = job.id
-            guard let data = try? JSONSerialization.data(withJSONObject: msg) else { return }
-            try? input.write(contentsOf: data + Data("\n".utf8))
+            // A request that cannot be sent ends right away with an error and frees the session (#292).
+            do {
+                let data = try JSONSerialization.data(withJSONObject: msg)
+                try input.write(contentsOf: data + Data("\n".utf8))
+            } catch {
+                fail(job, "Die Anfrage konnte nicht an den Interpreter gesendet werden: \(error.localizedDescription)")
+                return
+            }
             if job.limits.maxMemoryMB > 0 { watchMemory(job) }
             armTimeout(job)
         }
 
+        private func fail(_ job: Job, _ message: String) {
+            lock.lock()
+            guard current?.id == job.id else {
+                lock.unlock()
+                return
+            }
+            current?.status = "error"
+            current?.stderr.append(Data(message.utf8))
+            let finish = current?.finish
+            lock.unlock()
+            finish?()
+        }
+
+        /// Ends a request exactly once (the id check) and starts the next one.
         private func complete(_ job: Job, cont: ReplyContinuation) {
             lock.lock()
             guard current?.id == job.id else {
@@ -285,11 +352,13 @@ public enum KernelLanguages {
             }
             let finished = current
             current = nil
-            busy = false
-            let next = queue.isEmpty ? nil : queue.removeFirst()
-            if next != nil { busy = true }
+            let cancelled = cancelledIDs.remove(job.id) != nil
+            let next = ended || queue.isEmpty ? nil : queue.removeFirst()
+            busy = next != nil
             lock.unlock()
-            cont.resume(returning: (finished?.stdout.text ?? "", finished?.stderr.text ?? "", finished?.status ?? "error", job.timedOut.value))
+            let reply: Reply = (finished?.stdout.text ?? "", finished?.stderr.text ?? "", finished?.status ?? "error", job.timedOut.value, cancelled)
+            // After every output callback of this request (#298).
+            delivery.async { cont.resume(returning: reply) }
             if let next { DispatchQueue.global().async(execute: next) }
         }
 
@@ -318,7 +387,7 @@ public enum KernelLanguages {
             DispatchQueue.global().asyncAfter(deadline: .now() + job.timeout) { [weak self] in
                 guard let self, self.isCurrent(job), !job.keepRunning() else { return }
                 job.timedOut.set()
-                self.interrupt()
+                self.signalInterrupt()
             }
         }
 
@@ -357,11 +426,17 @@ public enum KernelLanguages {
         /// Called with `lock` held.
         private func emit(_ text: String, isErr: Bool) {
             if isErr { current?.stderr.append(Data(text.utf8)) } else { current?.stdout.append(Data(text.utf8)) }
-            if let cb = current?.onOutput { DispatchQueue.global().async { cb(text) } }
+            if let cb = current?.onOutput { delivery.async { cb(text) } }
         }
 
+        /// Ends everything at once: the running request and all waiting ones get an answer, exactly once (#293).
         private func terminated() {
             lock.lock()
+            guard !ended else {
+                lock.unlock()
+                return
+            }
+            ended = true
             current?.status = "error"
             current?.stderr.append(Data("\nDie Sitzung wurde beendet.".utf8))
             let finish = current?.finish
@@ -369,6 +444,7 @@ public enum KernelLanguages {
             queue.removeAll()
             lock.unlock()
             finish?()
+            // Each waiting request sees the ended process and answers with an error.
             pending.forEach { $0() }
         }
     }
@@ -413,7 +489,9 @@ struct KernelFrame: Equatable {
     static func next(in buffer: Data) -> KernelFrame? {
         guard !buffer.isEmpty else { return nil }
         guard let m = buffer.firstIndex(of: markerByte) else {
-            return KernelFrame(text: String(decoding: buffer, as: UTF8.self), consumed: buffer.count, marker: nil, continues: false)
+            // A character split between two reads waits for its other bytes (#294).
+            let complete = UTF8Stream.completeLength(buffer)
+            return KernelFrame(text: String(decoding: buffer.prefix(complete), as: UTF8.self), consumed: complete, marker: nil, continues: false)
         }
         let text = String(decoding: buffer[buffer.startIndex..<m], as: UTF8.self)
         let beforeMarker = m - buffer.startIndex

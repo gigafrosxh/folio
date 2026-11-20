@@ -27,7 +27,7 @@ struct ExecutionSettingsView: View {
                 Text("Grenzen")
             } footer: {
                 Text(
-                    "Gelten für jeden Lauf eines Code-Blocks. Bei zu viel Ausgabe bleiben Anfang und Ende erhalten. Erkannte Server laufen weiter, bis du sie stoppst. Zeitlimit, Interpreter, Arbeitsverzeichnis und Variablen lassen sich pro Notiz festlegen (Terminal-Symbol › Ausführungsumgebung)."
+                    "Gelten für jeden Lauf eines Code-Blocks. Bei zu viel Ausgabe bleiben Anfang und Ende erhalten. Das Arbeitsspeicher-Limit wird viermal pro Sekunde geprüft (weiche Grenze): Ein Programm kann kurz darüber liegen, bevor es gestoppt wird. Erkannte Server (Programme, die wirklich auf einem Port lauschen) laufen weiter, bis du sie stoppst. Zeitlimit, Interpreter, Arbeitsverzeichnis und Variablen lassen sich pro Notiz festlegen (Terminal-Symbol › Ausführungsumgebung)."
                 )
                 .font(.caption).foregroundStyle(.secondary)
             }

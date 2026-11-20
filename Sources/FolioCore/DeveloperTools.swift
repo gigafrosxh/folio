@@ -60,7 +60,8 @@ public struct ResourceLimits: Equatable, Sendable {
     public var timeout: TimeInterval
     /// Maximum output kept per run (bytes); the rest is dropped with a note.
     public var maxOutputBytes: Int
-    /// Memory limit for the whole process tree in megabytes (0 = none).
+    /// Memory limit for the whole process tree in megabytes (0 = none). A soft limit: macOS enforces no hard memory
+    /// cap for a process tree, so it is checked every 0.25 s and the run is stopped when it is exceeded (#300).
     public var maxMemoryMB: Int
     /// Stop processes the program left behind when it ends.
     public var killOrphans: Bool

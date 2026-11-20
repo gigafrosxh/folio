@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben (Code-Ausführung)
+- **Eigene Prozessgruppe pro Lauf** (#287, #288, #289, #290): Code-Blöcke laufen in einer eigenen Prozessgruppe. Ein Hintergrundprozess, der die Ausgabe offen hält, lässt den Lauf nicht mehr hängen; kurzlebige Helfer und verwaiste Prozesse werden zuverlässig beendet; verzögerte Signale treffen nie einen fremden Prozess mit wiederverwendeter Nummer; Abbrechen wirkt auch genau beim Start.
+- **Server-Erkennung** (#291): Nur ein Programm, das wirklich auf einem Port lauscht, gilt als Server und behält kein Zeitlimit; eine bloß ausgegebene Adresse hebt das Zeitlimit nicht mehr auf.
+- **Ausgabe** (#294, #295): Umlaute und Emoji bleiben auch an Blockgrenzen der Ausgabe ganz; sehr große Ausgaben werden nur bis zu einer Grenze live angezeigt, Anfang und Ende stehen im Ergebnis.
+- **Sitzungen (Kernel)** (#292, #293, #296, #297, #298): Sendefehler und ein beendeter Interpreter beantworten alle wartenden Anfragen sofort; manuelles Stoppen wird als „abgebrochen“ gemeldet (anders als das Zeitlimit); Vervollständigung wartet nicht hinter langen Läufen; Ausgaben kommen in der richtigen Reihenfolge an.
+- **Interpreter-Suche** (#299): Das Abfragen des Login-Shell-PATH hat eine harte Grenze von 3 Sekunden, auch wenn die Shell Hilfsprozesse startet.
+- **Arbeitsspeicher-Limit** (#300): Ehrlich als weiche Grenze beschrieben (viermal pro Sekunde geprüft, macOS kennt keine harte Grenze für Prozessbäume).
+
 ## [1.11.1] – 2026-11-20
 
 ### Sicherheit
