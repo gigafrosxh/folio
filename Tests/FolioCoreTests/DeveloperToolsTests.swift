@@ -5,7 +5,7 @@ final class DeveloperToolsTests: XCTestCase {
     private var python: LanguageSpec { Languages.spec(for: "python") }
 
     private func requirePython() throws {
-        if InterpreterLocator.shared.find("python3") == nil { throw XCTSkip("python3 fehlt") }
+        if InterpreterLocator.shared.find("python3") == nil { throw skipOrFail("python3 fehlt", tool: "python3") }
     }
 
     // MARK: Environment (#25)

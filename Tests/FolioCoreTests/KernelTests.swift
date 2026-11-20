@@ -3,7 +3,7 @@ import XCTest
 
 final class KernelTests: XCTestCase {
     func testPythonSharesState() async throws {
-        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
         let k = try Kernel(language: KernelLanguages.python)
         defer { k.shutdown() }
         let a = await k.execute("a = 10\nprint('set')")
@@ -21,7 +21,7 @@ final class KernelTests: XCTestCase {
     }
 
     func testTimeoutInterruptsButKeepsSession() async throws {
-        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
         let k = try Kernel(language: KernelLanguages.python)
         defer { k.shutdown() }
         _ = await k.execute("x = 5")
@@ -32,7 +32,7 @@ final class KernelTests: XCTestCase {
     }
 
     func testQueuedRuns() async throws {
-        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
         let k = try Kernel(language: KernelLanguages.python)
         defer { k.shutdown() }
         let one = Task { await k.execute("import time\ntime.sleep(0.3)\nn = 1") }

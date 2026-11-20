@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert (CI und Releases)
+- **Release prüft genau den veröffentlichten Stand** (#315): Tests und Komplexitätsprüfung laufen in einem Export des Release-Commits, nicht in der Arbeitskopie; `scripts/release.sh --check` prüft den committeten Stand ohne Release.
+- **Unterbrochene Releases fortsetzen** (#319): Der Tag entsteht erst nach Tests und Installer; ein abgebrochener Lauf setzt mit demselben Aufruf fort, ein vorhandenes Release bekommt die fehlenden Dateien.
+- **Aufräumen** (#323): Testbibliothek und Testlog eines Releases liegen in einem temporären Ordner, der danach gelöscht wird; das Log bleibt nur bei einem Fehler und sein Pfad wird angezeigt.
+- **Übersprungene Tests** (#317): Die CI installiert PostgreSQL und MySQL; Tests für vorhandene Werkzeuge dürfen dort nicht mehr still übersprungen werden (`FOLIO_REQUIRE`), und jeder verbliebene Skip steht mit Grund in der Zusammenfassung.
+- **Komplexität als eigener CI-Job** (#320), unabhängig vom App-Bundle.
+- **Feste Xcode-Version** (#321, #322): Die CI nutzt Xcode 26.6, prüft die Version und bricht ab, wenn sie fehlt; ein zusätzlicher, nicht blockierender Job probiert die neueste Xcode-Version. Der iPad-Selbsttest wählt ein vom Simulator unterstütztes Gerät.
+
 ## [1.11.6] – 2026-11-20
 
 ### Geändert

@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# One fixed toolchain (#321); a separate job tries the newest Xcode on the runner without failing the run.
+env:
+  XCODE_VERSION: "26.6"
+
 jobs:
   build-and-test:
     name: Build & Tests (macOS)
@@ -20,9 +24,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Toolchain
+        # Fails when the pinned Xcode is missing instead of building with another one (#321, #322).
         run: |
-          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)" || true
-          xcodebuild -version
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version | tee xcode.txt
+          grep -q "^Xcode ${XCODE_VERSION}$" xcode.txt
           swift --version
 
       - name: Cache SwiftPM
@@ -39,10 +45,26 @@ jobs:
       - name: Build
         run: swift build
 
+      - name: Test tools
+        # PostgreSQL and MySQL for the database tests (#317); SQL Server needs Docker, which macOS runners lack.
+        run: brew install --quiet postgresql@17 mysql && echo "$(brew --prefix postgresql@17)/bin" >> "$GITHUB_PATH"
+
       - name: Unit tests
-        timeout-minutes: 12
-        # Database tests skip themselves when PostgreSQL/MySQL/MSSQL tools are not installed.
+        timeout-minutes: 15
+        # These tools are on the runner, so their tests must run: a missing one fails instead of skipping (#317).
+        env:
+          FOLIO_REQUIRE: python3,initdb,pg_ctl,psql,postgres,mysqld,mysql
         run: swift test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+
+      - name: Skipped tests
+        if: always()
+        # Every skip is listed with its reason in the job summary (#317).
+        run: |
+          {
+            echo "### Übersprungene Tests"
+            grep -E "Test Case .* skipped|: Test skipped" test.log | sed -E 's/^.*-\[([^]]+)\].*$/- \1/' | sort -u || true
+            grep -oE "Test skipped - .*" test.log | sort | uniq -c | sed 's/^/    /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: App bundle
         run: ./scripts/build-app.sh
@@ -76,6 +98,29 @@ jobs:
           path: regression-logs/*.log
           if-no-files-found: ignore
 
+      - name: Test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: test.log
+
+  complexity:
+    # Independent of the app build, so a broken bundle never hides the report (#320).
+    name: Complexity
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        # Fails when the pinned Xcode is missing instead of building with another one (#321, #322).
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version | tee xcode.txt
+          grep -q "^Xcode ${XCODE_VERSION}$" xcode.txt
+          swift --version
+
       - name: Cache complexity check
         uses: actions/cache@v4
         with:
@@ -98,12 +143,21 @@ jobs:
             complexity.json
           if-no-files-found: ignore
 
-      - name: Test log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-log
-          path: test.log
+
+  newest-xcode:
+    # Early warning for the next Xcode; does not fail the run (#321).
+    name: Newest Xcode (informational)
+    runs-on: macos-26
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
+      - name: Build and test
+        run: swift build && swift test
 
   ipad:
     # The iPad/iPhone app (#214) is iOS-only code that the macOS build never compiles (#316). Both configurations are
@@ -115,10 +169,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        # No "|| true": a missing Xcode must fail the job, not build with the wrong one.
+        # Fails when the pinned Xcode is missing instead of building with another one (#321, #322).
         run: |
-          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
-          xcodebuild -version
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version | tee xcode.txt
+          grep -q "^Xcode ${XCODE_VERSION}$" xcode.txt
+          swift --version
 
       - name: Build Release
         run: CONFIG=Release scripts/build-ipad.sh
@@ -131,8 +187,11 @@ jobs:
         run: |
           set -euo pipefail
           SET="$RUNNER_TEMP/simset"; mkdir -p "$SET"
-          RUNTIME="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(r[-1]["identifier"])')"
-          TYPE="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; t=[x for x in json.load(sys.stdin)["devicetypes"] if "iPad" in x["name"]]; print(t[-1]["identifier"])')"
+          # An iPad the runtime actually supports ("Incompatible device" otherwise).
+          read -r RUNTIME TYPE < <(xcrun simctl list runtimes -j | python3 -c 'import json,sys
+          r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]][-1]
+          t=[d for d in r.get("supportedDeviceTypes", []) if "iPad" in d["name"]]
+          print(r["identifier"], t[-1]["identifier"])')
           UDID="$(xcrun simctl --set "$SET" create folio-ci "$TYPE" "$RUNTIME")"
           xcrun simctl --set "$SET" boot "$UDID"
           xcrun simctl --set "$SET" install "$UDID" build/FolioPad.app

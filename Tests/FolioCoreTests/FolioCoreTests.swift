@@ -89,7 +89,7 @@ final class CodeRunnerTests: XCTestCase {
     }
 
     func testPythonIfInstalled() async throws {
-        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
         let result = try await CodeRun().run(code: "print(6*7)", language: Languages.spec(for: "python"))
         XCTAssertEqual(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "42")
     }
@@ -109,7 +109,7 @@ final class ServerDetectorTests: XCTestCase {
     }
 
     func testSilentServerKeepsRunningPastTimeout() async throws {
-        guard InterpreterLocator.shared.find("python3") != nil else { throw XCTSkip("kein python3") }
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
         let run = CodeRun()
         let detected = expectation(description: "server")
         let code = "import http.server, socketserver\nsocketserver.TCPServer(('127.0.0.1', 0), http.server.SimpleHTTPRequestHandler).serve_forever()"
@@ -142,7 +142,7 @@ final class CodeStyleTests: XCTestCase {
     }
 
     func testGofmtIfInstalled() throws {
-        guard CodeFormatter.available(for: Languages.spec(for: "go")) != nil else { throw XCTSkip("kein gofmt") }
+        guard CodeFormatter.available(for: Languages.spec(for: "go")) != nil else { throw skipOrFail("kein gofmt", tool: "gofmt") }
         let out = try CodeFormatter.format("package main\nfunc main(){\nx:=1\n_=x}", language: Languages.spec(for: "go"))
         XCTAssertTrue(out.contains("\tx := 1"))
     }

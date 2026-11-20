@@ -4,7 +4,7 @@ import XCTest
 final class KernelMoreTests: XCTestCase {
     private func kernel(_ language: KernelLanguage) throws -> Kernel {
         guard InterpreterLocator.shared.find(language.command[0]) != nil else {
-            throw XCTSkip("\(language.command[0]) ist nicht installiert.")
+            throw skipOrFail("\(language.command[0]) ist nicht installiert.", tool: language.command[0])
         }
         return try Kernel(language: language)
     }

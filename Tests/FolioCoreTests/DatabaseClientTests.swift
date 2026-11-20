@@ -35,7 +35,7 @@ final class DatabaseClientTests: XCTestCase {
     }
 
     private func binary(_ name: String) throws -> String {
-        guard let path = InterpreterLocator.shared.find(name) else { throw XCTSkip("\(name) ist nicht installiert.") }
+        guard let path = InterpreterLocator.shared.find(name) else { throw skipOrFail("\(name) ist nicht installiert.", tool: name) }
         return path
     }
 
@@ -161,7 +161,7 @@ final class DatabaseClientTests: XCTestCase {
         do { try command(initdb, ["-D", data, "-A", "trust", "-U", "folio", "--encoding=UTF8", "--no-locale"]) } catch DatabaseError.queryFailed(let message)
             where message.contains("Operation not permitted") && message.contains("shared memory")
         {
-            throw XCTSkip("Die Umgebung erlaubt PostgreSQL keinen gemeinsamen Speicher.")
+            throw skipOrFail("Die Umgebung erlaubt PostgreSQL keinen gemeinsamen Speicher.", tool: "postgres")
         }
         postgres = (ctl, data)
         try command(ctl, ["-D", data, "-o", "-p \(port) -k /tmp -h 127.0.0.1", "-l", directory.appendingPathComponent("log").path, "start", "-w"])
@@ -175,7 +175,7 @@ final class DatabaseClientTests: XCTestCase {
         let data = directory.appendingPathComponent("data").path
         let port = try freePort()
         do { try command(mysqld, ["--no-defaults", "--initialize-insecure", "--datadir=\(data)"], timeout: 30) } catch {
-            throw XCTSkip("MySQL konnte nicht initialisiert werden: \(error)")
+            throw skipOrFail("MySQL konnte nicht initialisiert werden: \(error)", tool: "mysql")
         }
         let server = Process()
         server.executableURL = URL(fileURLWithPath: mysqld)
@@ -199,7 +199,7 @@ final class DatabaseClientTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 200_000_000)
         }
-        guard ready else { throw XCTSkip("MySQL wurde nicht innerhalb von 30 Sekunden bereit.") }
+        guard ready else { throw skipOrFail("MySQL wurde nicht innerhalb von 30 Sekunden bereit.", tool: "mysql") }
         _ = try await DatabaseClient.run("CREATE DATABASE test", on: connection, password: nil)
         connection.database = "test"
         try await roundTrip(connection)

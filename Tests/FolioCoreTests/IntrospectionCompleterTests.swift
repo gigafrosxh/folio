@@ -4,7 +4,7 @@ import XCTest
 
 final class IntrospectionCompleterTests: XCTestCase {
     private func complete(_ code: String, language: String, tool: String) async throws -> [CompletionItem] {
-        guard InterpreterLocator.shared.find(tool) != nil else { throw XCTSkip("\(tool) ist nicht installiert.") }
+        guard InterpreterLocator.shared.find(tool) != nil else { throw skipOrFail("\(tool) ist nicht installiert.", tool: tool) }
         return await IntrospectionCompleter().complete(CompletionContext(code: code, offset: (code as NSString).length, language: language))
     }
 
