@@ -46,7 +46,7 @@
             await autosave(url)
             savesInReverseOrder(url)
             await macChangeArrives(url)
-            switchLibrary()
+            await switchLibrary()
             displayScale()
             otherBlocksStay(except: url)
             editDuringConflictCopy(url)
@@ -103,7 +103,8 @@
             guard let doc = library.document else { return }
             doc.setCode("print(2)", of: doc.blocks[1].id)
             library.changed()
-            try? await Task.sleep(for: .seconds(3))
+            // Up to 15 s: a busy CI simulator compresses slowly.
+            for _ in 0..<30 where doc.isDirty { try? await Task.sleep(for: .milliseconds(500)) }
             check(!doc.isDirty && (try? NoteFile.read(from: url))?.body.blocks.last?.code == "print(2)", "Automatisch gesichert (im Hintergrund komprimiert)")
         }
 
@@ -124,6 +125,8 @@
 
         /// Editing while a conflict copy is written: the newer edit stays unsaved instead of being dropped (#268).
         private func editDuringConflictCopy(_ url: URL) {
+            library.selectedNote = nil
+            library.selectedNote = url
             guard let doc = library.document, doc.url == url else { return check(false, "Konfliktkopie: Dokument offen") }
             changeOnDisk(url, to: "Extern geändert (Revision)")
             doc.setCode("print('im Snapshot')", of: doc.blocks[1].id)
@@ -225,7 +228,7 @@
         }
 
         /// Another folder as library and back; nothing in either folder changes (#213).
-        private func switchLibrary() {
+        private func switchLibrary() async {
             let original = library.root
             let other = FileManager.default.temporaryDirectory.appendingPathComponent("folio-other-\(UUID().uuidString)")
             try? FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
@@ -233,9 +236,10 @@
             PadDocument.refreshMeta(&note)
             try? note.write(to: other.appendingPathComponent("Andere.folio"))
             let before = library.notes.count
-            library.useLibrary(other)
+            // The new library is read in the background (#302): wait for that scan.
+            await library.useLibrary(other)?.value
             check(library.notes.map(\.meta.title) == ["Andere Bibliothek"], "Anderer Ordner als Bibliothek")
-            library.useLibrary(original)
+            await library.useLibrary(original)?.value
             check(library.notes.count == before && library.root == original, "Zurück zur Testbibliothek")
             UserDefaults.standard.removeObject(forKey: "libraryBookmark")
         }

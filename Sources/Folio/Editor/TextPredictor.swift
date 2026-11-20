@@ -42,13 +42,25 @@ enum TextPredictor {
         """
 
     /// Suggests how `context` (the text before the cursor, ending in a space) continues; nil if nothing useful.
+    #if canImport(FoundationModels)
+        /// The newer SDK renamed the parameter; the CI builds with the pinned Xcode 26.6 SDK (#321).
+        @available(macOS 26.0, *)
+        static func greedy(maximumResponseTokens: Int) -> GenerationOptions {
+            #if compiler(>=6.4)
+                GenerationOptions(samplingMode: .greedy, maximumResponseTokens: maximumResponseTokens)
+            #else
+                GenerationOptions(sampling: .greedy, maximumResponseTokens: maximumResponseTokens)
+            #endif
+        }
+    #endif
+
     static func suggest(for context: String) async -> String? {
         let trimmed = String(context.suffix(400))
         if let hit = cache[trimmed] { return hit }
         #if canImport(FoundationModels)
             if #available(macOS 26.0, *), case .available = status {
                 let session = SessionPool.take(.text, instructions: instructions)
-                let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 20)
+                let options = Self.greedy(maximumResponseTokens: 20)
                 guard let response = try? await session.respond(to: trimmed, options: options),
                     let text = clean(response.content, context: context)
                 else { return nil }
@@ -89,7 +101,7 @@ enum TextPredictor {
                 let prompt = "Language: \(name)\n" + String(before.suffix(900)) + "<CURSOR>" + String(after.prefix(200))
                 if let hit = cache[prompt] { return hit }
                 let session = SessionPool.take(.code, instructions: codeInstructions(for: name))
-                let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 60)
+                let options = Self.greedy(maximumResponseTokens: 60)
                 guard let response = try? await session.respond(to: prompt, options: options),
                     let code = cleanCode(response.content, linePrefix: linePrefix, after: after)
                 else { return nil }

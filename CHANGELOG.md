@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **CI** (#364): Die Apple-Intelligence-Optionen kompilieren wieder mit dem festgelegten Xcode 26.6 (der neuere Parametername nur mit neuerem Compiler). Der iPad-Selbsttest, der jetzt erstmals in der CI im Simulator läuft, wartet beim Bibliothekswechsel auf das Einlesen im Hintergrund und beim automatischen Sichern bis zu 15 Sekunden.
+
 ## [1.11.8] – 2026-11-20
 
 ### Behoben (Qualität)

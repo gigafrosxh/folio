@@ -125,16 +125,18 @@
 
         /// Uses another folder as the library, e.g. the Mac's library in iCloud Drive or a shared folder (#213).
         /// The open note is saved first; nothing in either folder is moved or changed.
-        func useLibrary(_ url: URL?) {
-            guard saveNow() == .saved else { return }
-            guard url.map(adoptPickedFolder) ?? adoptDefaultLibrary() else { return }
+        /// Returns the background scan of the new library (nil when nothing changed).
+        @discardableResult
+        func useLibrary(_ url: URL?) -> Task<Void, Never>? {
+            guard saveNow() == .saved else { return nil }
+            guard url.map(adoptPickedFolder) ?? adoptDefaultLibrary() else { return nil }
             scanner.clearCache()
             setSelection(nil)
             document = nil
             selectedFolder = nil
             notes = []
             folders = []
-            refreshFromDisk(force: true)
+            return refreshFromDisk(force: true)
         }
 
         /// Checks access, readability and the bookmark first; only then leaves the current library (#350). A picked folder
