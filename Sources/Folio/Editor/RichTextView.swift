@@ -541,7 +541,7 @@ final class FolioTextView: NSTextView {
         let titleFont = typingAttributes[.font] as? NSFont
         // Rich text keeps its look but takes Folio's typeface and text colour (#357).
         if let rich = PasteStyle.richText(from: pb) {
-            insertText(PasteStyle.adopt(rich, body: bodyAttributes()), replacementRange: selectedRange())
+            insertPasted(PasteStyle.adopt(rich, body: bodyAttributes()))
             if inTitle, let titleFont { demotePastedLinesAfterTitle(from: start, to: selectedRange().location, titleFont: titleFont) }
             return
         }
@@ -550,6 +550,18 @@ final class FolioTextView: NSTextView {
             return
         }
         if inTitle, let titleFont { demotePastedLinesAfterTitle(from: start, to: selectedRange().location, titleFont: titleFont) }
+    }
+
+    /// Inserts pasted rich text with its own fonts: `insertText` would keep the colours but replace every font with the
+    /// typing font, so sizes, bold and italics got lost (#361). Undoable like typing.
+    func insertPasted(_ text: NSAttributedString) {
+        let range = selectedRange()
+        guard let storage = textStorage, shouldChangeText(in: range, replacementString: text.string) else { return }
+        storage.replaceCharacters(in: range, with: text)
+        didChangeText()
+        let end = NSRange(location: range.location + text.length, length: 0)
+        setSelectedRange(end)
+        scrollRangeToVisible(end)
     }
 
     /// Pasting several lines into the title line keeps only the first as title; the rest becomes body

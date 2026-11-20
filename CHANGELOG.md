@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Eingefügter Text** (#361): Beim Einfügen aus Webseiten, Pages oder Word bleiben Größe, Fett und Kursiv jetzt wirklich erhalten; bisher übernahm Folio nur die Farben und setzte alles in die normale Schriftgröße. Das Einfügen lässt sich wie gewohnt rückgängig machen.
+
 ## [1.10.1] – 2026-11-20
 
 ### Behoben

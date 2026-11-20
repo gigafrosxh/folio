@@ -43,4 +43,31 @@ final class PasteStyleTests: XCTestCase {
         XCTAssertFalse(PasteStyle.isPlainTextColor(.systemBlue))
         XCTAssertFalse(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0.4, green: 0.4, blue: 0.4, alpha: 1)))
     }
+
+    /// #361: the real paste keeps size, bold and italics (insertText used to replace the fonts) and can be undone.
+    func testPasteKeepsSizeBoldAndItalic() throws {
+        let tv = FolioTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        tv.isRichText = true
+        tv.allowsUndo = true
+        tv.bodyAttributes = { ThemeManager.shared.bodyAttributes }
+        let window = NSWindow(contentRect: tv.frame, styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView = tv
+        let pb = NSPasteboard(name: NSPasteboard.Name("folio-test-\(UUID().uuidString)"))
+        pb.clearContents()
+        pb.setData(Data(#"<p style="font-family: Georgia; font-size: 24px; color: #000">Gross <b>fett</b> <i>kursiv</i></p>"#.utf8), forType: .html)
+        pb.setString("Gross fett kursiv", forType: .string)
+        tv.paste(from: pb)
+        pb.releaseGlobally()
+        let storage = try XCTUnwrap(tv.textStorage)
+        let s = storage.string as NSString
+        func font(_ word: String) -> NSFont? { storage.attribute(.font, at: s.range(of: word).location, effectiveRange: nil) as? NSFont }
+        let expected = try XCTUnwrap(html(#"<p style="font-size: 24px">x</p>"#).attribute(.font, at: 0, effectiveRange: nil) as? NSFont).pointSize
+        XCTAssertEqual(font("Gross")?.pointSize ?? 0, expected, accuracy: 0.1, "Größe bleibt")
+        XCTAssertTrue(font("fett")?.fontDescriptor.symbolicTraits.contains(.bold) == true)
+        XCTAssertTrue(font("kursiv")?.fontDescriptor.symbolicTraits.contains(.italic) == true)
+        XCTAssertEqual(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .textColor)
+        XCTAssertEqual(tv.selectedRange().location, storage.length, "Cursor hinter dem eingefügten Text")
+        tv.undoManager?.undo()
+        XCTAssertFalse(tv.string.contains("Gross"), "Einfügen lässt sich rückgängig machen")
+    }
 }
