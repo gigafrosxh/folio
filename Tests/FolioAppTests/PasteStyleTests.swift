@@ -110,4 +110,20 @@ final class PasteStyleTests: XCTestCase {
         XCTAssertNotEqual((attrs[.font] as? NSFont)?.familyName, "Georgia", "Folio-Schrift statt Georgia")
         XCTAssertEqual((attrs[.font] as? NSFont)?.pointSize ?? 0, 18, accuracy: 0.1, "Größe bleibt")
     }
+
+    /// #363: lists keep their markers and levels as Folio lists.
+    func testListsBecomeFolioLists() {
+        let source = html("<p>Vor</p><ul><li>Eins</li><li>Zwei<ul><li>Unter</li></ul></li></ul><ol><li>Erst</li><li>Dann</li></ol><p>Nach</p>")
+        let out = PasteStyle.adopt(source, body: body)
+        let lines = out.string.components(separatedBy: "\n").filter { !$0.isEmpty }
+        XCTAssertEqual(lines, ["Vor", "• Eins", "• Zwei", "\t• Unter", "1. Erst", "2. Dann", "Nach"])
+        XCTAssertEqual(ListKind.detect("\t• Unter")?.kind, .bullet)
+        XCTAssertEqual(ListKind.detect("2. Dann")?.kind, .numbered)
+        let s = out.string as NSString
+        let item = out.attribute(.paragraphStyle, at: s.range(of: "Eins").location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(item?.headIndent ?? 0, PasteStyle.listHeadIndent, accuracy: 0.1)
+        XCTAssertEqual(item?.textLists.count, 0, "keine AppKit-Listen mehr, Folio-Marker im Text")
+        let plain = out.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(plain?.headIndent ?? -1, 0, accuracy: 0.1)
+    }
 }

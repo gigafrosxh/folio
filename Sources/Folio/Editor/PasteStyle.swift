@@ -13,7 +13,7 @@ enum PasteStyle {
     }
 
     static func adopt(_ source: NSAttributedString, body: [NSAttributedString.Key: Any]) -> NSAttributedString {
-        let out = NSMutableAttributedString(attributedString: source)
+        let (out, listParagraphs) = foldingLists(source)
         let bodyFont = (body[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 14)
         let bodyColor = (body[.foregroundColor] as? NSColor) ?? .textColor
         let bodyParagraph = (body[.paragraphStyle] as? NSParagraphStyle) ?? .default
@@ -29,7 +29,51 @@ enum PasteStyle {
             if let source = attrs[.paragraphStyle] as? NSParagraphStyle { paragraph.alignment = source.alignment }
             out.addAttribute(.paragraphStyle, value: paragraph, range: range)
         }
+        // Wrapped list lines line up after the marker, as with lists made in Folio.
+        for range in listParagraphs {
+            out.enumerateAttribute(.paragraphStyle, in: range) { value, sub, _ in
+                guard let style = (value as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle else { return }
+                style.headIndent = listHeadIndent
+                out.addAttribute(.paragraphStyle, value: style, range: sub)
+            }
+        }
         return out
+    }
+
+    /// Indent of wrapped lines in a list paragraph (same as `FormattingController.toggleList`).
+    static let listHeadIndent: CGFloat = 22
+
+    private static let orderedFormats: Set<NSTextList.MarkerFormat> = [
+        .decimal, .lowercaseAlpha, .uppercaseAlpha, .lowercaseLatin, .uppercaseLatin, .lowercaseRoman, .uppercaseRoman,
+        .octal, .lowercaseHexadecimal, .uppercaseHexadecimal
+    ]
+
+    /// Lists from web pages, Pages or Word (paragraphs with `textLists`, marker text between tabs) become Folio lists:
+    /// one tab per sub-level, then "• " or "N. ", so they keep working like typed lists (#363). Returns the text and
+    /// the ranges of the list paragraphs in it.
+    static func foldingLists(_ source: NSAttributedString) -> (NSMutableAttributedString, [NSRange]) {
+        let ns = source.string as NSString
+        let out = NSMutableAttributedString()
+        var lists: [NSRange] = []
+        var location = 0
+        while location < ns.length {
+            let range = ns.paragraphRange(for: NSRange(location: location, length: 0))
+            location = NSMaxRange(range)
+            let paragraph = NSMutableAttributedString(attributedString: source.attributedSubstring(from: range))
+            let style = source.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle
+            let text = paragraph.string as NSString
+            let marker = text.range(of: "^\\t*[^\\t\\n]*\\t", options: .regularExpression)
+            if let style, let list = style.textLists.last, marker.location != NSNotFound {
+                let ordered = orderedFormats.contains(list.markerFormat)
+                let prefix = ordered ? "\(source.itemNumber(in: list, at: range.location)). " : ListKind.bullet.rawValue
+                let tabs = String(repeating: "\t", count: style.textLists.count - 1)
+                let attrs = paragraph.attributes(at: min(NSMaxRange(marker), max(paragraph.length - 1, 0)), effectiveRange: nil)
+                paragraph.replaceCharacters(in: marker, with: NSAttributedString(string: tabs + prefix, attributes: attrs))
+                lists.append(NSRange(location: out.length, length: paragraph.length))
+            }
+            out.append(paragraph)
+        }
+        return (out, lists)
     }
 
     /// Same size, weight and slant as the source, in Folio's typeface; code stays monospaced.
