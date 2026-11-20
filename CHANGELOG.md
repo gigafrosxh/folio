@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.2] – 2026-11-20
+
 ### Behoben (Code-Ausführung)
 - **Eigene Prozessgruppe pro Lauf** (#287, #288, #289, #290): Code-Blöcke laufen in einer eigenen Prozessgruppe. Ein Hintergrundprozess, der die Ausgabe offen hält, lässt den Lauf nicht mehr hängen; kurzlebige Helfer und verwaiste Prozesse werden zuverlässig beendet; verzögerte Signale treffen nie einen fremden Prozess mit wiederverwendeter Nummer; Abbrechen wirkt auch genau beim Start.
 - **Server-Erkennung** (#291): Nur ein Programm, das wirklich auf einem Port lauscht, gilt als Server und behält kein Zeitlimit; eine bloß ausgegebene Adresse hebt das Zeitlimit nicht mehr auf.
