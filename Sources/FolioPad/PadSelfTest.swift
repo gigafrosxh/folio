@@ -54,6 +54,8 @@
             conflictWhileSwitching(url)
             failedSave(url)
             unstorableText(url)
+            damagedRTF()
+            await overlappingAutosaves(url)
             sameSecondChange(url)
             deletedElsewhere()
             trash(url)
@@ -145,6 +147,31 @@
             let accepted = doc.setText(NSAttributedString(string: "geht verloren"), of: doc.blocks[0].id)
             PadDocument.rtf = encode
             check(!accepted && doc.blocks[0].rtf == before, "RTF-Fehler: bisheriger Text bleibt erhalten (#270)")
+        }
+
+        /// Unreadable RTF is shown as damaged and its bytes are never replaced (#342).
+        private func damagedRTF() {
+            var block = BlockRecord(kind: .text)
+            block.rtf = Data("{\\rtf1 kaputt".utf8) + Data([0xFF, 0x00, 0xFE])
+            let doc = PadDocument(file: NoteFile(meta: NoteMetadata(title: "Kaputt"), body: NoteBody(blocks: [block])))
+            check(PadDocument.isUnreadable(block) || doc.attributedText(of: block).length > 0, "Beschädigtes RTF erkannt")
+            if PadDocument.isUnreadable(block) {
+                check(!doc.setText(NSAttributedString(string: "Neu"), of: block.id) && doc.blocks[0].rtf == block.rtf, "Beschädigtes RTF bleibt unverändert (#342)")
+            }
+        }
+
+        /// Several autosaves in a row never compress side by side and end with the newest text on disk (#336).
+        private func overlappingAutosaves(_ url: URL) async {
+            library.selectedNote = url
+            guard let doc = library.document, doc.blocks.count > 1 else { return check(false, "Autosave-Folge: Dokument offen") }
+            let history = NoteHistory(library: library.root)
+            var tasks: [Task<Void, Never>] = []
+            for i in 1...5 {
+                doc.setCode("print(\(i))", of: doc.blocks[1].id)
+                tasks.append(Task { _ = try? await doc.saveInBackground(history: history) })
+            }
+            for t in tasks { await t.value }
+            check(!doc.isDirty && (try? NoteFile.read(from: url))?.body.blocks[1].code == "print(5)", "Schnelle Autosaves: neuester Stand gesichert (#336)")
         }
 
         /// A change elsewhere with the same modification date is still noticed (size and checksum differ) (#271).

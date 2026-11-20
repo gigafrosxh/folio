@@ -42,6 +42,11 @@
 
         var blocks: [BlockRecord] { file.body.blocks }
 
+        /// Rough size of what a save compresses: attachments plus text and code (#303).
+        var payloadBytes: Int {
+            file.attachments.reduce(0) { $0 + $1.data.count } + file.body.blocks.reduce(0) { $0 + ($1.rtf?.count ?? 0) + ($1.code?.utf8.count ?? 0) }
+        }
+
         /// The file on disk is not the one this document was read from (or saved last).
         var changedOnDisk: Bool { FileStamp.of(url) != diskStamp }
 
@@ -59,11 +64,18 @@
             return s
         }
 
+        /// A text block whose stored RTF cannot be read: shown as damaged, never edited, so its bytes stay as they are
+        /// for the Mac or a later repair (#342).
+        static func isUnreadable(_ block: BlockRecord) -> Bool {
+            guard block.kind == .text, let rtf = block.rtf, !rtf.isEmpty else { return false }
+            return (try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf], documentAttributes: nil)) == nil
+        }
+
         /// Returns false when the text cannot be stored as RTF; the block then keeps its previous content instead of
         /// losing it (#270).
         @discardableResult
         func setText(_ text: NSAttributedString, of id: UUID) -> Bool {
-            guard let i = file.body.blocks.firstIndex(where: { $0.id == id }) else { return false }
+            guard let i = file.body.blocks.firstIndex(where: { $0.id == id }), !Self.isUnreadable(file.body.blocks[i]) else { return false }
             guard let rtf = Self.rtf(text) else { return false }
             file.body.blocks[i].rtf = rtf
             markChanged()
@@ -108,9 +120,27 @@
             return try write(snapshot, data: try snapshot.encoded(), revision: revision, history: history)
         }
 
+        /// The autosave that is running; another one waits for it instead of compressing in parallel (#336).
+        private var inFlight: Task<SaveOutcome, Error>?
+
         /// Autosave: compressing the note (with all attachments) runs off the main thread; checking for changes made
         /// elsewhere, keeping the previous version and writing stay on it, so they never race with each other (#264).
+        /// Single flight: while one compression runs, a new call waits for it and then saves what changed meanwhile, so
+        /// fast typing never starts compressions side by side (#336).
         func saveInBackground(history: NoteHistory) async throws -> SaveOutcome {
+            var earlier: SaveOutcome?
+            while let running = inFlight {
+                earlier = try? await running.value
+                if inFlight == running { inFlight = nil }
+            }
+            guard isDirty else { return earlier ?? .unchanged }
+            let task = Task { try await compressAndWrite(history: history) }
+            inFlight = task
+            defer { if inFlight == task { inFlight = nil } }
+            return try await task.value
+        }
+
+        private func compressAndWrite(history: NoteHistory) async throws -> SaveOutcome {
             guard isDirty else { return .unchanged }
             let snapshot = prepared()
             let rev = revision

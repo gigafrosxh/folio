@@ -52,25 +52,55 @@
             } else {
                 self.root = Self.defaultRoot
             }
-            try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
+            // A library that cannot be created or written is reported, never shown as an empty working one (#339).
+            do {
+                try FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
+            } catch {
+                message = "Die Bibliothek „\(self.root.lastPathComponent)“ lässt sich nicht anlegen: \(error.localizedDescription)"
+            }
+            if let problem = Self.restoreProblem { message = problem }
             reload()
-            if notes.isEmpty { createWelcomeNote() }
+            if notes.isEmpty, message == nil, Self.isUsable(self.root) { createWelcomeNote() }
         }
 
         static var defaultRoot: URL {
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Folio", isDirectory: true)
         }
 
+        /// Set when the picked library could not be restored; shown once the app is up (#337).
+        private static var restoreProblem: String?
+
         private static func restoredBookmark() -> URL? {
             guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
             var stale = false
-            guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else { return nil }
+            guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale) else {
+                restoreProblem = "Die gewählte Bibliothek ist nicht mehr erreichbar. Wähle sie unter „Bibliothek“ neu aus; bis dahin wird die Bibliothek auf dem Gerät verwendet."
+                return nil
+            }
             // A moved or renamed folder gives a stale bookmark; renew it so the next start finds the folder too (#350).
-            if stale, url.startAccessingSecurityScopedResource() {
-                if let fresh = try? url.bookmarkData() { UserDefaults.standard.set(fresh, forKey: bookmarkKey) }
-                url.stopAccessingSecurityScopedResource()
+            // If that is not possible, the folder is not used half-way: the user picks it again (#337).
+            if stale {
+                let access = url.startAccessingSecurityScopedResource()
+                let fresh = access ? try? url.bookmarkData() : nil
+                if access { url.stopAccessingSecurityScopedResource() }
+                guard let fresh else {
+                    restoreProblem =
+                        "Der Zugriff auf „\(url.lastPathComponent)“ ist abgelaufen. Wähle den Ordner unter „Bibliothek“ neu aus; bis dahin wird die Bibliothek auf dem Gerät verwendet."
+                    return nil
+                }
+                UserDefaults.standard.set(fresh, forKey: bookmarkKey)
             }
             return url
+        }
+
+        /// Whether Folio can read and write in `folder` (#338, #339).
+        static func isUsable(_ folder: URL) -> Bool {
+            let fm = FileManager.default
+            guard (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) != nil else { return false }
+            let probe = folder.appendingPathComponent(".folio-probe-\(UUID().uuidString)")
+            guard fm.createFile(atPath: probe.path, contents: Data()) else { return false }
+            try? fm.removeItem(at: probe)
+            return true
         }
 
         /// Uses another folder as the library, e.g. the Mac's library in iCloud Drive or a shared folder (#213).
@@ -79,12 +109,15 @@
             guard saveNow() == .saved else { return }
             if let url {
                 // Check access, readability and the bookmark first; only then leave the current library (#350).
+                // A picked folder needs security-scoped access (only folders inside the app's own container work without),
+                // must be readable and writable, and gets a bookmark (#338).
                 let access = url.startAccessingSecurityScopedResource()
-                let readable = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) != nil
-                let bookmark = try? url.bookmarkData()
-                guard readable, let bookmark else {
+                let ownContainer = url.standardizedFileURL.path.hasPrefix(Self.defaultRoot.deletingLastPathComponent().standardizedFileURL.path)
+                let usable = (access || ownContainer) && Self.isUsable(url)
+                let bookmark = usable ? try? url.bookmarkData() : nil
+                guard usable, let bookmark else {
                     if access { url.stopAccessingSecurityScopedResource() }
-                    message = "Der Ordner „\(url.lastPathComponent)“ lässt sich nicht als Bibliothek verwenden (kein Zugriff). Die bisherige Bibliothek bleibt."
+                    message = "Der Ordner „\(url.lastPathComponent)“ lässt sich nicht als Bibliothek verwenden (kein Lese- oder Schreibzugriff). Die bisherige Bibliothek bleibt."
                     return
                 }
                 if scoped { root.stopAccessingSecurityScopedResource() }
@@ -92,11 +125,16 @@
                 UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
                 root = url
             } else {
+                do {
+                    try FileManager.default.createDirectory(at: Self.defaultRoot, withIntermediateDirectories: true)
+                } catch {
+                    message = "Die Bibliothek auf dem Gerät lässt sich nicht anlegen: \(error.localizedDescription) Die bisherige Bibliothek bleibt."
+                    return
+                }
                 if scoped { root.stopAccessingSecurityScopedResource() }
                 scoped = false
                 UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
                 root = Self.defaultRoot
-                try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             }
             scanner.clearCache()
             setSelection(nil)
@@ -162,12 +200,34 @@
         /// Opening another note first saves the open one. If that fails, the selection goes back and the unsaved edits
         /// stay open; nothing is replaced (#260).
         private func switchNote(from old: URL?) {
+            // A large note (attachments) is compressed off the main thread; the switch happens when it is saved, so
+            // the interface never freezes and a failure still keeps the edits open (#303).
+            if let doc = document, doc.isDirty, doc.payloadBytes > Self.asyncSwitchThreshold {
+                let target = selectedNote
+                setSelection(old)
+                saveTask?.cancel()
+                Task {
+                    do {
+                        let outcome = try await doc.saveInBackground(history: NoteHistory(library: root))
+                        handle(outcome, of: doc, selectCopy: false)
+                        guard document === doc else { return }
+                        setSelection(target)
+                        open(target)
+                    } catch {
+                        message = "Sichern fehlgeschlagen: \(error.localizedDescription) Die Änderungen bleiben offen."
+                    }
+                }
+                return
+            }
             if saveNow(selectCopy: false) == .failed {
                 setSelection(old)
                 return
             }
             open(selectedNote)
         }
+
+        /// Above this size (text and attachments) switching saves in the background (#303).
+        static let asyncSwitchThreshold = 2_000_000
 
         private func setSelection(_ url: URL?) {
             reverting = true
@@ -250,7 +310,8 @@
         // MARK: Create, delete
 
         func createNote(text: String = "") {
-            saveNow()
+            // Only after the open note is safely saved; a failure or conflict copy is shown first (#340).
+            guard saveNow() == .saved else { return }
             let folder = selectedFolder ?? root
             var file = NoteFile(meta: NoteMetadata(title: "Neue Notiz"), body: NoteBody(blocks: [PadDocument.textRecord(text)]))
             PadDocument.refreshMeta(&file)

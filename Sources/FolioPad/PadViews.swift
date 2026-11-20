@@ -176,6 +176,10 @@
 
         var body: some View {
             switch block.kind {
+            case .text where PadDocument.isUnreadable(block):
+                // Damaged RTF stays untouched (#342).
+                Label("Dieser Textabsatz ist beschädigt und lässt sich nicht lesen. Folio lässt ihn unverändert.", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
             case .text:
                 PadTextView(text: doc.attributedText(of: block)) {
                     // Text that cannot be stored keeps the block as it was and says so (#270).

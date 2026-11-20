@@ -7,6 +7,16 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben (iPad und iPhone)
+- **Notizwechsel bei großen Notizen** (#303): Eine Notiz mit vielen Anhängen wird beim Wechsel im Hintergrund gesichert; die Oberfläche friert nicht ein, und bei einem Fehler bleiben die Änderungen offen.
+- **Automatisches Sichern** (#336): Schnelles Tippen startet keine parallelen Komprimierungen mehr; Sicherungen laufen nacheinander und fassen Änderungen zusammen.
+- **Gewählte Bibliothek** (#337, #338, #339): Ein abgelaufener Ordnerzugriff wird erneuert oder Folio bittet um eine neue Auswahl; ein Ordner ohne Lese- oder Schreibrecht wird nicht übernommen (die bisherige Bibliothek bleibt); kann die Bibliothek nicht angelegt werden, sagt Folio das, statt eine leere Bibliothek zu zeigen.
+- **Neue Notiz** (#340): Wird erst angelegt, wenn die offene Notiz sicher gesichert ist.
+- **Beschädigter Text** (#342): Ein unlesbarer Textabsatz wird als beschädigt angezeigt und nie überschrieben.
+
+### Geändert
+- **CI** (#316, #341): Die iPad-App wird in Debug und Release für den Simulator gebaut und ihr Selbsttest läuft in einem Wegwerf-Simulator; `CONFIG=Release scripts/build-ipad.sh` baut die Release-Konfiguration.
+
 ## [1.11.2] – 2026-11-20
 
 ### Behoben (Code-Ausführung)

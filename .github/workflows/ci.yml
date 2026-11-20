@@ -104,3 +104,51 @@ jobs:
         with:
           name: test-log
           path: test.log
+
+  ipad:
+    # The iPad/iPhone app (#214) is iOS-only code that the macOS build never compiles (#316). Both configurations are
+    # built (#341); the Debug build runs its self-test in a throwaway simulator.
+    name: iPad (Simulator)
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        # No "|| true": a missing Xcode must fail the job, not build with the wrong one.
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Build Release
+        run: CONFIG=Release scripts/build-ipad.sh
+
+      - name: Build Debug
+        run: scripts/build-ipad.sh
+
+      - name: Self-test in the simulator
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          SET="$RUNNER_TEMP/simset"; mkdir -p "$SET"
+          RUNTIME="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(r[-1]["identifier"])')"
+          TYPE="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; t=[x for x in json.load(sys.stdin)["devicetypes"] if "iPad" in x["name"]]; print(t[-1]["identifier"])')"
+          UDID="$(xcrun simctl --set "$SET" create folio-ci "$TYPE" "$RUNTIME")"
+          xcrun simctl --set "$SET" boot "$UDID"
+          xcrun simctl --set "$SET" install "$UDID" build/FolioPad.app
+          LIB="$RUNNER_TEMP/padlib"; mkdir -p "$LIB"
+          SIMCTL_CHILD_FOLIO_LIBRARY="$LIB" SIMCTL_CHILD_FOLIO_PAD_SELFTEST=1 \
+            xcrun simctl --set "$SET" launch --console-pty "$UDID" de.daniel.folio.pad | tee pad.log &
+          for _ in $(seq 1 300); do grep -q "PAD done" pad.log 2>/dev/null && break; sleep 2; done
+          xcrun simctl --set "$SET" shutdown "$UDID" || true
+          xcrun simctl --set "$SET" delete "$UDID" || true
+          grep "PAD" pad.log
+          grep -q "PAD done ok" pad.log
+
+      - name: Self-test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pad-self-test
+          path: pad.log
+          if-no-files-found: ignore
