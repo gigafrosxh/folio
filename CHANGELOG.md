@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.7] – 2026-11-20
+
 ### Behoben
 - **Regressionstests** (#360): Der Barrierefreiheits-Lauf meldet keinen falschen „TIMEOUT“ mehr, wenn er regulär fertig ist.
 
