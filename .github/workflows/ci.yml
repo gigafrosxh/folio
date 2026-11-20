@@ -61,11 +61,7 @@ jobs:
 
       - name: Crash reports
         if: failure()
-        run: |
-          for f in ~/Library/Logs/DiagnosticReports/Folio*.ips; do
-            [ -f "$f" ] || continue
-            echo "== $f"; head -c 12000 "$f"; echo
-          done
+        run: python3 scripts/print-crash.py
 
       - name: Self-test logs
         if: failure()
