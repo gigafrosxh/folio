@@ -4,7 +4,7 @@ import FolioCore
 
 /// The picture of an image block as it is shown: the original with its crop and rotation (#45).
 enum EditedImage {
-    private static var cache: [String: NSImage] = [:]
+    @MainActor private static var cache: [String: NSImage] = [:]
 
     @MainActor static func image(_ data: Data, edit: ImageEdit?, key: String) -> NSImage? {
         guard let edit, !edit.isIdentity else { return NSImage(data: data) }

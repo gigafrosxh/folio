@@ -67,7 +67,7 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testInteractiveInput() async throws {
         try requirePython()
-        let run = CodeRun()
+        let run = CodeRun(), python = self.python
         let task = Task {
             try await run.run(
                 code: "a = input()\nb = input()\nprint(int(a) + int(b))", language: python,
@@ -84,7 +84,7 @@ final class DeveloperToolsTests: XCTestCase {
 
     func testHangingInputIsCancellable() async throws {
         try requirePython()
-        let run = CodeRun()
+        let run = CodeRun(), python = self.python
         let task = Task { try await run.run(code: "input()", language: python, options: RunOptions(interactive: true)) }
         try await Task.sleep(for: .milliseconds(600))
         run.cancel()

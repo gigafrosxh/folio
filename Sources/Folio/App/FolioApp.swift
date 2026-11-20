@@ -50,6 +50,7 @@ enum BackgroundRun {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let services = FolioServices()
 

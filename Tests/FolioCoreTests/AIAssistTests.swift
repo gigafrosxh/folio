@@ -196,9 +196,8 @@ final class OllamaClientTests: XCTestCase {
     func testStreamWithoutDoneIsIncomplete() async throws {
         OllamaStub.routes["/api/chat"] = (200, #"{"message":{"role":"assistant","content":"Nur der Anf"},"done":false}"#)
         let client = try OllamaClient(baseURL: "localhost:11434", model: "m", session: session)
-        var parts: [String] = []
         do {
-            _ = try await client.chat(system: "", prompt: "x") { parts.append($0) }
+            _ = try await client.chat(system: "", prompt: "x") { _ in }
             XCTFail()
         } catch {
             XCTAssertEqual(error as? OllamaClient.Failure, .incomplete)

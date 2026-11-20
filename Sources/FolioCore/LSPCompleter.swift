@@ -228,18 +228,18 @@
                 "position": ["line": line, "character": column],
                 "context": ["triggerKind": 1]
             ]
-            let result: Any? = await withCheckedContinuation { cont in
+            let result: Any? = await withCheckedContinuation { (cont: CheckedContinuation<JSONBox, Never>) in
                 let once = Once()
-                let id = request("textDocument/completion", params) { value in once.run { cont.resume(returning: value) } }
+                let id = request("textDocument/completion", params) { value in once.run { cont.resume(returning: JSONBox(value)) } }
                 DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
                     once.run {
                         self?.lock.lock()
                         self?.pending[id] = nil
                         self?.lock.unlock()
-                        cont.resume(returning: nil)
+                        cont.resume(returning: JSONBox(nil))
                     }
                 }
-            }
+            }.value
             let list: [[String: Any]]
             if let dict = result as? [String: Any] { list = dict["items"] as? [[String: Any]] ?? [] } else { list = result as? [[String: Any]] ?? [] }
             return list.compactMap(Self.item)
@@ -401,3 +401,9 @@
         }
     }
 #endif
+
+/// A JSON value from the language server handed across a continuation; it is only read by the receiver (Swift 6, #309).
+struct JSONBox: @unchecked Sendable {
+    let value: Any?
+    init(_ value: Any?) { self.value = value }
+}

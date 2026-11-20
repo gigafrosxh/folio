@@ -13,32 +13,36 @@ class FolioScriptCommand: NSScriptCommand {
         return nil
     }
 
+    /// AppleScript commands arrive on the main thread; the result stays there (Swift 6, #309).
     func onMain(_ body: @MainActor () throws -> Any?) -> Any? {
-        do { return try MainActor.assumeIsolated(body) } catch { return fail(error) }
+        nonisolated(unsafe) var result: Any?
+        do { try MainActor.assumeIsolated { result = try body() } } catch { return fail(error) }
+        return result
     }
 }
 
 @objc(FolioCreateNoteCommand)
 final class FolioCreateNoteCommand: FolioScriptCommand {
     override func performDefaultImplementation() -> Any? {
-        let body = evaluatedArguments?["FTxt"] as? String ?? ""
-        return onMain { try NoteAutomation.create(title: text, text: body).id.uuidString }
+        let body = evaluatedArguments?["FTxt"] as? String ?? "", title = text
+        return onMain { try NoteAutomation.create(title: title, text: body).id.uuidString }
     }
 }
 
 @objc(FolioSearchNotesCommand)
 final class FolioSearchNotesCommand: FolioScriptCommand {
     override func performDefaultImplementation() -> Any? {
-        let ids = evaluatedArguments?["FIds"] as? Bool ?? false
-        return onMain { NoteAutomation.search(text).map { ids ? $0.id.uuidString : $0.meta.title } }
+        let ids = evaluatedArguments?["FIds"] as? Bool ?? false, query = text
+        return onMain { NoteAutomation.search(query).map { ids ? $0.id.uuidString : $0.meta.title } }
     }
 }
 
 @objc(FolioOpenNoteCommand)
 final class FolioOpenNoteCommand: FolioScriptCommand {
     override func performDefaultImplementation() -> Any? {
-        onMain {
-            let ref = try NoteAutomation.find(text)
+        let name = text
+        return onMain {
+            let ref = try NoteAutomation.find(name)
             NoteAutomation.open(ref)
             return ref.id.uuidString
         }
@@ -48,9 +52,9 @@ final class FolioOpenNoteCommand: FolioScriptCommand {
 @objc(FolioAppendCommand)
 final class FolioAppendCommand: FolioScriptCommand {
     override func performDefaultImplementation() -> Any? {
-        let addition = evaluatedArguments?["FTxt"] as? String ?? ""
+        let addition = evaluatedArguments?["FTxt"] as? String ?? "", name = text
         return onMain {
-            try NoteAutomation.append(addition, to: try NoteAutomation.find(text))
+            try NoteAutomation.append(addition, to: try NoteAutomation.find(name))
         }
     }
 }

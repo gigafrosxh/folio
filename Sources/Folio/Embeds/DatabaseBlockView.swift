@@ -236,7 +236,9 @@ struct DatabaseBlockView: View {
     private var runColor: Color { state.isRunning ? Color.red : Color(red: 0.12, green: 0.55, blue: 0.27) }
 
     private func runButton(iconOnly: Bool) -> some View {
-        Button(action: state.isRunning ? state.stop : run) {
+        Button {
+            if state.isRunning { state.stop() } else { run() }
+        } label: {
             Group {
                 if iconOnly { Image(systemName: runIcon) } else { Label(runTitle, systemImage: runIcon) }
             }

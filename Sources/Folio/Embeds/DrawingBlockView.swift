@@ -545,6 +545,7 @@ struct DrawingBlockView: View {
 }
 
 /// Receives NSColorPanel changes for the drawing toolbar's custom color.
+@MainActor
 final class ColorPanelBridge: NSObject {
     static let shared = ColorPanelBridge()
     var onChange: ((NSColor) -> Void)?

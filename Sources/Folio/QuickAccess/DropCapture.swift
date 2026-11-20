@@ -105,13 +105,13 @@ enum DropCapture {
 }
 
 /// Provider for „Dienste › Zu Folio hinzufügen“ (#90), also used for text dropped on the Dock icon (#91).
+/// AppKit calls services on the main thread (Swift 6, #309).
+@MainActor
 final class FolioServices: NSObject {
     @objc func addToFolio(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        MainActor.assumeIsolated {
-            if let problem = DropCapture.capture(pasteboard: pboard) {
-                error.pointee = problem as NSString
-                DropCapture.report(problem)
-            }
+        if let problem = DropCapture.capture(pasteboard: pboard) {
+            error.pointee = problem as NSString
+            DropCapture.report(problem)
         }
     }
 }

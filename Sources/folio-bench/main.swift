@@ -19,7 +19,7 @@ if let existing = try? FileManager.default.contentsOfDirectory(atPath: work.path
 }
 
 var results: [Benchmark.Result] = []
-func record(_ r: Benchmark.Result) {
+@MainActor func record(_ r: Benchmark.Result) {
     results.append(r)
     print(String(format: "%-34@ %6d  median %9.2f ms  p95 %9.2f ms", r.scenario as NSString, r.size, r.medianMs, r.p95Ms))
 }

@@ -4,8 +4,9 @@ import XCTest
 
 /// Milestone 1.11.2: process groups, bounded draining, cancellation, server detection, UTF-8 streaming, output
 /// budget and the session kernel (#287–#300).
+private let bashSpec = Languages.spec(for: "bash")
+
 final class ProcessLifecycleTests: XCTestCase {
-    private let bash = Languages.spec(for: "bash")
 
     // #294
     func testUTF8StreamKeepsCharactersAcrossChunks() {
@@ -28,20 +29,20 @@ final class ProcessLifecycleTests: XCTestCase {
         var options = RunOptions(limits: ResourceLimits(timeout: 20, killOrphans: false))
         options.stdin = nil
         let start = Date()
-        let r = try await CodeRun().run(code: "(sleep 30) &\necho fertig", language: bash, options: options)
+        let r = try await CodeRun().run(code: "(sleep 30) &\necho fertig", language: bashSpec, options: options)
         XCTAssertLessThan(Date().timeIntervalSince(start), 8, "Lauf endet, obwohl ein Hintergrundprozess die Ausgabe offen hält")
         XCTAssertEqual(r.stdout, "fertig\n")
         XCTAssertFalse(r.timedOut)
-        _ = try? await CodeRun().run(code: "pkill -f 'sleep 30' || true", language: bash)
+        _ = try? await CodeRun().run(code: "pkill -f 'sleep 30' || true", language: bashSpec)
     }
 
     // #289
     func testShortLivedParentLeavesNoBackgroundJobs() async throws {
         let marker = "folio-orphan-\(UUID().uuidString.prefix(8))"
-        let r = try await CodeRun().run(code: "bash -c 'exec -a \(marker) sleep 30' &\nexit 0", language: bash)
+        let r = try await CodeRun().run(code: "bash -c 'exec -a \(marker) sleep 30' &\nexit 0", language: bashSpec)
         XCTAssertEqual(r.exitCode, 0)
         try await Task.sleep(for: .milliseconds(500))
-        let left = try await CodeRun().run(code: "pgrep -f \(marker) || true", language: bash)
+        let left = try await CodeRun().run(code: "pgrep -f \(marker) || true", language: bashSpec)
         XCTAssertEqual(left.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "", "kein verwaister Prozess")
     }
 
@@ -59,13 +60,13 @@ final class ProcessLifecycleTests: XCTestCase {
     func testCancelBeforeAndDuringLaunch() async throws {
         let early = CodeRun()
         early.cancel()
-        let r = try await early.run(code: "sleep 5; echo nie", language: bash)
+        let r = try await early.run(code: "sleep 5; echo nie", language: bashSpec)
         XCTAssertTrue(r.cancelled)
         XCTAssertEqual(r.stdout, "")
         for delay in [0, 5, 20] {
             let run = CodeRun()
             let start = Date()
-            async let result = run.run(code: "sleep 10", language: bash)
+            async let result = run.run(code: "sleep 10", language: bashSpec)
             try await Task.sleep(for: .milliseconds(delay))
             run.cancel()
             let done = try await result
@@ -76,7 +77,7 @@ final class ProcessLifecycleTests: XCTestCase {
 
     // #291
     func testPrintedAddressAloneKeepsTheTimeout() async throws {
-        let r = try await CodeRun().run(code: "echo 'Running on http://localhost:59999'\nsleep 20", language: bash, timeout: 2)
+        let r = try await CodeRun().run(code: "echo 'Running on http://localhost:59999'\nsleep 20", language: bashSpec, timeout: 2)
         XCTAssertTrue(r.timedOut, "ohne lauschenden Port kein Server")
         XCTAssertNil(r.serverURL)
     }
@@ -87,7 +88,7 @@ final class ProcessLifecycleTests: XCTestCase {
         var options = RunOptions(limits: ResourceLimits(timeout: 20, maxOutputBytes: 50_000))
         options.stdin = nil
         let r = try await CodeRun().run(
-            code: "head -c 3000000 /dev/zero | tr '\\\\0' 'x'", language: bash, options: options, onOutput: { streamed.add($0) })
+            code: "head -c 3000000 /dev/zero | tr '\\\\0' 'x'", language: bashSpec, options: options, onOutput: { streamed.add($0) })
         XCTAssertLessThan(streamed.bytes, 400_000, "Live-Ausgabe begrenzt")
         XCTAssertTrue(streamed.text.contains("nicht mehr live"))
         XCTAssertLessThan(r.stdout.utf8.count, 200_000)

@@ -331,13 +331,13 @@ public struct RunOptions: Sendable {
         }
 
         /// What one process of a run needs besides its arguments, directory and environment (#142).
-        fileprivate struct ProcessJob {
+        fileprivate struct ProcessJob: Sendable {
             let timeout: TimeInterval
             let stdin: String?
             let interactive: Bool
             let limits: ResourceLimits
             let detectServer: Bool
-            let found: (URL) -> Void
+            let found: @Sendable (URL) -> Void
             let seen = LockedPIDs()
             let timedOut = LockedFlag()
         }
@@ -395,7 +395,8 @@ public struct RunOptions: Sendable {
             // The child has its own copies; ours must close, or the pipes never report their end.
             capture.closeWriteEnds()
             try? inPipe?.fileHandleForReading.close()
-            capture.startReading(onOutput: onOutput, serverFound: job.detectServer ? { [weak self] url in self?.confirmServer(url, p: p, job: job) } : nil)
+            let confirm: @Sendable (URL) -> Void = { [weak self] url in self?.confirmServer(url, p: p, job: job) }
+            capture.startReading(onOutput: onOutput, serverFound: job.detectServer ? confirm : nil)
             p.onExit { [weak self] status in self.finishProcess(p, status: status, capture: capture, job: job, cont: cont) }
             if let inPipe { feedInput(inPipe.fileHandleForWriting, job: job) }
             watchProcessTree(p, job: job)
@@ -528,8 +529,8 @@ public struct RunOptions: Sendable {
             return streamed > streamBudget ? text + Self.budgetNote : text
         }
 
-        func startReading(onOutput: (@Sendable (String) -> Void)?, serverFound: ((URL) -> Void)?) {
-            let handle: (FileHandle, LockedData, Int) -> Void = { [weak self] h, buffer, index in
+        func startReading(onOutput: (@Sendable (String) -> Void)?, serverFound: (@Sendable (URL) -> Void)?) {
+            let handle: @Sendable (FileHandle, LockedData, Int) -> Void = { [weak self] h, buffer, index in
                 let data = h.availableData
                 guard !data.isEmpty, let self else { return }
                 buffer.append(data)

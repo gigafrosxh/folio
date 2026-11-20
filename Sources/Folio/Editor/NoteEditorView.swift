@@ -721,10 +721,10 @@ struct NoteEditorView: View {
         }
     }
 
-    private func loadDroppedURL(_ provider: NSItemProvider, then insert: @escaping (URL) -> Void) {
+    private func loadDroppedURL(_ provider: NSItemProvider, then insert: @escaping @MainActor (URL) -> Void) {
         _ = provider.loadObject(ofClass: URL.self) { url, _ in
             guard let url else { return }
-            DispatchQueue.main.async { insert(url) }
+            Task { @MainActor in insert(url) }
         }
     }
 

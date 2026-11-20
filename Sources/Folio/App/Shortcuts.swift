@@ -230,7 +230,10 @@ final class ShortcutCenter {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, !self.isRecording else { return event }
-            return MainActor.assumeIsolated { self.handle(event) ? nil : event }
+            // Local monitors run on the main thread; the event never leaves it (Swift 6, #318).
+            nonisolated(unsafe) let event = event
+            let handled = MainActor.assumeIsolated { self.handle(event) }
+            return handled ? nil : event
         }
     }
 

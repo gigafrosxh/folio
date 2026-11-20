@@ -17,14 +17,14 @@ let package = Package(
             name: "FolioCore",
             dependencies: ["FolioTerminal"],
             path: "Sources/FolioCore",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // The SwiftUI/AppKit app.
         .executableTarget(
             name: "Folio",
             dependencies: ["FolioCore", "FolioWidgetData"],
             path: "Sources/Folio",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Widgets (#78–#84): the snapshot model shared with the app, the views, and the extension
         // executable that scripts/build-app.sh packs into Folio.app/Contents/PlugIns/FolioWidgets.appex.
@@ -44,14 +44,14 @@ let package = Package(
             name: "FolioPad",
             dependencies: ["FolioCore"],
             path: "Sources/FolioPad",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Safari share menu (#50): an app extension, packed by scripts/build-app.sh like the widgets.
         .executableTarget(
             name: "FolioShare",
             dependencies: ["FolioCore"],
             path: "Sources/FolioShare",
-            swiftSettings: [.swiftLanguageMode(.v5), .unsafeFlags(["-application-extension"])],
+            swiftSettings: [.swiftLanguageMode(.v6), .unsafeFlags(["-application-extension"])],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-application_extension", "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
         ),
         // Benchmarks on synthetic libraries (#219): scripts/benchmark.sh.
@@ -59,28 +59,28 @@ let package = Package(
             name: "folio-bench",
             dependencies: ["FolioCore"],
             path: "Sources/folio-bench",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Command-line inspector for .folio files.
         .executableTarget(
             name: "folio-dump",
             dependencies: ["FolioCore"],
             path: "Sources/folio-dump",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "FolioCoreTests",
             dependencies: ["FolioCore"],
             path: "Tests/FolioCoreTests",
             resources: [.copy("Fixtures")],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Editor model tests (block operations, undo); runs the app module without its UI.
         .testTarget(
             name: "FolioAppTests",
             dependencies: ["Folio", "FolioWidgetData", "FolioWidgetUI"],
             path: "Tests/FolioAppTests",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
 )

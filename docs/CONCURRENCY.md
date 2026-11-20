@@ -1,6 +1,6 @@
 # Nebenläufigkeit (#218)
 
-Stand 1.10.0. `Folio` und `FolioCore` laufen noch im Swift-5-Sprachmodus. Diese Übersicht hält fest, welche Typen
+Stand 1.11.6: **Alle Ziele laufen im Swift-6-Sprachmodus** (#309) – `FolioCore`, `Folio`, Widgets, Teilen, iPad, `folio-bench` und beide Testziele. Der Compiler prüft Datenrennen damit vollständig; neue Warnungen sind Fehler. Diese Übersicht hält fest, welche Typen
 `@unchecked Sendable` sind, was sie schützt und welche Warnungen der strenge Concurrency-Check meldet.
 
 ## `@unchecked Sendable` – Inventar
@@ -13,7 +13,8 @@ Stand 1.10.0. `Folio` und `FolioCore` laufen noch im Swift-5-Sprachmodus. Diese 
 | `LSPCompleter`, `LSPSession`, `Once` | Sitzungen, Lesepuffer, offene Anfragen | `NSLock`; `Once` stellt sicher, dass eine Antwort nur einmal zurückgegeben wird |
 | `PseudoTerminal` | `exited`, `onOutput`, `onExit` | `NSLock` – **seit 1.10.0 auch für die beiden Handler**, die der Hauptthread setzt und der Lesethread aufruft (vorher ungeschützt) |
 | `InterpreterLocator` | Suchpfad-Cache | `NSLock` |
-| `CodeRun`, `OutputCapture`, `LockedData`, `LockedPIDs`, `LockedFlag` | laufender Prozess, Eingabe, Ausgabe, PIDs | je ein `NSLock`; Pipes werden nur im Lese-Handler gelesen |
+| `CodeRun`, `OutputCapture`, `LockedData`, `LockedPIDs`, `LockedFlag`, `GroupProcess` | laufender Prozess, Eingabe, Ausgabe, Prozess-Identitäten | je ein `NSLock`; `CodeRun.ProcessJob` ist `Sendable` (nur `let`, Handler `@Sendable`) |
+| `JSONBox` (Kern) | eine JSON-Antwort des Sprachservers | wird über eine Continuation genau einmal übergeben und danach nur gelesen |
 | `IntrospectionCache`, `IntrospectionBuffer` | Ergebnis-Cache, Lesepuffer | `NSLock` |
 | `SyntaxHighlighter.Compiled` | keiner (nur `let`-Regexe) | unveränderlich; `NSRegularExpression` ist threadsicher |
 | `LibraryScanner` | Metadaten-Cache | `NSLock`; `concurrentPerform` schreibt jede Notiz in einen eigenen Index des Ergebnis-Puffers |
@@ -34,3 +35,15 @@ Stand 1.10.0. `Folio` und `FolioCore` laufen noch im Swift-5-Sprachmodus. Diese 
 - Behoben in 1.10.0: `LSPCompleter.specs` (jetzt `Sendable`), `PseudoTerminal`-Handler, `DownloadDelegate`.
 
 Nächster Schritt: Ziel für Ziel (zuerst `FolioCore`) in den Swift-6-Modus wechseln, sobald diese Liste leer ist.
+
+## Swift 6 (1.11.6, #309, #318)
+
+Umgestellt ohne Unterdrückung ganzer Ziele. Was dabei geändert wurde:
+
+- Hauptthread-Code ist ausdrücklich `@MainActor`: `AppDelegate`, `FolioServices` (Dienste-Menü), `ColorPanelBridge`, der
+  PDF-Koordinator, der Bild-Cache `EditedImage.cache`, `record` in `folio-bench`.
+- `NSEvent` im lokalen Tastatur-Monitor und AppleScript-Ergebnisse bleiben auf dem Hauptthread (`nonisolated(unsafe)`
+  nur für diese eine Übergabe innerhalb von `MainActor.assumeIsolated`).
+- Rückrufe über Threads hinweg sind `@Sendable` (Server-Erkennung, Lese-Handler) oder laufen über `Task { @MainActor … }`
+  (Ablegen von Links, Link-Vorschau mit `async`-API).
+- Die Testziele erfassen keine Testfall-Instanz mehr in nebenläufigen Tasks.

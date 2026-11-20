@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert
+- **Swift 6** (#309, #318): Alle Ziele (Kern, App, Widgets, Teilen, iPad, Benchmarks, Tests) laufen im Swift-6-Sprachmodus mit vollständiger Prüfung auf Datenrennen. Dabei wurden die Hauptthread-Grenzen ausdrücklich gemacht (App-Delegate, Dienste-Menü, Tastatur-Monitor, AppleScript, PDF-Auswahl, Bild-Cache) und Rückrufe über Threads hinweg abgesichert; die Warnungen zu `NSEvent` und zur Hauptthread-Isolierung sind weg. Übersicht in `docs/CONCURRENCY.md`.
+
 ## [1.11.5] – 2026-11-20
 
 ### Geändert (Aufbau)

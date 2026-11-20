@@ -139,12 +139,14 @@ struct PDFKitView: NSViewRepresentable {
     var revision: Int
     var controller: PDFAnnotationController? = nil
 
+    /// PDFKit posts selection changes on the main thread.
+    @MainActor
     final class Coordinator: NSObject {
         var revision = -1
         weak var controller: PDFAnnotationController?
         @objc func selectionChanged(_ note: Notification) {
             let view = note.object as? PDFView
-            MainActor.assumeIsolated { controller?.hasSelection = !(view?.currentSelection?.string ?? "").isEmpty }
+            controller?.hasSelection = !(view?.currentSelection?.string ?? "").isEmpty
         }
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -616,9 +618,9 @@ struct LinkPreview: NSViewRepresentable {
         v.metadata = LPLinkMetadata()
         v.metadata.originalURL = url
         let provider = LPMetadataProvider()
-        provider.startFetchingMetadata(for: url) { metadata, _ in
-            guard let metadata else { return }
-            DispatchQueue.main.async { v.metadata = metadata }
+        Task { @MainActor in
+            guard let metadata = try? await provider.startFetchingMetadata(for: url) else { return }
+            v.metadata = metadata
         }
     }
 }
