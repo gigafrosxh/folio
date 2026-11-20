@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.3] – 2026-11-20
+
 ### Behoben
 - **Neu laden** (#362): Ein Neuladen der Bibliothek im Hintergrund macht eine gerade angelegte, duplizierte oder gelöschte Notiz nicht mehr rückgängig; bisher konnte die neue Notiz kurz aus Liste und Tab verschwinden oder eine gelöschte wieder auftauchen.
 
