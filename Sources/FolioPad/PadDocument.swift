@@ -189,7 +189,8 @@
                 return .savedAsCopy(copy)
             }
             // The previous state is kept first; if that is not possible, the note is not overwritten (#260).
-            if fm.fileExists(atPath: target.path) { try history.record(try Data(contentsOf: target), noteID: snapshot.meta.id, force: true) }
+            // Copied, not read into memory, and skipped without unpacking when unchanged (#304).
+            if fm.fileExists(atPath: target.path) { try history.recordFile(at: target, noteID: snapshot.meta.id) }
             try data.write(to: target, options: .atomic)
             diskStamp = FileStamp.of(target)
             // Edits made while compressing stay unsaved and are written by the next save.

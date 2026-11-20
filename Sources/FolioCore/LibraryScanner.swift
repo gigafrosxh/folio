@@ -24,14 +24,25 @@ public final class LibraryScanner: @unchecked Sendable {
         public var cacheHits: Int
     }
 
+    /// What a file looked like when its metadata was cached: size, date, file number and the archive's own CRC-32
+    /// (its last 4 bytes), so a change with the same size and date is noticed too (#305).
     private struct CacheKey: Hashable {
-        var path: String
         var size: Int
         var modified: Date
+        var fileNumber: Int
+        var checksum: UInt32
     }
 
     private let lock = NSLock()
-    private var cache: [CacheKey: NoteMetadata] = [:]
+    /// One entry per path, the current version only; paths gone from the library are dropped after each scan (#301).
+    private var cache: [String: (key: CacheKey, meta: NoteMetadata)] = [:]
+
+    /// Number of cached notes (for tests and benchmarks).
+    public var cachedCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return cache.count
+    }
 
     public init() {}
 
@@ -55,6 +66,11 @@ public final class LibraryScanner: @unchecked Sendable {
         // same id (a copy made in the Finder, a sync conflict) are both listed; `NoteIdentity` sorts them out (#166).
         var seen = Set<String>()
         notes = notes.filter { seen.insert($0.0.resolvingSymlinksInPath().standardizedFileURL.path).inserted }
+        // Notes deleted or moved since the last scan leave the cache (#301).
+        let present = Set(walk.notePaths.map(\.path))
+        lock.lock()
+        cache = cache.filter { present.contains($0.key) }
+        lock.unlock()
         return Result(folders: folders, notes: notes, unreadable: unreadable, skippedLinks: walk.skipped, cacheHits: hits)
     }
 
@@ -75,15 +91,22 @@ public final class LibraryScanner: @unchecked Sendable {
     private func metadata(of url: URL) -> (NoteMetadata?, cached: Bool) {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         let key = CacheKey(
-            path: url.path, size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
-            modified: attrs?[.modificationDate] as? Date ?? .distantPast)
+            size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
+            modified: attrs?[.modificationDate] as? Date ?? .distantPast,
+            fileNumber: (attrs?[.systemFileNumber] as? NSNumber)?.intValue ?? -1,
+            checksum: FileFingerprint.of(url)?.checksum ?? 0)
         lock.lock()
-        let cached = cache[key]
+        let cached = cache[url.path]
         lock.unlock()
-        if let cached { return (cached, true) }
-        guard let meta = try? NoteFile.readMetadata(at: url) else { return (nil, false) }
+        if let cached, cached.key == key { return (cached.meta, true) }
+        guard let meta = try? NoteFile.readMetadata(at: url) else {
+            lock.lock()
+            cache[url.path] = nil
+            lock.unlock()
+            return (nil, false)
+        }
         lock.lock()
-        cache[key] = meta
+        cache[url.path] = (key, meta)
         lock.unlock()
         return (meta, false)
     }
@@ -111,8 +134,12 @@ private final class LibraryWalk {
 
     private func inside(_ path: String) -> Bool { path == realRoot || path.hasPrefix(realRoot + "/") }
 
+    /// Deeper folders are listed as skipped instead of being walked, so a pathological tree cannot exhaust the
+    /// stack (#308).
+    static let maxDepth = 64
+
     /// Every real folder is visited once; a folder that cannot be read counts as empty.
-    func folders(in dir: URL) -> [LibraryScanner.Folder] {
+    func folders(in dir: URL, depth: Int = 0) -> [LibraryScanner.Folder] {
         guard visited.insert(Self.realPath(dir)).inserted,
             let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: Self.keys, options: [.skipsHiddenFiles])
         else { return [] }
@@ -120,7 +147,9 @@ private final class LibraryWalk {
         for item in items.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
             switch classify(item) {
             case .note(let url): notePaths.append(url)
-            case .folder(let url): folders.append(LibraryScanner.Folder(url: url, name: url.lastPathComponent, children: self.folders(in: url)))
+            case .folder(let url) where depth >= Self.maxDepth: skipped.append((url, "zu tief verschachtelt (mehr als \(Self.maxDepth) Ebenen)"))
+            case .folder(let url):
+                folders.append(LibraryScanner.Folder(url: url, name: url.lastPathComponent, children: self.folders(in: url, depth: depth + 1)))
             case .skipped(let url, let reason): skipped.append((url, reason))
             case .other: break
             }

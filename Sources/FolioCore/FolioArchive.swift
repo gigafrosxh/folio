@@ -239,6 +239,13 @@ struct ByteReader {
 
     mutating func limit(to index: Int) { end = min(max(index, offset), bytes.endIndex) }
 
+    /// A slice of the input without copying it (#306).
+    mutating func readData(_ count: Int) throws -> Data {
+        guard count >= 0, count <= end - offset else { throw FolioFormatError.truncated }
+        defer { offset += count }
+        return bytes[offset..<offset + count]
+    }
+
     mutating func readBytes(_ count: Int) throws -> [UInt8] {
         // Compared by subtraction: `offset + count` could overflow for a forged length (#273).
         guard count >= 0, count <= end - offset else { throw FolioFormatError.truncated }
@@ -261,9 +268,10 @@ struct ByteReader {
             rawLength <= ArchiveLimits.maxTotal - unpacked
         else { throw FolioFormatError.tooLarge }
         unpacked += rawLength
-        let stored = Data(try readBytes(storedCount))
+        // Unpacked straight from the input; only uncompressed sections are copied (into a zero-based Data) (#306).
+        let stored = try readData(storedCount)
         guard let rawCount = Int(exactly: rawLength) else { throw FolioFormatError.tooLarge }
-        let raw = compressed ? try Codec.decompress(stored, size: rawCount) : stored
+        let raw = compressed ? try Codec.decompress(stored, size: rawCount) : Data(stored)
         guard raw.count == rawLength else { throw FolioFormatError.truncated }
         return raw
     }

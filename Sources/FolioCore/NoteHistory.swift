@@ -64,6 +64,22 @@ public struct NoteHistory: Sendable {
         return NoteVersion(url: url, date: date, size: Int64(data.count))
     }
 
+    /// Keeps the note file at `url` as a version: copied (a clone on APFS) instead of read into memory, and skipped
+    /// without unpacking when the newest version has the same size and checksum (#304).
+    @discardableResult
+    public func recordFile(at url: URL, noteID: UUID, date: Date = Date()) throws -> NoteVersion? {
+        let fm = FileManager.default
+        if let latest = versions(of: noteID).first, let a = FileFingerprint.of(latest.url), a == FileFingerprint.of(url) { return nil }
+        let dir = folder(for: noteID)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let target = try Self.writeNew(Data(), in: dir, stamp: Stamp.string(date))
+        try fm.removeItem(at: target)
+        try fm.copyItem(at: url, to: target)
+        prune(noteID: noteID, now: date)
+        let size = (try? target.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+        return NoteVersion(url: target, date: date, size: size)
+    }
+
     /// Writes a version under a name no other version has, even for the same millisecond: "<stamp>", then
     /// "<stamp>-2" … Created exclusively, so two saves at once never replace each other (#279).
     static func writeNew(_ data: Data, in dir: URL, stamp: String) throws -> URL {

@@ -13,8 +13,22 @@
     final class PadLibrary: ObservableObject {
         struct Entry: Identifiable, Hashable {
             var url: URL
-            var meta: NoteMetadata
+            var meta: NoteMetadata {
+                didSet { haystack = Self.haystack(meta) }
+            }
+            /// Title, tags and text, lowercased once per scan instead of on every search keystroke (#307).
+            private(set) var haystack: String
             var id: URL { url }
+
+            init(url: URL, meta: NoteMetadata) {
+                self.url = url
+                self.meta = meta
+                haystack = Self.haystack(meta)
+            }
+
+            static func haystack(_ meta: NoteMetadata) -> String {
+                (meta.title + " " + meta.tags.joined(separator: " ") + " " + meta.searchText).lowercased()
+            }
         }
 
         private(set) var root: URL
@@ -59,8 +73,14 @@
                 message = "Die Bibliothek „\(self.root.lastPathComponent)“ lässt sich nicht anlegen: \(error.localizedDescription)"
             }
             if let problem = Self.restoreProblem { message = problem }
-            reload()
-            if notes.isEmpty, message == nil, Self.isUsable(self.root) { createWelcomeNote() }
+            // A picked folder (iCloud Drive, a file provider) is scanned in the background, so a slow provider never
+            // blocks the start (#302); the local library is read right away.
+            if scoped {
+                refreshFromDisk(force: true)
+            } else {
+                reload()
+                if notes.isEmpty, message == nil, Self.isUsable(self.root) { createWelcomeNote() }
+            }
         }
 
         static var defaultRoot: URL {
@@ -112,7 +132,9 @@
             setSelection(nil)
             document = nil
             selectedFolder = nil
-            reload()
+            notes = []
+            folders = []
+            refreshFromDisk(force: true)
         }
 
         /// Checks access, readability and the bookmark first; only then leaves the current library (#350). A picked folder
@@ -153,19 +175,24 @@
         /// Picks up changes made elsewhere (the Mac through a shared folder): the list, and the open note when it has no
         /// unsaved edits here. With unsaved edits the next save notices the change and keeps both versions (#213).
         @discardableResult
-        func refreshFromDisk() -> Task<Void, Never>? {
-            // The scan runs off the main thread; a slow file provider never blocks typing (#350).
-            guard !scanning else { return nil }
+        func refreshFromDisk(force: Bool = false) -> Task<Void, Never>? {
+            // The scan runs off the main thread; a slow file provider never blocks typing (#350). Only the newest scan
+            // is applied: one started before a later reload or library switch is dropped (#302).
+            guard force || !scanning else { return nil }
             scanning = true
-            let root = self.root, scanner = self.scanner
+            scanGeneration += 1
+            let generation = scanGeneration, root = self.root, scanner = self.scanner
             return Task {
                 let result = await Task.detached(priority: .utility) { scanner.scan(root) }.value
+                guard generation == scanGeneration else { return }
                 scanning = false
                 guard root == self.root else { return }
                 apply(result)
                 reopenIfChangedElsewhere()
             }
         }
+
+        private var scanGeneration = 0
 
         private var scanning = false
 
@@ -181,6 +208,8 @@
         }
 
         func reload() {
+            scanGeneration += 1
+            scanning = false
             apply(scanner.scan(root))
         }
 
@@ -197,8 +226,7 @@
             let terms = search.lowercased().split(separator: " ").map(String.init)
             return notes.filter { e in
                 if let folder, !e.url.standardizedFileURL.path.hasPrefix(folder + "/") { return false }
-                let haystack = (e.meta.title + " " + e.meta.tags.joined(separator: " ") + " " + e.meta.searchText).lowercased()
-                return terms.allSatisfy { haystack.contains($0) }
+                return terms.allSatisfy { e.haystack.contains($0) }
             }
         }
 

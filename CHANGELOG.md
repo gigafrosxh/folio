@@ -7,6 +7,13 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Verbessert (Leistung)
+- **Notizliste** (#301, #305, #308): Der Metadaten-Cache hält nur noch den aktuellen Stand je Notiz und vergisst gelöschte Notizen; eine Änderung mit gleicher Größe und gleichem Datum wird über die Prüfsumme der Datei erkannt; sehr tief verschachtelte Ordner (mehr als 64 Ebenen) werden übersprungen statt den Scan zu gefährden.
+- **Notizen öffnen** (#306): Abschnitte werden ohne zusätzliche Kopie direkt aus der Datei entpackt.
+- **iPad: Versionen** (#304): Die vorige Fassung wird als Datei kopiert statt ganz eingelesen und ohne Entpacken übersprungen, wenn sie sich nicht geändert hat.
+- **iPad: Bibliothek einlesen** (#302): Eine gewählte Bibliothek (iCloud Drive, Dateianbieter) wird beim Start und beim Wechsel im Hintergrund gelesen; nur der neueste Durchlauf zählt.
+- **iPad: Suche** (#307): Suchtexte werden einmal pro Einlesen vorbereitet statt bei jedem Tastendruck.
+
 ## [1.11.3] – 2026-11-20
 
 ### Behoben (iPad und iPhone)
