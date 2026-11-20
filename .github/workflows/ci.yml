@@ -15,7 +15,7 @@ jobs:
   build-and-test:
     name: Build & Tests (macOS)
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +40,7 @@ jobs:
         run: swift build
 
       - name: Unit tests
+        timeout-minutes: 12
         # Database tests skip themselves when PostgreSQL/MySQL/MSSQL tools are not installed.
         run: swift test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
 
@@ -47,11 +48,12 @@ jobs:
         run: ./scripts/build-app.sh
 
       - name: App self-tests (#223)
+        timeout-minutes: 12
         # The app's own self-tests, headless: FOLIO_BACKGROUND=1 shows no window and takes no focus, every suite runs
         # against a fresh throwaway library. The keyboard test needs real focus and stays a local test.
         env:
           FOLIO_BACKGROUND: "1"
-          FOLIO_REGRESSION_TIMEOUT: "240"
+          FOLIO_REGRESSION_TIMEOUT: "150"
           FOLIO_REGRESSION_DIR: regression-logs
           FOLIO_SLOW_MACHINE: "1"
           # The accessibility audit depends on the runner's macOS version (system controls there have no names);

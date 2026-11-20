@@ -180,4 +180,14 @@ final class AIAssistAppTests: XCTestCase {
         XCTAssertGreaterThan(wide, narrow)
         XCTAssertLessThan(wide, 18)
     }
+
+    func testOutputTailKeepsLastLines() {
+        let out = (0..<1000).map(String.init).joined(separator: "\n") + "\n"
+        let tail = OutputTail.make(out, maxLines: 10)
+        XCTAssertEqual(tail.omitted, OutputTail.lineCount(out) - 10)
+        XCTAssertTrue(tail.text.hasSuffix("999\n"))
+        XCTAssertEqual(OutputTail.lineCount(tail.text), 10)
+        XCTAssertEqual(OutputTail.make("kurz").text, "kurz")
+        XCTAssertEqual(OutputTail.make("kurz").omitted, 0)
+    }
 }

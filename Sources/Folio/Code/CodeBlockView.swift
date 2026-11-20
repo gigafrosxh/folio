@@ -234,8 +234,29 @@ struct CodeBlockView: View {
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder private func outputText(_ output: String) -> some View {
+        if !block.diagnostics.isEmpty { diagnosticList }
+        // Only the last lines are laid out: a SwiftUI Text with tens of thousands of lines made every layout
+        // pass so slow that the app stopped responding on slower Macs (#223). „Kopieren“ still takes everything.
+        let tail = OutputTail.make(output)
+        if tail.omitted > 0 {
+            Text("… \(tail.omitted) frühere Zeilen ausgeblendet – „Kopieren“ übernimmt die ganze Ausgabe")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+        ScrollView {
+            Text(output.isEmpty ? "(keine Ausgabe)" : tail.text)
+                .font(Font(theme.codeFont()))
+                .foregroundStyle(block.outputIsError ? Color.red : Color(nsColor: codeTheme.foregroundColor))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 260)
+        .fixedSize(horizontal: false, vertical: true)
+
+    }
+
     private func outputView(_ output: String) -> some View {
-        let lineCount = output.isEmpty ? 0 : output.components(separatedBy: "\n").count
+        let lineCount = OutputTail.lineCount(output)
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Button {
@@ -276,18 +297,7 @@ struct CodeBlockView: View {
                 .font(.system(size: 9))
                 .helpLabel("Ausgabe leeren")
             }
-            if !block.outputCollapsed {
-                if !block.diagnostics.isEmpty { diagnosticList }
-                ScrollView {
-                    Text(output.isEmpty ? "(keine Ausgabe)" : output)
-                        .font(Font(theme.codeFont()))
-                        .foregroundStyle(block.outputIsError ? Color.red : Color(nsColor: codeTheme.foregroundColor))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 260)
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            if !block.outputCollapsed { outputText(output) }
         }
         .padding(12)
         .background(Color(nsColor: NSColor(hex: codeTheme.outputBackground) ?? .windowBackgroundColor))
@@ -838,5 +848,37 @@ final class DatabaseObserver: ObservableObject {
     func watch(_ state: DatabaseBlockState) {
         guard cancellable == nil else { return }
         cancellable = state.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
+    }
+}
+
+/// The visible part of a long run output (#223).
+enum OutputTail {
+    static let maxLines = 400
+
+    static func lineCount(_ s: String) -> Int {
+        guard !s.isEmpty else { return 0 }
+        var n = 1
+        for b in s.utf8 where b == 10 { n += 1 }
+        return s.utf8.last == 10 ? n - 1 : n  // a final newline does not start another line
+    }
+
+    static func make(_ s: String, maxLines: Int = maxLines) -> (text: String, omitted: Int) {
+        let total = lineCount(s)
+        guard total > maxLines else { return (s, 0) }
+        var seen = 0
+        var index = s.endIndex
+        let utf8 = s.utf8
+        var i = utf8.endIndex
+        while i > utf8.startIndex {
+            i = utf8.index(before: i)
+            if utf8[i] == 10, i != utf8.index(before: utf8.endIndex) {
+                seen += 1
+                if seen == maxLines {
+                    index = utf8.index(after: i)
+                    break
+                }
+            }
+        }
+        return (String(s[index...]), total - maxLines)
     }
 }
