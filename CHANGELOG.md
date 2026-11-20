@@ -7,6 +7,12 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Regressionstests** (#360): Der Barrierefreiheits-Lauf meldet keinen falschen „TIMEOUT“ mehr, wenn er regulär fertig ist.
+
+### Geändert
+- **AGENTS.md**: Codex wird nur noch eingesetzt, wenn es für eine Aufgabe ausdrücklich gewünscht ist; Pfad und Aufruf der CLI dokumentiert.
+
 ## [1.10.6] – 2026-11-20
 
 ### Behoben

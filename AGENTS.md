@@ -25,8 +25,13 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
      Beispiel: `1.1.0 → 1.1.1 (P0) → Test → neues P0 → 1.1.2 (P0) → 1.1.3 (P1) → 1.1.4 (P2) → 1.1.5 (P3)`.
    - **Release Candidates nur vor einer Hauptversion** (`2.0.0-rc.1 …` → `2.0.0`), nie danach: Nach SemVer ist `2.0.0-rc.1`
      älter als `2.0.0`, der Update-Knopf würde es nie anbieten (vom Nutzer so bestätigt).
-9. **Kein Codex mehr** (Vorgabe des Nutzers vom 19.11.2026): Claude baut, testet und reviewt alles selbst; keine Übergaben
-   an Codex. Bugs aus dem Test eines Releases werden als weitere Patches behoben, bevor der nächste Meilenstein beginnt.
+9. **Codex nur auf ausdrücklichen Wunsch** (Vorgabe des Nutzers vom 19./20.11.2026): Standardmäßig baut, testet und reviewt
+   Claude alles selbst. Codex wird nur eingesetzt, wenn der Nutzer es für eine Aufgabe ausdrücklich verlangt (so beim Test von
+   1.10.1). Die CLI liegt unter `/Volumes/ExterneSSD/Library/Developer/Xcode/CodingAssistant/Agents/codex/<version>/codex`
+   (nicht im PATH); Aufruf mit `codex exec -C <worktree> --sandbox workspace-write`, `swift build/test` braucht dort
+   `--disable-sandbox`. Codex arbeitet nur in einem eigenen Worktree mit Bibliothekskopie, legt keine Issues an und
+   committet nicht; Claude prüft die Funde. Bugs aus dem Test eines Releases werden als weitere Patches behoben, bevor
+   der nächste Meilenstein beginnt.
 
 ## Aufbau
 

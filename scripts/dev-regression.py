@@ -45,12 +45,16 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
                                 stdout=output, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + TIMEOUT
-            while proc.poll() is None and time.monotonic() < deadline:
+            # A11Y never prints "done"; its summary line ends the run (#360).
+            def finished():
                 current = log.read_text(errors="replace")
-                if f"{prefix} done" in current or (flag == "A11Y" and "A11Y checked" in current):
+                return f"{prefix} done" in current or (flag == "A11Y" and "A11Y checked" in current)
+
+            while proc.poll() is None and time.monotonic() < deadline:
+                if finished():
                     break
                 time.sleep(0.25)
-            if proc.poll() is None and f"{prefix} done" not in log.read_text(errors="replace"):
+            if proc.poll() is None and not finished():
                 # Timed out: record where the app hangs (main thread and helpers) before stopping it.
                 print(f"TIMEOUT {flag} after {TIMEOUT:.0f} s, sampling", flush=True)
                 sample = RUN / f"{flag}-sample.log"
