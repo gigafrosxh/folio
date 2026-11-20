@@ -7,6 +7,18 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Geändert
+- **Schnellere Bibliothek** (#220): Die Bibliothek wird im Hintergrund gelesen; Neuladen blockiert die Oberfläche nicht mehr.
+- **Schnellerer Code-Editor** (#221, #222): Färbung, Höhenberechnung und Code-Vervollständigung arbeiten bei langen Blöcken nur noch mit dem, was sich geändert hat. Der Editor merkt sich gemessene Höhen, damit sich das Layout nicht aufschaukelt.
+- **Lange Ausgaben** (#223): Code-Blöcke zeigen von sehr langen Ausgaben die letzten 400 Zeilen mit einem Hinweis; „Kopieren“ übernimmt weiter alles. Vorher konnte eine Ausgabe mit zehntausenden Zeilen die App auf langsameren Macs lange blockieren.
+- **Kopfzeile von Code- und Datenbank-Block** (#223): Sie wählt ihre Form nach der verfügbaren Breite statt über ViewThatFits, das auf macOS 26 das Layout nicht zur Ruhe kommen ließ.
+
+### Intern
+- **Benchmarks** (#219): Messbare Suite für Bibliothek, Suche, Editor und Graph (`scripts/benchmark.sh`).
+- **Aufgeräumt** (#216, #217, #218): NoteStore in UI-Zustand, Bibliotheksoperationen und Dateidienste aufgeteilt, Einstellungen in eigene Tab-Ansichten zerlegt, Concurrency-Audit für `@unchecked Sendable` und gemeinsamen Prozesszustand.
+- **Einheitliche Formatierung** (#215): swift-format mit Prüfung in der CI.
+- **App-Selbsttests in der CI** (#223): Die Selbsttests laufen ohne Fenster in der CI, mit einer Testkopie des App-Pakets (damit auch AppleScript), Zeitgrenzen je Schritt sowie Stichproben und Absturzberichten bei Hängern.
+
 ## [1.9.4] – 2026-11-19
 
 ### Behoben
