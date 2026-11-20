@@ -51,11 +51,13 @@ enum PasteStyle {
         return font
     }
 
-    /// Black, white and near-greys are a page's plain text or background, not a colour the author chose.
+    /// Black, white and dark or light greys are a page's plain text or background, not a colour the author chose.
+    /// Dark greys up to about #555 count too: many sites set body text in #333 or #444, which would stay nearly
+    /// invisible in dark mode (#359). Mid greys (secondary text) keep their colour.
     static func isPlainTextColor(_ color: NSColor) -> Bool {
         guard let c = color.usingColorSpace(.sRGB) else { return false }
         let maxC = max(c.redComponent, c.greenComponent, c.blueComponent)
         let minC = min(c.redComponent, c.greenComponent, c.blueComponent)
-        return maxC - minC < 0.08 && (maxC < 0.2 || minC > 0.92)
+        return maxC - minC < 0.08 && (maxC < 0.34 || minC > 0.88)
     }
 }

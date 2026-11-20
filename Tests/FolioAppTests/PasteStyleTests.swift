@@ -42,6 +42,15 @@ final class PasteStyleTests: XCTestCase {
         XCTAssertTrue(PasteStyle.isPlainTextColor(.white))
         XCTAssertFalse(PasteStyle.isPlainTextColor(.systemBlue))
         XCTAssertFalse(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0.4, green: 0.4, blue: 0.4, alpha: 1)))
+        // #359: typical body-text greys of web pages (#333, #444, #3c4043) and light page greys count as plain.
+        for grey in [0x33, 0x44, 0x55] {
+            let v = CGFloat(grey) / 255
+            XCTAssertTrue(PasteStyle.isPlainTextColor(NSColor(srgbRed: v, green: v, blue: v, alpha: 1)), "#\(String(grey, radix: 16))")
+        }
+        XCTAssertTrue(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0x3c / 255, green: 0x40 / 255, blue: 0x43 / 255, alpha: 1)))
+        XCTAssertTrue(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0.93, green: 0.93, blue: 0.93, alpha: 1)))
+        XCTAssertFalse(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0.6, green: 0.6, blue: 0.6, alpha: 1)))
+        XCTAssertFalse(PasteStyle.isPlainTextColor(NSColor(srgbRed: 0.2, green: 0.3, blue: 0.5, alpha: 1)), "dunkles Blau bleibt")
     }
 
     /// #361: the real paste keeps size, bold and italics (insertText used to replace the fonts) and can be undone.
