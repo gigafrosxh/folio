@@ -11,10 +11,13 @@ final class NoteStore: ObservableObject {
     static let shared = NoteStore()
 
     @Published internal(set) var rootURL: URL
-    @Published internal(set) var folders: [FolderNode] = []
+    @Published internal(set) var folders: [FolderNode] = [] {
+        didSet { libraryVersion += 1 }
+    }
     @Published internal(set) var notes: [NoteRef] = [] {
         didSet {
             notesVersion += 1
+            libraryVersion += 1
             refreshLinkIndex()
         }
     }
@@ -94,12 +97,16 @@ final class NoteStore: ObservableObject {
         didSet { if let d = try? JSONEncoder().encode(recent) { UserDefaults.standard.set(d, forKey: "folio.recent") } }
     }
     /// Note templates.
-    @Published internal(set) var templates: [NoteRef] = []
+    @Published internal(set) var templates: [NoteRef] = [] {
+        didSet { libraryVersion += 1 }
+    }
     /// Symbolic links in the library that were not followed (outside the library or a loop) (#56).
     @Published internal(set) var skippedLinks: [String] = []
     let scanner = LibraryScanner()
     /// Counts reloads; a background read that is not the newest one is dropped (#220).
     var reloadGeneration = 0
+    /// Counts changes to notes, folders, templates and trash; a background read that began before one is outdated (#362).
+    var libraryVersion = 0
     /// How long applying the last reload took on the main thread (benchmark #219/#220).
     var lastApplyMs = 0.0
     /// Last result of `filteredNotes` and what it was computed from (it is read on every redraw) (#62).
@@ -127,7 +134,9 @@ final class NoteStore: ObservableObject {
     /// The organization file as Folio last read or wrote it; anything else on disk was changed by someone else (#175).
     var organizationOnDisk: Data?
     /// Items in Folio's trash.
-    @Published internal(set) var trashItems: [TrashItem] = []
+    @Published internal(set) var trashItems: [TrashItem] = [] {
+        didSet { libraryVersion += 1 }
+    }
     /// Note files in the library that cannot be read at all.
     @Published internal(set) var damagedNotes: [DamagedNote] = []
     /// The selected note could not be opened; the editor shows the diagnosis instead.
@@ -212,15 +221,33 @@ final class NoteStore: ObservableObject {
 
     /// Reads the library off the main thread and applies the result there. Only the newest read is applied, and only
     /// while the library is still the same, so quick changes never leave an older state behind.
+    /// A read that started before a note was created, duplicated or deleted would undo that in the list, close
+    /// its tab and drop the selection, so it is read again instead (#362).
     @discardableResult
-    func reloadInBackground() -> Task<Void, Never> {
+    func reloadInBackground(attempt: Int = 0) -> Task<Void, Never> {
         reloadGeneration += 1
-        let generation = reloadGeneration, root = rootURL, scanner = self.scanner
+        let generation = reloadGeneration, version = libraryVersion, root = rootURL, scanner = self.scanner
         return Task {
             let snapshot = await Task.detached(priority: .userInitiated) { NoteStore.readLibrary(root, scanner: scanner) }.value
-            guard generation == reloadGeneration, root == rootURL else { return }
-            apply(snapshot)
+            switch Self.reloadOutcome(started: (generation, version, root), now: (reloadGeneration, libraryVersion, rootURL), attempt: attempt) {
+            case .apply: apply(snapshot)
+            case .drop: return
+            case .readAgain: await reloadInBackground(attempt: attempt + 1).value
+            case .readNow: reload()
+            }
         }
+    }
+
+    enum ReloadOutcome: Equatable { case apply, drop, readAgain, readNow }
+
+    /// What to do with a finished background read: a newer read or another library wins; changed lists mean the read
+    /// is outdated and is repeated (after two tries synchronously, so constant edits cannot starve it) (#362).
+    nonisolated static func reloadOutcome(
+        started: (generation: Int, version: Int, root: URL), now: (generation: Int, version: Int, root: URL), attempt: Int
+    ) -> ReloadOutcome {
+        guard started.generation == now.generation, started.root == now.root else { return .drop }
+        if started.version == now.version { return .apply }
+        return attempt < 2 ? .readAgain : .readNow
     }
 
     private func apply(_ snapshot: LibrarySnapshot) {
