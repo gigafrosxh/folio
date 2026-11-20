@@ -29,6 +29,25 @@ enum BackgroundRun {
         }
         CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
     }
+
+    /// Test runs only: AppKit decides about crashing on exceptions before the delegate runs, and the crash report
+    /// carries no reason. Logs every reported exception with its reason and stack to stderr first (#223).
+    @MainActor static func logExceptions() {
+        UserDefaults.standard.register(defaults: ["NSApplicationCrashOnExceptions": false])
+        let selector = #selector(NSApplication.reportException(_:))
+        guard let method = class_getInstanceMethod(NSApplication.self, selector) else { return }
+        typealias Report = @convention(c) (NSApplication, Selector, NSException) -> Void
+        let original = unsafeBitCast(method_getImplementation(method), to: Report.self)
+        let block: @convention(block) (NSApplication, NSException) -> Void = { app, exception in
+            let text =
+                "*** Exception \(exception.name.rawValue): \(exception.reason ?? "-")\n"
+                + exception.callStackSymbols.prefix(40).joined(separator: "\n") + "\n"
+            FileHandle.standardError.write(Data(text.utf8))
+            print(text)
+            original(app, selector, exception)
+        }
+        method_setImplementation(method, imp_implementationWithBlock(block))
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -128,6 +147,7 @@ enum FolioMain {
             FileHandle.standardError.write(Data((refusal + "\n").utf8))
             exit(78)
         }
+        if ProcessInfo.processInfo.environment["FOLIO_LIBRARY"] != nil { BackgroundRun.logExceptions() }
         FolioApp.main()
     }
 }
