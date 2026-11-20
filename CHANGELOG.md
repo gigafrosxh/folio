@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.4] – 2026-11-20
+
 ### Verbessert (Leistung)
 - **Notizliste** (#301, #305, #308): Der Metadaten-Cache hält nur noch den aktuellen Stand je Notiz und vergisst gelöschte Notizen; eine Änderung mit gleicher Größe und gleichem Datum wird über die Prüfsumme der Datei erkannt; sehr tief verschachtelte Ordner (mehr als 64 Ebenen) werden übersprungen statt den Scan zu gefährden.
 - **Notizen öffnen** (#306): Abschnitte werden ohne zusätzliche Kopie direkt aus der Datei entpackt.
