@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.10.1] – 2026-11-20
+
 ### Behoben
 - **Eingefügter Text** (#357): Text aus Webseiten, Pages, Word und anderen Apps behält beim Einfügen Größe, Fett, Kursiv, gewählte Farben und Links, bekommt aber die Folio-Schrift. Das normale Schwarz (oder Weiß) der Quelle wird zu Folios Textfarbe, sodass eingefügter Text im Dunkelmodus nicht mehr schwarz bleibt; Code bleibt in Festbreitenschrift, weiße Seitenhintergründe fallen weg.
 
