@@ -539,6 +539,12 @@ final class FolioTextView: NSTextView {
         let start = selectedRange().location
         let inTitle = isFirstBlock && !ns.substring(to: start).contains("\n")
         let titleFont = typingAttributes[.font] as? NSFont
+        // Rich text keeps its look but takes Folio's typeface and text colour (#357).
+        if let rich = PasteStyle.richText(from: pb) {
+            insertText(PasteStyle.adopt(rich, body: bodyAttributes()), replacementRange: selectedRange())
+            if inTitle, let titleFont { demotePastedLinesAfterTitle(from: start, to: selectedRange().location, titleFont: titleFont) }
+            return
+        }
         guard readSelection(from: pb) else {
             NSSound.beep()
             return
