@@ -53,11 +53,15 @@ for flag, prefix in [(f, p) for f, p in [("DEV", "DEV"), ("SAFETY", "SAFETY"), (
             if proc.poll() is None and f"{prefix} done" not in log.read_text(errors="replace"):
                 # Timed out: record where the app hangs (main thread and helpers) before stopping it.
                 print(f"TIMEOUT {flag} after {TIMEOUT:.0f} s, sampling", flush=True)
-                sample = RUN / f"{flag}-sample.txt"
+                sample = RUN / f"{flag}-sample.log"
                 subprocess.run(["sample", str(proc.pid), "3", "-file", str(sample)], capture_output=True)
                 if sample.exists():
                     lines = sample.read_text(errors="replace").splitlines()
-                    print("\n".join(lines[:120]), flush=True)
+                    # Folio's own frames say which view or step hangs; the top of stack says what it is doing.
+                    own = sorted({l.strip(" +!:|") for l in lines if "(in Folio)" in l})
+                    print("Folio frames:\n" + "\n".join(own[:80]), flush=True)
+                    start = next((i for i, l in enumerate(lines) if l.startswith("Sort by top of stack")), len(lines))
+                    print("\n".join(lines[start:start + 30]), flush=True)
         finally:
             proc.terminate()
             try:
