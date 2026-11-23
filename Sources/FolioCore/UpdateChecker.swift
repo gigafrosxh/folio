@@ -88,8 +88,15 @@ public enum UpdateChecker {
             version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag,
             notes: stripFooter(json["body"] as? String ?? ""),
             pageURL: page,
-            dmgURL: (dmg?["browser_download_url"] as? String).flatMap(URL.init(string:)),
+            dmgURL: (dmg?["browser_download_url"] as? String).flatMap(URL.init(string:)).flatMap { isTrustedDownload($0) ? $0 : nil },
             published: (json["published_at"] as? String).flatMap(formatter.date(from:)))
+    }
+
+    /// Updates come only from this repository's releases on GitHub over https (#386). Until Folio is signed with a
+    /// Developer ID (#63) that, TLS and the version check are what vouches for a download.
+    public static func isTrustedDownload(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", url.host()?.lowercased() == "github.com" else { return false }
+        return url.path.hasPrefix("/\(repository)/releases/download/")
     }
 
     public static func latestRelease(session: URLSession = .shared) async throws -> ReleaseInfo {

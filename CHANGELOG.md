@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Sicherheit
+- **Updates** (#386): Folio lädt Updates nur noch per https aus den eigenen Releases auf GitHub herunter; jede andere Adresse aus der Release-Antwort wird ignoriert.
+
 ## [1.11.24] – 2026-11-23
 
 ### Sicherheit

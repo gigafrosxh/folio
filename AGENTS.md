@@ -9,7 +9,7 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
 1. **Vor jeder Aufgabe die GitHub-Issues prüfen** (`gh issue list --state open`). Gibt es die Anfrage schon als Issue,
    wird genau dieses Issue abgearbeitet und im Commit mit `Closes #N` geschlossen.
 2. **Jedes Update wird ein Release**: Eintrag unter `## [Unreleased]` in `CHANGELOG.md`, dann `make release V=X.Y.Z`.
-   **Jeder gemeldete Bug („[Bug] …“-Issue) bekommt ein eigenes Patch-Release** (0.16.1, 0.16.2, …), Commit mit `Closes #N`.
+   Bugs werden nach Prioritätsgruppen gebündelt als Patch-Releases ausgeliefert (Regel 8), Commit mit `Closes #N`.
 3. **Folio nie selbst auf dem Mac des Nutzers installieren oder aktualisieren** – er aktualisiert selbst über den
    Update-Knopf. Kein `make install`, kein Ersetzen von `/Applications/Folio.app`.
 4. **Nie mit der echten Bibliothek testen** (`~/Documents/Folio`). Immer eine Kopie oder eine leere Testbibliothek
@@ -19,10 +19,13 @@ Kommuniziert wird mit dem Nutzer auf **Deutsch**; Code, Kommentare und Commit-Ti
    `.folio/damaged` verschoben.
 7. **Jedes Issue hat eine Priorität** als Label `P0`–`P3` (P0 kritisch: Datenverlust, Absturz, Eingabe am falschen Ort;
    P1 hoch; P2 mittel; P3 niedrig). Neue Issues werden beim Anlegen priorisiert.
-8. **Release-Ablauf** (Vorgabe des Nutzers, Stand 21.10.2026): `Fixen → Release → Testen → Issues anlegen → Prioritäten prüfen`.
-   - Nach **jedem** Release (stabil oder nicht): P0 → `x.y.1`, P1 → `x.y.2`, P2 → `x.y.3`, P3 → `x.y.4`; leere Stufen entfallen.
-     Ein neu gefundenes P0 kommt immer ins nächste Release, alles andere rückt nach. Erst wenn kein P0 offen ist, P1, dann P2, P3.
-     Beispiel: `1.1.0 → 1.1.1 (P0) → Test → neues P0 → 1.1.2 (P0) → 1.1.3 (P1) → 1.1.4 (P2) → 1.1.5 (P3)`.
+8. **Release-Ablauf** (Vorgabe des Nutzers, Stand 23.11.2026): `Fixen → Release → Testen → Issues anlegen → Prioritäten prüfen`.
+   - **Ein Patch pro Prioritätsgruppe, nicht pro Issue:** Nach einem Release kommen alle offenen P0 gemeinsam in `x.y.1`,
+     alle P1 in `x.y.2`, alle P2 in `x.y.3`, alle P3 in `x.y.4`; leere Stufen entfallen. Commits pro Gruppe mit `Closes #N` für
+     jedes Issue (GitHub schließt nur die ersten 10 automatisch, den Rest mit `gh issue close`).
+   - **Nach jedem Patch testen.** Ein dabei neu gefundener Fehler kommt in den direkt nächsten Patch, die übrigen Gruppen
+     rutschen je eine Nummer nach hinten. Beispiel: Fehler in `x.y.1` gefunden → Fix in `x.y.2`, P1 dann in `x.y.3`, P2 in
+     `x.y.4`, P3 in `x.y.5`.
    - **Release Candidates nur vor einer Hauptversion** (`2.0.0-rc.1 …` → `2.0.0`), nie danach: Nach SemVer ist `2.0.0-rc.1`
      älter als `2.0.0`, der Update-Knopf würde es nie anbieten (vom Nutzer so bestätigt).
 9. **Codex nur auf ausdrücklichen Wunsch** (Vorgabe des Nutzers vom 19./20.11.2026): Standardmäßig baut, testet und reviewt

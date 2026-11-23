@@ -27,12 +27,12 @@ final class UpdateCheckerTests: XCTestCase {
         let json = """
             {"tag_name":"v0.12.0","html_url":"https://github.com/gigafrosxh/folio/releases/tag/v0.12.0","body":"### Neu\\n- Update",
              "published_at":"2026-10-20T08:00:00Z",
-             "assets":[{"name":"Folio-0.12.0-arm64.pkg","browser_download_url":"https://example.com/a.pkg"},
-                       {"name":"Folio-0.12.0-arm64.dmg","browser_download_url":"https://example.com/a.dmg"}]}
+             "assets":[{"name":"Folio-0.12.0-arm64.pkg","browser_download_url":"https://github.com/gigafrosxh/folio/releases/download/v0.12.0/a.pkg"},
+                       {"name":"Folio-0.12.0-arm64.dmg","browser_download_url":"https://github.com/gigafrosxh/folio/releases/download/v0.12.0/a.dmg"}]}
             """
         let r = try UpdateChecker.parse(Data(json.utf8))
         XCTAssertEqual(r.version, "0.12.0")
-        XCTAssertEqual(r.dmgURL?.absoluteString, "https://example.com/a.dmg")
+        XCTAssertEqual(r.dmgURL?.absoluteString, "https://github.com/gigafrosxh/folio/releases/download/v0.12.0/a.dmg")
         XCTAssertTrue(r.notes.contains("Update"))
         XCTAssertNotNil(r.published)
     }
@@ -78,5 +78,14 @@ final class UpdatePathsTests: XCTestCase {
         XCTAssertTrue(UpdatePaths.isTranslocated("/private/var/folders/dp/x/T/AppTranslocation/80349E44/d/Folio.app"))
         XCTAssertFalse(UpdatePaths.isTranslocated("/Applications/Folio.app"))
         XCTAssertFalse(UpdatePaths.isTranslocated("/Volumes/ExterneSSD/Applications/Folio.app"))
+    }
+
+    // #386
+    func testOnlyOwnGitHubReleasesAreDownloaded() {
+        let repo = UpdateChecker.repository
+        XCTAssertTrue(UpdateChecker.isTrustedDownload(URL(string: "https://github.com/\(repo)/releases/download/v1.0.0/Folio-1.0.0-arm64.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedDownload(URL(string: "http://github.com/\(repo)/releases/download/v1.0.0/F.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedDownload(URL(string: "https://evil.example/\(repo)/releases/download/v1.0.0/F.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedDownload(URL(string: "https://github.com/someone/else/releases/download/v1/F.dmg")!))
     }
 }
