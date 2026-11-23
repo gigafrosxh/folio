@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.15] – 2026-11-23
+
 ### Behoben
 - **Sicherungsprüfung** (#370): Ein Manifest ohne Notizliste oder -anzahl gilt als ungültig; große Sicherungen werden in linearer Zeit geprüft; meldet das System für „wichtige Nutzung“ 0 Byte frei, zählt der normale freie Platz.
 
