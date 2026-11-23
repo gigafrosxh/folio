@@ -31,7 +31,11 @@ public struct BackupCheck: Sendable, Equatable {
 /// Folio's hidden data folder (versions, trash) is not part of a backup, only the notes and folders.
 public enum LibraryBackup {
     public static let prefix = "Folio-Backup-"
+    /// Manifest of backups before 1.11.12, in the archive's root (where a library file of that name could replace it).
     static let manifestName = "Folio-Backup.json"
+    /// Since 1.11.12 the manifest has a folder of its own that the library never backs up (#367).
+    static let manifestFolder = ".folio-backup"
+    static var manifestPath: String { manifestFolder + "/manifest.json" }
 
     public enum BackupError: LocalizedError {
         case tool(String)
@@ -66,10 +70,11 @@ public enum LibraryBackup {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true)
             let final = directory.appendingPathComponent(prefix + Stamp.string(date)).appendingPathExtension("zip")
             let partial = directory.appendingPathComponent(".partial-\(UUID().uuidString).zip")
-            let manifest = fm.temporaryDirectory.appendingPathComponent("folio-manifest-\(UUID().uuidString)").appendingPathComponent(manifestName)
+            let manifestRoot = fm.temporaryDirectory.appendingPathComponent("folio-manifest-\(UUID().uuidString)")
+            let manifest = manifestRoot.appendingPathComponent(manifestPath)
             defer {
                 try? fm.removeItem(at: partial)
-                try? fm.removeItem(at: manifest.deletingLastPathComponent())
+                try? fm.removeItem(at: manifestRoot)
             }
             // A small manifest first, so even an empty library gives a valid archive.
             try fm.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -81,9 +86,9 @@ public enum LibraryBackup {
                 "library": library.path, "created": ISO8601DateFormatter().string(from: date), "notes": files.count, "files": files
             ]
             try JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]).write(to: manifest)
-            try run("/usr/bin/zip", ["-q", "-j", partial.path, manifest.path], cwd: nil)
+            try run("/usr/bin/zip", ["-q", partial.path, manifestPath], cwd: manifestRoot)
             try run(
-                "/usr/bin/zip", ["-r", "-q", "-y", partial.path, ".", "-x", ".folio/*", "*.DS_Store", ".partial-*", "*Folio-Backup-*.zip"], cwd: library, allowNothingToDo: true)
+                "/usr/bin/zip", ["-r", "-q", "-y", partial.path, ".", "-x", ".folio/*", "\(manifestFolder)/*", "*.DS_Store", ".partial-*", "*Folio-Backup-*.zip"], cwd: library, allowNothingToDo: true)
             // Folio's own folder stays out (history, trash, caches), except the library's order, favorites and smart views (#176).
             if fm.fileExists(atPath: LibraryOrganization.file(in: library).path) {
                 try run("/usr/bin/zip", ["-q", partial.path, "\(LibraryData.folderName)/organization.json"], cwd: library, allowNothingToDo: true)
@@ -103,7 +108,13 @@ public enum LibraryBackup {
             let base = temp.standardizedFileURL.path
             let paths = notes.map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }
             let damaged = zip(notes, paths).filter { (try? NoteFile.read(from: $0.0)) == nil }.map(\.1)
-            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: temp.appendingPathComponent(manifestName), found: paths))
+            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: manifestURL(in: temp), found: paths))
+        }
+
+        /// The manifest of an unpacked backup: its own folder, or the root for backups before 1.11.12 (#367).
+        static func manifestURL(in folder: URL) -> URL {
+            let current = folder.appendingPathComponent(manifestPath)
+            return FileManager.default.fileExists(atPath: current.path) ? current : folder.appendingPathComponent(manifestName)
         }
 
         /// What the manifest lists but the archive lacks. Older backups only stored the number of notes; a missing
@@ -125,7 +136,12 @@ public enum LibraryBackup {
             let staging = parent.appendingPathComponent(".folio-restore-\(UUID().uuidString)", isDirectory: true)
             defer { try? fm.removeItem(at: staging) }
             try unpack(backup, to: staging)
-            try? fm.removeItem(at: staging.appendingPathComponent(manifestName))
+            // Only the manifest goes; a library file that happens to be called like the old manifest stays (#367).
+            if fm.fileExists(atPath: staging.appendingPathComponent(manifestPath).path) {
+                try? fm.removeItem(at: staging.appendingPathComponent(manifestFolder))
+            } else {
+                try? fm.removeItem(at: staging.appendingPathComponent(manifestName))
+            }
             let target = LibraryTrash.uniqueURL(parent.appendingPathComponent(name, isDirectory: true))
             try fm.moveItem(at: staging, to: target)
             return target

@@ -169,6 +169,20 @@ final class ArchiveSafetyTests: XCTestCase {
             XCTAssertEqual(check.notes, 2)
         }
 
+        // #367
+        func testLibraryFileNamedLikeTheOldManifestSurvives() throws {
+            let library = dir.appendingPathComponent("Bib")
+            try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+            try note("a").write(to: library.appendingPathComponent("A.folio"))
+            try Data(#"{"privat":true}"#.utf8).write(to: library.appendingPathComponent(LibraryBackup.manifestName))
+            let backup = try LibraryBackup.create(library: library, in: dir.appendingPathComponent("Backups"))
+            let check = try LibraryBackup.verify(backup.url)
+            XCTAssertTrue(check.isValid, check.problems)
+            let restored = try LibraryBackup.restore(backup.url, into: dir, name: "Zurück")
+            XCTAssertEqual(try Data(contentsOf: restored.appendingPathComponent(LibraryBackup.manifestName)), Data(#"{"privat":true}"#.utf8))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: restored.appendingPathComponent(LibraryBackup.manifestFolder).path))
+        }
+
         // #325
         func testFailedRestoreLeavesNothingBehind() throws {
             let broken = dir.appendingPathComponent("kaputt.zip")

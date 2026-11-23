@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Sicherungen** (#367): Das Manifest liegt jetzt in einem eigenen Ordner im ZIP. Eine Datei „Folio-Backup.json“ in der Bibliothek ersetzt es nicht mehr und geht beim Wiederherstellen nicht mehr verloren; ältere Sicherungen werden weiter gelesen.
+
 ## [1.11.11] – 2026-11-23
 
 ### Behoben
