@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Sicherheit
+- **Markdown-Import** (#385): Folio liest beim Import nur normale Dateien bis zu einer Größengrenze (Markdown 50 MB, eingebettete Dateien 256 MB); Sonderdateien wie Pipes können den Import nicht mehr blockieren.
+
 ## [1.11.23] – 2026-11-23
 
 ### Sicherheit

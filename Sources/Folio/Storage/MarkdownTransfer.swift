@@ -124,8 +124,17 @@ enum MarkdownTransfer {
         return urls.count - failures.count
     }
 
+    /// Largest Markdown file and largest embedded file an import reads (#385).
+    static let maxMarkdownBytes = 50 << 20
+    static let maxEmbeddedBytes = 256 << 20
+
     static func note(fromMarkdownAt url: URL) throws -> NoteFile {
-        let data = try Data(contentsOf: url)
+        // Only regular files up to a size limit: a FIFO or device would block, a huge file fill the memory (#385).
+        let data: Data
+        switch CodeExport.boundedData(at: url, limit: maxMarkdownBytes) {
+        case .success(let d): data = d
+        case .failure: throw CocoaError(.fileReadTooLarge, userInfo: [NSFilePathErrorKey: url.path])
+        }
         guard let markdown = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
@@ -179,7 +188,9 @@ enum MarkdownTransfer {
     private static func embeddedBlock(alt: String, path: String, baseURL: URL?, attachments: inout [FolioArchive.Attachment]) -> BlockRecord {
         let decoded = path.removingPercentEncoding ?? path
         // Only files next to the Markdown file: a path like ../../.ssh/id_rsa must not pull other files in (#161).
-        if let base = baseURL, let file = LinkSafety.fileInside(base, relativePath: decoded), let data = try? Data(contentsOf: file) {
+        if let base = baseURL, let file = LinkSafety.fileInside(base, relativePath: decoded),
+            case .success(let data) = CodeExport.boundedData(at: file, limit: maxEmbeddedBytes)
+        {
             let name = (decoded as NSString).lastPathComponent
             let type = UTType(filenameExtension: (name as NSString).pathExtension) ?? .data
             let a = FolioArchive.Attachment(filename: name, typeIdentifier: type.identifier, data: data)
