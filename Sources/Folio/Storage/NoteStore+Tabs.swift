@@ -95,11 +95,34 @@ extension NoteStore {
         Task.detached(priority: .utility) { _ = try? history.record(data, noteID: noteID, force: force) }
     }
 
+    /// The edits of a note whose file vanished, as a new note with new ids; the old one is closed (#365).
+    func rescueDeleted(_ doc: NoteDocument) {
+        let file = NoteIdentity.renewed(doc.makeFile())
+        let parent = doc.url.deletingLastPathComponent()
+        let folder = FileManager.default.fileExists(atPath: parent.path) ? parent : rootURL
+        guard let ref = saveAsNewNote(file, in: folder, suffix: "(gerettet)") else {
+            doc.markDirtyWithoutSaving()
+            return
+        }
+        let oldID = doc.id
+        closeDocument(oldID)
+        notes.removeAll { $0.id == oldID }
+        tabs.removeAll { $0 == oldID }
+        if selectedNoteID == oldID || selectedNoteID == nil { selectedNoteID = ref.id }
+        lastError = "„\(doc.meta.title)“ wurde außerhalb von Folio gelöscht oder verschoben. Deine Änderungen liegen jetzt in „\(ref.meta.title)“."
+    }
+
     func save(_ doc: NoteDocument) {
         // Never overwrite a change made outside Folio since the note was loaded or last saved.
         // Still unresolved: the own changes are not on disk, so the note stays unsaved for every guard (#206).
         if conflict?.doc === doc {
             doc.markDirtyWithoutSaving()
+            return
+        }
+        // Deleted or moved elsewhere since it was opened: never recreate it silently at the old place (a moved note
+        // would exist twice with the same id); the edits become a new note next to it (#365, like #269 on the iPad).
+        if doc.diskFingerprint != nil, !FileManager.default.fileExists(atPath: doc.url.path), !isTemplate(doc.url) {
+            rescueDeleted(doc)
             return
         }
         if let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url), current != expected {

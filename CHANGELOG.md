@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Anderswo gelöschte Notiz** (#365): Wird eine geöffnete Notiz im Finder gelöscht oder verschoben, legt Folio sie beim Sichern nicht mehr still am alten Ort an (beim Verschieben gab es sie sonst doppelt). Die Änderungen landen als neue Notiz „… (gerettet)“ daneben, und Folio sagt Bescheid – wie auf dem iPad.
+
 ## [1.11.9] – 2026-11-20
 
 ### Behoben

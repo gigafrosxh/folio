@@ -10,7 +10,8 @@ extension NoteStore {
         checkOrganizationChange()
         guard conflict == nil else { return }
         for doc in Array(documents.values) {
-            guard let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url) else { continue }  // moved/deleted: the next save recreates it
+            // Moved or deleted: with edits the next save keeps them as a new note (#365); without, nothing to do here.
+            guard let expected = doc.diskFingerprint, let current = FileFingerprint.of(doc.url) else { continue }
             guard current != expected else { continue }
             if doc.isDirty {
                 raiseConflict(doc)

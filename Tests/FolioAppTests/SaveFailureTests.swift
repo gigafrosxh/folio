@@ -281,4 +281,19 @@ final class SaveFailureTests: XCTestCase {
         XCTAssertNotNil(store.lastError)
         store.lastError = nil
     }
+
+    /// #365: a note deleted outside Folio while open is not recreated at its old place; the edits become a new note.
+    func testDeletedOutsideIsNotRecreated() throws {
+        let doc = try openNote("Wird gelöscht", text: "Anfang")
+        let (id, url) = (doc.id, doc.url)
+        type(doc, " GERETTET_365")
+        try FileManager.default.removeItem(at: url)
+        doc.saveNow()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "nicht still neu angelegt")
+        XCTAssertNil(store.documents[id])
+        let rescued = try XCTUnwrap(store.notes.first { $0.meta.title.contains("(gerettet)") })
+        XCTAssertNotEqual(rescued.id, id, "neue Notiz-ID")
+        XCTAssertTrue(((try? NoteFile.read(from: rescued.url)).map(NoteText.of) ?? "").contains("GERETTET_365"))
+        XCTAssertTrue(store.lastError?.contains("gerettet") == true)
+    }
 }
