@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.21] – 2026-11-23
+
 ### Behoben
 - **KI-Assistent und mehrdeutige Titel** (#382): Passen mehrere Notizen zum genannten Titel, ändert der Assistent keine davon, sondern nennt die Kandidaten und fragt nach – bisher traf es die zuletzt bearbeitete.
 
