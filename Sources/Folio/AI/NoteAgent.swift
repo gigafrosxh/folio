@@ -32,11 +32,25 @@ enum NoteAgent {
         // Only close matches („Portugal“ for „Urlaub Portugal“); a loose fuzzy hit could change the wrong note.
         let q = WikiLink.key(title)
         guard q.count >= 3 else { return nil }
-        let close = store.notes.filter {
+        let close = closeMatches(q)
+        // Several candidates: change none of them, the answer names them instead (#382).
+        return close.count == 1 ? close[0] : nil
+    }
+
+    private static func closeMatches(_ key: String) -> [NoteRef] {
+        NoteStore.shared.notes.filter {
             let t = WikiLink.key($0.meta.title)
-            return t.contains(q) || (t.count >= 3 && q.contains(t))
+            return t.contains(key) || (t.count >= 3 && key.contains(t))
         }
-        return close.count == 1 ? close[0] : close.max { $0.meta.modified < $1.meta.modified }
+    }
+
+    /// Why a title found no single note: none at all, or several that fit (#382).
+    static func missing(_ title: String) -> String {
+        let q = WikiLink.key(title)
+        let close = q.count >= 3 ? closeMatches(q) : []
+        guard close.count > 1 else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
+        let names = close.prefix(5).map { "„\($0.meta.title)“" }.joined(separator: ", ")
+        return "Fehler: „\(title)“ ist nicht eindeutig (\(names)\(close.count > 5 ? " …" : "")). Frag den Nutzer, welche gemeint ist; ändere nichts."
     }
 
     @discardableResult
@@ -53,7 +67,7 @@ enum NoteAgent {
     @discardableResult
     static func append(to title: String, text: String) -> String {
         if let limitReached { return limitReached }
-        guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
+        guard let ref = find(title) else { return missing(title) }
         guard let doc = document(ref) else { return "Fehler: „\(ref.meta.title)“ ist nicht lesbar." }
         let target =
             doc.blocks.last(where: { $0.kind == .text })
@@ -74,8 +88,8 @@ enum NoteAgent {
     @discardableResult
     static func link(from: String, to: String) -> String {
         if let limitReached { return limitReached }
-        guard let a = find(from) else { return "Fehler: Keine Notiz „\(from)“ gefunden." }
-        guard let b = find(to) else { return "Fehler: Keine Notiz „\(to)“ gefunden." }
+        guard let a = find(from) else { return missing(from) }
+        guard let b = find(to) else { return missing(to) }
         guard a.id != b.id else { return "Eine Notiz verweist nicht auf sich selbst." }
         if NoteStore.shared.linkIndex.outgoing(a.id).contains(b.id) {
             return "„\(a.meta.title)“ verweist schon auf „\(b.meta.title)“."
@@ -92,7 +106,7 @@ enum NoteAgent {
         if let limitReached { return limitReached }
         let clean = tag.trimmingCharacters(in: CharacterSet(charactersIn: "# ")).replacingOccurrences(of: " ", with: "-")
         guard !clean.isEmpty else { return "Fehler: Leerer Tag." }
-        guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
+        guard let ref = find(title) else { return missing(title) }
         if ref.meta.tags.contains(clean.lowercased()) { return "„\(ref.meta.title)“ hat #\(clean) schon." }
         let result = append(to: ref.meta.title, text: "#\(clean)")
         guard !result.hasPrefix("Fehler") else { return result }
@@ -106,8 +120,9 @@ enum NoteAgent {
         if let limitReached { return limitReached }
         let new = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !new.isEmpty else { return "Fehler: Leerer Titel." }
-        guard let ref = find(title), let doc = document(ref), let first = doc.blocks.first(where: { $0.kind == .text }) else {
-            return "Fehler: Keine Notiz „\(title)“ gefunden."
+        guard let ref = find(title) else { return missing(title) }
+        guard let doc = document(ref), let first = doc.blocks.first(where: { $0.kind == .text }) else {
+            return "Fehler: „\(ref.meta.title)“ hat keinen Text zum Umbenennen."
         }
         let ns = first.storage.string as NSString
         let line = ns.lineRange(for: NSRange(location: 0, length: 0))
@@ -124,7 +139,7 @@ enum NoteAgent {
     static func move(_ title: String, toFolder folder: String) -> String {
         if let limitReached { return limitReached }
         let store = NoteStore.shared
-        guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
+        guard let ref = find(title) else { return missing(title) }
         let parts = folder.split(separator: "/").map { NoteStore.sanitize(String($0)) }.filter { !$0.isEmpty }
         guard !parts.isEmpty else { return "Fehler: Kein Ordner angegeben." }
         let url = parts.reduce(store.rootURL) { $0.appendingPathComponent($1, isDirectory: true) }

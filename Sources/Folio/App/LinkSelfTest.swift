@@ -225,5 +225,12 @@ enum LinkSelfTest {
         check(delta?.folderURL.path.hasSuffix("Archiv/2026") == true, "Assistent verschiebt nach Archiv/2026 (\(delta?.folderURL.path ?? "-"))")
         check(NoteAgent.log.count == 5, "Fünf Aktionen protokolliert (\(NoteAgent.log.map(\.summary)))")
         check(NoteAgent.append(to: "gibt es nicht xyz", text: "x").hasPrefix("Fehler"), "Unbekannte Notiz wird gemeldet, nichts wird geändert")
+        // #382: two notes fit the title: none is changed, the answer names both.
+        let one = store.createNote(titled: "Zwilling Nord", body: ""), two = store.createNote(titled: "Zwilling Süd", body: "")
+        let answer = NoteAgent.addTag("zwilling-x", to: "Zwilling")
+        let tagged = store.notes.filter { $0.meta.tags.contains("zwilling-x") }
+        check(
+            one != nil && two != nil && answer.contains("nicht eindeutig") && tagged.isEmpty,
+            "Mehrdeutiger Titel: keine Notiz geändert, Kandidaten genannt (#382)")
     }
 }
