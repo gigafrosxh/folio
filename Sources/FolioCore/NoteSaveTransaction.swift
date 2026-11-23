@@ -52,15 +52,24 @@ public struct NoteSaveTransaction: Sendable {
         return copy
     }
 
-    /// A file name in `folder` that is not taken yet: "<title>.folio", "<title> 2.folio" …
+    /// A file name in `folder` that is not taken yet: "<title>.folio", "<title> 2.folio" … The title is shortened so
+    /// that the name with counter and extension stays within the 255 bytes a file name may have (#366).
     public static func freeURL(in folder: URL, title: String, fs: any FileOperations = LocalFileOperations()) -> URL {
         let base = title.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
-        var url = folder.appendingPathComponent(base).appendingPathExtension(FolioArchive.fileExtension)
-        var n = 2
-        while fs.fileExists(url) {
-            url = folder.appendingPathComponent("\(base) \(n)").appendingPathExtension(FolioArchive.fileExtension)
-            n += 1
+        func candidate(_ n: Int) -> URL {
+            let counter = n == 1 ? "" : " \(n)"
+            let name = fitting(base, extra: counter.utf8.count + 1 + FolioArchive.fileExtension.utf8.count) + counter
+            return folder.appendingPathComponent(name).appendingPathExtension(FolioArchive.fileExtension)
         }
-        return url
+        var n = 1
+        while fs.fileExists(candidate(n)) { n += 1 }
+        return candidate(n)
+    }
+
+    /// Longest prefix of `name` (whole characters) that leaves room for `extra` bytes in a 255-byte file name.
+    static func fitting(_ name: String, extra: Int) -> String {
+        var out = name
+        while out.utf8.count + extra > 255, !out.isEmpty { out.removeLast() }
+        return out.trimmingCharacters(in: .whitespaces)
     }
 }

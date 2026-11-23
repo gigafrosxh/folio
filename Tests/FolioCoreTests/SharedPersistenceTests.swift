@@ -136,4 +136,23 @@ final class SharedPersistenceTests: XCTestCase {
         NoteMetaBuilder.apply([.init(kind: .image, caption: "nur Bild")], to: &empty)
         XCTAssertEqual(empty.title, "Bleibt", "ohne Text bleibt der Titel")
     }
+
+    // #366
+    func testConflictCopyWithLongNameIsWritten() throws {
+        let long = String(repeating: "ä", count: 120)  // 240 bytes
+        let url = dir.appendingPathComponent(long).appendingPathExtension("folio")
+        try note("eins").write(to: url)
+        var revisions = SaveRevisions()
+        let stamp = FileStamp.of(url)
+        try note("fremd, länger").write(to: url)
+        let mine = note("meins")
+        let t = NoteSaveTransaction(history: NoteHistory(library: dir), copySuffix: " (iPad)")
+        let r = try t.save(mine, data: mine.encoded(), to: url, expected: stamp, revision: 1, current: 1, revisions: &revisions)
+        guard case .savedAsCopy(let copy) = r.outcome else { return XCTFail("\(r.outcome)") }
+        XCTAssertLessThanOrEqual(copy.lastPathComponent.utf8.count, 255)
+        XCTAssertEqual(try NoteFile.read(from: copy).body.blocks[0].code, "meins")
+        let second = NoteSaveTransaction.freeURL(in: dir, title: copy.deletingPathExtension().lastPathComponent)
+        XCTAssertNotEqual(second, copy)
+        XCTAssertLessThanOrEqual(second.lastPathComponent.utf8.count, 255)
+    }
 }
