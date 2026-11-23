@@ -124,9 +124,16 @@ public enum LibraryBackup {
             guard let data = try? Data(contentsOf: manifest),
                 let info = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { return [manifestName] }
-            if let files = info["files"] as? [String] { return files.filter { !Set(found).contains($0) } }
-            if let count = info["notes"] as? Int, count > found.count { return ["\(count - found.count) von \(count) Notizen"] }
-            return []
+            // The set is built once: a large library is checked in linear time (#370).
+            if let files = info["files"] as? [String] {
+                let present = Set(found)
+                return files.filter { !present.contains($0) }
+            }
+            if let count = info["notes"] as? Int {
+                return count > found.count ? ["\(count - found.count) von \(count) Notizen"] : []
+            }
+            // Neither a note list nor a count: nothing says what should be there (#370).
+            return [manifestName]
         }
 
         /// Restores a backup into a new folder `name` inside `parent` (never over existing notes). Unpacked into a hidden
@@ -169,15 +176,23 @@ public enum LibraryBackup {
         /// and size of files) and afterwards that no symbolic link leads out of the folder (#282).
         static func unpack(_ zip: URL, to folder: URL) throws {
             let entries = try contents(of: zip)
-            let free =
-                (try? folder.deletingLastPathComponent().resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-                .volumeAvailableCapacityForImportantUsage.map { UInt64(max($0, 0)) } ?? maxUnpacked
+            let free = freeSpace(at: folder.deletingLastPathComponent())
             try check(entries, freeSpace: free)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try run("/usr/bin/ditto", ["-x", "-k", zip.path, folder.path], cwd: nil)
             // Links out of the backup (e.g. a folder link the library had) are dropped; the library never follows
             // them either (#56).
             for link in linksOutside(folder) { try? FileManager.default.removeItem(at: link) }
+        }
+
+        /// Free space where the backup is unpacked. Some environments report 0 for "important usage"; the larger of the
+        /// two values counts, so a tiny backup is never refused for lack of space (#370).
+        static func freeSpace(at folder: URL) -> UInt64 {
+            let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey])
+            let important = values?.volumeAvailableCapacityForImportantUsage.map { UInt64(max($0, 0)) } ?? 0
+            let regular = values?.volumeAvailableCapacity.map { UInt64(max($0, 0)) } ?? 0
+            let best = max(important, regular)
+            return best > 0 ? best : maxUnpacked
         }
 
         struct Entry: Equatable {

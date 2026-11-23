@@ -169,6 +169,19 @@ final class ArchiveSafetyTests: XCTestCase {
             XCTAssertEqual(check.notes, 2)
         }
 
+        // #370
+        func testManifestNeedsAnInventoryAndScales() throws {
+            let manifest = dir.appendingPathComponent("m.json")
+            try Data("{}".utf8).write(to: manifest)
+            XCTAssertEqual(LibraryBackup.missing(manifest: manifest, found: []), [LibraryBackup.manifestName], "leeres Manifest ist ungültig")
+            let files = (0..<20_000).map { "N\($0).folio" }
+            try JSONSerialization.data(withJSONObject: ["files": files]).write(to: manifest)
+            let start = Date()
+            XCTAssertEqual(LibraryBackup.missing(manifest: manifest, found: files), [])
+            XCTAssertLessThan(Date().timeIntervalSince(start), 2, "lineare Prüfung")
+            XCTAssertGreaterThan(LibraryBackup.freeSpace(at: dir), 0)
+        }
+
         // #367
         func testLibraryFileNamedLikeTheOldManifestSurvives() throws {
             let library = dir.appendingPathComponent("Bib")
