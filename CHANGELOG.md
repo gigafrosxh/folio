@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **sys.exit in Python-Sitzungen** (#369): `sys.exit(7)` (oder ein Text) gilt als Fehler und wird angezeigt; `sys.exit()` und `sys.exit(0)` bleiben ein Erfolg. Die Sitzung läuft in beiden Fällen weiter.
+
 ## [1.11.13] – 2026-11-23
 
 ### Behoben

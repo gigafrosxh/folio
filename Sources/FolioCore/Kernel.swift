@@ -84,8 +84,11 @@ public enum KernelLanguages {
                 except KeyboardInterrupt:
                     status = "error"
                     print("KeyboardInterrupt", file=sys.stderr)
-                except SystemExit:
-                    pass
+                except SystemExit as e:
+                    # sys.exit() ends the block, not the session; a code other than 0/None is a failure (#369).
+                    if e.code not in (None, 0):
+                        status = "error"
+                        print("SystemExit: " + str(e.code), file=sys.stderr)
                 except BaseException:
                     status = "error"
                     etype, value, tb = sys.exc_info()

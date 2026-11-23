@@ -142,6 +142,22 @@ final class ProcessLifecycleTests: XCTestCase {
 }
 
 extension ProcessLifecycleTests {
+    // #369
+    func testSysExitWithCodeFailsButKeepsTheSession() async throws {
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
+        let k = try Kernel(language: KernelLanguages.python)
+        defer { k.shutdown() }
+        let failed = await k.execute("import sys\nw = 1\nsys.exit(7)")
+        XCTAssertFalse(failed.succeeded)
+        XCTAssertTrue(failed.stderr.contains("SystemExit: 7"), failed.stderr)
+        let zero = await k.execute("import sys\nsys.exit(0)")
+        XCTAssertTrue(zero.succeeded)
+        let plain = await k.execute("sys.exit()")
+        XCTAssertTrue(plain.succeeded)
+        let after = await k.execute("print(w)")
+        XCTAssertEqual(after.stdout, "1\n", "Sitzung bleibt")
+    }
+
     // #368
     func testInterruptWhileIdleKeepsTheSession() async throws {
         guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
