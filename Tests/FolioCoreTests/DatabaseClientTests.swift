@@ -205,6 +205,21 @@ final class DatabaseClientTests: XCTestCase {
         try await roundTrip(connection)
     }
 
+    // #383: a client that writes too much is stopped, nothing huge is read into memory.
+    func testHugeOutputIsStopped() async throws {
+        let before = DatabaseClient.maxOutputBytes
+        DatabaseClient.maxOutputBytes = 1 << 20
+        defer { DatabaseClient.maxOutputBytes = before }
+        do {
+            _ = try await DatabaseClient.execute("/bin/sh", arguments: ["-c", "yes folio | head -c 20000000"], input: "", environment: [:], timeout: 20)
+            XCTFail("zu große Ausgabe wurde nicht gestoppt")
+        } catch let error as DatabaseError {
+            XCTAssertEqual(error, .outputTooLarge(1))
+        }
+        let small = try await DatabaseClient.execute("/bin/sh", arguments: ["-c", "echo ok"], input: "", environment: [:], timeout: 20)
+        XCTAssertEqual(small, "ok\n")
+    }
+
     func testSQLCMDParser() throws {
         let sep = "\u{001F}"
         let result = try DatabaseClient.parseSQLCMD("old\n---\n1\n\ntitle\(sep)id\n-----\(sep)--\nä 🎉\tAnfang\nEnde\(sep)1\nNULL\(sep)2\n\n__folio_changes\n---------------\n2\n")

@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Sicherheit
+- **Datenbank-Abfragen** (#383): Liefert eine Abfrage mehr als 64 MB, bricht Folio sie ab und bittet, sie einzuschränken; vorher konnte ein riesiges Ergebnis Platte und Arbeitsspeicher füllen.
+
 ## [1.11.21] – 2026-11-23
 
 ### Behoben

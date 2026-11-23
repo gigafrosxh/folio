@@ -80,7 +80,11 @@ public enum DatabaseClient {
             return result
         }
 
-        private static func execute(
+        /// Most output a client may write: beyond it the query is stopped, so a huge result fills neither the disk nor
+        /// the memory (#383). The row limit cuts the shown result further.
+        nonisolated(unsafe) static var maxOutputBytes = 64 << 20
+
+        static func execute(
             _ path: String, arguments: [String], input: String,
             environment: [String: String], timeout: TimeInterval, sqlcmd: Bool = false
         ) async throws -> String {
@@ -111,7 +115,25 @@ public enum DatabaseClient {
                         process.standardError = stderr
                         try process.run()
                         let deadline = Date().addingTimeInterval(timeout.isFinite ? max(0, timeout) : 30)
-                        while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+                        let limit = maxOutputBytes
+                        var tooLarge = false
+                        func written() -> Int {
+                            ((try? FileManager.default.attributesOfItem(atPath: urls[1].path))?[.size] as? NSNumber)?.intValue ?? 0
+                        }
+                        while process.isRunning && Date() < deadline {
+                            Thread.sleep(forTimeInterval: 0.01)
+                            if written() > limit {
+                                tooLarge = true
+                                break
+                            }
+                        }
+                        // Also when the client finished between two checks.
+                        if !process.isRunning, written() > limit { tooLarge = true }
+                        if tooLarge {
+                            ServerDetector.terminateTree(process.processIdentifier)
+                            process.waitUntilExit()
+                            throw DatabaseError.outputTooLarge(limit >> 20)
+                        }
                         if process.isRunning {
                             ServerDetector.terminateTree(process.processIdentifier)
                             process.waitUntilExit()

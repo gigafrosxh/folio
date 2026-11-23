@@ -123,6 +123,8 @@ public enum DatabaseError: Error, LocalizedError, Equatable {
     case connectionFailed(String)
     case queryFailed(String)
     case timeout
+    /// The client printed more than `DatabaseClient.maxOutputBytes` (#383).
+    case outputTooLarge(Int)
 
     public var errorDescription: String? {
         switch self {
@@ -132,6 +134,8 @@ public enum DatabaseError: Error, LocalizedError, Equatable {
         case .connectionFailed(let m): return "Verbindung fehlgeschlagen: \(m)"
         case .queryFailed(let m): return m
         case .timeout: return "Die Abfrage hat zu lange gedauert und wurde abgebrochen."
+        case .outputTooLarge(let mb):
+            return "Das Ergebnis ist größer als \(mb) MB und wurde abgebrochen. Schränke die Abfrage ein, z. B. mit LIMIT oder einer WHERE-Bedingung."
         }
     }
 }
