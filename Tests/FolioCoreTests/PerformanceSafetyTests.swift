@@ -52,6 +52,22 @@ final class PerformanceSafetyTests: XCTestCase {
         XCTAssertEqual(result.cacheHits, 0)
     }
 
+    // #371
+    func testHeaderDamageWithRestoredDateIsNoticed() throws {
+        let scanner = LibraryScanner()
+        let url = dir.appendingPathComponent("A.folio")
+        try note("Alpha").write(to: url)
+        let date = try XCTUnwrap(try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+        XCTAssertEqual(scanner.scan(dir).notes.count, 1)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.write(contentsOf: Data("XXXX".utf8))
+        try handle.close()
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+        let result = scanner.scan(dir)
+        XCTAssertEqual(result.unreadable.count, 1, "beschädigter Kopf wird erkannt")
+        XCTAssertEqual(result.cacheHits, 0)
+    }
+
     // #308
     func testVeryDeepFoldersDoNotOverflow() throws {
         var deep = dir!

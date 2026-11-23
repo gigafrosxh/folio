@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Notizliste** (#371): Der Zwischenspeicher prüft zusätzlich die Statusänderungszeit der Datei; eine überschriebene Datei mit zurückgesetztem Datum gilt nicht mehr als unverändert.
+
 ## [1.11.15] – 2026-11-23
 
 ### Behoben

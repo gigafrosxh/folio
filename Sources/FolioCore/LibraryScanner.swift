@@ -31,6 +31,8 @@ public final class LibraryScanner: @unchecked Sendable {
         var modified: Date
         var fileNumber: Int
         var checksum: UInt32
+        /// Status change time: every write changes it and nobody can set it back, unlike the modification date (#371).
+        var changed: Double
     }
 
     private let lock = NSLock()
@@ -90,13 +92,20 @@ public final class LibraryScanner: @unchecked Sendable {
         return (metas, hits.filter { $0 }.count)
     }
 
+    static func statusChangeTime(_ url: URL) -> Double {
+        var info = stat()
+        guard stat(url.path, &info) == 0 else { return -1 }
+        return Double(info.st_ctimespec.tv_sec) + Double(info.st_ctimespec.tv_nsec) / 1e9
+    }
+
     private func metadata(of url: URL) -> (NoteMetadata?, cached: Bool) {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         let key = CacheKey(
             size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
             modified: attrs?[.modificationDate] as? Date ?? .distantPast,
             fileNumber: (attrs?[.systemFileNumber] as? NSNumber)?.intValue ?? -1,
-            checksum: FileFingerprint.of(url)?.checksum ?? 0)
+            checksum: FileFingerprint.of(url)?.checksum ?? 0,
+            changed: Self.statusChangeTime(url))
         lock.lock()
         let cached = cache[url.path]
         lock.unlock()
