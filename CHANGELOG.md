@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.23] – 2026-11-23
+
 ### Sicherheit
 - **Formel- und Diagramm-Vorschau** (#384): Die Vorschau bleibt auf Folios eigener Seite; ein Link in einem Diagramm lädt keine fremde Seite mehr in den Block, Web-Links öffnen im Browser.
 
