@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.20] – 2026-11-23
+
 ### Sicherheit
 - **KI-Assistent** (#381): Notizinhalte gelten ausdrücklich als Daten, Anweisungen darin werden nicht ausgeführt. Die Werkzeuge zum Ändern von Notizen stehen nur bereit, wenn deine eigene Frage eine Änderung verlangt, und eine Antwort ändert höchstens 10 Notizen.
 
