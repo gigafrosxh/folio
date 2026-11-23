@@ -24,15 +24,22 @@ public final class LibraryScanner: @unchecked Sendable {
         public var cacheHits: Int
     }
 
-    /// What a file looked like when its metadata was cached: size, date, file number and the archive's own CRC-32
-    /// (its last 4 bytes), so a change with the same size and date is noticed too (#305).
-    private struct CacheKey: Hashable {
-        var size: Int
-        var modified: Date
-        var fileNumber: Int
-        var checksum: UInt32
-        /// Status change time: every write changes it and nobody can set it back, unlike the modification date (#371).
+    /// What a file looked like when its metadata was cached, from one `stat` call: size, modification time, file
+    /// number and status change time. Every write changes the status change time and nobody can set it back, so a
+    /// change with the same size and date is noticed too (#305, #371) – without opening the file (#374).
+    public struct CacheKey: Hashable, Sendable {
+        var size: Int64
+        var modified: Double
+        var fileNumber: UInt64
         var changed: Double
+
+        public static func of(_ url: URL) -> CacheKey? {
+            var info = stat()
+            guard stat(url.path, &info) == 0 else { return nil }
+            func seconds(_ t: timespec) -> Double { Double(t.tv_sec) + Double(t.tv_nsec) / 1e9 }
+            return CacheKey(
+                size: Int64(info.st_size), modified: seconds(info.st_mtimespec), fileNumber: UInt64(info.st_ino), changed: seconds(info.st_ctimespec))
+        }
     }
 
     private let lock = NSLock()
@@ -92,24 +99,12 @@ public final class LibraryScanner: @unchecked Sendable {
         return (metas, hits.filter { $0 }.count)
     }
 
-    static func statusChangeTime(_ url: URL) -> Double {
-        var info = stat()
-        guard stat(url.path, &info) == 0 else { return -1 }
-        return Double(info.st_ctimespec.tv_sec) + Double(info.st_ctimespec.tv_nsec) / 1e9
-    }
-
     private func metadata(of url: URL) -> (NoteMetadata?, cached: Bool) {
-        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let key = CacheKey(
-            size: (attrs?[.size] as? NSNumber)?.intValue ?? -1,
-            modified: attrs?[.modificationDate] as? Date ?? .distantPast,
-            fileNumber: (attrs?[.systemFileNumber] as? NSNumber)?.intValue ?? -1,
-            checksum: FileFingerprint.of(url)?.checksum ?? 0,
-            changed: Self.statusChangeTime(url))
+        let key = CacheKey.of(url)
         lock.lock()
         let cached = cache[url.path]
         lock.unlock()
-        if let cached, cached.key == key { return (cached.meta, true) }
+        if let cached, let key, cached.key == key { return (cached.meta, true) }
         guard let meta = try? NoteFile.readMetadata(at: url) else {
             lock.lock()
             cache[url.path] = nil
@@ -117,7 +112,7 @@ public final class LibraryScanner: @unchecked Sendable {
             return (nil, false)
         }
         lock.lock()
-        cache[url.path] = (key, meta)
+        if let key { cache[url.path] = (key, meta) }
         lock.unlock()
         return (meta, false)
     }

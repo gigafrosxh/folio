@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Geschwindigkeit** (#380): Folio laggt beim Tippen nicht mehr durch Neuberechnungen bei jedem Neuzeichnen: Die Seitenleiste zählt Notizen je Ordner nur noch, wenn sich die Liste ändert (vorher rund die Hälfte der Rechenzeit beim Tippen), die Notizliste ordnet nach Datum ohne Kalenderrechnung je Notiz, die Wortzählung läuft im Hintergrund, und der PDF-Index liest unveränderte Notizen nicht bei jedem Neuladen neu. Das Einlesen der Notizliste öffnet die Dateien dafür nicht mehr.
+
 ## [1.11.18] – 2026-11-23
 
 ### Behoben

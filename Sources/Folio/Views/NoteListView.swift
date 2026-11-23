@@ -310,8 +310,13 @@ struct NoteListView: View {
             let pinned = notes.filter(\.meta.pinned), rest = notes.filter { !$0.meta.pinned }
             return [Group(title: "Angepinnt", notes: pinned), Group(title: "Notizen", notes: rest)].filter { !$0.notes.isEmpty }
         }
+        // Day boundaries once per redraw instead of calendar arithmetic for every note (#374).
         let cal = Calendar.current
         let now = Date()
+        let today = cal.startOfDay(for: now)
+        let yesterday = cal.date(byAdding: .day, value: -1, to: today) ?? today
+        let week = cal.date(byAdding: .day, value: -7, to: now) ?? now
+        let month = cal.date(byAdding: .day, value: -30, to: now) ?? now
         var buckets: [(String, [NoteRef])] = [
             ("Angepinnt", []), ("Heute", []), ("Gestern", []), ("Letzte 7 Tage", []),
             ("Letzte 30 Tage", []), ("Älter", [])
@@ -321,13 +326,13 @@ struct NoteListView: View {
             let idx: Int
             if n.meta.pinned {
                 idx = 0
-            } else if cal.isDateInToday(d) {
+            } else if d >= today {
                 idx = 1
-            } else if cal.isDateInYesterday(d) {
+            } else if d >= yesterday {
                 idx = 2
-            } else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 7 {
+            } else if d > week {
                 idx = 3
-            } else if let days = cal.dateComponents([.day], from: d, to: now).day, days < 30 {
+            } else if d > month {
                 idx = 4
             } else {
                 idx = 5

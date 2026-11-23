@@ -140,10 +140,20 @@ struct NoteStatusPill: View {
     private var dot: some View { Text("·").foregroundStyle(.tertiary) }
 
 
+    /// Counting words in a long note took noticeable main-thread time after every save; it runs in the background now,
+    /// only the strings are taken here (#374).
     private func refresh() {
-        wordCount = doc.statistics.words
-        let attrs = try? FileManager.default.attributesOfItem(atPath: doc.url.path)
-        fileSize = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+        let texts = doc.blocks.filter { $0.kind == .text }.map(\.storage.string)
+        let code = doc.blocks.filter { $0.kind == .code }.map(\.storage.string)
+        let url = doc.url
+        Task {
+            let (words, size) = await Task.detached(priority: .utility) {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                return (NoteStatistics(texts: texts, code: code).words, (attrs?[.size] as? NSNumber)?.int64Value ?? 0)
+            }.value
+            wordCount = words
+            fileSize = size
+        }
     }
 }
 

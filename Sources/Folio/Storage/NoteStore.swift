@@ -112,6 +112,9 @@ final class NoteStore: ObservableObject {
     var lastApplyMs = 0.0
     /// Last result of `filteredNotes` and what it was computed from (it is read on every redraw) (#62).
     var filterMemo: (key: String, notes: [NoteRef])?
+    /// Notes per folder (direct, and with subfolders), counted once per change of the note list instead of once per
+    /// folder on every sidebar redraw – that took half of the main thread while typing (#374).
+    var folderCountMemo: (version: Int, direct: [String: Int], nested: [String: Int])?
     var notesVersion = 0
     /// Links between notes (#119), updated per changed note when `notes` changes.
     var linkIndex = LinkIndex()
@@ -339,7 +342,25 @@ final class NoteStore: ObservableObject {
     }
 
     func noteCount(in folder: URL) -> Int {
-        notes.filter { isInFolder($0.folderURL, folder) }.count
+        let counts = folderCounts()
+        let path = folder.standardizedFileURL.path
+        return (includeSubfolders ? counts.nested : counts.direct)[path] ?? 0
+    }
+
+    private func folderCounts() -> (direct: [String: Int], nested: [String: Int]) {
+        if let memo = folderCountMemo, memo.version == notesVersion { return (memo.direct, memo.nested) }
+        var direct: [String: Int] = [:], nested: [String: Int] = [:]
+        for note in notes {
+            var path = note.folderURL.standardizedFileURL.path
+            direct[path, default: 0] += 1
+            // Every folder above the note counts it too (with subfolders), up to the root.
+            while !path.isEmpty, path != "/" {
+                nested[path, default: 0] += 1
+                path = (path as NSString).deletingLastPathComponent
+            }
+        }
+        folderCountMemo = (notesVersion, direct, nested)
+        return (direct, nested)
     }
 
     func relativeFolderName(_ url: URL) -> String {
