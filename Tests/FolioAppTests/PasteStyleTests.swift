@@ -126,4 +126,12 @@ final class PasteStyleTests: XCTestCase {
         let plain = out.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
         XCTAssertEqual(plain?.headIndent ?? -1, 0, accuracy: 0.1)
     }
+
+    /// #373: italic code stays italic and monospaced.
+    func testItalicCodeStaysItalic() throws {
+        let source = try XCTUnwrap(NSFontManager.shared.convert(try XCTUnwrap(NSFont(name: "Menlo", size: 13)), toHaveTrait: .italicFontMask) as NSFont?)
+        let font = PasteStyle.font(like: source, body: NSFont.systemFont(ofSize: 14))
+        XCTAssertTrue(font.isFixedPitch || font.fontDescriptor.symbolicTraits.contains(.monoSpace))
+        XCTAssertTrue(font.fontDescriptor.symbolicTraits.contains(.italic), font.fontName)
+    }
 }

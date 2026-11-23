@@ -83,7 +83,10 @@ enum PasteStyle {
         let traits = source.fontDescriptor.symbolicTraits
         let weight = (source.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any])?[.weight] as? CGFloat
         if source.isFixedPitch || traits.contains(.monoSpace) {
-            return NSFont.monospacedSystemFont(ofSize: size, weight: NSFont.Weight(weight ?? (traits.contains(.bold) ? NSFont.Weight.bold.rawValue : 0)))
+            let mono = NSFont.monospacedSystemFont(ofSize: size, weight: NSFont.Weight(weight ?? (traits.contains(.bold) ? NSFont.Weight.bold.rawValue : 0)))
+            // Italic code stays italic (#373).
+            guard traits.contains(.italic) else { return mono }
+            return NSFont(descriptor: mono.fontDescriptor.withSymbolicTraits(mono.fontDescriptor.symbolicTraits.union(.italic)), size: size) ?? mono
         }
         var descriptor = body.fontDescriptor.withSize(size)
         if let weight { descriptor = descriptor.addingAttributes([.traits: [NSFontDescriptor.TraitKey.weight: weight]]) }
