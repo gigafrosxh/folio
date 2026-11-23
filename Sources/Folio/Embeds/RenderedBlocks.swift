@@ -22,6 +22,10 @@ enum WebResources {
         return FileManager.default.fileExists(atPath: repo.path) ? repo : nil
     }()
 
+    /// The render pages stay on Folio's own page: a link in a diagram never loads another site into the block; web
+    /// links clicked there open in the browser (#384).
+    @MainActor static let navigationGuard = RenderNavigationGuard()
+
     @MainActor static func configuration(handler: WKScriptMessageHandler) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler.shared, forURLScheme: scheme)
@@ -79,6 +83,7 @@ struct RenderPreview: NSViewRepresentable {
         web.setValue(false, forKey: "drawsBackground")
         web.underPageBackgroundColor = .clear
         context.coordinator.web = web
+        web.navigationDelegate = WebResources.navigationGuard
         web.load(URLRequest(url: WebResources.pageURL))
         return web
     }
@@ -135,6 +140,27 @@ struct RenderPreview: NSViewRepresentable {
 }
 
 /// Lets scroll-wheel events reach the note instead of the (non-scrolling) preview.
+/// Allows only Folio's own render page (#384).
+@MainActor
+final class RenderNavigationGuard: NSObject, WKNavigationDelegate {
+    static func allows(_ url: URL?) -> Bool {
+        guard let scheme = url?.scheme?.lowercased() else { return false }
+        return scheme == WebResources.scheme || url?.absoluteString == "about:blank"
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        let url = action.request.url
+        if Self.allows(url) {
+            decisionHandler(.allow)
+            return
+        }
+        if action.navigationType == .linkActivated, let url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            NSWorkspace.shared.open(url)
+        }
+        decisionHandler(.cancel)
+    }
+}
+
 final class PassThroughWebView: WKWebView {
     override func scrollWheel(with event: NSEvent) { nextResponder?.scrollWheel(with: event) }
 }
@@ -207,6 +233,7 @@ final class OffscreenRenderer: NSObject, WKScriptMessageHandler {
         guard WebResources.directory != nil else { throw RenderError.failed("Die Render-Dateien fehlen im App-Paket.") }
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 600), configuration: WebResources.configuration(handler: self))
         web.setValue(false, forKey: "drawsBackground")
+        web.navigationDelegate = WebResources.navigationGuard
         // A window (never shown) keeps WebKit laying out and painting normally.
         let w = NSWindow(contentRect: web.frame, styleMask: .borderless, backing: .buffered, defer: false)
         w.isReleasedWhenClosed = false
