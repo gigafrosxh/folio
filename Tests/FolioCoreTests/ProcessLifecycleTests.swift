@@ -141,6 +141,21 @@ final class ProcessLifecycleTests: XCTestCase {
     }
 }
 
+extension ProcessLifecycleTests {
+    // #368
+    func testInterruptWhileIdleKeepsTheSession() async throws {
+        guard InterpreterLocator.shared.find("python3") != nil else { throw skipOrFail("kein python3", tool: "python3") }
+        let k = try Kernel(language: KernelLanguages.python)
+        defer { k.shutdown() }
+        _ = await k.execute("v = 42")
+        k.interrupt()
+        try await Task.sleep(for: .seconds(2))
+        let r = await k.execute("print(v)")
+        XCTAssertTrue(k.isAlive)
+        XCTAssertEqual(r.stdout, "42\n", r.stderr)
+    }
+}
+
 private final class LockedCount: @unchecked Sendable {
     private let lock = NSLock()
     private var parts: [String] = []

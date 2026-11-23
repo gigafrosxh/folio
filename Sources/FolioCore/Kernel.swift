@@ -166,9 +166,15 @@ public enum KernelLanguages {
 
         /// Stops the code that is running right now (like Ctrl-C), keeping the session's variables. The run reports
         /// `cancelled` (#296).
+        /// Without running code there is nothing to stop: the signal would end the waiting interpreter and lose the
+        /// session's variables (#368).
         public func interrupt() {
             lock.lock()
-            if let id = current?.id { cancelledIDs.insert(id) }
+            guard let id = current?.id else {
+                lock.unlock()
+                return
+            }
+            cancelledIDs.insert(id)
             lock.unlock()
             signalInterrupt()
         }
