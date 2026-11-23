@@ -44,8 +44,13 @@ public struct LibraryTrash: Sendable {
     private func info(_ id: UUID) -> URL { directory.appendingPathComponent(id.uuidString).appendingPathComponent("info.json") }
 
     /// Where the trashed file or folder itself lies.
+    /// Since 1.11.17 the trashed file or folder lies in `content/`, apart from `info.json`, so a folder of that name
+    /// can be trashed too (#372). Items trashed before lie next to `info.json`.
     public func contentURL(of item: TrashItem) -> URL {
-        directory.appendingPathComponent(item.id.uuidString).appendingPathComponent(item.name)
+        let holder = directory.appendingPathComponent(item.id.uuidString)
+        let current = holder.appendingPathComponent("content", isDirectory: true).appendingPathComponent(item.name)
+        let legacy = holder.appendingPathComponent(item.name)
+        return !fs.fileExists(current) && fs.fileExists(legacy) && item.name != "info.json" ? legacy : current
     }
 
     /// Moves a note file or a folder from the library into the trash.
@@ -72,6 +77,7 @@ public struct LibraryTrash: Sendable {
         // A failure at any step leaves the note where it was and no half entry in the trash.
         do {
             try fs.write(try encoder.encode(item), to: info(item.id))
+            try fs.createDirectory(holder.appendingPathComponent("content", isDirectory: true))
             try fs.moveItem(source, to: contentURL(of: item))
         } catch {
             try? fs.removeItem(holder)

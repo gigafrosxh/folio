@@ -37,6 +37,28 @@ final class SecurityHardeningTests: XCTestCase {
         XCTAssertEqual(try trash.restore(item).lastPathComponent, "A.folio")
     }
 
+    // #372
+    func testFolderNamedInfoJsonGoesToTheTrashAndBack() throws {
+        let folder = library.appendingPathComponent("Notizen/info.json", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try writeNote(folder.appendingPathComponent("N.folio"))
+        let trash = LibraryTrash(library: library)
+        let item = try trash.moveToTrash(folder)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        XCTAssertEqual(trash.items().map(\.id), [item.id])
+        let back = try trash.restore(item)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: back.appendingPathComponent("N.folio").path))
+        // An item trashed before 1.11.17 (content next to info.json) is still found.
+        let note = library.appendingPathComponent("Notizen/Alt.folio")
+        try writeNote(note)
+        let old = try trash.moveToTrash(note)
+        let holder = trash.directory.appendingPathComponent(old.id.uuidString)
+        try FileManager.default.moveItem(at: holder.appendingPathComponent("content/Alt.folio"), to: holder.appendingPathComponent("Alt.folio"))
+        try FileManager.default.removeItem(at: holder.appendingPathComponent("content"))
+        XCTAssertTrue(trash.items().contains { $0.id == old.id })
+        XCTAssertEqual(try trash.restore(old).lastPathComponent, "Alt.folio")
+    }
+
     // #281
     func testSymbolicFolderLinks() throws {
         let outside = dir.appendingPathComponent("Fremd")

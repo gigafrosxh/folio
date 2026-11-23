@@ -7,6 +7,9 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Papierkorb** (#372): Auch ein Ordner namens „info.json“ lässt sich löschen und wiederherstellen; gelöschte Inhalte liegen jetzt in einem eigenen Unterordner, ältere Papierkorb-Einträge werden weiter gefunden.
+
 ## [1.11.16] – 2026-11-23
 
 ### Behoben
