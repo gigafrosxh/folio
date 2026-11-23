@@ -19,6 +19,11 @@ struct NoteEditorView: View {
     @State private var alertMessage: String?
     @State private var dropTargeted = false
     @State private var scrolled = false
+    /// Width of the editor header and a counter that redraws it once the variants are measured (#388).
+    @State private var headerWidth: CGFloat = 0
+    @State private var headerMeasured = 0
+    /// Natural widths of the header variants 0–5, measured once per session (#388).
+    private static var headerWidths: [Int: CGFloat] = [:]
     /// Remembered across launches; the panel itself is driven by `showChat`/`chatPopped` below, because
     /// changes to @AppStorage arrive outside the animation transaction and would skip the animation.
     @AppStorage("folio.chatVisible") private var chatRemembered = false
@@ -494,27 +499,64 @@ struct NoteEditorView: View {
     /// Opaque header like in Apple Notes: content scrolls underneath it, and a hairline plus a soft
     /// shadow appear once something is behind it.
     private var header: some View {
-        // Narrower windows fold tools into menus instead of cutting them off (#103).
-        ViewThatFits(in: .horizontal) {
-            bars(.full)
-            bars(.compact)
-            bars(.minimal)
-            // Still too narrow (e.g. chat open in a small window): two rows, then the smallest bar.
-            stackedBars(.minimal)
-            stackedBars(.tiny)
-            // Narrow window: rarely used note actions move into a menu before anything has to scroll (#177).
-            stackedBars(.tiny, compactActions: true)
-            ScrollView(.horizontal) { stackedBars(.tiny, compactActions: true).padding(.horizontal, 2) }.scrollIndicators(.automatic)
+        // Narrower windows fold tools into menus instead of cutting them off (#103). The variant is picked from the
+        // measured width: ViewThatFits built and measured all seven toolbars on every note switch, about half a second
+        // (#388). The variants are measured once, hidden, and only the chosen one is built.
+        headerVariant(chosenHeaderVariant)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.width
+            } action: {
+                headerWidth = $0
+            }
+            .background(alignment: .topLeading) {
+                if Self.headerWidths.count < 6 {
+                    ZStack {
+                        ForEach(0..<6, id: \.self) { i in
+                            headerVariant(i).fixedSize().hidden()
+                                .onGeometryChange(for: CGFloat.self) {
+                                    $0.size.width
+                                } action: { width in
+                                    Self.headerWidths[i] = width
+                                    headerMeasured += 1
+                                }
+                        }
+                    }
+                    .frame(width: 0, height: 0, alignment: .topLeading)
+                    .clipped()
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Color.primary.opacity(scrolled ? 0.12 : 0)).frame(height: 1)
+            }
+            .shadow(color: .black.opacity(scrolled ? 0.10 : 0), radius: 6, y: 3)
+            .zIndex(1)
+    }
+
+    /// The header variants from widest to narrowest; 6 scrolls and always fits.
+    @ViewBuilder private func headerVariant(_ index: Int) -> some View {
+        switch index {
+        case 0: bars(.full)
+        case 1: bars(.compact)
+        case 2: bars(.minimal)
+        // Still too narrow (e.g. chat open in a small window): two rows, then the smallest bar.
+        case 3: stackedBars(.minimal)
+        case 4: stackedBars(.tiny)
+        // Narrow window: rarely used note actions move into a menu before anything has to scroll (#177).
+        case 5: stackedBars(.tiny, compactActions: true)
+        default: ScrollView(.horizontal) { stackedBars(.tiny, compactActions: true).padding(.horizontal, 2) }.scrollIndicators(.automatic)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Color.primary.opacity(scrolled ? 0.12 : 0)).frame(height: 1)
-        }
-        .shadow(color: .black.opacity(scrolled ? 0.10 : 0), radius: 6, y: 3)
-        .zIndex(1)
+    }
+
+    /// The widest variant that fits; before the widths are known, the full bar.
+    private var chosenHeaderVariant: Int {
+        _ = headerMeasured
+        guard headerWidth > 0, Self.headerWidths.count == 6 else { return 0 }
+        return (0..<6).first { (Self.headerWidths[$0] ?? .infinity) <= headerWidth + 0.5 } ?? 6
     }
 
     private func stackedBars(_ layout: FormatToolbar.Layout, compactActions: Bool = false) -> some View {

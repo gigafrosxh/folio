@@ -373,7 +373,19 @@ struct AIAvailability {
 
     var state: State
 
+    /// Asked by every toolbar redraw; the system's answer is kept for a few seconds (#388).
+    @MainActor private static var cached: (value: AIAvailability, at: Date)?
+
     @MainActor static var current: AIAvailability {
+        // Only Apple's model answer is kept; the provider setting and Ollama's status are read live.
+        guard ThemeManager.shared.settings.aiProvider != "ollama" else { return uncachedCurrent }
+        if let cached, Date().timeIntervalSince(cached.at) < 5 { return cached.value }
+        let value = uncachedCurrent
+        cached = (value, Date())
+        return value
+    }
+
+    @MainActor private static var uncachedCurrent: AIAvailability {
         // A local Ollama the user chose counts as available; problems show up when it is asked (#42).
         if ThemeManager.shared.settings.aiProvider == "ollama" {
             if let problem = OllamaStatus.shared.problem { return AIAvailability(state: .ollamaDown(problem)) }

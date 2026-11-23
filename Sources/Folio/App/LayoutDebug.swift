@@ -211,6 +211,7 @@ enum LayoutDebug {
         for (key, run) in tests where env[key] != nil { Task { @MainActor in await run() } }
         if env["FOLIO_QUICK_TEST"] != nil, env["FOLIO_CAPTURE_QUEUE"] != nil { Task { @MainActor in await QuickAccessSelfTest.run() } }
         if let out = env["FOLIO_BENCH"] { Task { @MainActor in await AppBenchmark.run(report: URL(fileURLWithPath: out)) } }
+        if env["FOLIO_SWITCH_BENCH"] != nil { Task { @MainActor in await SwitchBenchmark.run() } }
         if let out = env["FOLIO_SWEEP_TEST"] { Task { @MainActor in await LibrarySweepTest.run(out: URL(fileURLWithPath: out)) } }
     }
 
