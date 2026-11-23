@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.13] – 2026-11-23
+
 ### Behoben
 - **Sitzung stoppen** (#368): Stoppen, während in einer Python-, JavaScript- oder Ruby-Sitzung gerade nichts läuft, beendet die Sitzung nicht mehr; die Variablen bleiben erhalten.
 
