@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.11] – 2026-11-23
+
 ### Behoben
 - **Konfliktkopie bei langen Namen** (#366): Bei sehr langen Dateinamen kürzt Folio den Namen der Konfliktkopie, statt beim Schreiben zu scheitern.
 
