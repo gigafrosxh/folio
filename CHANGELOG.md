@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.18] – 2026-11-23
+
 ### Behoben
 - **Eingefügter Code** (#373): Kursiver Code in Festbreitenschrift bleibt beim Einfügen kursiv.
 
