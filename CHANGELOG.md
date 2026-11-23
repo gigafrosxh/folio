@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.26] – 2026-11-23
+
 ### Behoben
 - **Notizen und Ordner öffnen** (#392): Öffnen ist rund neunmal schneller (Notiz im Median 61 statt 535 ms, Ordner 12 statt 56 ms). Die Kopfleiste des Editors baute bei jedem Wechsel alle sieben Varianten der Werkzeugleiste auf und vermaß sie; jetzt wird nur die passende gebaut. Neu: `FOLIO_SWITCH_BENCH=1` misst Notiz- und Ordnerwechsel.
 
