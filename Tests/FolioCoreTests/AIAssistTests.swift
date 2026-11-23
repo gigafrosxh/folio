@@ -236,4 +236,14 @@ final class OllamaClientTests: XCTestCase {
             XCTAssertFalse((f.errorDescription ?? "").isEmpty)
         }
     }
+
+    // #381: only the user's own words switch the note tools on.
+    func testToolsOnlyForRequestedChanges() {
+        for q in ["Leg eine Notiz Einkauf an", "Füge #projekt zu Urlaub hinzu", "Benenne Delta in Gamma um", "Verschieb Rechnung nach Archiv", "rename note A to B"] {
+            XCTAssertTrue(AssistantIntent.asksForChanges(q), q)
+        }
+        for q in ["Was steht in meinen Notizen über Rom?", "Fasse die Besprechung zusammen", "Wann ist der Termin?"] {
+            XCTAssertFalse(AssistantIntent.asksForChanges(q), q)
+        }
+    }
 }

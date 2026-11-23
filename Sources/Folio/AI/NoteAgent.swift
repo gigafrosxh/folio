@@ -20,6 +20,12 @@ enum NoteAgent {
 
     // MARK: Operations (also used by tests)
 
+    /// One answer changes at most a handful of notes (#381); the rest needs a new request.
+    private static var limitReached: String? {
+        log.count >= AssistantIntent.maxActionsPerAnswer
+            ? "Fehler: Pro Antwort ändere ich höchstens \(AssistantIntent.maxActionsPerAnswer) Notizen. Bitte für den Rest erneut fragen." : nil
+    }
+
     static func find(_ title: String) -> NoteRef? {
         let store = NoteStore.shared
         if let id = store.linkIndex.resolve(title) { return store.notes.first { $0.id == id } }
@@ -35,6 +41,7 @@ enum NoteAgent {
 
     @discardableResult
     static func createNote(title: String, text: String) -> String {
+        if let limitReached { return limitReached }
         let store = NoteStore.shared
         guard let ref = store.createNote(titled: title.trimmingCharacters(in: .whitespacesAndNewlines), body: text) else {
             return "Fehler: Die Notiz konnte nicht angelegt werden."
@@ -45,6 +52,7 @@ enum NoteAgent {
 
     @discardableResult
     static func append(to title: String, text: String) -> String {
+        if let limitReached { return limitReached }
         guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
         guard let doc = document(ref) else { return "Fehler: „\(ref.meta.title)“ ist nicht lesbar." }
         let target =
@@ -65,6 +73,7 @@ enum NoteAgent {
 
     @discardableResult
     static func link(from: String, to: String) -> String {
+        if let limitReached { return limitReached }
         guard let a = find(from) else { return "Fehler: Keine Notiz „\(from)“ gefunden." }
         guard let b = find(to) else { return "Fehler: Keine Notiz „\(to)“ gefunden." }
         guard a.id != b.id else { return "Eine Notiz verweist nicht auf sich selbst." }
@@ -80,6 +89,7 @@ enum NoteAgent {
 
     @discardableResult
     static func addTag(_ tag: String, to title: String) -> String {
+        if let limitReached { return limitReached }
         let clean = tag.trimmingCharacters(in: CharacterSet(charactersIn: "# ")).replacingOccurrences(of: " ", with: "-")
         guard !clean.isEmpty else { return "Fehler: Leerer Tag." }
         guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
@@ -93,6 +103,7 @@ enum NoteAgent {
 
     @discardableResult
     static func rename(_ title: String, to newTitle: String) -> String {
+        if let limitReached { return limitReached }
         let new = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !new.isEmpty else { return "Fehler: Leerer Titel." }
         guard let ref = find(title), let doc = document(ref), let first = doc.blocks.first(where: { $0.kind == .text }) else {
@@ -111,6 +122,7 @@ enum NoteAgent {
 
     @discardableResult
     static func move(_ title: String, toFolder folder: String) -> String {
+        if let limitReached { return limitReached }
         let store = NoteStore.shared
         guard let ref = find(title) else { return "Fehler: Keine Notiz „\(title)“ gefunden." }
         let parts = folder.split(separator: "/").map { NoteStore.sanitize(String($0)) }.filter { !$0.isEmpty }

@@ -201,3 +201,21 @@ public enum TagSuggester {
         return out
     }
 }
+
+/// Whether the user's own words ask the assistant to change notes (#381). Only then does the chat offer its note
+/// tools: text inside notes (sources) can never switch them on, whatever it says.
+public enum AssistantIntent {
+    static let actionWords = [
+        "anleg", "erstell", "neue notiz", "ergänz", "hinzufüg", "füg", "anhäng", "häng", "verknüpf", "verlink", "tagg", "tag ",
+        "markier", "umbenenn", "benenn", "verschieb", "lege ", "leg ", "schreib", "notier",
+        "create", "add ", "append", "link", "rename", "move", "tag"
+    ]
+
+    public static func asksForChanges(_ question: String) -> Bool {
+        let q = " " + question.lowercased() + " "
+        return actionWords.contains { q.contains($0) }
+    }
+
+    /// Most note changes one answer may make (#381): a request for "all notes" stops here and asks to continue.
+    public static let maxActionsPerAnswer = 10
+}
