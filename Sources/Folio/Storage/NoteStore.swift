@@ -496,6 +496,12 @@ final class NoteStore: ObservableObject {
             loadingNotes.remove(id)
             // Closed or opened otherwise meanwhile: nothing to do.
             guard documents[id] == nil, isVisible(id) || tabs.contains(id) else { return }
+            // Moved or renamed while loading: the document must get the current path, not the one read before (#394).
+            let current = (notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id }))?.url
+            if let current, current.standardizedFileURL != url.standardizedFileURL {
+                ensureLoaded(id)
+                return
+            }
             if let (data, file) = loaded {
                 adopt(file, data: data, url: url, id: id)
             } else {

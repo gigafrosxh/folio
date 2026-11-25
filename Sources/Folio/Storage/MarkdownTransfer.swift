@@ -40,7 +40,7 @@ enum MarkdownTransfer {
         var failures: [String] = []
         let e = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
         while let url = e?.nextObject() as? URL {
-            guard url.pathExtension == FolioArchive.fileExtension else { continue }
+            guard LibraryTrash.isNoteFile(url) else { continue }  // a folder named `*.folio` is no note (#393)
             let rel = String(url.deletingLastPathComponent().standardizedFileURL.path.dropFirst(folder.standardizedFileURL.path.count))
             let dir = root.appendingPathComponent(rel, isDirectory: true)
             do {

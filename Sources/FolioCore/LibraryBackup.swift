@@ -117,7 +117,12 @@ public enum LibraryBackup {
             let base = folder.standardizedFileURL.path
             let paths = notes.map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }
             let damaged = zip(notes, paths).filter { (try? NoteFile.read(from: $0.0)) == nil }.map(\.1)
-            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: manifestURL(in: folder), found: paths))
+            // Backups before 1.11.29 listed folders named `*.folio` as notes; such a folder is present, not missing (#393).
+            let missing = missing(manifest: manifestURL(in: folder), found: paths).filter { path in
+                var isDir: ObjCBool = false
+                return !(FileManager.default.fileExists(atPath: folder.appendingPathComponent(path).path, isDirectory: &isDir) && isDir.boolValue)
+            }
+            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing)
         }
 
         /// The manifest of an unpacked backup: its own folder, or the root for backups before 1.11.12 (#367).

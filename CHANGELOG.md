@@ -7,6 +7,10 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Sicherungen mit Ordnern wie „Projekt.folio“** (#393): Ein Ordner, dessen Name auf `.folio` endet, gilt nicht mehr als beschädigte Notiz; solche Sicherungen lassen sich wieder prüfen und wiederherstellen (auch ältere), und der Markdown-Export überspringt den Ordner nicht mehr als Fehler.
+- **Große Notiz während des Ladens verschoben** (#394): Wird eine Notiz über 8 MB verschoben oder umbenannt, während sie noch lädt, öffnet sie am neuen Ort; Änderungen landen nicht mehr unter dem alten Pfad.
+
 ## [1.11.28] – 2026-11-25
 
 ### Behoben

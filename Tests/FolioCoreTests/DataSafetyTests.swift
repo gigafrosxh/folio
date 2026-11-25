@@ -249,6 +249,18 @@ final class DataSafetyTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path), [])
     }
 
+    /// A folder named like a note is a folder: backups with it stay valid and restore (#393).
+    func testFolderNamedLikeANoteIsNoNote() throws {
+        try write(note("Eins"), "Projekt.folio/Eins.folio")
+        let dir = library.appendingPathComponent("..").appendingPathComponent("folio-backups-\(UUID().uuidString)").standardizedFileURL
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let backup = try LibraryBackup.create(library: library, in: dir)
+        XCTAssertEqual(try LibraryBackup.verify(backup.url), BackupCheck(notes: 1, damaged: []))
+        let restored = try LibraryBackup.restore(backup.url, into: dir, name: "Wiederhergestellt")
+        XCTAssertEqual(try NoteFile.read(from: restored.appendingPathComponent("Projekt.folio/Eins.folio")).meta.title, "Eins")
+        XCTAssertEqual(LibraryTrash.noteFiles(in: library).map(\.lastPathComponent), ["Eins.folio"])
+    }
+
     func testBackupOfEmptyLibrary() throws {
         let empty = library.appendingPathComponent("leer")
         try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)

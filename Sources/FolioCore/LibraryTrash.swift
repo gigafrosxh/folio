@@ -167,13 +167,22 @@ public struct LibraryTrash: Sendable {
         return path.hasPrefix(root + "/")
     }
 
+    /// Every note file below `folder`. A folder whose name ends in `.folio` is a folder, not a note: the scanner
+    /// skips it too, and counting it made backups look damaged (#393).
     static func noteFiles(in folder: URL) -> [URL] {
-        let e = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+        let e = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
         var out: [URL] = []
         while let url = e?.nextObject() as? URL {
-            if url.pathExtension == FolioArchive.fileExtension { out.append(url) }
+            if isNoteFile(url) { out.append(url) }
         }
         return out
+    }
+
+    /// A regular file with the note extension.
+    public static func isNoteFile(_ url: URL) -> Bool {
+        url.pathExtension == FolioArchive.fileExtension
+            && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
     }
 
     static func uniqueURL(_ url: URL) -> URL {
