@@ -51,8 +51,9 @@ check_commit() {
         || fail_checks "Unit-Tests sind rot, kein Release."
     echo "Prüfe $(git rev-parse --short "$rev"): Komplexität …"
     # The checker tool is built once in the repository; it reads the exported sources and baseline.
+    # --root makes the paths relative ("Sources/…") so they match the baseline; an absolute folder found nothing.
     swift run -c release --package-path "$ROOT/Tools/ComplexityCheck" complexity-check \
-        --baseline "$WORK/src/Tools/ComplexityCheck/baseline.json" "$WORK/src/Sources" >>"$CHECK_LOG" 2>&1 \
+        --root "$WORK/src" --baseline "$WORK/src/Tools/ComplexityCheck/baseline.json" Sources >>"$CHECK_LOG" 2>&1 \
         || fail_checks "Die Komplexitätsprüfung schlägt fehl, kein Release."
 }
 

@@ -22,6 +22,11 @@ while let arg = args.next() {
 }
 
 let units = try ComplexityScanner.units(root: root, folders: folders.isEmpty ? ["Sources"] : folders, excluding: ["Tests/", ".build/"])
+// No unit means a wrong root or folder, never a clean result: the release check once passed this way.
+guard !units.isEmpty else {
+    print("FEHLER: keine Swift-Dateien unter \(folders.isEmpty ? ["Sources"] : folders) (Root \(root.path)).")
+    exit(1)
+}
 let baseline = baselineURL.flatMap { try? JSONDecoder().decode([String: Int].self, from: Data(contentsOf: $0)) } ?? [:]
 let report = ComplexityReport(units: units, baseline: baseline)
 let encoder = JSONEncoder()
