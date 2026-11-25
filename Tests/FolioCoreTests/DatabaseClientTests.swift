@@ -338,10 +338,24 @@ final class DatabaseClientTests: XCTestCase {
             <row><field name="title"></field><field name="id">3</field></row>
             <row><field name="title">NULL</field><field name="id">4</field></row>
             </resultset>
-            <resultset statement="SELECT 1 WHERE 0"/>
             """)
         XCTAssertEqual(result.columns, ["title", "id"])
         XCTAssertEqual(result.rows, [["ä 🎉\tZeile\n,&<\\", "1"], [nil, "2"], ["", "3"], ["NULL", "4"]])
+    }
+
+    /// A last SELECT without rows is the result, not the one before it (#377).
+    func testMySQLXMLEmptyLastResultSet() throws {
+        let result = try DatabaseClient.parseMySQLXML(
+            """
+            <?xml version="1.0"?>
+            <resultset statement="SELECT 1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <row><field name="old">1</field></row></resultset>
+            <?xml version="1.0"?>
+            <resultset statement="SELECT 1 WHERE 0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            </resultset>
+            """)
+        XCTAssertEqual(result.rows, [])
+        XCTAssertEqual(result.message, "Keine Zeilen.")
     }
 
     func testCSVNullMarkerAndDifferentWidths() throws {

@@ -290,7 +290,10 @@ private final class MySQLXML: NSObject, XMLParserDelegate {
             row.append(isNull ? nil : text)
             inField = false
         case "row": current.rows.append(row)
-        case "resultset": if !current.rows.isEmpty { last = current }
+        // Every result set counts, also an empty one: a last SELECT without rows must not show an earlier result (#377).
+        case "resultset":
+            if current.rows.isEmpty { current.message = "Keine Zeilen." }
+            last = current
         default: break
         }
     }

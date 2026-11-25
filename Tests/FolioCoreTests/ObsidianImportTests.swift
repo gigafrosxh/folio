@@ -67,6 +67,18 @@ final class ObsidianCodeSplitTests: XCTestCase {
             XCTAssertEqual(ObsidianImport.outsideCode(text) { $0 }, text, text.debugDescription)
         }
     }
+
+    /// Code spans close with a run of the same length; a lone backtick inside double backticks stays code (#379).
+    func testInlineCodeSpansByRunLength() {
+        let upper: (String) -> String = { $0.uppercased() }
+        XCTAssertEqual(ObsidianImport.inlineAware("a ``x ` [[y]]`` b", upper), "A ``x ` [[y]]`` B")
+        XCTAssertEqual(ObsidianImport.inlineAware("a `x` b `c", upper), "A `x` B `C")
+        XCTAssertEqual(ObsidianImport.inlineAware("``a` b", upper), "``A` B")
+        XCTAssertEqual(ObsidianImport.inlineAware("kein code", upper), "KEIN CODE")
+        for text in ["", "`", "``", "a ``` b ``` c", "t `c` u `d"] {
+            XCTAssertEqual(ObsidianImport.inlineAware(text) { $0 }, text, text.debugDescription)
+        }
+    }
 }
 
 final class ObsidianP1Tests: XCTestCase {

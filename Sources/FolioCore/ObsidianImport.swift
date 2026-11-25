@@ -161,13 +161,49 @@ public enum ObsidianImport {
     private static func fenceMarker(_ line: String) -> MarkdownFence? { MarkdownFence.opening(line) }
 
     /// Inline `code` spans are kept, the rest is transformed.
-    private static func inlineAware(_ text: String, _ transform: (String) -> String) -> String {
-        let parts = text.components(separatedBy: "`")
-        guard parts.count >= 3 else { return transform(text) }
-        return parts.enumerated().map { i, part in
-            // Odd parts are inside backticks; an unmatched last backtick leaves the tail as text.
-            i % 2 == 1 && i < parts.count - (parts.count % 2 == 0 ? 1 : 0) ? part : transform(part)
-        }.joined(separator: "`")
+    /// Applies `transform` only outside inline code. A code span opens with a run of backticks and closes with the next
+    /// run of the same length, as in Markdown (`` `a` `` with two backticks); an unclosed run is plain text (#379).
+    static func inlineAware(_ text: String, _ transform: (String) -> String) -> String {
+        let chars = Array(text)
+        var out = "", plain = ""
+        var i = 0
+        func runLength(at index: Int) -> Int {
+            var n = 0
+            while index + n < chars.count, chars[index + n] == "`" { n += 1 }
+            return n
+        }
+        while i < chars.count {
+            guard chars[i] == "`" else {
+                plain.append(chars[i])
+                i += 1
+                continue
+            }
+            let n = runLength(at: i)
+            // The next run of exactly n backticks closes the span.
+            var j = i + n, close: Int?
+            while j < chars.count {
+                if chars[j] == "`" {
+                    let m = runLength(at: j)
+                    if m == n {
+                        close = j
+                        break
+                    }
+                    j += m
+                } else {
+                    j += 1
+                }
+            }
+            guard let close else {
+                plain += String(chars[i..<i + n])
+                i += n
+                continue
+            }
+            out += transform(plain)
+            plain = ""
+            out += String(chars[i..<close + n])
+            i = close + n
+        }
+        return out + transform(plain)
     }
 
     // MARK: Embeds and links

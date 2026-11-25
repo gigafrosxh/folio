@@ -232,6 +232,23 @@ final class DataSafetyTests: XCTestCase {
         XCTAssertEqual(check.damaged, ["Notizen/Kaputt.folio"])
     }
 
+    /// Restore runs the same check as verify and leaves nothing behind for a damaged backup (#375).
+    func testRestoreRefusesDamagedBackup() throws {
+        var data = try note("Kaputt", text: String(repeating: "y", count: 2000)).encoded()
+        data[data.count - 10] ^= 0x55
+        try data.write(to: library.appendingPathComponent("Notizen/Kaputt.folio"))
+        let dir = library.appendingPathComponent("..").appendingPathComponent("folio-backups-\(UUID().uuidString)").standardizedFileURL
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let backup = try LibraryBackup.create(library: library, in: dir)
+        let target = library.appendingPathComponent("..").appendingPathComponent("restore-\(UUID().uuidString)").standardizedFileURL
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: target) }
+        XCTAssertThrowsError(try LibraryBackup.restore(backup.url, into: target, name: "Wiederhergestellt")) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Kaputt.folio"), error.localizedDescription)
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path), [])
+    }
+
     func testBackupOfEmptyLibrary() throws {
         let empty = library.appendingPathComponent("leer")
         try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)

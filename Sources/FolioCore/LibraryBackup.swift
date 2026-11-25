@@ -42,11 +42,14 @@ public enum LibraryBackup {
         case noLibrary
         /// The archive is not a plausible Folio backup: unsafe paths, links out of it, too many or too large files (#282).
         case unsafeArchive(String)
+        /// The unpacked backup has damaged notes or lacks notes its manifest lists (#375).
+        case damaged(String)
         public var errorDescription: String? {
             switch self {
             case .tool(let m): return "Die Sicherung ist fehlgeschlagen: \(m)"
             case .noLibrary: return "Der Bibliotheksordner fehlt."
             case .unsafeArchive(let m): return "Diese Sicherung wird nicht entpackt: \(m)"
+            case .damaged(let m): return "Diese Sicherung wird nicht wiederhergestellt: \(m)"
             }
         }
     }
@@ -105,11 +108,16 @@ public enum LibraryBackup {
             let temp = fm.temporaryDirectory.appendingPathComponent("folio-backup-check-\(UUID().uuidString)")
             defer { try? fm.removeItem(at: temp) }
             try unpack(backup, to: temp)
-            let notes = LibraryTrash.noteFiles(in: temp)
-            let base = temp.standardizedFileURL.path
+            return check(unpacked: temp)
+        }
+
+        /// Decodes every note of an unpacked backup and compares it with the manifest; used by `verify` and `restore`.
+        static func check(unpacked folder: URL) -> BackupCheck {
+            let notes = LibraryTrash.noteFiles(in: folder)
+            let base = folder.standardizedFileURL.path
             let paths = notes.map { String($0.standardizedFileURL.path.dropFirst(base.count + 1)) }
             let damaged = zip(notes, paths).filter { (try? NoteFile.read(from: $0.0)) == nil }.map(\.1)
-            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: manifestURL(in: temp), found: paths))
+            return BackupCheck(notes: notes.count, damaged: damaged, missing: missing(manifest: manifestURL(in: folder), found: paths))
         }
 
         /// The manifest of an unpacked backup: its own folder, or the root for backups before 1.11.12 (#367).
@@ -144,6 +152,9 @@ public enum LibraryBackup {
             let staging = parent.appendingPathComponent(".folio-restore-\(UUID().uuidString)", isDirectory: true)
             defer { try? fm.removeItem(at: staging) }
             try unpack(backup, to: staging)
+            // The same check as `verify` runs before anything lands in the library: a damaged backup stops here (#375).
+            let check = check(unpacked: staging)
+            guard check.isValid else { throw BackupError.damaged(check.problems) }
             // Only the manifest goes; a library file that happens to be called like the old manifest stays (#367).
             if fm.fileExists(atPath: staging.appendingPathComponent(manifestPath).path) {
                 try? fm.removeItem(at: staging.appendingPathComponent(manifestFolder))
