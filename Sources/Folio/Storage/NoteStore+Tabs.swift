@@ -75,18 +75,22 @@ extension NoteStore {
             return
         }
         do {
-            let file = try NoteFile.decode(data)
-            let doc = NoteDocument(file: file, url: url)
-            doc.store = self
-            doc.diskFingerprint = FileFingerprint(data: data)
-            documents[id] = doc
-            AttachmentSync.syncExternalEdits(in: doc)
-            doc.indexPDFs()
-            // The state on disk before any edit is always in the history.
-            recordVersion(data, noteID: file.meta.id, force: true)
+            adopt(try NoteFile.decode(data), data: data, url: url, id: id)
         } catch {
             failures[id] = DamagedNote(url: url, report: FolioDiagnostics.diagnose(data))
         }
+    }
+
+    /// Makes a decoded note the open document (read here or in the background, #388).
+    func adopt(_ file: NoteFile, data: Data, url: URL, id: UUID) {
+        let doc = NoteDocument(file: file, url: url)
+        doc.store = self
+        doc.diskFingerprint = FileFingerprint(data: data)
+        documents[id] = doc
+        AttachmentSync.syncExternalEdits(in: doc)
+        doc.indexPDFs()
+        // The state on disk before any edit is always in the history.
+        recordVersion(data, noteID: file.meta.id, force: true)
     }
 
     /// Writes a version in the background (versions never slow down typing).

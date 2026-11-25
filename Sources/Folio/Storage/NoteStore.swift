@@ -31,6 +31,8 @@ final class NoteStore: ObservableObject {
     }
     /// Open notes, shared by tabs, the split view and note windows (one document per note).
     @Published var documents: [UUID: NoteDocument] = [:]
+    /// Large notes being read in the background (#388).
+    @Published var loadingNotes: Set<UUID> = []
     /// Tabs of the main window (note ids, left to right).
     @Published var tabs: [UUID] = []
     /// Note shown on the right of the split view.
@@ -473,10 +475,37 @@ final class NoteStore: ObservableObject {
     }
 
     /// Loads a note unless it is open already.
+    /// A large note (big attachments) is read and unpacked in the background; the editor shows a progress indicator
+    /// meanwhile and the main thread stays free (#388). Small notes open right away, as before.
     func ensureLoaded(_ id: UUID) {
-        guard documents[id] == nil, let ref = notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id }) else { return }
-        open(ref.url, id: id)
+        guard documents[id] == nil, !loadingNotes.contains(id),
+            let ref = notes.first(where: { $0.id == id }) ?? templates.first(where: { $0.id == id })
+        else { return }
+        let size = (try? ref.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard size > Self.backgroundOpenBytes else {
+            open(ref.url, id: id)
+            return
+        }
+        loadingNotes.insert(id)
+        let url = ref.url
+        Task {
+            let loaded = await Task.detached(priority: .userInitiated) { () -> (Data, NoteFile)? in
+                guard let data = try? Data(contentsOf: url), let file = try? NoteFile.decode(data) else { return nil }
+                return (data, file)
+            }.value
+            loadingNotes.remove(id)
+            // Closed or opened otherwise meanwhile: nothing to do.
+            guard documents[id] == nil, isVisible(id) || tabs.contains(id) else { return }
+            if let (data, file) = loaded {
+                adopt(file, data: data, url: url, id: id)
+            } else {
+                open(url, id: id)  // reports the damage the usual way
+            }
+        }
     }
+
+    /// Above this size a note opens in the background (#388).
+    static let backgroundOpenBytes = 8 << 20
 
     func document(for id: UUID?) -> NoteDocument? { id.flatMap { documents[$0] } }
 

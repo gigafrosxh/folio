@@ -114,54 +114,58 @@ public enum DatabaseClient {
                         process.standardOutput = stdout
                         process.standardError = stderr
                         try process.run()
-                        let deadline = Date().addingTimeInterval(timeout.isFinite ? max(0, timeout) : 30)
-                        let limit = maxOutputBytes
-                        var tooLarge = false
-                        func written() -> Int {
-                            ((try? FileManager.default.attributesOfItem(atPath: urls[1].path))?[.size] as? NSNumber)?.intValue ?? 0
-                        }
-                        while process.isRunning && Date() < deadline {
-                            Thread.sleep(forTimeInterval: 0.01)
-                            if written() > limit {
-                                tooLarge = true
-                                break
-                            }
-                        }
-                        // Also when the client finished between two checks.
-                        if !process.isRunning, written() > limit { tooLarge = true }
-                        if tooLarge {
-                            ServerDetector.terminateTree(process.processIdentifier)
-                            process.waitUntilExit()
-                            throw DatabaseError.outputTooLarge(limit >> 20)
-                        }
-                        if process.isRunning {
-                            ServerDetector.terminateTree(process.processIdentifier)
-                            process.waitUntilExit()
-                            throw DatabaseError.timeout
-                        }
-                        process.waitUntilExit()
+                        try waitBounded(process, output: urls[1], timeout: timeout)
                         let error = try String(contentsOf: urls[2], encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
                         let output = try String(contentsOf: urls[1], encoding: .utf8)
-                        let diagnostics = sqlcmd ? [output.trimmingCharacters(in: .whitespacesAndNewlines), error].filter { !$0.isEmpty }.joined(separator: "\n") : error
-                        let lower = diagnostics.lowercased()
-                        let connectionError = [
-                            "could not connect", "connection refused", "access denied", "unable to open database",
-                            "can't connect", "connection to server", "password authentication failed", "unknown database",
-                            "could not translate host", "login failed", "login timeout expired", "tcp provider",
-                            "unable to complete login"
-                        ].contains { lower.contains($0) }
-                        if process.terminationStatus != 0 || error.lowercased().contains("error") || (!sqlcmd && connectionError) {
-                            // A tool may repeat its connection string; the password never reaches the note or the screen (#161).
-                            let message =
-                                diagnostics.isEmpty
-                                ? "Die Abfrage ist fehlgeschlagen (\(process.terminationStatus))."
-                                : SecretRedaction.redact(diagnostics, secrets: SecretRedaction.secrets(in: environment))
-                            throw connectionError ? DatabaseError.connectionFailed(message) : DatabaseError.queryFailed(message)
-                        }
+                        try checkFailure(process, output: output, error: error, environment: environment, sqlcmd: sqlcmd)
                         continuation.resume(returning: output)
                     } catch { continuation.resume(throwing: error) }
                 }
             }
+        }
+
+        /// Waits for the client within the time limit; stops it when it writes more than `maxOutputBytes` (#383).
+        private static func waitBounded(_ process: Process, output: URL, timeout: TimeInterval) throws {
+            let deadline = Date().addingTimeInterval(timeout.isFinite ? max(0, timeout) : 30)
+            let limit = maxOutputBytes
+            func written() -> Int { ((try? FileManager.default.attributesOfItem(atPath: output.path))?[.size] as? NSNumber)?.intValue ?? 0 }
+            var tooLarge = false
+            while process.isRunning && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.01)
+                if written() > limit {
+                    tooLarge = true
+                    break
+                }
+            }
+            // Also when the client finished between two checks.
+            if !process.isRunning, written() > limit { tooLarge = true }
+            if tooLarge || process.isRunning {
+                ServerDetector.terminateTree(process.processIdentifier)
+                process.waitUntilExit()
+                throw tooLarge ? DatabaseError.outputTooLarge(limit >> 20) : DatabaseError.timeout
+            }
+            process.waitUntilExit()
+        }
+
+        static let connectionErrors = [
+            "could not connect", "connection refused", "access denied", "unable to open database",
+            "can't connect", "connection to server", "password authentication failed", "unknown database",
+            "could not translate host", "login failed", "login timeout expired", "tcp provider",
+            "unable to complete login"
+        ]
+
+        /// Turns a failed run into an error; a tool may repeat its connection string, the password never reaches the
+        /// note or the screen (#161).
+        private static func checkFailure(_ process: Process, output: String, error: String, environment: [String: String], sqlcmd: Bool) throws {
+            let diagnostics = sqlcmd ? [output.trimmingCharacters(in: .whitespacesAndNewlines), error].filter { !$0.isEmpty }.joined(separator: "\n") : error
+            let lower = diagnostics.lowercased()
+            let connectionError = connectionErrors.contains { lower.contains($0) }
+            guard process.terminationStatus != 0 || error.lowercased().contains("error") || (!sqlcmd && connectionError) else { return }
+            let message =
+                diagnostics.isEmpty
+                ? "Die Abfrage ist fehlgeschlagen (\(process.terminationStatus))."
+                : SecretRedaction.redact(diagnostics, secrets: SecretRedaction.secrets(in: environment))
+            throw connectionError ? DatabaseError.connectionFailed(message) : DatabaseError.queryFailed(message)
         }
 
         public static func testConnection(

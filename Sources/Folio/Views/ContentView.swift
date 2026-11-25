@@ -207,6 +207,9 @@ struct ContentView: View {
                 // A reloaded note (restored version, external change) is a new document with the same id.
                 .id(ObjectIdentifier(doc))
                 .transition(Motion.enabled ? .opacity.combined(with: .offset(y: 8)) : .identity)
+        } else if let id, store.loadingNotes.contains(id) {
+            // A large note is still being read (#388).
+            ProgressView("Notiz wird geöffnet …").frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !isSplit {
             emptyState
         }

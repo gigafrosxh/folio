@@ -67,6 +67,45 @@ enum WebResources {
     }
 }
 
+// MARK: - Picture cache and start-up queue (#390)
+
+/// Pictures of finished previews: a note opened again shows formulas and diagrams without starting a web view.
+@MainActor
+final class RenderImageCache {
+    static let shared = RenderImageCache()
+    private var items: [String: (image: NSImage, height: CGFloat)] = [:]
+    private var order: [String] = []
+    private let limit = 300
+
+    static func key(kind: RenderScript.Kind, source: String, options: RenderScript.Options) -> String {
+        "\(kind)|\(options.dark)|\(options.fontSize)|\(source)"
+    }
+
+    func image(for key: String) -> (image: NSImage, height: CGFloat)? { items[key] }
+
+    func store(_ key: String, image: NSImage, height: CGFloat) {
+        if items[key] == nil { order.append(key) }
+        items[key] = (image, height)
+        while order.count > limit { items[order.removeFirst()] = nil }
+    }
+}
+
+/// Web views for previews start one after another, so a note with many formulas shows its text at once (#390).
+@MainActor
+final class RenderStartQueue {
+    static let shared = RenderStartQueue()
+    private var next = Date.distantPast
+
+    /// Waits for this preview's turn: one start every 30 ms.
+    func turn() async {
+        let now = Date()
+        let at = max(now, next)
+        next = at.addingTimeInterval(0.03)
+        let wait = at.timeIntervalSince(now)
+        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+    }
+}
+
 // MARK: - Live preview
 
 /// Renders a formula or diagram in a transparent web view and reports the result (size, error, SVG).
@@ -74,6 +113,8 @@ struct RenderPreview: NSViewRepresentable {
     var kind: RenderScript.Kind
     var source: String
     var options: RenderScript.Options
+    /// Where a finished picture of the preview is kept, so the next opening shows it without a web view (#390).
+    var cacheKey: String? = nil
     var onResult: (RenderScript.Result) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -90,6 +131,7 @@ struct RenderPreview: NSViewRepresentable {
 
     func updateNSView(_ web: WKWebView, context: Context) {
         context.coordinator.onResult = onResult
+        context.coordinator.cacheKey = cacheKey
         context.coordinator.request(RenderScript.call(kind, source: source, options: options))
     }
 
@@ -100,6 +142,7 @@ struct RenderPreview: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler {
         weak var web: WKWebView?
         var onResult: ((RenderScript.Result) -> Void)?
+        var cacheKey: String?
         private var ready = false
         private var pending: String?
         private var lastCall: String?
@@ -135,6 +178,18 @@ struct RenderPreview: NSViewRepresentable {
                 return
             }
             onResult?(result)
+            if result.ok, let key = cacheKey { remember(result, as: key) }
+        }
+
+        /// A picture of the finished preview, once it is laid out (#390).
+        private func remember(_ result: RenderScript.Result, as key: String) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                guard let web = self?.web, self?.cacheKey == key, web.bounds.height > 1 else { return }
+                web.takeSnapshot(with: nil) { image, _ in
+                    guard let image else { return }
+                    MainActor.assumeIsolated { RenderImageCache.shared.store(key, image: image, height: CGFloat(result.pageHeight)) }
+                }
+            }
         }
     }
 }
@@ -310,8 +365,12 @@ struct RenderedBlockView: View {
     @State private var previewHeight: CGFloat = 60
     @State private var message: String?
     @FocusState private var editorFocused: Bool
+    /// The web view may start (its turn in `RenderStartQueue`) (#390).
+    @State private var mayStart = false
 
     private var isMath: Bool { kind == .math }
+    private var renderOptions: RenderScript.Options { RenderScript.Options(dark: colorScheme == .dark, fontSize: isMath ? 20 : 14) }
+    private var cacheKey: String { RenderImageCache.key(kind: kind, source: source, options: renderOptions) }
 
     var body: some View {
         EmbedCard(
@@ -373,24 +432,39 @@ struct RenderedBlockView: View {
             }
     }
 
+    /// A cached picture while not editing; otherwise the live web view, started in turn (#390).
+    @ViewBuilder private var livePreview: some View {
+        if !editing, let cached = RenderImageCache.shared.image(for: cacheKey) {
+            Image(nsImage: cached.image)
+                .frame(height: max(cached.height, 30))
+                .frame(maxWidth: .infinity)
+        } else if mayStart || editing {
+            RenderPreview(kind: kind, source: source, options: renderOptions, cacheKey: cacheKey) { r in
+                result = r
+                if r.ok { previewHeight = max(CGFloat(r.pageHeight), 30) }
+            }
+            .frame(height: previewHeight)
+        } else {
+            Color.clear.frame(height: previewHeight)
+                .task {
+                    await RenderStartQueue.shared.turn()
+                    mayStart = true
+                }
+        }
+    }
+
     private var preview: some View {
-        RenderPreview(
-            kind: kind, source: source,
-            options: RenderScript.Options(dark: colorScheme == .dark, fontSize: isMath ? 20 : 14)
-        ) { r in
-            result = r
-            if r.ok { previewHeight = max(CGFloat(r.pageHeight), 30) }
-        }
-        .frame(height: previewHeight)
-        .frame(maxWidth: .infinity)
-        .opacity(result?.ok == false ? 0.35 : 1)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            editing = true
-            editorFocused = true
-        }
-        .help(editing ? "" : "Doppelklick zum Bearbeiten")
-        .padding(.vertical, 4)
+        livePreview
+            .frame(height: max(previewHeight, RenderImageCache.shared.image(for: cacheKey)?.height ?? 0))
+            .frame(maxWidth: .infinity)
+            .opacity(result?.ok == false ? 0.35 : 1)
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                editing = true
+                editorFocused = true
+            }
+            .help(editing ? "" : "Doppelklick zum Bearbeiten")
+            .padding(.vertical, 4)
     }
 
     @ViewBuilder

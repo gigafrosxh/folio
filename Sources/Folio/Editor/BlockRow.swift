@@ -79,7 +79,7 @@ struct BlockRow: View {
                     selection: { [doc, id = block.id] in doc.revealSelection(in: id, range: $0) })
             )
             .frame(height: height)
-            .onAppear { DispatchQueue.main.async { doc.applyFolds() } }
+            .onAppear { DispatchQueue.main.async { [id = block.id] in doc.applyFolds(blockID: id) } }
         case .code:
             CodeBlockView(block: block, doc: doc)
         case .pdf:

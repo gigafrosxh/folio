@@ -88,6 +88,10 @@ final class SecurityHardeningTests: XCTestCase {
             XCTAssertThrowsError(try LibraryBackup.check([.init(size: 1, path: "/etc/x")], freeSpace: 1 << 30))
             XCTAssertThrowsError(try LibraryBackup.check([.init(size: 2 << 30, path: "big")], freeSpace: 1 << 30), "größer als der freie Platz")
             XCTAssertThrowsError(try LibraryBackup.check([.init(size: .max, path: "a"), .init(size: .max, path: "b")], freeSpace: .max))
+            // #374: a sum that wraps around to a small value is still refused.
+            XCTAssertThrowsError(try LibraryBackup.check([.init(size: .max, path: "a"), .init(size: 2, path: "b")], freeSpace: .max))
+            XCTAssertNoThrow(try LibraryBackup.check([.init(size: 600, path: "a"), .init(size: 400, path: "b")], freeSpace: 1000))
+            XCTAssertThrowsError(try LibraryBackup.check([.init(size: 600, path: "a"), .init(size: 401, path: "b")], freeSpace: 1000))
             XCTAssertThrowsError(try LibraryBackup.check(Array(repeating: .init(size: 0, path: "a"), count: LibraryBackup.maxEntries + 1), freeSpace: .max))
             // A real archive: its table of contents is read, a link out of it is dropped, a broken file refused.
             let src = dir.appendingPathComponent("src")

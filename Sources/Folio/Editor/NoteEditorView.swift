@@ -21,6 +21,12 @@ struct NoteEditorView: View {
     @State private var scrolled = false
     /// Width of the editor header and a counter that redraws it once the variants are measured (#388).
     @State private var headerWidth: CGFloat = 0
+    /// Long notes are built in steps: the first blocks show at once, the rest follow frame by frame (#389).
+    @State private var shownBlocks = Int.max
+    /// The note `shownBlocks` belongs to; another note starts with the first batch right in its first frame.
+    @State private var shownBlocksNote: UUID?
+    static let firstBlocks = 60
+    static let blocksPerStep = 120
     @State private var headerMeasured = 0
     /// Natural widths of the header variants 0–5, measured once per session (#388).
     private static var headerWidths: [Int: CGFloat] = [:]
@@ -134,18 +140,41 @@ struct NoteEditorView: View {
                 .padding(.leading, BlockRow.gutter)
             tagRow
             let hidden = doc.foldRevision >= 0 ? doc.hiddenBlockIDs : []
-            ForEach(doc.blocks.filter { !hidden.contains($0.id) }) { block in
+            ForEach(doc.blocks.filter { !hidden.contains($0.id) }.prefix(blockLimit)) { block in
                 BlockRow(block: block, doc: doc, isFirst: block.id == doc.blocks.first?.id, actions: actions)
                     .transition(Motion.blockTransition)
                 if let note = foldNote(after: block) { note }
             }
             BacklinksView(noteID: doc.id)
                 .padding(.top, 8)
+                .task(id: doc.id) { await showBlocksInSteps() }
             Color.clear
                 .frame(height: 220)
                 .contentShape(Rectangle())
                 .onTapGesture { focusEnd() }
         }
+    }
+
+    /// A note with many blocks: the first ones at once, then the rest in steps, so opening shows text right away
+    /// instead of building hundreds of text views before the first frame (#389). Short notes are built in one go.
+    private var blockLimit: Int {
+        if shownBlocksNote == doc.id { return shownBlocks }
+        return doc.blocks.count > Self.firstBlocks ? Self.firstBlocks : .max
+    }
+
+    private func showBlocksInSteps() async {
+        shownBlocksNote = doc.id
+        guard doc.blocks.count > Self.firstBlocks else {
+            shownBlocks = .max
+            return
+        }
+        shownBlocks = Self.firstBlocks
+        while shownBlocks < doc.blocks.count {
+            try? await Task.sleep(for: .milliseconds(16))
+            if Task.isCancelled { return }
+            shownBlocks += Self.blocksPerStep
+        }
+        shownBlocks = .max
     }
 
     /// „… (3 Absätze, 1 Bild)“ under the last visible part of a collapsed section; a click expands it (#205).

@@ -7,6 +7,18 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Verbessert (Geschwindigkeit)
+- **Lange Notizen** (#389): Notizen mit vielen Blöcken zeigen die ersten 60 sofort und bauen den Rest Bild für Bild auf; Falten und die Registrierung der Textblöcke laufen nicht mehr in quadratischer Zeit, Textblöcke senden keine unnötigen Größenmeldungen mehr, und die KI-Verfügbarkeit wird nicht mehr pro Block abgefragt. Eine Notiz mit 1000 Absätzen öffnet in 0,16 statt 2,5 Sekunden.
+- **Formeln und Diagramme** (#390): Fertige Vorschauen werden als Bild zwischengespeichert, beim erneuten Öffnen ohne Web-Ansicht gezeigt, und neue Web-Ansichten starten nacheinander. Eine Notiz mit 20 Formeln und Diagrammen öffnet in 0,25 statt 1,8 Sekunden.
+- **Große Anhänge** (#388): Notizen über 8 MB werden im Hintergrund gelesen und entpackt; währenddessen zeigt Folio „Notiz wird geöffnet …“, statt zu blockieren.
+- **Rust?** (#391): Messung und Entscheidung in `docs/RUST.md` – das Einlesen der Notiz macht unter 2 % der Öffnungszeit aus, die Zeit lag in der Oberfläche; ein Rust-Kern brächte deshalb keinen messbaren Gewinn.
+
+### Sicherheit
+- **ZIP-Sicherungen** (#374): Die Größenprüfung erkennt einen Überlauf der Summe und bricht beim Überschreiten der Grenze sofort ab.
+
+### Neu für Entwickler
+- `FOLIO_SWITCH_BENCH=synthetic` misst das Öffnen großer Notizen (1000 Blöcke, 20 Formeln/Diagramme, 50-MB-Anhang).
+
 ## [1.11.26] – 2026-11-23
 
 ### Behoben

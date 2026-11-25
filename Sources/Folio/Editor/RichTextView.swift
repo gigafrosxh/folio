@@ -517,6 +517,9 @@ struct RichTextView: NSViewRepresentable {
         tv.isEditable = true
         tv.isSelectable = true
         tv.drawsBackground = false
+        // Nothing listens to a block's frame changes; posting them cost most of the layout time when a long note
+        // opened with many text views (#389).
+        tv.postsFrameChangedNotifications = false
         tv.isVerticallyResizable = false
         tv.isHorizontallyResizable = false
         tv.textContainerInset = NSSize(width: 0, height: 2)

@@ -91,9 +91,14 @@ final class FormattingController: ObservableObject {
     private var theme: ThemeManager { .shared }
 
     func register(_ tv: FolioTextView, for id: UUID) {
-        registry = registry.filter { $0.value.view != nil }
+        // Gone views are dropped now and then, not on every registration: a note with many blocks registered them in
+        // quadratic time (#389).
+        registrations += 1
+        if registrations % 256 == 0 { registry = registry.filter { $0.value.view != nil } }
         registry[id] = WeakTextView(tv)
     }
+
+    private var registrations = 0
 
     func textView(for id: UUID) -> FolioTextView? { registry[id]?.view }
 

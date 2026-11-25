@@ -218,9 +218,19 @@ public enum LibraryBackup {
             if let bad = entries.first(where: { $0.path.hasPrefix("/") || $0.path.split(separator: "/").contains("..") }) {
                 throw BackupError.unsafeArchive("„\(bad.path)“ liegt außerhalb des Sicherungsordners.")
             }
-            let total = entries.reduce(UInt64(0)) { $0.addingReportingOverflow($1.size).partialValue }
-            guard total <= min(maxUnpacked, freeSpace) else {
-                throw BackupError.unsafeArchive("sie würde \(ByteCountFormatter.string(fromByteCount: Int64(clamping: total), countStyle: .file)) belegen.")
+            // Summed with the limit checked at every step: an overflow or a sum past the limit stops at once (#374).
+            let limit = min(maxUnpacked, freeSpace)
+            var total: UInt64 = 0
+            for entry in entries {
+                let (sum, overflow) = total.addingReportingOverflow(entry.size)
+                guard !overflow, sum <= limit else {
+                    let shown =
+                        overflow
+                        ? "mehr als \(ByteCountFormatter.string(fromByteCount: Int64(clamping: limit), countStyle: .file))"
+                        : ByteCountFormatter.string(fromByteCount: Int64(clamping: sum), countStyle: .file)
+                    throw BackupError.unsafeArchive("sie würde \(shown) belegen.")
+                }
+                total = sum
             }
         }
 

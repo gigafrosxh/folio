@@ -135,9 +135,11 @@ extension NoteDocument {
         }
     }
 
-    /// Puts the hidden ranges into every open text view of this note.
-    func applyFolds() {
-        for b in blocks where b.kind == .text {
+    /// Puts the hidden ranges into every open text view of this note; with `blockID` only into that block's views
+    /// (a block that just appeared – doing all blocks there made opening long notes quadratic, #389).
+    func applyFolds(blockID: UUID? = nil) {
+        if blockID != nil, collapsedHeadings.isEmpty { return }
+        for b in blocks where b.kind == .text && (blockID == nil || b.id == blockID) {
             // Every view of the block: the note may be open in the main window and in a window of its own (#351).
             let views = b.storage.layoutManagers.compactMap { $0.firstTextView as? FolioTextView }
             guard !views.isEmpty else { continue }

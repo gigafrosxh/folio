@@ -5,7 +5,7 @@
   "Sources/Folio/App/FolioCommands.swift|FolioCommands.body" : 35,
   "Sources/Folio/Code/CodeBlockView.swift|CodeBlockView.body" : 24,
   "Sources/Folio/Code/CodeBlockView.swift|CodeBlockView.connectionMenu(compact:)" : 19,
-  "Sources/Folio/Code/CodeBlockView.swift|CodeBlockView.outputView(_:)" : 34,
+  "Sources/Folio/Code/CodeBlockView.swift|CodeBlockView.outputView(_:)" : 22,
   "Sources/Folio/Code/CodeBlockView.swift|CodeBlockView.testPanel" : 35,
   "Sources/Folio/Code/TerminalPanel.swift|TerminalPanel.body" : 21,
   "Sources/Folio/Editor/FindBar.swift|FindBar.body" : 29,
@@ -31,8 +31,7 @@
   "Sources/Folio/Views/ShortcutSettingsView.swift|ShortcutSettingsView.shortcutRow(_:)" : 22,
   "Sources/Folio/Views/SidebarView.swift|SidebarView.body" : 25,
   "Sources/Folio/Views/UpdateView.swift|UpdateView.body" : 18,
-  "Sources/FolioCore/DatabaseClient.swift|DatabaseClient.execute(_:arguments:input:environment:timeout:sqlcmd:)" : 32,
-  "Sources/FolioCore/MarkdownStructure.swift|MarkdownStructure.pieces(_:)" : 37,
+  "Sources/FolioCore/MarkdownStructure.swift|MarkdownStructure.pieces(_:)" : 36,
   "Sources/FolioWidgetUI/WidgetViews.swift|ChecklistWidgetView.content(_:)" : 19,
   "Sources/FolioWidgetUI/WidgetViews.swift|NoteListWidgetView.row(_:)" : 16,
   "Sources/FolioWidgetUI/WidgetViews.swift|NoteOfTheDayWidgetView.body" : 43

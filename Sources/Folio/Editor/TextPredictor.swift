@@ -12,7 +12,18 @@ enum TextPredictor {
         case unavailable(String)
     }
 
+    /// Every text view asks when it is set up; the system's answer is kept for a few seconds, so a note with many
+    /// blocks does not query the language model a thousand times (#389).
+    private static var cachedStatus: (value: Status, at: Date)?
+
     static var status: Status {
+        if let cachedStatus, Date().timeIntervalSince(cachedStatus.at) < 5 { return cachedStatus.value }
+        let value = uncachedStatus
+        cachedStatus = (value, Date())
+        return value
+    }
+
+    private static var uncachedStatus: Status {
         #if canImport(FoundationModels)
             if #available(macOS 26.0, *) {
                 switch SystemLanguageModel.default.availability {
