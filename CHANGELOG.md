@@ -7,6 +7,14 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+### Behoben
+- **Sicherung wiederherstellen** (#375): Vor dem Wiederherstellen läuft dieselbe Prüfung wie bei „Sicherung prüfen“; eine beschädigte oder unvollständige Sicherung wird mit klarer Meldung abgelehnt, und es bleibt nichts in der Bibliothek zurück.
+- **MySQL** (#377): Liefert die letzte Abfrage keine Zeilen, zeigt Folio „Keine Zeilen.“ statt des Ergebnisses einer früheren Abfrage.
+- **Obsidian-Import** (#379): Inline-Code mit mehreren Backticks (z. B. ``` ``a ` b`` ```) wird erkannt; Links darin bleiben unverändert.
+
+### Neu für Entwickler
+- Die Komplexitätsprüfung im Release misst wieder den exportierten Code (seit 1.11.7 fand sie dort keine Dateien und war immer grün); eine Messung ohne Dateien schlägt jetzt fehl.
+
 ## [1.11.27] – 2026-11-25
 
 ### Verbessert (Geschwindigkeit)
