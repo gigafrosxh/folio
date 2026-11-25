@@ -7,6 +7,8 @@ Neue Einträge kommen unter **Unreleased**; `scripts/release.sh` macht daraus be
 
 ## [Unreleased]
 
+## [1.11.28] – 2026-11-25
+
 ### Behoben
 - **Sicherung wiederherstellen** (#375): Vor dem Wiederherstellen läuft dieselbe Prüfung wie bei „Sicherung prüfen“; eine beschädigte oder unvollständige Sicherung wird mit klarer Meldung abgelehnt, und es bleibt nichts in der Bibliothek zurück.
 - **MySQL** (#377): Liefert die letzte Abfrage keine Zeilen, zeigt Folio „Keine Zeilen.“ statt des Ergebnisses einer früheren Abfrage.
